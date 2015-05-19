@@ -16,3 +16,4 @@ The Zen of Python
     Readability counts.
     Errors should never pass silently.
 ```
+Please start by reading some practical examples of [the Julia style.](http://julia.readthedocs.org/en/latest/manual/style-guide/)
