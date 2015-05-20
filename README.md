@@ -1,5 +1,7 @@
 # JuliaFEM 
-[![Build Status](https://api.travis-ci.org/ovainola/JuliaFEM.svg?branch=master)](https://travis-ci.org/ovainola/JuliaFEM)
+Build Status: [![Build Status](https://api.travis-ci.org/ovainola/JuliaFEM.svg?branch=master)](https://travis-ci.org/ovainola/JuliaFEM)
+
+Code Coverage: [![Coverage Status](https://coveralls.io/repos/ovainola/JuliaFEM.svg?branch=master)](https://coveralls.io/r/ovainola/JuliaFEM?branch=master)
 
 The JuliaFEM project develops open-source software for reliable, scalable, distributed Finite Element Methdod.
 
