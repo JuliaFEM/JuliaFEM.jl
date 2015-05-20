@@ -4,3 +4,5 @@ julia:
   - nightly
 notifications:
     email: false
+after_success:
+- julia -e 'cd(Pkg.dir("JuliaFem")); Pkg.add("Coverage"); using Coverage; >Coveralls.submit(Coveralls.process_folder())'
