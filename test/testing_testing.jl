@@ -1,5 +1,6 @@
 # This file is a part of JuliaFEM. License is MIT: https://github.com/ovainola/JuliaFEM/blob/master/README.md
 
+using JuliaFEM
 using Base.Test
 
 @test 1 == 1
