@@ -2,8 +2,8 @@ language: julia
 julia:
   - release
   - nightly
-notifications:
-    email: false
+#notifications:
+#    email: false
 #script:
 #  - julia -e 'Pkg.clone(pwd())'
 #  - julia -e 'Pkg.build("$name")'
