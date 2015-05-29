@@ -24,3 +24,6 @@ FEATURES / TODO
     - Mortar
 - Modular design
   - E.g. contact formulation can be altered by user
+- Mesh and results format, Xdmf?
+- No scalars but field variables, e.g. no constant 210GPa for steel, we interpolate variable from nodes.
+  - (Constant is a special case of field variable).
