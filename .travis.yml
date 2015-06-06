@@ -11,5 +11,5 @@ script:
   - julia -e 'Pkg.init(); Pkg.clone(pwd()); Pkg.build("JuliaFEM"); Pkg.test("JuliaFEM"; coverage=true)'
   - julia --code-coverage test/runtests.jl
 after_success:
- - julia -e 'cd(Pkg.dir("JuliaFEM")); run(`ls -al src test`); Pkg.add("Coverage"); using Coverage; println((Coveralls.process_folder()); Coveralls.submit(Coveralls.process_folder())'
+ - julia -e 'cd(Pkg.dir("JuliaFEM")); run(`ls -al src test`); Pkg.add("Coverage"); using Coverage; a = Coveralls.process_folder(); println(a); Coveralls.submit(Coveralls.process_folder())'
 
