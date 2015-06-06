@@ -1,6 +1,8 @@
 module JuliaFEM
 
 # package code goes here
-test = 1
+function test()
+    return 1
+end
 
 end # module
