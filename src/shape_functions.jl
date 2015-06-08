@@ -4,6 +4,7 @@ end
 
 
 function C2D4(xx)
+     θ = 1
      chi = xx[1]
      eta = xx[2]
      return = [(1 - chi) * (1 - eta),
