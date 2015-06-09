@@ -9,7 +9,6 @@ notifications:
 script:
   - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
   - julia -e 'Pkg.init(); Pkg.clone(pwd()); Pkg.build("JuliaFEM"); Pkg.test("JuliaFEM"; coverage=true)'
-  - julia --code-coverage test/runtests.jl
 after_success:
- - julia -e 'cd(Pkg.dir("JuliaFEM")); run(`ls -al src test`); Pkg.add("Coverage"); using Coverage; a = Coveralls.process_folder(); println(a); Coveralls.submit(Coveralls.process_folder())'
+ - julia -e 'cd(Pkg.dir("JuliaFEM")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
 
