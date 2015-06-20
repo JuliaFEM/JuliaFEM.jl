@@ -1,7 +1,7 @@
 using JuliaFEM
 using Base.Test
 using Logging
-Logging.configure(level=DEBUG)
+@Logging.configure(level=DEBUG)
 
 function test_create_model()
     m = new_model()
@@ -82,8 +82,8 @@ function test_print()
     close(fil)
   end
   #@test lines_with_print == Dict()
-  debug("number of lines with print = ", length(lines_with_print))
-  debug(lines_with_print)
+  @debug("number of lines with print = ", length(lines_with_print))
+  @debug(lines_with_print)
   @test length(lines_with_print) == 0
 end
 test_print()
@@ -101,7 +101,7 @@ function test_add_element()
     el2 = Dict("element_type" => 0x6, "node_ids" => [4, 3, 2, 1])
     elements = Dict(1 => el1, 2 => el2)
     add_elements(m, elements)
-    debug(m)
+    @debug(m)
     @test m.elements["element_type"][1] == 0x6
     @test m.elements["connectivity"][1] == [1, 2, 3, 4]
 end
