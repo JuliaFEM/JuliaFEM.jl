@@ -5,19 +5,21 @@ using Base.Test
 function test_create_model()
     m = new_model()
     fn = fieldnames(m)
-    @assert :model in fn
-    @assert :nodes in fn
-    @assert :elements in fn
-    @assert :element_nodes in fn
-    @assert :element_gauss_points in fn
+    @test :model in fn
+    @test :nodes in fn
+    @test :elements in fn
+    @test :element_nodes in fn
+    @test :element_gauss_points in fn
 end
+test_create_model()
 
 
 function test_add_field()
     m = new_model()
     field = new_field(m.elements, "color")
-    @assert "color" in keys(m.elements)
+    @test "color" in keys(m.elements)
 end
+test_add_field()
 
 
 function test_get_field()
@@ -25,8 +27,9 @@ function test_get_field()
     field = new_field(m.elements, "color")
     field[1] = "red"  # set element 1 field value to "red"
     field2 = get_field(m.elements, "color") # get color field
-    @assert field2[1] == "red"
+    @test field2[1] == "red"
 end
+test_get_field()
 
 
 function test_get_field_if_it_doesnt_exist()
@@ -36,8 +39,9 @@ function test_get_field_if_it_doesnt_exist()
     field = get_field(m.elements, "temperature"; create_if_doesnt_exist=true)
     field[1] = 173
     field2 = get_field(m.elements, "temperature")
-    @assert field2[1] == 173
+    @test field2[1] == 173
 end
+test_get_field_if_it_doesnt_exist()
 
 
 function test_add_and_get_nodes()
@@ -48,10 +52,12 @@ function test_add_and_get_nodes()
                  4 => [0.0, 0.0, 1.0])
     add_nodes(m, nodes)
     subset = get_nodes(m, [2, 3])
-    @assert length(subset) == 2
-    @assert subset[2] == [1.0, 0.0, 0.0]
-    @assert subset[3] == [0.0, 1.0, 0.0]
+    @test length(subset) == 2
+    @test subset[2] == [1.0, 0.0, 0.0]
+    @test subset[3] == [0.0, 1.0, 0.0]
 end
+test_add_and_get_nodes()
+
 
 # write your own tests here
 # @test 1 == JuliaFEM.test()
