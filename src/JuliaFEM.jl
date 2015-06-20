@@ -71,5 +71,50 @@ function get_field(field_type, field_name; create_if_doesnt_exist=false)
 end
 
 
+function add_nodes(model, nodes)
+    """Add new nodes to model.
+
+    Parameters
+    ----------
+    nodes : Dict()
+        id => coords
+
+    Returns
+    -------
+    model
+
+    Notes
+    -----
+    Create new field "coords" to model if not found
+    """
+
+    println("Adding ", length(nodes), " nodes to model")
+    field = get_field(model.nodes, "coords"; create_if_doesnt_exist=true)
+    for (node_id, coords) in nodes
+        field[node_id] = coords
+    end
+end
+
+
+function get_nodes(model, node_ids)
+    """Return subset of nodes from model.
+
+    Parameters
+    ----------
+    node_ids : array
+        list of node ids to return
+
+    Returns
+    -------
+    Dict()
+        id => coords
+    """
+    subset = Dict()
+    for node_id in node_ids
+        subset[node_id] = model.nodes["coords"][node_id]
+    end
+    return subset
+end
+
 
 end # module
