@@ -58,6 +58,21 @@ function test_add_and_get_nodes()
 end
 test_add_and_get_nodes()
 
+function test_print()
+  lines_with_print = Dict()
+  src = readdir("src")
+  for file_name in src
+    fil = open(joinpath("src",file_name),"r")
+    for line in readlines(fil)
+      if ismatch(r"print",line)
+        lines_with_print[file_name] = "print"
+      end
+    end
+    close(fil)
+  end
+  @test lines_with_print == Dict()
+end
+test_print()
 
 # write your own tests here
 # @test 1 == JuliaFEM.test()
