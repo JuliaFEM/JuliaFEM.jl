@@ -142,4 +142,62 @@ function get_nodes(model, node_ids)
 end
 
 
+
+
+@doc """Add new elements to model.
+Parameters
+----------
+list of dicts, dict = {element_type => elcode, elids => [node ids..]}
+
+Examples
+--------
+Create two tet4 element and add them:
+
+>>> m = new_model()
+>>> const TET4 = 0x6
+>>> el1 = Dict("element_type" => TET4, "node_ids" => [1, 2, 3, 4])
+>>> el2 = Dict("element_type" => TET4, "node_ids" => [4, 3, 2, 1])
+
+In dict key means element id
+
+>>> elements = Dict(1 => el1, 2 => el2)
+>>> add_elements(m, elements)
+
+""" ->
+function add_elements(model, elements)
+    elfield = get_field(model.elements, "connectivity"; create_if_doesnt_exist=true)
+    eltyfield = get_field(model.elements, "element_type"; create_if_doesnt_exist=true)
+    for (elid, element) in elements
+        println("Adding element ", elid)
+        elfield[elid] = element["node_ids"]
+        eltyfield[elid] = element["element_type"]
+    end
+end
+
+
+
+
+@doc """Get subset of elements from model.
+Parameters
+----------
+element_ids : list of ints
+    Element id numbers
+
+Returns
+-------
+Dict
+{element_type = XXX, node_ids = [a, b, c, d, e, ..., n]}
+""" ->
+function get_elements(model, element_ids)
+    eltyfield = get_field(model.elements, "element_type")
+    elfield = get_field(model.elements, "connectivity")
+    ret = Dict()
+    for i in element_ids
+        ret[i] = Dict("element_type" => eltyfield[i], "node_ids" => elfield[i])
+    end
+    return ret
+end
+
+
+
 end # module
