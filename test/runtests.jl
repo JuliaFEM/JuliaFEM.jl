@@ -66,7 +66,7 @@ function test_print()
   src_dir = "/home/travis/build/ovainola/JuliaFEM/src"
   src = readdir(src_dir)
   for file_name in src
-    fil = open(joinpath("src",file_name),"r")
+    fil = open(joinpath(src_dir,file_name),"r")
     for line in readlines(fil)
       if ismatch(r"print",line)
         lines_with_print[file_name] = "print"
