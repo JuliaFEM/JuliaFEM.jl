@@ -63,7 +63,7 @@ test_add_and_get_nodes()
 function test_print()
   lines_with_print = Dict()
   #src = readdir("/src")
-  src_dir = "/home/travis/build/ovainola/JuliaFEM"
+  src_dir = "/home/travis/build/ovainola/JuliaFEM/src"
   src = readdir(src_dir)
   for file_name in src
     fil = open(joinpath("src",file_name),"r")
