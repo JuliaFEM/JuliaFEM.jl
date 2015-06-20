@@ -74,7 +74,8 @@ function test_print()
     end
     close(fil)
   end
-  @test lines_with_print == Dict()
+  #@test lines_with_print == Dict()
+  @test length(lines_with_print) == 0
 end
 test_print()
 
