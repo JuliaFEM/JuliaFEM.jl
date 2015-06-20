@@ -1,6 +1,8 @@
 # This file is a part of JuliaFEM. License is MIT: https://github.com/ovainola/JuliaFEM/blob/master/README.md
 module JuliaFEM
 
+export Model, new_model
+
 type Model
     model  # For global variables
     nodes  # For nodes
