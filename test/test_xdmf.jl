@@ -2,7 +2,7 @@ using JuliaFEM
 using Base.Test
 
 
-function test_write_to_xdfm()
+function test_write_to_xdmf()
     m = new_model()
     nodes = Dict(1 => [0.0, 0.0, 0.0],
                  2 => [1.0, 0.0, 0.0],
@@ -30,4 +30,4 @@ function test_write_to_xdfm()
     @test d[123]["temperature"][:] = [0.1, 0.2, 0.3]
 
 end
-test_write_to_xdfm()
+test_write_to_xdmf()
