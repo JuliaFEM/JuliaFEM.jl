@@ -43,6 +43,11 @@ function test_get_field_if_it_doesnt_exist()
 end
 test_get_field_if_it_doesnt_exist()
 
+function test_get_field_throw_exception()
+    m = new_model()
+    @test_throws ASCIIString get_field(m.elements, "temperature")
+end
+test_get_field_throw_exception()
 
 function test_add_and_get_nodes()
     m = new_model()
@@ -63,7 +68,8 @@ test_add_and_get_nodes()
 function test_print()
   lines_with_print = Dict()
   #src = readdir("/src")
-  src_dir = "/home/travis/build/ovainola/JuliaFEM/src"
+  #src_dir = "/home/travis/build/ovainola/JuliaFEM/src"
+  src_dir = "../src"
   src = readdir(src_dir)
   for file_name in src
     fil = open(joinpath(src_dir,file_name),"r")
@@ -76,6 +82,7 @@ function test_print()
   end
   #@test lines_with_print == Dict()
   println("number of lines with print = ", length(lines_with_print))
+  println(lines_with_print)
   @test length(lines_with_print) == 0
 end
 test_print()
