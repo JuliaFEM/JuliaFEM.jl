@@ -1,6 +1,8 @@
 # This file is a part of JuliaFEM. License is MIT: https://github.com/ovainola/JuliaFEM/blob/master/README.md
 module JuliaFEM
 
+VERSION < v"0.4-" && using Docile
+
 export Model, new_model, new_field, get_field, add_nodes, get_nodes, add_elements, get_elements
 
 
