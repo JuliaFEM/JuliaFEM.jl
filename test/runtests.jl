@@ -132,7 +132,7 @@ test_get_element()
 
 
 
-include("test_xdfm.jl")
+include("test_xdmf.jl")
 
 # write your own tests here
 # @test 1 == JuliaFEM.test()
