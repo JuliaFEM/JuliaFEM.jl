@@ -59,6 +59,49 @@ end
 test_add_and_get_nodes()
 
 
+function test_add_element()
+    m = new_model()
+    nodes = Dict(1 => [0.0, 0.0, 0.0],
+                 2 => [1.0, 0.0, 0.0],
+                 3 => [0.0, 1.0, 0.0],
+                 4 => [0.0, 0.0, 1.0])
+    add_nodes(m, nodes)
+    el1 = Dict("element_type" => 0x6, "node_ids" => [1, 2, 3, 4])
+    el2 = Dict("element_type" => 0x6, "node_ids" => [4, 3, 2, 1])
+    elements = Dict(1 => el1, 2 => el2)
+    add_elements(m, elements)
+    println(m)
+    @test m.elements["element_type"][1] == 0x6
+    @test m.elements["connectivity"][1] == [1, 2, 3, 4]
+end
+test_add_element()
+
+
+function test_get_element()
+    m = new_model()
+    nodes = Dict(1 => [0.0, 0.0, 0.0],
+                 2 => [1.0, 0.0, 0.0],
+                 3 => [0.0, 1.0, 0.0],
+                 4 => [0.0, 0.0, 1.0])
+    add_nodes(m, nodes)
+    el1 = Dict("element_type" => 0x6, "node_ids" => [1, 2, 3, 4])
+    el2 = Dict("element_type" => 0x6, "node_ids" => [4, 3, 2, 1])
+    elements = Dict(1 => el1, 2 => el2)
+    #println(elements)
+    add_elements(m, elements)
+    #println(m)
+    # get elements by element id
+    els = get_elements(m, [1])
+    #println(els)
+    @test length(els) == 1
+    @test 1 in keys(els)
+    @test els[1]["element_type"] == 0x6
+    @test els[1]["node_ids"] == [1, 2, 3, 4]
+end
+test_get_element()
+
+
+
 # write your own tests here
 # @test 1 == JuliaFEM.test()
 # @test_approx_eq 1.0 1.0
