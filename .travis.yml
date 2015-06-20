@@ -2,13 +2,13 @@ language: julia
 os:
   - linux
 julia:
-#  - release
+  - release
   - nightly
 notifications:
   email: false
 script:
   - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-# - julia -e 'Pkg.init(); Pkg.clone(pwd()); Pkg.build("JuliaFEM"); run(`ls -al`) ;Pkg.test("JuliaFEM"; coverage=true)'
+#  - julia -e 'Pkg.init(); Pkg.clone(pwd()); Pkg.build("JuliaFEM"); Pkg.test("JuliaFEM"; coverage=true)'
   - julia -e 'Pkg.init(); Pkg.clone(pwd()); Pkg.build("JuliaFEM")'
 after_success:
  - julia -e 'Pkg.test("JuliaFEM"; coverage=true)'
