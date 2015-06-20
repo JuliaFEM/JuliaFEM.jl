@@ -58,9 +58,11 @@ function test_add_and_get_nodes()
 end
 test_add_and_get_nodes()
 
+
+
 function test_print()
   lines_with_print = Dict()
-  src = readdir("./src")
+  src = readdir("/src")
   for file_name in src
     fil = open(joinpath("src",file_name),"r")
     for line in readlines(fil)
@@ -73,6 +75,8 @@ function test_print()
   @test lines_with_print == Dict()
 end
 test_print()
+
+
 
 function test_add_element()
     m = new_model()
