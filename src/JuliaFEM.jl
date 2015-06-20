@@ -168,7 +168,7 @@ function add_elements(model, elements)
     elfield = get_field(model.elements, "connectivity"; create_if_doesnt_exist=true)
     eltyfield = get_field(model.elements, "element_type"; create_if_doesnt_exist=true)
     for (elid, element) in elements
-        println("Adding element ", elid)
+        #prin*tln("Adding element ", elid)
         elfield[elid] = element["node_ids"]
         eltyfield[elid] = element["element_type"]
     end
