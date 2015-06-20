@@ -9,4 +9,10 @@ type Model
     element_gauss_points  # For element gauss points
 end
 
+function new_model()
+    """Initialize empty model.
+    """
+    return Model(Dict(), Dict(), Dict(), Dict(), Dict())
+end
+
 end # module
