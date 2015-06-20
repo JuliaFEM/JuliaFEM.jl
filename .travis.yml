@@ -8,7 +8,9 @@ notifications:
   email: false
 script:
   - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-  - julia -e 'Pkg.init(); Pkg.clone(pwd()); Pkg.build("JuliaFEM"); run(`ls -al`) ;Pkg.test("JuliaFEM"; coverage=true)'
+# - julia -e 'Pkg.init(); Pkg.clone(pwd()); Pkg.build("JuliaFEM"); run(`ls -al`) ;Pkg.test("JuliaFEM"; coverage=true)'
+  - julia -e 'Pkg.init(); Pkg.clone(pwd()); Pkg.build("JuliaFEM")'
 after_success:
+ - julia -e 'Pkg.test("JuliaFEM"; coverage=true)'
  - julia -e 'cd(Pkg.dir("JuliaFEM")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
 
