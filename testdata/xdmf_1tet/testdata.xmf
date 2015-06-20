@@ -10,7 +10,7 @@
           <DataItem DataType="Float" Dimensions="12" Format="XML" Precision="4">0 0 0 1 0 0 0 1 0 0 0 1</DataItem>
         </Geometry>
         <Topology Dimensions="1" Type="Mixed">
-          <DataItem DataType="Int" Dimensions="5" Format="XML" Precision="4">6 1 2 3 4</DataItem>
+          <DataItem DataType="Int" Dimensions="5" Format="XML" Precision="4">6 0 1 2 3</DataItem>
         </Topology>
         <Attribute Center="Cell" Name="Temperature field" Type="Scalar">
           <DataItem DataType="Int" Dimensions="1" Format="XML" Precision="4">56</DataItem>
