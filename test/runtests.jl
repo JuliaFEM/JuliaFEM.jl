@@ -75,7 +75,7 @@ function test_print()
     close(fil)
   end
   #@test lines_with_print == Dict()
-  println("number of lines with print", length(lines_with_print))
+  println("number of lines with print = ", length(lines_with_print))
   @test length(lines_with_print) == 0
 end
 test_print()
