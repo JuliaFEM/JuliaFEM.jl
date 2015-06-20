@@ -125,6 +125,8 @@ test_get_element()
 
 
 
+include("test_xdfm.jl")
+
 # write your own tests here
 # @test 1 == JuliaFEM.test()
 # @test_approx_eq 1.0 1.0
