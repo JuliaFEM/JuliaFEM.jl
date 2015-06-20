@@ -111,7 +111,7 @@ Notes
 Create new field "coords" to model if not found
 """ ->
 function add_nodes(model, nodes)
-    println("Adding ", length(nodes), " nodes to model")
+    #pri("Adding ", length(nodes), " nodes to model")
     field = get_field(model.nodes, "coords"; create_if_doesnt_exist=true)
     for (node_id, coords) in nodes
         field[node_id] = coords
