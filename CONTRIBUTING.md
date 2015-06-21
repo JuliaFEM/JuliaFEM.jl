@@ -13,3 +13,7 @@ Use of UTF-8 characters in program code
 ---------------------------------------
 We have decided not to use them. See issue #18.
 
+Supported Julia versions
+------------------------
+
+We support Julia versions 0.4+
