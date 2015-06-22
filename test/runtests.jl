@@ -20,38 +20,35 @@ facts("Testing if somebody used print, println(), @sprint in src directory") do
   end
   @fact lines_with_print => isempty "Instead of println() use Logging.jl package"
 end
-<<<<<<< HEAD
-test_add_element()
 
 
-function test_get_element()
-    m = new_model()
-    nodes = Dict(1 => [0.0, 0.0, 0.0],
-                 2 => [1.0, 0.0, 0.0],
-                 3 => [0.0, 1.0, 0.0],
-                 4 => [0.0, 0.0, 1.0])
-    add_nodes(m, nodes)
-    el1 = Dict("element_type" => 0x6, "node_ids" => [1, 2, 3, 4])
-    el2 = Dict("element_type" => 0x6, "node_ids" => [4, 3, 2, 1])
-    elements = Dict(1 => el1, 2 => el2)
-    #println(elements)
-    add_elements(m, elements)
-    #println(m)
-    # get elements by element id
-    els = get_elements(m, [1])
-    #println(els)
-    @test length(els) == 1
-    @test 1 in keys(els)
-    @test els[1]["element_type"] == 0x6
-    @test els[1]["node_ids"] == [1, 2, 3, 4]
-end
-test_get_element()
+
+#function test_get_element()
+#    m = new_model()
+#    nodes = Dict(1 => [0.0, 0.0, 0.0],
+#                 2 => [1.0, 0.0, 0.0],
+#                 3 => [0.0, 1.0, 0.0],
+#                 4 => [0.0, 0.0, 1.0])
+#    add_nodes(m, nodes)
+#    el1 = Dict("element_type" => 0x6, "node_ids" => [1, 2, 3, 4])
+#    el2 = Dict("element_type" => 0x6, "node_ids" => [4, 3, 2, 1])
+#    elements = Dict(1 => el1, 2 => el2)
+#    #println(elements)
+#    add_elements(m, elements)
+#    #println(m)
+#    # get elements by element id
+#    els = get_elements(m, [1])
+#    #println(els)
+#    @test length(els) == 1
+#    @test 1 in keys(els)
+#    @test els[1]["element_type"] == 0x6
+#    @test els[1]["node_ids"] == [1, 2, 3, 4]
+#end
+#test_get_element()
 
 
 
 include("test_xdmf.jl")
 include("solver_tests/test_elasticity_solver.jl")
 include("test_model.jl")
-=======
->>>>>>> 1794244a42142f1581f0594dd6d94bc8326a0759
 
