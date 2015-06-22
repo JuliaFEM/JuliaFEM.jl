@@ -38,30 +38,6 @@ end
 
 
 
-@doc """
-Create new field to model.
-
-Parameters
-----------
-field_type : Dict()
-    Target topology (model.model, model.nodes, model.elements,
-                     model.element_nodes, model.element_gauss
-field_name : str
-    Field name
-
-Returns
--------
-Dict
-    New field
-
-""" ->
-function new_field(field_type, field_name)
-    d = Dict()
-    setindex!(field_type, d, field_name)
-    return d
-end
-
-
 
 
 @doc """Get field from model.
@@ -93,56 +69,6 @@ function get_field(field_type, field_name; create_if_doesnt_exist=false)
     end
     return field
 end
-
-
-
-
-@doc """Add new nodes to model.
-
-Parameters
-----------
-nodes : Dict()
-    id => coords
-
-Returns
--------
-model
-
-Notes
------
-Create new field "coords" to model if not found
-""" ->
-function add_nodes(model, nodes)
-    #pri("Adding ", length(nodes), " nodes to model")
-    field = get_field(model.nodes, "coords"; create_if_doesnt_exist=true)
-    for (node_id, coords) in nodes
-        field[node_id] = coords
-    end
-end
-
-
-
-
-@doc """Return subset of nodes from model.
-
-Parameters
-----------
-node_ids : array
-    list of node ids to return
-
-Returns
--------
-Dict()
-    id => coords
-""" ->
-function get_nodes(model, node_ids)
-    subset = Dict()
-    for node_id in node_ids
-        subset[node_id] = model.nodes["coords"][node_id]
-    end
-    return subset
-end
-
 
 
 
