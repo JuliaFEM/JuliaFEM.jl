@@ -135,6 +135,7 @@ test_get_element()
 
 include("test_xdmf.jl")
 include("solver_tests/test_elasticity_solver.jl")
+include("test_model.jl")
 
 # write your own tests here
 # @test 1 == JuliaFEM.test()
