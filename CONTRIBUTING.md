@@ -15,5 +15,8 @@ We have decided not to use them. See issue #18.
 
 Supported Julia versions
 ------------------------
-
 We support Julia versions 0.4+
+
+Only pull requests to src folder
+--------------------------------
+See [issue #29](https://github.com/JuliaFEM/JuliaFEM/issues/29). This ensures peer review check for contributors and hopefully will decrease the number of merge conflicts. 
