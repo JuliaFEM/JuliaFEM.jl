@@ -86,8 +86,8 @@ Dict()
 """ ->
 function get_nodes(model, node_ids=[]; partition=1, time=0, increment=0)
   subset = Dict()
-  all_node_coords = h5read("$model.1.h5", "$time/$increment/nodes/coords")
-  all_node_ids = h5read("$model.1.h5", "$time/$increment/nodes/node_ids")
+  all_node_coords = h5read("$model.$partition.h5", "$time/$increment/nodes/coords")
+  all_node_ids = h5read("$model.$partition.h5", "$time/$increment/nodes/node_ids")
   @debug("all node coords: ", all_node_coords)
   @debug("all node ids: ", all_node_ids)
   if length(node_ids) == 0
