@@ -2,9 +2,11 @@
 
 [![Join the chat at https://gitter.im/JuliaFEM/JuliaFEM](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/JuliaFEM/JuliaFEM?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-Build Status: [![Build Status](https://api.travis-ci.org/ovainola/JuliaFEM.svg?branch=master)](https://travis-ci.org/ovainola/JuliaFEM)
+Build Status: [![Build Status](https://travis-ci.org/JuliaFEM/JuliaFEM.svg?branch=master)](https://travis-ci.org/JuliaFEM/JuliaFEM)
 
 Code Coverage: [![Coverage Status](https://coveralls.io/repos/ovainola/JuliaFEM/badge.svg?branch=master)](https://coveralls.io/r/ovainola/JuliaFEM?branch=master)
+
+http://juliafem.readthedocs.org/en/latest/
 
 The JuliaFEM project develops open-source software for reliable, scalable, distributed Finite Element Methdod.
 
@@ -34,6 +36,6 @@ We strongly believe in the test driven development as well as building on top of
     Errors should never pass silently.
 ```
 
-Please start by reading some practical examples of [the Julia style.](http://julia.readthedocs.org/en/latest/manual/style-guide/)
+Interested in participating? Please start by reading  [CONTRIBUTING.md](https://github.com/JuliaFEM/JuliaFEM/blob/master/CONTRIBUTING.md).
 
-Contributors: see [contributors](https://github.com/ovainola/JuliaFEM/blob/master/contributors)
+Contributors: see [contributors](https://github.com/JuliaFEM/JuliaFEM/blob/master/contributors)
