@@ -119,3 +119,38 @@ facts("test assembly of global vector for 2 dim/node case") do
     expected = [1.0 2.0 5.0 8.0 6.0 8.0]'
     @fact S => expected
 end
+
+
+using JuliaFEM.elasticity_solver: eliminate_boundary_conditions
+facts("remove boundary conditions from matrix with 2 dof/node") do
+    # create sparse matrix 4x4 with some data
+    # 4x4 Array{Int64,2}:
+    #  1  5   9  13
+    #  2  6  10  14
+    #  3  7  11  15
+    #  4  8  12  16
+    A = sparse(reshape(1:4*4, 4, 4))
+    I, J, V = findnz(A)
+    # we plan to eliminate first dof of first node and second dof of second node
+    # expected output would be
+    # 6 10
+    # 7 11
+    dirichletbc = [0 NaN; NaN 0]'
+    I, J, V = eliminate_boundary_conditions(dirichletbc, I, J, V)
+    A2 = full(sparse(I, J, V))
+    @fact A2 => [6 10; 7 11]
+end
+
+facts("remove boundary conditions from vector with 2 dof/node") do
+    # create sparse vector dim 4 with some data
+    #  1 2 3 4 '
+    A = sparsevec([1, 2, 3, 4])
+    I, J, V = findnz(A)
+    # we plan to eliminate first dof of first node and second dof of second node
+    # expected output would be
+    # 2 3
+    dirichletbc = [0 NaN; NaN 0]'
+    I, V = eliminate_boundary_conditions(dirichletbc, I, V)
+    A2 = full(sparsevec(I, V))
+    @fact A2 => [2 3]'
+end

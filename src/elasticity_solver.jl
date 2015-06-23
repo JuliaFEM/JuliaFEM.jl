@@ -136,6 +136,89 @@ end
 
 
 @doc """
+Eliminate Dirichlet boundary conditions from matrix
+
+Parameters
+----------
+dirichletbc : array [dim x nnodes]
+I, J, V : sparse matrix arrays
+
+Returns
+-------
+I, J, V : boundary conditions removed
+
+Notes
+-----
+pros:
+- matrix assembly remains positive definite
+cons:
+- maybe inefficient because of extra sparse matrix operations. (It's hard to remove stuff from sparse matrix.)
+- if u != 0 in dirichlet boundary requires extra care
+
+Raises
+------
+Exception, if displacement boundary conditions given, i.e.
+DX=2 for some node, for example.
+
+"""
+function eliminate_boundary_conditions(dirichletbc, I, J, V)
+    if any(dirichletbc .> 0)
+        throw("displacement boundary condition not supported")
+    end
+    # dofs to remove
+    free_dofs = find(isnan(dirichletbc))
+    remove_dofs = find(!isnan(dirichletbc))
+    @debug("Removing dofs: ", remove_dofs)
+    # this can be done more clever by removing corresponging indexes from I, J, and V
+    A = sparse(I, J, V)
+    A = A[free_dofs, free_dofs]
+    return findnz(A)
+end
+
+@doc """
+Eliminate Dirichlet boundary conditions from vector
+
+Parameters
+----------
+dirichletbc : array [dim x nnodes]
+I, V : sparse vector arrays
+
+Returns
+-------
+I, V : boundary conditions removed
+
+Notes
+-----
+pros:
+- matrix assembly remains positive definite
+cons:
+- maybe inefficient because of extra sparse matrix operations. (It's hard to remove stuff from sparse matrix.)
+- if u != 0 in dirichlet boundary requires extra care
+
+Raises
+------
+Exception, if displacement boundary conditions given, i.e.
+DX=2 for some node, for example.
+""" ->
+function eliminate_boundary_conditions(dirichletbc, I, V)
+    if any(dirichletbc .> 0)
+        throw("displacement boundary condition not supported")
+    end
+    # dofs to remove
+    free_dofs = find(isnan(dirichletbc))
+    remove_dofs = find(!isnan(dirichletbc))
+    @debug("Removing dofs: ", remove_dofs)
+    # this can be done more clever by removing corresponging indexes from I, J, and V
+    A = sparsevec(I, V)
+    A = A[free_dofs]
+    @debug("new vector: ", A)
+    i, j, v = findnz(A)
+    return i, v
+end
+
+
+
+@doc """
 Solve one increment of elasticity problem
 """ ->
 function solve_elasticity_increment!(X, u, du, R, Kt, elmap, nodalloads,
