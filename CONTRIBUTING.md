@@ -36,3 +36,7 @@ New technology should be introduced through notebooks
 FactCheck.jl is used to write test for the JuliaFEM.jl package
 --------------------------------------------------------------
 [See issue #27](https://github.com/JuliaFEM/JuliaFEM.jl/issues/27). Use FactCheck.jl package to write the tests. We believe Test Driven Development thus 100 % test coverage is expected. 
+
+JuliaFEM.jl is using Logging.jl
+-------------------------------
+[See issue #25](https://github.com/JuliaFEM/JuliaFEM.jl/issues/25). We have written a test to check all sources in src folder to find any print statements. Use Logging.jl instead of println(). 
