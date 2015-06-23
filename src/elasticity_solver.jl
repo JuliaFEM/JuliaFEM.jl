@@ -1,6 +1,9 @@
 # This file is a part of JuliaFEM. License is MIT: https://github.com/ovainola/JuliaFEM/blob/master/README.md
 module elasticity_solver
 
+using Logging
+@Logging.configure(level=DEBUG)
+
 VERSION < v"0.4-" && using Docile
 
 export solve_elasticity_interface!
@@ -65,6 +68,85 @@ function calc_local_matrices!(X, u, R, Kt, N, dNdξ, λ_, μ_, ipoints, iweights
             end
         end
 
+    end
+end
+
+
+@doc """
+Assemble global stiffness matrix to I,J,V ready for sparse format
+
+Parameters
+----------
+ke : local matrix
+eldofs_ : Array
+  degrees of freedom
+I,J,V : Arrays for sparse matrix
+
+Notes
+-----
+eldofs can also be node ids for convenience. In that case dimension
+is calculated and eldofs are "extended" to problem dimension.
+""" ->
+function assemble!(ke, eldofs_, I, J, V)
+    n, m = size(ke)
+    dim = round(Int, n/length(eldofs_))
+    @debug("problem dim = ", dim)
+    if dim == 1
+        eldofs = eldofs_
+    else
+        eldofs = Int64[]
+        for i in eldofs_
+            for d in 1:dim
+                push!(eldofs, dim*(i-1)+d)
+            end
+        end
+        @debug("old eldofs", eldofs_)
+        @debug("new eldofs", eldofs)
+    end
+    for i in 1:n
+        for j in 1:m
+            push!(I, eldofs[i])
+            push!(J, eldofs[j])
+            push!(V, ke[i,j])
+        end
+    end
+end
+
+
+@doc """
+Assemble global RHS to I,V ready for sparse format
+
+Parameters
+----------
+fe : local vector
+eldofs_ : Array
+  degrees of freedom
+I,V : Arrays for sparse matrix
+
+Notes
+-----
+eldofs can also be node ids for convenience. In that case dimension
+is calculated and eldofs are "extended" to problem dimension.
+""" ->
+function assemble!(fe, eldofs_, I, V)
+    n = length(fe)
+    dim = round(Int, n/length(eldofs_))
+    if dim == 1
+        eldofs = eldofs_
+    else
+        eldofs = Int64[]
+        for i in eldofs_
+            for d in 1:dim
+                push!(eldofs, dim*(i-1)+d)
+            end
+        end
+        @debug("old eldofs", eldofs_)
+        @debug("new eldofs", eldofs)
+    end
+
+    for i in 1:n
+        push!(I, eldofs[i])
+        push!(V, fe[i])
     end
 end
 
