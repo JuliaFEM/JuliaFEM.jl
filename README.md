@@ -2,7 +2,7 @@
 
 [![Join the chat at https://gitter.im/JuliaFEM/JuliaFEM](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/JuliaFEM/JuliaFEM?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-Build Status: [![Build Status](https://travis-ci.org/JuliaFEM/JuliaFEM.svg?branch=master)](https://travis-ci.org/JuliaFEM/JuliaFEM)
+Build Status: [![Build Status](https://travis-ci.org/JuliaFEM/JuliaFEM.jl.svg?branch=master)](https://travis-ci.org/JuliaFEM/JuliaFEM.jl)
 
 Code Coverage: [![Coverage Status](https://coveralls.io/repos/JuliaFEM/JuliaFEM/badge.svg?branch=master)](https://coveralls.io/r/JuliaFEM/JuliaFEM?branch=master)
 
