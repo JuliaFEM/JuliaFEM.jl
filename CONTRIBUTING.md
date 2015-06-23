@@ -23,7 +23,7 @@ We have decided not to use them. See issue #18.
 
 Supported Julia versions
 ------------------------
-We support Julia versions 0.4+
+We support Julia versions 0.4+. [See issue #26](https://github.com/JuliaFEM/JuliaFEM.jl/issues/26)
 
 Only pull requests to src folder
 --------------------------------
