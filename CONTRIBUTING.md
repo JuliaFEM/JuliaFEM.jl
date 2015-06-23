@@ -9,6 +9,14 @@ For now, read
 https://github.com/JuliaLang/julia/blob/master/CONTRIBUTING.md
 
 
+Developing
+----------
+
+git clone https://github.com/JuliaFEM/JuliaFEM
+cd ~/.julia/v0.4
+ln -s ~/dev/JuliaFEM .
+
+
 Use of UTF-8 characters in program code
 ---------------------------------------
 We have decided not to use them. See issue #18.
