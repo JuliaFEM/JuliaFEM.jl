@@ -6,22 +6,6 @@ using Logging
 
 VERSION < v"0.4-" && using Docile
 
-export solve_elasticity_interface!
-
-@doc """
-This is generic interface that reads data from data model, solves elasticity
-problem and updates model.
-
-Parameters
-----------
-model : to be defined
-""" ->
-function solve_elasticity_interface!()
-  return 0
-end
-
-
-
 # Below this line is internal functions related to solver. They can be used
 # directly if needed or using general interface combining data model and
 # solver.
