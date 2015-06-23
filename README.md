@@ -4,7 +4,7 @@
 
 Build Status: [![Build Status](https://travis-ci.org/JuliaFEM/JuliaFEM.svg?branch=master)](https://travis-ci.org/JuliaFEM/JuliaFEM)
 
-Code Coverage: [![Coverage Status](https://coveralls.io/repos/ovainola/JuliaFEM/badge.svg?branch=master)](https://coveralls.io/r/ovainola/JuliaFEM?branch=master)
+Code Coverage: [![Coverage Status](https://coveralls.io/repos/JuliaFEM/JuliaFEM/badge.svg?branch=master)](https://coveralls.io/r/JuliaFEM/JuliaFEM?branch=master)
 
 http://juliafem.readthedocs.org/en/latest/
 
