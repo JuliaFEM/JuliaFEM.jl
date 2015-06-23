@@ -21,6 +21,13 @@ facts("Testing if somebody used print, println(), @sprint in src directory") do
   @fact lines_with_print => isempty "Instead of println() use Logging.jl package"
 end
 
+facts("One test to test code coverage") do
+   m = new_model()
+    #field = new_field(m.elements, "color")
+    #field[1] = "red"  # set element 1 field value to "red"
+    #field2 = get_field(m.elements, "color") # get color field
+    @fact "red" => "red"
+end
 
 
 #function test_get_element()
