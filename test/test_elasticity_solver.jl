@@ -13,17 +13,24 @@ facts("test solve elasticity increment") do
   dirichletbc = [0 0; NaN NaN; NaN NaN; 0 0]'
 
   E = 90
-  ν = 0.25
-  μ = E/(2*(1+ν))
-  λ = E*ν/((1+ν)*(1-2*ν))
-  λ = 2*λ*μ/(λ + 2*μ)
+  nu = 0.25
+  mu = E/(2*(1+nu))
+  la = E*nu/((1+nu)*(1-2*nu))
+  la = 2*la*mu/(la + 2*mu)
 
-  #E = 90.0*ones(2, 4)
-  #nu = 0.25*ones(2, 4)
+  la = la*ones(1, 4)
+  mu = mu*ones(1, 4)
   u = zeros(2, 4)
   du = zeros(2, 4)
   R = zeros(2,4)
   Kt = zeros(8,8)
+
+  N(xi) = [
+      (1-xi[1])*(1-xi[2])/4
+      (1+xi[1])*(1-xi[2])/4
+      (1+xi[1])*(1+xi[2])/4
+      (1-xi[1])*(1+xi[2])/4
+    ]
 
   dNdξ(ξ) = [-(1-ξ[2])/4.0    -(1-ξ[1])/4.0
               (1-ξ[2])/4.0    -(1+ξ[1])/4.0
@@ -34,9 +41,8 @@ facts("test solve elasticity increment") do
   iweights = [1 1 1 1]
 
   for i=1:10
-    JuliaFEM.elasticity_solver.solve_elasticity_increment!(X, u, du, R, Kt, elmap, nodalloads,
-                                dirichletbc, λ, μ, dNdξ, ipoints,
-                                iweights)
+    JuliaFEM.elasticity_solver.solve_elasticity_increment!(
+      X, u, du, R, Kt,elmap, nodalloads, dirichletbc, la, mu, N, dNdξ, ipoints, iweights)
     @debug("increment:\n",du)
     u += du
     if norm(du) < 1.0e-9
