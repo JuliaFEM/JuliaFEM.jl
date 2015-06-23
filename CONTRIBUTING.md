@@ -11,11 +11,12 @@ https://github.com/JuliaLang/julia/blob/master/CONTRIBUTING.md
 
 Developing
 ----------
-
-git clone https://github.com/JuliaFEM/JuliaFEM
+```bash
+cd ~dev/
+git clone https://github.com/JuliaFEM/JuliaFEM.jl
 cd ~/.julia/v0.4
 ln -s ~/dev/JuliaFEM .
-
+```
 
 Use of UTF-8 characters in program code
 ---------------------------------------
@@ -27,7 +28,7 @@ We support Julia versions 0.4+. [See issue #26](https://github.com/JuliaFEM/Juli
 
 Only pull requests to src folder
 --------------------------------
-See [issue #29](https://github.com/JuliaFEM/JuliaFEM/issues/29). This ensures peer review check for contributors and hopefully will decrease the number of merge conflicts. 
+See [issue #29](https://github.com/JuliaFEM/JuliaFEM.jl/issues/29). This ensures peer review check for contributors and hopefully will decrease the number of merge conflicts. 
 
 New technology should be introduced through notebooks
 -----------------------------------------------------
