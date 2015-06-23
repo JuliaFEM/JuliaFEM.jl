@@ -3,6 +3,10 @@ module JuliaFEM
 
 VERSION < v"0.4-" && using Docile
 
+# import solvers
+include("elasticity_solver.jl")
+#using elasticity_solver
+
 export Model, new_model, new_field, get_field, add_nodes, get_nodes, add_elements, get_elements
 
 

@@ -1,37 +1,48 @@
-using JuliaFEM
-using Base.Test
+using JuliaFEM.elasticity_solver
 
-function test_one_element_solution()
-    model = new_model()
+using FactCheck
+using Logging
+@Logging.configure(level=DEBUG)
 
-    # 1. create mesh structure
-    # add nodes to model
-    nodes = Dict(1 => [0.0, 0.0], 2 => [10.0, 0.0], 3 => [10.0, 1.0], 4 => [0.0, 1.0])
-    add_nodes(model, nodes)
 
-    # 2. add elements to model
-    const QUAD4 = 0x4
-    element = Dict("element_type" => QUAD4, "node_ids" => [1, 2, 3, 4])
-    elements = Dict()
-    elements[1] = element
-    add_elements(model, elements)
+facts("test solve elasticity increment") do
+  X = [0 0; 10 0; 10 1; 0 1]'
+  elmap = [1; 2; 3; 4]
+  nodalloads = [0 0; 0 0; 0 -2; 0 0]'
+  @debug("nodal loads:\n", nodalloads)
+  dirichletbc = [0 0; NaN NaN; NaN NaN; 0 0]'
 
-    # 3. add boundary conditions
-    # add dirichlet boundary condition u=0
-    boundaries = Dict("SUPPORT" => [1, 4])
-    add_dirichlet_boundary_condition(model, boundaries)
+  E = 90
+  ν = 0.25
+  μ = E/(2*(1+ν))
+  λ = E*ν/((1+ν)*(1-2*ν))
+  λ = 2*λ*μ/(λ + 2*μ)
 
-    # add nodal load to node 3
-    nodal_loads = Dict(3 => [-2, 0])
-    add_nodal_loads(mode, nodal_loads)
+  #E = 90.0*ones(2, 4)
+  #nu = 0.25*ones(2, 4)
+  u = zeros(2, 4)
+  du = zeros(2, 4)
+  R = zeros(2,4)
+  Kt = zeros(8,8)
 
-    # 4. model is defined, solve it
-    JuliaFEM.solvers.solve_elasticity!(model; parallel=false)
+  dNdξ(ξ) = [-(1-ξ[2])/4.0    -(1-ξ[1])/4.0
+              (1-ξ[2])/4.0    -(1+ξ[1])/4.0
+              (1+ξ[2])/4.0     (1+ξ[1])/4.0
+             -(1+ξ[2])/4.0     (1-ξ[1])/4.0]
 
-    # 5. extract results
-    #write_xdmf(m, "results", ["displacement"])
-    disp = get_field(model, "displacement")
-    @assert_eq disp[2, 4] == -2.22224475
+  ipoints = 1/sqrt(3)*[-1 -1; 1 -1; 1 1; -1 1]
+  iweights = [1 1 1 1]
+
+  for i=1:10
+    JuliaFEM.elasticity_solver.solve_elasticity_increment!(X, u, du, R, Kt, elmap, nodalloads,
+                                dirichletbc, λ, μ, dNdξ, ipoints,
+                                iweights)
+    @debug("increment:\n",du)
+    u += du
+    if norm(du) < 1.0e-9
+      break
+    end
+  end
+  @debug("solution\n",u)
+  @fact u[2, 3] => roughly(-2.222244754401764)  # Tested against Elmer solution
 end
-
-test_one_element_solution()
