@@ -4,6 +4,8 @@ using Logging
 
 
 using JuliaFEM.elasticity_solver: solve_elasticity_increment!
+
+
 facts("test solve elasticity increment") do
 
   X = [0 0; 10 0; 10 1; 0 1]'
@@ -22,8 +24,6 @@ facts("test solve elasticity increment") do
   mu = mu*ones(1, 4)
   u = zeros(2, 4)
   du = zeros(2, 4)
-  R = zeros(2,4)
-  Kt = zeros(8,8)
 
   N(xi) = [
       (1-xi[1])*(1-xi[2])/4
@@ -41,7 +41,7 @@ facts("test solve elasticity increment") do
   iweights = [1 1 1 1]
 
   for i=1:10
-    solve_elasticity_increment!(X, u, du, R, Kt,elmap, nodalloads, dirichletbc,
+    solve_elasticity_increment!(X, u, du, elmap, nodalloads, dirichletbc,
                                 la, mu, N, dNdξ, ipoints, iweights)
     @debug("increment:\n",du)
     u += du

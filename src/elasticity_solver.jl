@@ -221,15 +221,70 @@ end
 @doc """
 Solve one increment of elasticity problem
 """ ->
-function solve_elasticity_increment!(X, u, du, R, Kt, elmap, nodalloads,
+function solve_elasticity_increment!(X, u, du, elmap, nodalloads,
                                      dirichletbc, λ, μ, N, dNdξ, ipoints,
                                      iweights)
-  calc_local_matrices!(X, u, R, Kt, N, dNdξ, λ, μ, ipoints, iweights)
-  # FIXME: boundary conditions
-  free_dofs = find(isnan(dirichletbc))
-  R -= nodalloads
-  du[free_dofs] = Kt[free_dofs, free_dofs] \ -reshape(R, 8)[free_dofs]
-end
+    if length(size(elmap)) == 1
+        # quick hack for just one element
+        elmap = elmap''
+    end
+    nelnodes, nelements = size(elmap)
+    #@debug("elements in model: ", nelements)
+    #@debug("nodes / element in model: ", nelnodes)
 
+
+    dim = size(u)[1]
+    Imat = Int64[]
+    Jmat = Int64[]
+    Vmat = Float64[]
+    Ivec = Int64[]
+    Vvec = Float64[]
+    # FIXME: different number of elements / node
+    #@debug("problem dimension: ", dim)
+
+    dofs = dim*nelnodes
+    R = zeros(dim, nelnodes)
+    Kt = zeros(dofs, dofs)
+    #@debug("size of R: ", size(R))
+    #@debug("size of Kt: ", size(Kt))
+
+    # this can be parallelized
+    for i in 1:nelements
+        eldofs = elmap[:,i]
+        #@debug("element dofs ", eldofs)
+        #@debug("Assembling element ", i)
+        #@debug("Local coords:\n", X[:, eldofs])
+        #@debug("Local u:\n", u[:, eldofs])
+        calc_local_matrices!(X[:, eldofs], u[:, eldofs], R, Kt, N, dNdξ, λ, μ, ipoints, iweights)
+        #@debug("Assemble Kt")
+        assemble!(Kt, eldofs, Imat, Jmat, Vmat)
+        #@debug("Assemble R")
+        assemble!(R, eldofs, Ivec, Vvec)
+    end
+
+    # add additional neumann boundary conditions
+    for (i, nodal_load) in enumerate(nodalloads)
+        if nodal_load == 0
+            continue
+        end
+        push!(Ivec, i)
+        push!(Vvec, -nodal_load)
+    end
+
+    # Remove dirichlet boundary conditions
+    Imat, Jmat, Vmat = eliminate_boundary_conditions(dirichletbc, Imat, Jmat, Vmat)
+    Ivec, Vvec = eliminate_boundary_conditions(dirichletbc, Ivec, Vvec)
+  #R -= nodalloads
+
+    # Create sparse matrices
+    A = sparse(Imat, Jmat, Vmat)
+    b = sparsevec(Ivec, Vvec)
+
+    # solution
+    free_dofs = find(isnan(dirichletbc))
+    #du[free_dofs] = Kt[free_dofs, free_dofs] \ -reshape(R, 8)[free_dofs]
+    # TODO: cholesky decomposition
+    du[free_dofs] = full(A) \ -full(b)
+end
 
 end
