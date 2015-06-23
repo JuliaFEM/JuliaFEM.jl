@@ -32,3 +32,7 @@ See [issue #29](https://github.com/JuliaFEM/JuliaFEM/issues/29). This ensures pe
 New technology should be introduced through notebooks
 -----------------------------------------------------
 [See issue #12](https://github.com/JuliaFEM/JuliaFEM.jl/issues/12). Idea is to introduce new technology as a notebook for the very beginning. Then when it's get mature the notebook will serve functional test for the matter. All notebooks will be included as examples to the documentation. 
+
+FactCheck.jl is used to write test for the JuliaFEM.jl package
+--------------------------------------------------------------
+[See issue #27](https://github.com/JuliaFEM/JuliaFEM.jl/issues/27). Use FactCheck.jl package to write the tests. We believe Test Driven Development thus 100 % test coverage is expected. 
