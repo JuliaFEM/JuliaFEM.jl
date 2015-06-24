@@ -21,12 +21,20 @@ facts("Testing if somebody used print, println(), @sprint in src directory") do
   @fact lines_with_print => isempty "Instead of println() use Logging.jl package"
 end
 
-facts("One test to test code coverage") do
-   m = new_model()
-    #field = new_field(m.elements, "color")
-    #field[1] = "red"  # set element 1 field value to "red"
-    #field2 = get_field(m.elements, "color") # get color field
-    @fact "red" => "red"
+facts("Testing if we have non ascii characters in the src files") do
+  lines_with_non_ascii = []
+  src_dir = "../src"
+  src = readdir(src_dir)
+  for file_name in src
+    fil = open(joinpath(src_dir,file_name),"r")
+    for (line_number,line) in enumerate(readlines(fil))
+      if ismatch(r"[^\x00-\x7F]",line)
+        push!(lines_with_non_ascii, file_name * ":line $line_number")
+      end
+    end
+    close(fil)
+  end
+  @fact lines_with_non_ascii => isempty "non ascii charecters found in src -> test is failing"
 end
 
 
