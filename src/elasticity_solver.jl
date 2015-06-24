@@ -2,7 +2,7 @@
 module elasticity_solver
 
 using Logging
-@Logging.configure(level=DEBUG)
+@Logging.configure(level=INFO)
 
 VERSION < v"0.4-" && using Docile
 
@@ -178,8 +178,6 @@ function assemble!(fe, eldofs_, I, V)
                 push!(eldofs, dim*(i-1)+d)
             end
         end
-        @debug("old eldofs", eldofs_)
-        @debug("new eldofs", eldofs)
     end
 
     for i in 1:n
@@ -283,40 +281,29 @@ function solve_elasticity_increment!(X, u, du, elmap, nodalloads,
         elmap = elmap''
     end
     nelnodes, nelements = size(elmap)
-    #@debug("elements in model: ", nelements)
-    #@debug("nodes / element in model: ", nelnodes)
+    dim, nnodes = size(u)
+    dofs = dim*nelnodes
 
-
-    dim = size(u)[1]
     Imat = Int64[]
     Jmat = Int64[]
     Vmat = Float64[]
     Ivec = Int64[]
     Vvec = Float64[]
-    # FIXME: different number of elements / node
-    #@debug("problem dimension: ", dim)
 
-    dofs = dim*nelnodes
+    # FIXME: different number of nodes/element
     R = zeros(dim, nelnodes)
     Kt = zeros(dofs, dofs)
-    #@debug("size of R: ", size(R))
-    #@debug("size of Kt: ", size(Kt))
 
     # this can be parallelized
     for i in 1:nelements
         eldofs = elmap[:,i]
-        #@debug("element dofs ", eldofs)
-        #@debug("Assembling element ", i)
-        #@debug("Local coords:\n", X[:, eldofs])
-        #@debug("Local u:\n", u[:, eldofs])
-        calc_local_matrices!(X[:, eldofs], u[:, eldofs], R, Kt, N, dNdξ, λ, μ, ipoints, iweights)
-        #@debug("Assemble Kt")
+        calc_local_matrices!(X[:, eldofs], u[:, eldofs], R, Kt, N, dNdξ,
+                             λ[eldofs], μ[eldofs], ipoints, iweights)
         assemble!(Kt, eldofs, Imat, Jmat, Vmat)
-        #@debug("Assemble R")
         assemble!(R, eldofs, Ivec, Vvec)
     end
 
-    # add additional neumann boundary conditions
+    # add additional neumann boundary conditions to force vector
     for (i, nodal_load) in enumerate(nodalloads)
         if nodal_load == 0
             continue
@@ -325,19 +312,19 @@ function solve_elasticity_increment!(X, u, du, elmap, nodalloads,
         push!(Vvec, -nodal_load)
     end
 
-    # Remove dirichlet boundary conditions
-    Imat, Jmat, Vmat = eliminate_boundary_conditions(dirichletbc, Imat, Jmat, Vmat)
-    Ivec, Vvec = eliminate_boundary_conditions(dirichletbc, Ivec, Vvec)
-  #R -= nodalloads
-
-    # Create sparse matrices
+    # Create sparse matrix and vector
     A = sparse(Imat, Jmat, Vmat)
     b = sparsevec(Ivec, Vvec)
 
-    # solution
+    # Remove dirichlet boundary conditions
     free_dofs = find(isnan(dirichletbc))
-    #du[free_dofs] = Kt[free_dofs, free_dofs] \ -reshape(R, 8)[free_dofs]
+    #Imat, Jmat, Vmat = eliminate_boundary_conditions(dirichletbc, Imat, Jmat, Vmat)
+    b = b[free_dofs]
+    A = A[free_dofs, free_dofs]
+
+    # solution
     du[free_dofs] = lufact(A) \ -full(b)
 end
+
 
 end
