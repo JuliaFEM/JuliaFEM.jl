@@ -5,9 +5,7 @@ using Logging
 
 using JuliaFEM.elasticity_solver: solve_elasticity_increment!
 
-
-facts("test solve elasticity increment") do
-
+function one_elem_fixture()
   X = [0.0 0.0; 10.0 0.0; 10.0 1.0; 0.0 1.0]'
   elmap = [1; 2; 3; 4]
   nodalloads = [0 0; 0 0; 0 -2; 0 0]'
@@ -40,6 +38,15 @@ facts("test solve elasticity increment") do
   ipoints = 1/sqrt(3)*[-1 -1; 1 -1; 1 1; -1 1]
   iweights = [1 1 1 1]
 
+    return (X, u, du, elmap, nodalloads, dirichletbc,
+     la, mu, N, dNdξ, ipoints, iweights)
+end
+
+facts("test solve elasticity increment") do
+
+    (X, u, du, elmap, nodalloads, dirichletbc,
+     la, mu, N, dNdξ, ipoints, iweights) = one_elem_fixture()
+
   for i=1:10
     solve_elasticity_increment!(X, u, du, elmap, nodalloads, dirichletbc,
                                 la, mu, N, dNdξ, ipoints, iweights)
@@ -49,6 +56,31 @@ facts("test solve elasticity increment") do
       break
     end
   end
+  @debug("solution\n",u)
+  @fact u[2, 3] => roughly(-2.222244754401764)  # Tested against Elmer solution
+end
+
+
+facts("test solve elasticity increment rot 30") do
+
+    (X, u, du, elmap, nodalloads, dirichletbc,
+     la, mu, N, dNdξ, ipoints, iweights) = one_elem_fixture()
+
+    phi = 30/180*pi
+    rmat = [cos(phi) -sin(phi); sin(phi) cos(phi)]
+    X = rmat*X
+    nodalloads = rmat*nodalloads
+
+  for i=1:10
+    solve_elasticity_increment!(X, u, du, elmap, nodalloads, dirichletbc,
+                                la, mu, N, dNdξ, ipoints, iweights)
+    @debug("increment:\n",du)
+    u += du
+    if norm(du) < 1.0e-9
+      break
+    end
+  end
+    u = rmat'*u
   @debug("solution\n",u)
   @fact u[2, 3] => roughly(-2.222244754401764)  # Tested against Elmer solution
 end
