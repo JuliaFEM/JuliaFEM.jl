@@ -1,6 +1,6 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
-module JuliaFEM
+
 using JuliaFEM
 using FactCheck
 using Logging
@@ -108,4 +108,3 @@ include("test_elasticity_solver.jl")
 for dic in FactCheck.getstats()
   @debug(dic[1], ": ",dic[2])
 end
-end # of Module
