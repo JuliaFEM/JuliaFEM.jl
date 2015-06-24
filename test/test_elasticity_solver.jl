@@ -1,6 +1,6 @@
 using FactCheck
 using Logging
-@Logging.configure(level=DEBUG)
+@Logging.configure(level=INFO)
 
 
 using JuliaFEM.elasticity_solver: solve_elasticity_increment!
@@ -83,6 +83,57 @@ facts("test solve elasticity increment rot 30") do
     u = rmat'*u
   @debug("solution\n",u)
   @fact u[2, 3] => roughly(-2.222244754401764)  # Tested against Elmer solution
+end
+
+
+facts("test solve elasticity increment, two elements") do
+
+    X = Float64[0 0; 1 0; 2 0; 0 1; 1 1; 2 1]'
+  elmap = [1 2 5 4; 2 3 6 5]'
+  nodalloads = [0 0; 0 0; 0 0; 0 0; 0 0; -3 0]'
+  @debug("nodal loads:\n", nodalloads)
+  dirichletbc = [0 0; NaN NaN; NaN NaN; 0 0; NaN NaN; NaN NaN]'
+
+    dim, nnodes = size(X)
+
+  E = 90
+  nu = 0.25
+  mu = E/(2*(1+nu))
+  la = E*nu/((1+nu)*(1-2*nu))
+  la = 2*la*mu/(la + 2*mu)
+
+    la = la*ones(1, nnodes)
+    mu = mu*ones(1, nnodes)
+    u = zeros(dim, nnodes)
+    du = zeros(dim, nnodes)
+
+  N(xi) = [
+      (1-xi[1])*(1-xi[2])/4
+      (1+xi[1])*(1-xi[2])/4
+      (1+xi[1])*(1+xi[2])/4
+      (1-xi[1])*(1+xi[2])/4
+    ]
+
+  dNdξ(ξ) = [-(1-ξ[2])/4.0    -(1-ξ[1])/4.0
+              (1-ξ[2])/4.0    -(1+ξ[1])/4.0
+              (1+ξ[2])/4.0     (1+ξ[1])/4.0
+             -(1+ξ[2])/4.0     (1-ξ[1])/4.0]
+
+  ipoints = 1/sqrt(3)*[-1 -1; 1 -1; 1 1; -1 1]
+  iweights = [1 1 1 1]
+
+  for i=1:10
+    solve_elasticity_increment!(X, u, du, elmap, nodalloads, dirichletbc,
+                                la, mu, N, dNdξ, ipoints, iweights)
+    @debug("increment:\n",du)
+    u += du
+    if norm(du) < 1.0e-9
+      break
+    end
+  end
+    @debug("solution\n",u)
+    # Known to fail, test against elmer.
+  @pending u[2, 6] => roughly(:something)
 end
 
 
