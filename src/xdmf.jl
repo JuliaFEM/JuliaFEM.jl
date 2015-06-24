@@ -9,6 +9,7 @@ using LightXML
 VERSION < v"0.4-" && using Docile
 
 # i add docstrings later
+# element codes: http://www.paraview.org/pipermail/paraview/2013-July/028859.html
 
 function xdmf_new_model(xdmf_version="2.1")
     xdoc = XMLDocument()
