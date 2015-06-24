@@ -68,3 +68,9 @@ end
 # include("test_model.jl")
 
 include("test_elasticity_solver.jl")
+
+# Keep this at the end of this file (include statements above this)
+@debug("Let's print the summary of the tests")
+for dic in FactCheck.getstats()
+  @debug(dic[1], ": ",dic[2])
+end
