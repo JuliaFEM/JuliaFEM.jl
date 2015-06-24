@@ -81,7 +81,7 @@ function calc_local_matrices!(X, u, R, Kt, N, dNdξ, λ_, μ_, ipoints, iweights
     #@debug("Jt:\n",Jᵀ)
     λ = interpolate(λ_, N, ξ)
     μ = interpolate(μ_, N, ξ)
-    Jᵀ = interpolate(X, dNdξ, ξ)'
+    Jᵀ = interpolate(X, dNdξ, ξ)
         detJ = det(Jᵀ)
         ∇N = inv(Jᵀ)*dNdξ(ξ)'
         ∇u = u*∇N'
