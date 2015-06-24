@@ -23,13 +23,16 @@ testdata = """\
           <DataItem DataType="Int" Dimensions="1" Format="XML" Precision="4">56</DataItem>
         </Attribute>
         <Attribute Center="Node" Name="Density" Type="Vector">
-          <DataItem DataType="Float" Dimensions="4" Format="XML" Precision="4">1 2 4 7</DataItem>
+          <DataItem DataType="Float" Dimensions="12" Format="XML" Precision="4">1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0 11.0 12.0</DataItem>
         </Attribute>
       </Grid>
     </Grid>
   </Domain>
 </Xdmf>
 """
+
+# makes no sense for vector field
+# <DataItem DataType="Float" Dimensions="4" Format="XML" Precision="4">1 2 4 7</DataItem>
 
 facts("test test data") do
   xdoc = XMLDocument()
@@ -85,10 +88,26 @@ facts("test test data") do
   set_attribute(attribute, "Type", "Vector")
   dataitem = new_child(attribute, "DataItem")
   set_attribute(dataitem, "DataType", "Float")
-  set_attribute(dataitem, "Dimensions", 4)
+  set_attribute(dataitem, "Dimensions", 12)
   set_attribute(dataitem, "Format", "XML")
   set_attribute(dataitem, "Precision", 4)
-  add_text(dataitem, "1 2 4 7")
+  add_text(dataitem, "1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0 11.0 12.0")
   #save_file(xdoc, "/tmp/model.xmf")
+  @fact string(xdoc) => testdata
+end
+
+using JuliaFEM.xdmf: xdmf_new_model, xdmf_new_grid, xdmf_new_temporal_collection, xdmf_new_mesh, xdmf_new_field
+
+facts("test model write XML") do
+  X = [0 0 0; 1 0 0; 0 1 0; 0 0 1]'
+  elmap = [6 1 2 3 4]' # element type 6, nodes 1 2 3 4
+  temperature_field = [56]
+  density_field = Float64[1 2 3; 4 5 6; 7 8 9; 10 11 12]'
+  xdoc, model = xdmf_new_model()
+  temporal_collection = xdmf_new_temporal_collection(model)
+  grid = xdmf_new_grid(temporal_collection; time=123)
+  xdmf_new_mesh(grid, X, elmap)
+  xdmf_new_field(grid, "Temperature field", "elements", temperature_field)
+  xdmf_new_field(grid, "Density", "nodes", density_field)
   @fact string(xdoc) => testdata
 end
