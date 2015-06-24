@@ -1,3 +1,6 @@
+# This file is a part of JuliaFEM.
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+module JuliaFEM
 using JuliaFEM
 using FactCheck
 using Logging
@@ -37,6 +40,37 @@ facts("Testing if we have non ascii characters in the src files") do
   @fact lines_with_non_ascii => isempty "non ascii charecters found in src -> test is failing"
 end
 
+facts("Looking the [src,test] folders *.jl files header information") do
+  files_no_license = []
+  dirs = [".";"../src"]
+  for folder in dirs
+    for file_name in readdir(folder)
+      if file_name[end-2:end] == ".jl"
+        fil = open(joinpath(folder,file_name),"r")
+        head = readall(fil)
+      else
+        continue
+      end
+      if ~ismatch(r"This file is a part of JuliaFEM",head)
+        push!(files_no_license,"$file_name is missing JuliaFEM statement")
+      end
+      if ~ismatch(r"MIT",head)
+        push!(files_no_license,"$file_name is missing MIT statement")
+      end
+      if ~ismatch(r"https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md",head)
+        push!(files_no_license,"$file_name is missing reference to LICENSE.md")
+      end
+      close(fil)
+    end
+  end
+  out_str = """License information missing or incorrect. Please use these two lines in the beginning of each file:
+
+# This file is a part of JuliaFEM.
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+
+  """
+  @fact files_no_license => isempty out_str
+end
 
 #function test_get_element()
 #    m = new_model()
@@ -74,3 +108,4 @@ include("test_elasticity_solver.jl")
 for dic in FactCheck.getstats()
   @debug(dic[1], ": ",dic[2])
 end
+end # of Module
