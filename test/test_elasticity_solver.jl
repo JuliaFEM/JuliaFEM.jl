@@ -8,7 +8,7 @@ using JuliaFEM.elasticity_solver: solve_elasticity_increment!
 
 facts("test solve elasticity increment") do
 
-  X = [0 0; 10 0; 10 1; 0 1]'
+  X = [0.0 0.0; 10.0 0.0; 10.0 1.0; 0.0 1.0]'
   elmap = [1; 2; 3; 4]
   nodalloads = [0 0; 0 0; 0 -2; 0 0]'
   @debug("nodal loads:\n", nodalloads)
@@ -52,6 +52,34 @@ facts("test solve elasticity increment") do
   @debug("solution\n",u)
   @fact u[2, 3] => roughly(-2.222244754401764)  # Tested against Elmer solution
 end
+
+
+using JuliaFEM.elasticity_solver: interpolate
+facts("test interpolation of different field variables") do
+    N(xi) = [
+      (1-xi[1])*(1-xi[2])/4
+      (1+xi[1])*(1-xi[2])/4
+      (1+xi[1])*(1+xi[2])/4
+      (1-xi[1])*(1+xi[2])/4
+    ]
+    dNdξ(ξ) = [-(1-ξ[2])/4.0    -(1-ξ[1])/4.0
+                (1-ξ[2])/4.0    -(1+ξ[1])/4.0
+                (1+ξ[2])/4.0     (1+ξ[1])/4.0
+               -(1+ξ[2])/4.0     (1-ξ[1])/4.0]
+    F1 = [36.0, 36.0, 36.0, 36.0]
+    F2 = [36.0 36.0 36.0 36.0]
+    F3 = F2'
+    F4 = [0.0 0.0; 10.0 0.0; 10.0 1.0; 0.0 1.0]'
+    F5 = F4'
+
+    @fact interpolate(F1, N, [0.0, 0.0]) => 36.0
+    @fact interpolate(F2, N, [0.0, 0.0]) => 36.0
+    @fact interpolate(F3, N, [0.0, 0.0]) => 36.0
+    @fact interpolate(F4, N, [0.0, 0.0]) => [5.0; 0.5]
+    @fact interpolate(F5, N, [0.0, 0.0]) => [5.0; 0.5]
+    @fact interpolate(F5, dNdξ, [0.0, 0.0]) => [5.0 0.0; 0.0 0.5]
+end
+
 
 
 using JuliaFEM.elasticity_solver: assemble!
