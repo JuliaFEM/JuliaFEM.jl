@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/PR-SVG-20010719/DTD/svg10.dtd">
+<svg width="27cm" height="7cm" viewBox="98 117 539 128" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <g>
+    <rect style="fill: #ffffff" x="99" y="161" width="146" height="82"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="99" y="161" width="146" height="82"/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="321" y="191" width="105" height="22"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="321" y="191" width="105" height="22"/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="514" y="118" width="122" height="51"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="514" y="118" width="122" height="51"/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="505.892" y1="148.89" x2="434.108" y2="196.61"/>
+    <polygon style="fill: #000000" points="512.138,144.738 506.578,154.438 505.892,148.89 501.042,146.11 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="512.138,144.738 506.578,154.438 505.892,148.89 501.042,146.11 "/>
+    <polygon style="fill: #000000" points="427.862,200.762 433.422,191.062 434.108,196.61 438.958,199.39 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="427.862,200.762 433.422,191.062 434.108,196.61 438.958,199.39 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="255.737" y1="202" x2="310.259" y2="202"/>
+    <polygon style="fill: #000000" points="248.237,202 258.237,197 255.737,202 258.237,207 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="248.237,202 258.237,197 255.737,202 258.237,207 "/>
+    <polygon style="fill: #000000" points="317.759,202 307.759,207 310.259,202 307.759,197 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="317.759,202 307.759,207 310.259,202 307.759,197 "/>
+  </g>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="373.5" y="206.45">
+    <tspan x="373.5" y="206.45">Interface</tspan>
+  </text>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="172" y="206.45">
+    <tspan x="172" y="206.45">User</tspan>
+  </text>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="575" y="147.95">
+    <tspan x="575" y="147.95">Elastic solver</tspan>
+  </text>
+</svg>
