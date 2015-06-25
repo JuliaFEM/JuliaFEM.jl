@@ -25,11 +25,11 @@ basis :: Function
 ip :: Array{Number, 1}
   Point to interpolate
 """ ->
-function interpolate(field::Array{Float64,1}, basis::Function, ip)
+function interpolate{T<:Real}(field::Array{T,1}, basis::Function, ip)
     result = dot(field, basis(ip))
     return result
 end
-function interpolate(field::Array{Float64,2}, basis::Function, ip)
+function interpolate{T<:Real}(field::Array{T,2}, basis::Function, ip)
     m, n = size(field)
     bip = basis(ip)
     tmp = size(bip)
