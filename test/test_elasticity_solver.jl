@@ -162,6 +162,7 @@ facts("test interpolation of different field variables") do
     @fact interpolate(F4, N, [0.0, 0.0]) => [5.0; 0.5]
     @fact interpolate(F5, N, [0.0, 0.0]) => [5.0; 0.5]
     @fact interpolate(F5, dNdξ, [0.0, 0.0]) => [5.0 0.0; 0.0 0.5]
+    @fact interpolate(F6, N, [0.0, 0.0]) => 36
 end
 
 
