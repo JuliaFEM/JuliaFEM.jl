@@ -14,7 +14,7 @@ VERSION < v"0.4-" && using Docile
 eldims = Dict("C3D10" => 10)
 global handlers = Dict()
 
-<<<<<<< HEAD
+
 @doc """
 Register new handler for parser
 """ ->
