@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 # This file is a part of JuliaFEM. 
 # License is MIT: https://github.com/ovainola/JuliaFEM/blob/master/README.md
+=======
+# This file is a part of JuliaFEM. License is MIT: https://github.com/ovainola/JuliaFEM/blob/master/README.md
+>>>>>>> 3e48ae32abe7a17af89cd1e23d798532aed2960a
 module abaqus_reader
 
 using Logging
@@ -10,9 +14,15 @@ VERSION < v"0.4-" && using Docile
 eldims = Dict("C3D10" => 10)
 global handlers = Dict()
 
+<<<<<<< HEAD
 @doc """
 Register new handler for parser
 """ ->
+=======
+"""
+Register new handler for parser
+"""
+>>>>>>> 3e48ae32abe7a17af89cd1e23d798532aed2960a
 function add_handler(section, function_name)
   handlers[section] = function_name
 end
@@ -130,4 +140,8 @@ add_handler("ELEMENT", parse_element_section)
 add_handler("NSET", parse_nodeset_section)
 
 
+<<<<<<< HEAD
 end
+=======
+end
+>>>>>>> 3e48ae32abe7a17af89cd1e23d798532aed2960a

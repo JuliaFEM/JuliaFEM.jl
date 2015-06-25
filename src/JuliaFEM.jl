@@ -1,13 +1,12 @@
-# This file is a part of JuliaFEM. 
+# This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 module JuliaFEM
 
 VERSION < v"0.4-" && using Docile
 
-# import solvers
 include("elasticity_solver.jl")
 include("xdmf.jl")
-#using elasticity_solver
+include("abaqus_reader.jl")
 
 export Model, new_model, new_field, get_field, add_nodes, get_nodes, add_elements, get_elements
 
