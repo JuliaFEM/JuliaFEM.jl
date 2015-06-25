@@ -8,7 +8,7 @@ using Logging
 
 VERSION < v"0.4-" && using Docile
 
-eldims = Dict("C3D10" => 10)
+eldims = Dict({"C3D10" => 10})
 global handlers = Dict()
 
 
