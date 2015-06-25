@@ -1,9 +1,7 @@
-<<<<<<< HEAD
 # This file is a part of JuliaFEM. 
 # License is MIT: https://github.com/ovainola/JuliaFEM/blob/master/README.md
 =======
 # This file is a part of JuliaFEM. License is MIT: https://github.com/ovainola/JuliaFEM/blob/master/README.md
->>>>>>> 3e48ae32abe7a17af89cd1e23d798532aed2960a
 module abaqus_reader
 
 using Logging
