@@ -214,7 +214,7 @@ Raises
 Exception, if displacement boundary conditions given, i.e.
 DX=2 for some node, for example.
 
-"""
+""" ->
 function eliminate_boundary_conditions(dirichletbc, I, J, V)
     if any(dirichletbc .> 0)
         throw("displacement boundary condition not supported")
