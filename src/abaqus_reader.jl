@@ -1,7 +1,6 @@
-# This file is a part of JuliaFEM. 
-# License is MIT: https://github.com/ovainola/JuliaFEM/blob/master/README.md
-=======
-# This file is a part of JuliaFEM. License is MIT: https://github.com/ovainola/JuliaFEM/blob/master/README.md
+# This file is a part of JuliaFEM.
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+
 module abaqus_reader
 
 using Logging
@@ -16,11 +15,6 @@ global handlers = Dict()
 @doc """
 Register new handler for parser
 """ ->
-=======
-"""
-Register new handler for parser
-"""
->>>>>>> 3e48ae32abe7a17af89cd1e23d798532aed2960a
 function add_handler(section, function_name)
   handlers[section] = function_name
 end
@@ -137,9 +131,5 @@ add_handler("NODE", parse_node_section)
 add_handler("ELEMENT", parse_element_section)
 add_handler("NSET", parse_nodeset_section)
 
+end
 
-<<<<<<< HEAD
-end
-=======
-end
->>>>>>> 3e48ae32abe7a17af89cd1e23d798532aed2960a

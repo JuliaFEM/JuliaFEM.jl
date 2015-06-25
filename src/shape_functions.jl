@@ -1,11 +1,6 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-function test(a)
-     return a*2
-end
-
-
 function C2D4(xx)
      theta = 1
      chi = xx[1]
