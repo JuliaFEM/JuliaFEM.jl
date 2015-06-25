@@ -10,7 +10,7 @@ using Logging
 facts("Testing if somebody used print, println(), @sprint in src directory") do
   # TODO: make better reqular expression. Currently it will match all print words
   lines_with_print = Dict()
-  src_dir = "../src"
+  src_dir = joinpath(Pkg.dir("JuliaFEM"),"src")
   src = readdir(src_dir)
   for file_name in src
     fil = open(joinpath(src_dir,file_name),"r")
@@ -25,8 +25,9 @@ facts("Testing if somebody used print, println(), @sprint in src directory") do
 end
 
 facts("Testing if we have non ascii characters in the src files") do
+  # TODO: we should allow Greeck letters in documentation. Thus this test should skip docstrings
   lines_with_non_ascii = []
-  src_dir = "../src"
+  src_dir = joinpath(Pkg.dir("JuliaFEM"),"src")
   src = readdir(src_dir)
   for file_name in src
     fil = open(joinpath(src_dir,file_name),"r")
@@ -42,11 +43,12 @@ end
 
 facts("Looking the [src,test] folders *.jl files header information") do
   files_no_license = []
-  dirs = [".";"../src"]
+  pkg_dir = Pkg.dir("JuliaFEM")
+  dirs = ["test";"src"]
   for folder in dirs
-    for file_name in readdir(folder)
+    for file_name in readdir(joinpath(pkg_dir,folder))
       if file_name[end-2:end] == ".jl"
-        fil = open(joinpath(folder,file_name),"r")
+        fil = open(joinpath(pkg_dir,folder,file_name),"r")
         head = readall(fil)
       else
         continue
@@ -104,6 +106,7 @@ end
 include("test_elasticity_solver.jl")
 
 # Keep this at the end of this file (include statements above this)
+@Logging.configure(level=DEBUG)
 @debug("Let's print the summary of the tests")
 for dic in FactCheck.getstats()
   @debug(dic[1], ": ",dic[2])
