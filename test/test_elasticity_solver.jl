@@ -154,6 +154,7 @@ facts("test interpolation of different field variables") do
     F3 = F2'
     F4 = [0.0 0.0; 10.0 0.0; 10.0 1.0; 0.0 1.0]'
     F5 = F4'
+    F6 = [36, 36, 36, 36]
 
     @fact interpolate(F1, N, [0.0, 0.0]) => 36.0
     @fact interpolate(F2, N, [0.0, 0.0]) => 36.0
