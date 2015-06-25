@@ -104,5 +104,8 @@ function xdmf_new_field(grid, name, source, data)
     add_text(dataitem, join(data, " "))
 end
 
+function xdmf_save_model(xdoc, filename)
+  save_file(xdoc, filename)
+end
 
 end
