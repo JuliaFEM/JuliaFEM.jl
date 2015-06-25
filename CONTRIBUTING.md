@@ -28,7 +28,7 @@ We support Julia versions 0.4+. [See issue #26](https://github.com/JuliaFEM/Juli
 
 Only pull requests to src folder
 --------------------------------
-See [issue #29](https://github.com/JuliaFEM/JuliaFEM.jl/issues/29). This ensures peer review check for contributors and hopefully will decrease the number of merge conflicts. 
+See [issue #29](https://github.com/JuliaFEM/JuliaFEM.jl/issues/29). This ensures peer review check for contributors and hopefully will decrease the number of merge conflicts. Before making the pull request runn all test: either type `julia> Pkg.test("JuliaFEM")` at REPL or `julia test/runtests.jl` at command line. 
 
 New technology should be introduced through notebooks
 -----------------------------------------------------
