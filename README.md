@@ -7,7 +7,7 @@ Build Status: [![Build Status](https://travis-ci.org/JuliaFEM/JuliaFEM.jl.svg?br
 
 Code Coverage: [![Coverage Status](https://coveralls.io/repos/JuliaFEM/JuliaFEM.jl/badge.svg?branch=master)](https://coveralls.io/r/JuliaFEM/JuliaFEM.jl?branch=master)
 
-http://juliafem.readthedocs.org/en/latest/
+Documentation: [![Documentation Status](https://readthedocs.org/projects/juliafem/badge/?version=latest)](https://readthedocs.org/projects/juliafem/?badge=latest)
 
 The JuliaFEM project develops open-source software for reliable, scalable, distributed Finite Element Method.
 
