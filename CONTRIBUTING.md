@@ -20,7 +20,7 @@ ln -s ~/dev/JuliaFEM .
 
 Use of UTF-8 characters in program code
 ---------------------------------------
-We have decided not to use them. See issue #18.
+We have decided not to use them. [See issue #18](https://github.com/JuliaFEM/JuliaFEM.jl/issues/18).
 
 Supported Julia versions
 ------------------------
