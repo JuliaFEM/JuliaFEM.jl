@@ -102,6 +102,7 @@ end
 include("test_xdmf.jl")
 include("test_elasticity_solver.jl")
 include("test_model.jl")
+include("test_abaqus_reader.jl")
 
 include("test_elasticity_solver.jl")
 
