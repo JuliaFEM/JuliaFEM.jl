@@ -8,7 +8,7 @@ site_dir: 'site'
 repo_url: https://github.com/JuliaFEM/JuliaFEM.jl
 pages:
 - Home: 'README.md'
-- Overview: 'api/index.md'
+- Overview: 'docs/api/index.md'
 - API Docs:
-  - JuliaFEM: 'api/JuliaFEM.md'
-  - JuliaFEM.elasticity_solver: 'api/JuliaFEM.elasticity_solver.md'
+  - JuliaFEM: 'docs/api/JuliaFEM.md'
+  - JuliaFEM.elasticity_solver: 'docs/api/JuliaFEM.elasticity_solver.md'
