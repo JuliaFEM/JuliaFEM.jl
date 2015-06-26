@@ -8,5 +8,6 @@ using Logging
 using JuliaFEM.interfaces: solve_elasticity_interface!
 
 facts("test solve_elasticity_interface!") do
+  test = solve_elasticity_interface!()
   @pending
 end
