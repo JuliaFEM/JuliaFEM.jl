@@ -99,7 +99,7 @@ end
 
 
 
-# include("test_xdmf.jl")
+include("test_xdmf.jl")
 # include("solver_tests/test_elasticity_solver.jl")
 # include("test_model.jl")
 
