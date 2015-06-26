@@ -12,9 +12,9 @@ eldims = Dict({"C3D10" => 10})
 global handlers = Dict()
 
 
-@doc """
+"""
 Register new handler for parser
-""" ->
+"""
 function add_handler(section, function_name)
   handlers[section] = function_name
 end
