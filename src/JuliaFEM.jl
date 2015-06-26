@@ -9,5 +9,6 @@ using Lexicon
 include("elasticity_solver.jl")
 include("xdmf.jl")
 include("abaqus_reader.jl")
+include("interfaces.jl")
 
 end # module
