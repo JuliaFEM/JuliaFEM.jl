@@ -3,11 +3,11 @@ using Docile, Lexicon, JuliaFEM
 const api_directory = "api"
 const modules = [JuliaFEM, JuliaFEM.elasticity_solver]
 
-main_folder = dirname(dirname(@__FILE__))
-this_folder = dirname(@__FILE__)
+# main_folder = dirname(dirname(@__FILE__))
+# this_folder = dirname(@__FILE__)
 
-file_ = "README.md"
-run(`cp $main_folder/$file_ $this_folder`)
+# file_ = "README.md"
+# run(`cp $main_folder/$file_ $this_folder`)
 
 cd(dirname(@__FILE__)) do
     # Generate and save the contents of docstrings as markdown files.
