@@ -103,8 +103,7 @@ include("test_xdmf.jl")
 include("test_elasticity_solver.jl")
 include("test_model.jl")
 include("test_abaqus_reader.jl")
-
-include("test_elasticity_solver.jl")
+include("test_interfaces.jl")
 
 # Keep this at the end of this file (include statements above this)
 @Logging.configure(level=DEBUG)
