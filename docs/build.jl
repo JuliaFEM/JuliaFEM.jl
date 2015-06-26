@@ -3,6 +3,12 @@ using Docile, Lexicon, JuliaFEM
 const api_directory = "api"
 const modules = [JuliaFEM, JuliaFEM.elasticity_solver]
 
+main_folder = dirname(dirname(@__FILE__))
+this_folder = dirname(@__FILE__)
+
+file_ = "README.md"
+run(`cp $main_folder/$file_ $this_folder`)
+
 cd(dirname(@__FILE__)) do
     # Generate and save the contents of docstrings as markdown files.
     index  = Index()
@@ -12,7 +18,7 @@ cd(dirname(@__FILE__)) do
     save(joinpath(api_directory, "index.md"), index; md_subheader = :category)
 
     # Add a reminder not to edit the generated files.
-    open(joinpath(api_directory, "README_new.md"), "w") do f
+    open(joinpath(api_directory, "README.md"), "w") do f
         print(f, """
         Files in this directory are generated using the `build.jl` script. Make
         all changes to the originating docstrings/files rather than these ones.

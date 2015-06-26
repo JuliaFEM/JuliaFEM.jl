@@ -13,7 +13,7 @@ VERSION < v"0.4-" && using Docile
 # solver.
 
 
-@doc """
+"""
 Interpolate field variable using basis functions f for point ip.
 This function tries to be as general as possible and allows interpolating
 lot of different fields.
@@ -26,7 +26,7 @@ basis :: Function
   Basis functions
 ip :: Array{Number, 1}
   Point to interpolate
-""" ->
+"""
 function interpolate{T<:Real}(field::Array{T,1}, basis::Function, ip)
     result = dot(field, basis(ip))
     return result
@@ -62,9 +62,9 @@ end
 
 
 
-@doc """
+"""
 Calculate local tangent stiffness matrix and residual force vector R = T - F
-""" ->
+"""
 function calc_local_matrices!(X, u, R, Kt, N, dNdchi, lambda_, mu_, ipoints, iweights)
   dim, nnodes = size(X)
   I = eye(dim)
@@ -112,7 +112,7 @@ function calc_local_matrices!(X, u, R, Kt, N, dNdchi, lambda_, mu_, ipoints, iwe
 end
 
 
-@doc """
+"""
 Assemble global stiffness matrix to I,J,V ready for sparse format
 
 Parameters
@@ -126,7 +126,7 @@ Notes
 -----
 eldofs can also be node ids for convenience. In that case dimension
 is calculated and eldofs are "extended" to problem dimension.
-""" ->
+"""
 function assemble!(ke, eldofs_, I, J, V)
     n, m = size(ke)
     dim = round(Int, n/length(eldofs_))
@@ -153,7 +153,7 @@ function assemble!(ke, eldofs_, I, J, V)
 end
 
 
-@doc """
+"""
 Assemble global RHS to I,V ready for sparse format
 
 Parameters
@@ -167,7 +167,7 @@ Notes
 -----
 eldofs can also be node ids for convenience. In that case dimension
 is calculated and eldofs are "extended" to problem dimension.
-""" ->
+"""
 function assemble!(fe, eldofs_, I, V)
     n = length(fe)
     dim = round(Int, n/length(eldofs_))
@@ -189,7 +189,7 @@ function assemble!(fe, eldofs_, I, V)
 end
 
 
-@doc """
+"""
 Eliminate Dirichlet boundary conditions from matrix
 
 Parameters
@@ -214,7 +214,7 @@ Raises
 Exception, if displacement boundary conditions given, i.e.
 DX=2 for some node, for example.
 
-""" ->
+"""
 function eliminate_boundary_conditions(dirichletbc, I, J, V)
     if any(dirichletbc .> 0)
         throw("displacement boundary condition not supported")
@@ -229,7 +229,7 @@ function eliminate_boundary_conditions(dirichletbc, I, J, V)
     return findnz(A)
 end
 
-@doc """
+"""
 Eliminate Dirichlet boundary conditions from vector
 
 Parameters
@@ -253,7 +253,7 @@ Raises
 ------
 Exception, if displacement boundary conditions given, i.e.
 DX=2 for some node, for example.
-""" ->
+""" 
 function eliminate_boundary_conditions(dirichletbc, I, V)
     if any(dirichletbc .> 0)
         throw("displacement boundary condition not supported")
@@ -272,9 +272,9 @@ end
 
 
 
-@doc """
+"""
 Solve one increment of elasticity problem
-""" ->
+""" 
 function solve_elasticity_increment!(X, u, du, elmap, nodalloads,
                                      dirichletbc, lambda, mu, N, dNdchi, ipoints,
                                      iweights)
