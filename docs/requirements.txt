@@ -1,1 +1,2 @@
 -e git+https://github.com/JuliaLang/JuliaDoc.git#egg=Julia
+-e git+https://github.com/JuliaFEM/JuliaFEM.jl.git#egg=JuliaFEM
