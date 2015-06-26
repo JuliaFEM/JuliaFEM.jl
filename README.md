@@ -1,3 +1,4 @@
+![JuliaFEMLogo](https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/geometry/JuliaFEMLogo_256x256.png) 
 # JuliaFEM 
 
 [![Join the chat at https://gitter.im/JuliaFEM/JuliaFEM](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/JuliaFEM/JuliaFEM?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
