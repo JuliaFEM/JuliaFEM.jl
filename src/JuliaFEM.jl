@@ -1,20 +1,21 @@
-# This file is a part of JuliaFEM. 
+# This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 module JuliaFEM
 
-VERSION < v"0.4-" && using Docile
 
-# import solvers
+VERSION < v"0.4-" && using Docile
+using Lexicon
+
 include("elasticity_solver.jl")
 include("xdmf.jl")
-#using elasticity_solver
+include("abaqus_reader.jl")
 
 export Model, new_model, new_field, get_field, add_nodes, get_nodes, add_elements, get_elements
 
 
-@doc """
+"""
 Basic model
-""" ->
+"""
 type Model
     model  # For global variables
     nodes  # For nodes
@@ -26,7 +27,7 @@ end
 
 
 
-@doc """
+"""
 Initialize empty model.
 
 Parameters
@@ -36,7 +37,7 @@ None
 Returns
 -------
 New model struct
-""" ->
+"""
 function new_model()
     return Model(Dict(), Dict(), Dict(), Dict(), Dict())
 end
@@ -46,7 +47,7 @@ end
 
 
 
-@doc """Get field from model.
+"""Get field from model.
 
 Parameters
 ----------
@@ -62,7 +63,7 @@ create_if_doesnt_exist : bool, optional
 Raises
 ------
 Error, if field not found and create_if_doesnt_exist == false
-""" ->
+"""
 function get_field(field_type, field_name; create_if_doesnt_exist=false)
     if !(field_name in keys(field_type))
         if create_if_doesnt_exist
@@ -78,7 +79,7 @@ end
 
 
 
-@doc """Add new elements to model.
+"""Add new elements to model.
 Parameters
 ----------
 list of dicts, dict = {element_type => elcode, elids => [node ids..]}
@@ -97,7 +98,7 @@ In dict key means element id
 >>> elements = Dict(1 => el1, 2 => el2)
 >>> add_elements(m, elements)
 
-""" ->
+"""
 function add_elements(model, elements)
     elfield = get_field(model.elements, "connectivity"; create_if_doesnt_exist=true)
     eltyfield = get_field(model.elements, "element_type"; create_if_doesnt_exist=true)
@@ -111,7 +112,7 @@ end
 
 
 
-@doc """Get subset of elements from model.
+"""Get subset of elements from model.
 Parameters
 ----------
 element_ids : list of ints
@@ -121,7 +122,7 @@ Returns
 -------
 Dict
 {element_type = XXX, node_ids = [a, b, c, d, e, ..., n]}
-""" ->
+""" 
 function get_elements(model, element_ids)
     eltyfield = get_field(model.elements, "element_type")
     elfield = get_field(model.elements, "connectivity")
