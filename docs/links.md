@@ -20,3 +20,6 @@ Interpolation
 Integration
 ===========
 - http://arxiv.org/pdf/1411.1341.pdf
+
+Hierarchial shape functions
+- https://www.math.vt.edu/people/adjerids/research/papers/basis.pdf
