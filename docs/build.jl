@@ -12,7 +12,7 @@ cd(dirname(@__FILE__)) do
     save(joinpath(api_directory, "index.md"), index; md_subheader = :category)
 
     # Add a reminder not to edit the generated files.
-    open(joinpath(api_directory, "README_new.md"), "w") do f
+    open(joinpath(api_directory, "README.md"), "w") do f
         print(f, """
         Files in this directory are generated using the `build.jl` script. Make
         all changes to the originating docstrings/files rather than these ones.
