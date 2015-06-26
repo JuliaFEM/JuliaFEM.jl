@@ -1,4 +1,6 @@
-# This file is a part of JuliaFEM. License is MIT: https://github.com/ovainola/JuliaFEM/blob/master/README.md
+# This file is a part of JuliaFEM.
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+
 module elasticity_solver
 
 using Logging
@@ -25,11 +27,11 @@ basis :: Function
 ip :: Array{Number, 1}
   Point to interpolate
 """ ->
-function interpolate(field::Array{Float64,1}, basis::Function, ip)
+function interpolate{T<:Real}(field::Array{T,1}, basis::Function, ip)
     result = dot(field, basis(ip))
     return result
 end
-function interpolate(field::Array{Float64,2}, basis::Function, ip)
+function interpolate{T<:Real}(field::Array{T,2}, basis::Function, ip)
     m, n = size(field)
     bip = basis(ip)
     tmp = size(bip)
@@ -63,7 +65,7 @@ end
 @doc """
 Calculate local tangent stiffness matrix and residual force vector R = T - F
 """ ->
-function calc_local_matrices!(X, u, R, Kt, N, dNdξ, λ_, μ_, ipoints, iweights)
+function calc_local_matrices!(X, u, R, Kt, N, dNdchi, lambda_, mu_, ipoints, iweights)
   dim, nnodes = size(X)
   I = eye(dim)
   R[:,:] = 0.0
@@ -73,34 +75,34 @@ function calc_local_matrices!(X, u, R, Kt, N, dNdξ, λ_, μ_, ipoints, iweights
 
   for m = 1:length(iweights)
     w = iweights[m]
-    ξ = ipoints[m, :]
+    chi = ipoints[m, :]
     # interpolate material parameters from element node fields
-    #λ = (λ_*N(ξ))[1]
-    #μ = (μ_*N(ξ))[1]
-    #    Jᵀ = X*dNdξ(ξ)
-    #@debug("Jt:\n",Jᵀ)
-    λ = interpolate(λ_, N, ξ)
-    μ = interpolate(μ_, N, ξ)
-    Jᵀ = interpolate(X, dNdξ, ξ)
-        detJ = det(Jᵀ)
-        ∇N = inv(Jᵀ)*dNdξ(ξ)'
-        ∇u = u*∇N'
-        F = I + ∇u  # Deformation gradient
-        E = 1/2*(∇u' + ∇u + ∇u'*∇u)  # Green-Lagrange strain tensor
-        S = λ*trace(E)*I + 2*μ*E  # PK2 stress tensor
+    #lambda = (lambda_*N(chi))[1]
+    #mu = (mu_*N(chi))[1]
+    #    Jt = X*dNdchi(chi)
+    #@debug("Jt:\n",Jt)
+    lambda = interpolate(lambda_, N, chi)
+    mu = interpolate(mu_, N, chi)
+    Jt = interpolate(X, dNdchi, chi)
+        detJ = det(Jt)
+    deltaN = inv(Jt)*dNdchi(chi)'
+        delta_u = u*deltaN'
+        F = I + delta_u  # Deformation gradient
+        E = 1/2*(delta_u' + delta_u + delta_u'*delta_u)  # Green-Lagrange strain tensor
+        S = lambda*trace(E)*I + 2*mu*E  # PK2 stress tensor
         P = F*S  # PK1 stress tensor
-        R[:,:] += w*P*∇N*detJ
+        R[:,:] += w*P*deltaN*detJ
 
         for p = 1:nnodes
             for i = 1:dim
                 dF[:,:] = 0.0
-                dF[i,:] = ∇N[:,p]
+                dF[i,:] = deltaN[:,p]
                 dE = 1/2*(F'*dF + dF'*F)
-                dS = λ*trace(dE)*I + 2*μ*dE
+                dS = lambda*trace(dE)*I + 2*mu*dE
                 dP = dF*S + F*dS
                 for q = 1:nnodes
                     for j = 1:dim
-                        Kt[dim*(p-1)+i,dim*(q-1)+j] += w*(dP[j,:]*∇N[:,q])[1]*detJ
+                        Kt[dim*(p-1)+i,dim*(q-1)+j] += w*(dP[j,:]*deltaN[:,q])[1]*detJ
                     end
                 end
             end
@@ -212,7 +214,7 @@ Raises
 Exception, if displacement boundary conditions given, i.e.
 DX=2 for some node, for example.
 
-"""
+""" ->
 function eliminate_boundary_conditions(dirichletbc, I, J, V)
     if any(dirichletbc .> 0)
         throw("displacement boundary condition not supported")
@@ -274,7 +276,7 @@ end
 Solve one increment of elasticity problem
 """ ->
 function solve_elasticity_increment!(X, u, du, elmap, nodalloads,
-                                     dirichletbc, λ, μ, N, dNdξ, ipoints,
+                                     dirichletbc, lambda, mu, N, dNdchi, ipoints,
                                      iweights)
     if length(size(elmap)) == 1
         # quick hack for just one element
@@ -297,8 +299,8 @@ function solve_elasticity_increment!(X, u, du, elmap, nodalloads,
     # this can be parallelized
     for i in 1:nelements
         eldofs = elmap[:,i]
-        calc_local_matrices!(X[:, eldofs], u[:, eldofs], R, Kt, N, dNdξ,
-                             λ[eldofs], μ[eldofs], ipoints, iweights)
+        calc_local_matrices!(X[:, eldofs], u[:, eldofs], R, Kt, N, dNdchi,
+                             lambda[eldofs], mu[eldofs], ipoints, iweights)
         assemble!(Kt, eldofs, Imat, Jmat, Vmat)
         assemble!(R, eldofs, Ivec, Vvec)
     end
