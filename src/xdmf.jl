@@ -9,7 +9,39 @@ using LightXML
 VERSION < v"0.4-" && using Docile
 
 # i add docstrings later
+
 # element codes: http://www.paraview.org/pipermail/paraview/2013-July/028859.html
+# > from  ./VTK/ThirdParty/xdmf2/vtkxdmf2/libsrc/XdmfTopology.h
+# >
+# > // Topologies
+# > #define XDMF_NOTOPOLOGY     0x0
+# > #define XDMF_POLYVERTEX     0x1
+# > #define XDMF_POLYLINE       0x2
+# > #define XDMF_POLYGON        0x3
+# > #define XDMF_TRI            0x4
+# > #define XDMF_QUAD           0x5
+# > #define XDMF_TET            0x6
+# > #define XDMF_PYRAMID        0x7
+# > #define XDMF_WEDGE          0x8
+# > #define XDMF_HEX            0x9
+# > #define XDMF_EDGE_3         0x0022
+# > #define XDMF_TRI_6          0x0024
+# > #define XDMF_QUAD_8         0x0025
+# > #define XDMF_QUAD_9         0x0023
+# > #define XDMF_TET_10         0x0026
+# > #define XDMF_PYRAMID_13     0x0027
+# > #define XDMF_WEDGE_15       0x0028
+# > #define XDMF_WEDGE_18       0x0029
+# > #define XDMF_HEX_20         0x0030
+# > #define XDMF_HEX_24         0x0031
+# > #define XDMF_HEX_27         0x0032
+# > #define XDMF_MIXED          0x0070
+# > #define XDMF_2DSMESH        0x0100
+# > #define XDMF_2DRECTMESH     0x0101
+# > #define XDMF_2DCORECTMESH   0x0102
+# > #define XDMF_3DSMESH        0x1100
+# > #define XDMF_3DRECTMESH     0x1101
+# > #define XDMF_3DCORECTMESH   0x1102
 
 function xdmf_new_model(xdmf_version="2.1")
     xdoc = XMLDocument()
