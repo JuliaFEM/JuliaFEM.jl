@@ -8,7 +8,8 @@ using Logging
 using JuliaFEM.abaqus_reader: parse_abaqus, parse_element_section
 
 facts("test import abaqus model") do
-    fid = open("../geometry/3d_beam/palkki.inp")
+  # FIXME: get_test_data()
+    fid = open(Pkg.dir("JuliaFEM")*"/geometry/3d_beam/palkki.inp")
     model = parse_abaqus(fid)
     close(fid)
     @fact length(model["nodes"]) => 298

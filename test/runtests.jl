@@ -74,9 +74,11 @@ facts("Looking the [src,test] folders *.jl files header information") do
   @fact files_no_license => isempty out_str
 end
 
-# FIXME: $PACKAGE_ROOT/test
-test_files = readdir(".")
+test_files = readdir(Pkg.dir("JuliaFEM")*"/test")
+#println("test files: $test_files")
 for test_file in test_files
+  println("checking is $test_file is real test file")
+  #if contains("test_", test_file)
   if beginswith(test_file, "test_")
     Logging.info("Running tests from file $test_file")
     include(test_file)
