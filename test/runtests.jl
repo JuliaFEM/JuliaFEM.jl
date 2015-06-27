@@ -74,36 +74,20 @@ facts("Looking the [src,test] folders *.jl files header information") do
   @fact files_no_license => isempty out_str
 end
 
-#function test_get_element()
-#    m = new_model()
-#    nodes = Dict(1 => [0.0, 0.0, 0.0],
-#                 2 => [1.0, 0.0, 0.0],
-#                 3 => [0.0, 1.0, 0.0],
-#                 4 => [0.0, 0.0, 1.0])
-#    add_nodes(m, nodes)
-#    el1 = Dict("element_type" => 0x6, "node_ids" => [1, 2, 3, 4])
-#    el2 = Dict("element_type" => 0x6, "node_ids" => [4, 3, 2, 1])
-#    elements = Dict(1 => el1, 2 => el2)
-#    #println(elements)
-#    add_elements(m, elements)
-#    #println(m)
-#    # get elements by element id
-#    els = get_elements(m, [1])
-#    #println(els)
-#    @test length(els) == 1
-#    @test 1 in keys(els)
-#    @test els[1]["element_type"] == 0x6
-#    @test els[1]["node_ids"] == [1, 2, 3, 4]
-#end
-#test_get_element()
+# FIXME: $PACKAGE_ROOT/test
+test_files = readdir(".")
+for test_file in test_files
+  if beginswith(test_file, "test_")
+    Logging.info("Running tests from file $test_file")
+    include(test_file)
+  end
+end
 
-
-
-include("test_xdmf.jl")
-include("test_elasticity_solver.jl")
-include("test_model.jl")
-include("test_abaqus_reader.jl")
-include("test_interfaces.jl")
+#include("test_xdmf.jl")
+#include("test_elasticity_solver.jl")
+#include("test_model.jl")
+#include("test_abaqus_reader.jl")
+#include("test_interfaces.jl")
 
 # Keep this at the end of this file (include statements above this)
 @Logging.configure(level=DEBUG)
