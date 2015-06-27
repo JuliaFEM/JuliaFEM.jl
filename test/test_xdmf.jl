@@ -114,3 +114,11 @@ facts("test model write XML") do
   xdmf_new_field(grid, "Density", "nodes", density_field)
   @fact string(xdoc) => testdata
 end
+
+facts("test that xdmf throws error when trying to add field not able to handle") do
+  xdoc, model = xdmf_new_model()
+  temporal_collection = xdmf_new_temporal_collection(model)
+  grid = xdmf_new_grid(temporal_collection; time=123)
+  temperature_field = ["56"] # strings not supported by xdmf
+  @fact_throws xdmf_new_field(grid, "unknown field data", "elements", temperature_field)
+end
