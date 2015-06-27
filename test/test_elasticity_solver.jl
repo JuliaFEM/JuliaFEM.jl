@@ -270,3 +270,13 @@ facts("remove boundary conditions from vector with 2 dof/node") do
     A2 = full(sparsevec(I, V))
     @fact A2 => [2 3]'
 end
+
+facts("test that elimination of non-homogeneous dirichlet boundary conditions raises error because they are not supported atm") do
+    A = sparse(reshape(1:4*4, 4, 4))
+    I, J, V = findnz(A)
+    dirichletbc = [0 1; NaN 0]'
+    @fact_throws I, J, V = eliminate_boundary_conditions(dirichletbc, I, J, V)
+    A = sparsevec([1, 2, 3, 4])
+    I, J, V = findnz(A)
+    @fact_throws I, V = eliminate_boundary_conditions(dirichletbc, I, V)
+end
