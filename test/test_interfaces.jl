@@ -7,13 +7,13 @@ using Logging
 
 using JuliaFEM.interfaces: solve_elasticity_interface!
 
-facts("test solve_elasticity_interface!") do
-  test = solve_elasticity_interface!()
-  @pending
-end
+#facts("test solve_elasticity_interface!") do
+#  test = solve_elasticity_interface!()
+#  @pending
+#end
 
 
 facts("test interface modules") do
-  test = solve_elasticity_interface!() 
-  @assert test == 0 
+  output = solve_elasticity_interface!()
+  @fact output => 0
 end
