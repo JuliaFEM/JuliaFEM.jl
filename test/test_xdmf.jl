@@ -99,7 +99,7 @@ facts("test test data") do
   @fact string(xdoc) => testdata
 end
 
-using JuliaFEM.xdmf: xdmf_new_model, xdmf_new_grid, xdmf_new_temporal_collection, xdmf_new_mesh, xdmf_new_field
+using JuliaFEM.xdmf: xdmf_new_model, xdmf_new_grid, xdmf_new_temporal_collection, xdmf_new_mesh, xdmf_new_field, xdmf_save_model
 
 facts("test model write XML") do
   X = [0 0 0; 1 0 0; 0 1 0; 0 0 1]'
@@ -121,4 +121,13 @@ facts("test that xdmf throws error when trying to add field not able to handle")
   grid = xdmf_new_grid(temporal_collection; time=123)
   temperature_field = ["56"] # strings not supported by xdmf
   @fact_throws xdmf_new_field(grid, "unknown field data", "elements", temperature_field)
+end
+
+facts("test saving xdmf model") do
+  xdoc, model = xdmf_new_model()
+  # FIXME: xdoc here is just / of xml file, we're not interested of it but
+  # xdmf_new_model returns it that we're able to save xml file.
+  t = tempname()
+  xdmf_save_model(xdoc, t)
+  @fact isfile(t) => true
 end
