@@ -29,3 +29,20 @@ facts("test that reader throws error when dimension information of elemenet is m
   header = Dict("section"=>"ELEMENT", "options" => Dict("TYPE" => "neverseenbefore", "ELSET"=>"Body1"))
   @fact_throws parse_element_section(model, header, data)
 end
+
+facts("test unknown handler warning message") do
+  fn = tempname()
+  fid = open(fn, "w")
+  testdata = """
+  *ELEMENT2, TYPE=C3D10, ELSET=Body1
+         1,       243,       240,       191,       117,       245,       242,       244,
+         1,         2,       196
+  """
+  write(fid, testdata)
+  close(fid)
+  fid = open(fn)
+  model = parse_abaqus(fid)
+  close(fid)
+  # empty model expected, parser doesn't know what to do with unknown section
+  @fact length(model) => 0
+end
