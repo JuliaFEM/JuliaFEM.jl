@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Xdmf xmlns:xi="http://www.w3.org/2001/XInclude" Version="2.1">
+  <Domain>
+    <Grid CollectionType="Temporal" GridType="Collection" Name="Collection">
+      <Grid Name="Grid">
+        <Geometry Type="XYZ">
+          <Time Value="0"/>
+          <DataItem DataType="Float" Dimensions="8 3" Format="XML" Precision="8">
+            0.0 0.0 0.0
+            1.0 0.0 0.0
+            1.0 1.0 0.0
+            0.0 1.0 0.0
+            1.0 0.0 0.0
+            2.0 0.0 0.0
+            2.0 1.0 0.0
+            1.0 1.0 0.0
+          </DataItem>
+        </Geometry>
+        <Topology TopologyType="Mixed" NumberOfElements="2" >
+          <DataItem Format="XML" DataType="Int" Dimensions="2 5">
+              5  0 1 2 3
+              5  4 5 6 7
+            </DataItem>
+        </Topology>
+      </Grid>
+    </Grid>
+  </Domain>
+</Xdmf>
