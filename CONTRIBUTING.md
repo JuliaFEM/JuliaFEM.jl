@@ -40,4 +40,9 @@ FactCheck.jl is used to write test for the JuliaFEM.jl package
 
 JuliaFEM.jl is using Logging.jl
 -------------------------------
-[See issue #25](https://github.com/JuliaFEM/JuliaFEM.jl/issues/25). We have written a test to check all sources in src folder to find any print statements. Use Logging.jl instead of println(). 
+[See issue #25](https://github.com/JuliaFEM/JuliaFEM.jl/issues/25). We have written a test to check all sources in src folder to find any print statements. Use Logging.jl instead of println().
+
+Code indentation
+----------------
+We use 4 spaces like in Python. [See issue #5](https://github.com/JuliaFEM/JuliaFEM.jl/issues/5)
+
