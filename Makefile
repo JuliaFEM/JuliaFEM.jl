@@ -35,6 +35,10 @@ apidoc:
 copyreadme:
 	cp README.md docs/index.md
 
+# sync web server
+wwwdeploy:
+	rsync -r --delete docs/build/html/ $(JULIAFEM_WWW)
+
 #coverage_report:
 #	julia -e 'Pkg.test("JuliaFEM"; coverage=true); cd(Pkg.dir("JuliaFEM")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
 
