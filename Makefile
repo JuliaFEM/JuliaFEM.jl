@@ -18,12 +18,21 @@ ALLSPHINXOPTS   = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) docs
 # the i18n builder cannot share the environment and doctrees with the others
 I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) source
 
-.PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext
+.PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext build apidoc
 
+
+#build:
+#	julia -e 'Pkg.init(); Pkg.clone(pwd()); Pkg.build("JuliaFEM")'
+
+build:
+	julia -e 'Pkg.build("JuliaFEM")'
 
 # create .md files from function docstrings
 apidoc:
 	julia docs/build.jl
+
+#coverage_report:
+#	julia -e 'Pkg.test("JuliaFEM"; coverage=true); cd(Pkg.dir("JuliaFEM")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
 
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
