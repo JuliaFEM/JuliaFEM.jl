@@ -31,6 +31,10 @@ build:
 apidoc:
 	julia docs/build.jl
 
+# copy readme to correct place in docs root
+copyreadme:
+	cp README.md docs/
+
 #coverage_report:
 #	julia -e 'Pkg.test("JuliaFEM"; coverage=true); cd(Pkg.dir("JuliaFEM")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
 
