@@ -11,11 +11,11 @@ for ipynb in readdir("tutorials")
     println("Running notebook tutorials/$ipynb")
     try
         run(`runipy -o tutorials/$ipynb --kernel=julia-0.4 --port=34211`)
-        runtime = toc()
         status = 0
     catch
         println("did not work")
     end
+    runtime = toc()
     run(`ipython nbconvert tutorials/$ipynb --to rst --output=tutorials/$(ipynb[1:end-6])`)
     println("took $runtime seconds")
     push!(results, Dict("filename" => ipynb, "status" => status, "runtime" => runtime))

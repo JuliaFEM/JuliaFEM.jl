@@ -29,11 +29,11 @@ build:
 
 # create .md files from function docstrings
 apidoc:
-	julia docs/build.jl
+	julia docs/build_api.jl
 
 # copy readme to correct place in docs root
-copyreadme:
-	cp README.md docs/index.md
+#copyreadme:
+#	cp README.md docs/index.md
 
 # convert notebooks to md files
 convert_notebooks:
