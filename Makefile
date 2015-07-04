@@ -33,7 +33,7 @@ apidoc:
 
 # copy readme to correct place in docs root
 copyreadme:
-	cp README.md docs/index.md
+	cp README.md docs/README.md
 
 # convert notebooks to md files
 convert_notebooks:
