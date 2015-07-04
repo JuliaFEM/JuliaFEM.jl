@@ -1,9 +1,7 @@
 Tutorials
 =========
 
-Tutorials are automatically generated. Current status of notebooks:
+Tutorials are automatically generated each time new commit is done. 
 
-| id | Notebook | Runtime | Status|
-|----|----------|---------|-------|
-|1|2015-07-04-hello-world-functional-tests-part-2.ipynb|17.6|0|
-|2|2015-07-04-hello-world-functional-tests.ipynb|16.01|1|
+.. include:: notebooks.rst
+
