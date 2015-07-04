@@ -37,7 +37,7 @@ copyreadme:
 
 # convert notebooks to md files
 convert_notebooks:
-	runipy --kernel=julia-0.4 docs/tutorials/2015-07-04-hello-world-functional-tests-part-2.ipynb /tmp/2015-07-04-hello-world-functional-tests-part-2.ipynb && ipython nbconvert /tmp/2015-07-04-hello-world-functional-tests-part-2.ipynb --to=rst docs/tutorials/2015-07-04-hello-world-functional-tests-part-2.md
+	cd docs/tutorials && runipy --kernel=julia-0.4 2015-07-04-hello-world-functional-tests-part-2.ipynb /tmp/2015-07-04-hello-world-functional-tests-part-2.ipynb && ipython nbconvert /tmp/2015-07-04-hello-world-functional-tests-part-2.ipynb --to=rst
 
 # sync web server
 wwwdeploy:
