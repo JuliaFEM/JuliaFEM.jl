@@ -17,11 +17,15 @@ JuliaFEM current status: project planning
 
 Initial road map for JuliaFEM:
 
-version | number of degree of freedom | number of cores
-----------|-----------------------------------------|----------------------
-1.0 | 100 000 000 | 1 000
-2.0 | 1 000 000 000 | 10 000
-3.0 | 10 000 000 000 | 100 000
++---------+-----------------------------+-----------------+
+| version | number of degree of freedom | number of cores |
++=========+=============================+=================+
+|     1.0 |                 100 000 000 |           1 000 |
++---------+-----------------------------+-----------------+
+|     2.0 |               1 000 000 000 |          10 000 |
++---------+-----------------------------+-----------------+
+|     3.0 |              10 000 000 000 |         100 000 |
++---------+-----------------------------+-----------------+
 
 We strongly believe in the test driven development as well as building on top of previous work. Thus all the new code in this project should be 100% tested. Also other people have wisdom in style as well:
 
