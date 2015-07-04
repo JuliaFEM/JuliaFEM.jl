@@ -39,10 +39,6 @@ copyreadme:
 convert_notebooks:
 	cd docs/tutorials && runipy --kernel=julia-0.4 2015-07-04-hello-world-functional-tests-part-2.ipynb /tmp/2015-07-04-hello-world-functional-tests-part-2.ipynb && ipython nbconvert /tmp/2015-07-04-hello-world-functional-tests-part-2.ipynb --to=rst
 
-# sync web server
-wwwdeploy:
-	rsync -r --delete docs/build/html/ $(JULIAFEM_WWW)
-
 #coverage_report:
 #	julia -e 'Pkg.test("JuliaFEM"; coverage=true); cd(Pkg.dir("JuliaFEM")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
 
