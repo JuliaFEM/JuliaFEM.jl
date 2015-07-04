@@ -17,7 +17,10 @@ import os
 import juliadoc
 import shlex
 import sphinx_rtd_theme
+import datetime
 
+with open("last_updated.rst", "w") as fh:
+    fh.write("Documentation last updated (UTC): {0}".format(str(datetime.datetime.utcnow())))
 
 extensions = ['juliadoc.julia', 'juliadoc.jlhelp']
 html_theme_path = [juliadoc.get_theme_dir(), sphinx_rtd_theme.get_html_theme_path()]
@@ -145,7 +148,7 @@ html_show_copyright = False
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-#html_logo = None
+html_logo = './logo/JuliaFEMLogo_256x256.png'
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32

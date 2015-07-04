@@ -1,14 +1,13 @@
-JuliaFEM
-========
-
 .. include:: ../README.rst
+
+.. include:: last_updated.rst
 
 Contents:
 
 .. toctree::
    :maxdepth: 2
 
-   introduction
-   api/index
+   ../README.rst
    tutorials/index
+   api/index
 
