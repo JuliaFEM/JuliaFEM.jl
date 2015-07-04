@@ -47,15 +47,15 @@ cd(dirname(dirname(@__FILE__))) do
     site_name: JuliaFEM.jl
     site_description: JuliaFEM.jl, open-source software for reliable, scalable, distributed Finite Element Method.
     repo_name: GitHub
-    docs_dir: 'docs'
-    site_dir: 'site'
+    # docs_dir: 'docs'
+    # site_dir: 'site'
     repo_url: https://github.com/JuliaFEM/JuliaFEM.jl
     pages:
-    - Home: 'README.md'
-    - Overview: 'api/index.md'
-    - API Docs:
-      - JuliaFEM: 'api/JuliaFEM.md'
-      - JuliaFEM.elasticity_solver: 'api/JuliaFEM.elasticity_solver.md'
+    - Home: 'index.md'
+    #- API Docs:
+    - JuliaFEM: 'api/JuliaFEM.md'
+    - JuliaFEM.elasticity_solver: 'api/JuliaFEM.elasticity_solver.md'
+    theme: readthedocs
     """
 
     # TODO: add the solutions if I figure out how to get them to render properly
