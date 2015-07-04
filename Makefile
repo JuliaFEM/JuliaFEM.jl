@@ -39,6 +39,9 @@ apidoc:
 convert_notebooks:
 	julia docs/build_notebooks.jl
 
+fix_permissions:
+	find docs/build/html -type d -exec chmod 775 {} \; && find docs/build/html -type f -exec chmod 664 {} \;
+
 #coverage_report:
 #	julia -e 'Pkg.test("JuliaFEM"; coverage=true); cd(Pkg.dir("JuliaFEM")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
 
