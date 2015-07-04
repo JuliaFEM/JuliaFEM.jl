@@ -10,7 +10,7 @@ for ipynb in readdir("tutorials")
     status = 1
     println("Running notebook tutorials/$ipynb")
     try
-        run(`runipy -o tutorials/$ipynb --kernel=julia-0.4 --port=0`)
+        run(`runipy -o tutorials/$ipynb --kernel=julia-0.4 --port=34211`)
         runtime = toc()
         status = 0
     catch
