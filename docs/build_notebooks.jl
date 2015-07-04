@@ -1,5 +1,6 @@
 cd(dirname(@__FILE__)) do
 
+k = 0
 results = Dict[]
 for ipynb in readdir("tutorials")
     tic()
@@ -9,8 +10,10 @@ for ipynb in readdir("tutorials")
     runtime = 0
     status = 1
     println("Running notebook tutorials/$ipynb")
+    port = 34211+k
+    k += 1
     try
-        run(`runipy -o tutorials/$ipynb --kernel=julia-0.4 --port=34211`)
+        run(`runipy -o tutorials/$ipynb --kernel=julia-0.4 --port=$port`)
         status = 0
     catch
         println("did not work")
