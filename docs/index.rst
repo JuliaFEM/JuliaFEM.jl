@@ -1,13 +1,10 @@
+.. include:: last_updated.rst
 .. include:: ../README.rst
 
-.. include:: last_updated.rst
-
-Contents:
-
 .. toctree::
-   :maxdepth: 2
+   :hidden:
 
-   ../README.rst
+   self
    tutorials/index
    api/index
 
