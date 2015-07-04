@@ -15,7 +15,7 @@
 import sys
 import os
 import juliadoc
-#import shlex
+import shlex
 import sphinx_rtd_theme
 
 
@@ -119,7 +119,7 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 # html_theme = 'alabaster'
-html_theme = 'julia'
+html_theme = 'sphinx_rtd_theme'
 
 
 # If true, "Created using Sphinx" is shown in the HTML footer. Default is True.
