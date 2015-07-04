@@ -35,6 +35,10 @@ apidoc:
 copyreadme:
 	cp README.md docs/index.md
 
+# convert notebooks to md files
+convert_notebooks:
+	runipy docs/tutorials/2015-07-04-hello-world-functional-tests-part-2.ipynb /tmp/2015-07-04-hello-world-functional-tests-part-2.ipynb && ipython nbconvert /tmp/2015-07-04-hello-world-functional-tests-part-2.ipynb --to=rst docs/tutorials/2015-07-04-hello-world-functional-tests-part-2.md
+
 # sync web server
 wwwdeploy:
 	rsync -r --delete docs/build/html/ $(JULIAFEM_WWW)
