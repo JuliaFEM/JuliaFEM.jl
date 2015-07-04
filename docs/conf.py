@@ -14,13 +14,17 @@
 
 import sys
 import os
-import shlex
-
 import juliadoc
+#import shlex
+import sphinx_rtd_theme
+
 
 extensions = ['juliadoc.julia', 'juliadoc.jlhelp']
-html_theme_path = [juliadoc.get_theme_dir()]
+html_theme_path = [juliadoc.get_theme_dir(), sphinx_rtd_theme.get_html_theme_path()]
 html_sidebars = juliadoc.default_sidebars()
+
+primary_domain = 'jl'
+highlight_language = 'julia'
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -49,7 +53,7 @@ source_suffix = ['.rst', '.md']
 #source_encoding = 'utf-8-sig'
 
 # The master toctree document.
-master_doc = 'README'
+master_doc = 'index'
 
 # General information about the project.
 project = u'JuliaFEM'
@@ -115,6 +119,14 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 # html_theme = 'alabaster'
+html_theme = 'julia'
+
+
+# If true, "Created using Sphinx" is shown in the HTML footer. Default is True.
+html_show_sphinx = False
+
+# If true, "(C) Copyright ..." is shown in the HTML footer. Default is True.
+html_show_copyright = False
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
