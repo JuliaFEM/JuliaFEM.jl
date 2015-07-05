@@ -1,12 +1,10 @@
 
-.. image:: https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/docs/logo/JuliaFEMLogo_256x256.png
+.. image:: https://raw.githubusercontent.com/JuliaFEM/JuliaFEM.jl/master/docs/logo/JuliaFEMLogo_256x256.png
+  :target: https://github.com/JuliaFEM/JuliaFEM.jl
 
 ========
 JuliaFEM
 ========
-
-.. image:: https://raw.githubusercontent.com/JuliaFEM/JuliaFEM.jl/master/docs/logo/JuliaFEMLogo_256x256.png
-  :target: https://github.com/JuliaFEM/JuliaFEM.jl
 
 The JuliaFEM project develops open-source software for reliable, scalable, distributed Finite Element Method.
 
