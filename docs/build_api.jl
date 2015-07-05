@@ -4,8 +4,8 @@ const api_directory = "api"
 
 """
 Searches recursively all the modules from packages. As documentation grows, it's a bit
-troublesome to add all the new modules manually, so we've written with this function
-which searches all the modules automatically. 
+troublesome to add all the new modules manually, so this function searches all the modules
+automatically. 
 
 Parameters
 ----------
