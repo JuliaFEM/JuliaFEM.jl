@@ -1,5 +1,40 @@
 # Automatically run notebooks and generate rst table for results
 
+""" rst file parser to find title, author and factcheck status.
+"""
+function parse_rst(filename)
+    res = Dict("author" => "unknown", "status" => 0, "title" => "", "abstract" => "")
+    title_found = false
+    open(filename) do fid
+        data = readlines(fid)
+        for line in data
+            line = strip(line)
+            if line == ""
+                continue
+            end
+            if !title_found
+                res["title"] = line
+                title_found = true
+            end
+            if startswith(line, "Author(s):")
+                auth = split(line[12:end], ' ')
+                auth = filter(s -> !('@' in s), auth)
+                auth = join(auth, ' ')
+                res["author"] = auth
+            end
+            if startswith(line, "Abstract:")  # not working, todo, fixme, ...
+                res["abstract"] = line[11:end]
+            end
+            if startswith(line, "Failed:")
+                res["status"] = 1
+            end
+            m = matchall(r"[-0-9.]+", line)
+        end
+    end
+    return res
+end
+
+
 function run_notebooks()
     k = 0
     results = Dict[]
@@ -21,10 +56,19 @@ function run_notebooks()
                 println("did not work")
             end
             runtime = toc()
-            run(`ipython nbconvert tutorials/$ipynb --to rst --output=tutorials/$(ipynb[1:end-6])`)
-            #println("took $runtime seconds")
+            bn = "tutorials/$(ipynb[1:end-6])"
+            run(`ipython nbconvert tutorials/$ipynb --to rst --output=$bn`)
+            run(`ipython nbconvert tutorials/$ipynb --to pdf --output=$bn`)
             data = Dict("author" => "unknown", "status" => status, "runtime" => runtime,
                         "filename" => ipynb, "last_run" => time(), "description"=>"")
+            res = parse_rst("$bn.rst")
+            data["description"] = res["title"]
+            data["author"] = res["author"]
+            # there is two possibilities, either notbook does not run for syntax error (status = 1)
+            # or notebook is fine but factcheck returns failed. This checks the latter one.
+            if status == 0
+                data["status"] = res["status"]
+            end
             push!(results, data)
         end
     end
@@ -35,7 +79,7 @@ end
 Make rows from results ready to tabular form
 """
 function makerows(results)
-    rows = ["id" "author" "description" "last run" "runtime (s)" "status" "html" "pdf"]
+    rows = ["id" "author" "description" "last run" "runtime (s)" "status" "ipynb" "pdf"]
     for (i, data) in enumerate(results)
         row = ["na" "unknown" "unknown" "unknown" "unknown" "unknown" "na" "na"]
         println(i)
@@ -44,7 +88,9 @@ function makerows(results)
         if desc == ""
             desc = data["filename"]
         end
-        row[3] = desc
+        row[2] = data["author"]
+        fn = data["filename"][1:end-6]
+        row[3] = ":doc:`$desc <$fn>`"
         row[4] = Libc.strftime("%Y-%m-%d %H:%M:%S", data["last_run"])
         row[5] = string(round(data["runtime"], 2))
         if data["status"] == 0
@@ -52,10 +98,10 @@ function makerows(results)
         else
             row[6] = "FAIL"
         end
-        fn = data["filename"][1:end-6]*".rst"
-        row[7] = ":doc:`html <$fn>`"
+        fn = data["filename"]
+        row[7] = ":download:`ipynb <$fn>`"
         fn = data["filename"][1:end-6]*".pdf"
-        row[8] = ":download:`html <$fn>`"
+        row[8] = ":download:`pdf <$fn>`"
         rows = vcat(rows, row)
     end
     return rows
