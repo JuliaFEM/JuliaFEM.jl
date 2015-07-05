@@ -1,7 +1,41 @@
 using Docile, Lexicon, JuliaFEM
 
 const api_directory = "api"
-const modules = [JuliaFEM, JuliaFEM.elasticity_solver]
+
+"""
+Searches recursively all the modules from packages. As documentation grows, it's a bit
+troublesome to add all the new modules manually, so we've written with this function
+which searches all the modules automatically. 
+
+Parameters
+----------
+    module_: Module
+        Module where we want to search modules inside
+    append_list: Array{Module, 1}
+        Array, where we append Modules as we find them
+
+Returns
+-------
+    None. Void function, which manipulates the append_list 
+"""
+function search_modules!(module_::Module, append_list::Array{Module, 1})
+    if module_parent(module_) == Main
+        push!(append_list, module_)
+    end
+    all_names = names(module_, true)
+    for each in all_names
+        inner_module = module_.(each)
+        if (typeof(inner_module) == Module) && !(inner_module in append_list)
+            push!(append_list, inner_module)
+            search_modules!(inner_module, append_list)
+        end
+    end
+end
+
+append_list = []
+search_modules!(JuliaFEM, append_list)
+
+const modules = append_list
 
 # main_folder = dirname(dirname(@__FILE__))
 # this_folder = dirname(@__FILE__)
