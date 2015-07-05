@@ -28,6 +28,9 @@ function parse_rst(filename)
             if startswith(line, "Failed:")
                 res["status"] = 1
             end
+            if startswith(line, "Failure")
+                res["status"] = 1
+            end
             m = matchall(r"[-0-9.]+", line)
         end
     end
