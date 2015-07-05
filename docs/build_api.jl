@@ -29,7 +29,7 @@ function search_modules!(module_::Module, append_list::Array{Module, 1})
     end
 end
 
-append_list = []
+append_list = Array(Module, 0)
 search_modules!(JuliaFEM, append_list)
 
 const modules = append_list
