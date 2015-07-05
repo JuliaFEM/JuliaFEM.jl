@@ -19,9 +19,6 @@ Returns
     None. Void function, which manipulates the append_list 
 """
 function search_modules!(module_::Module, append_list::Array{Module, 1})
-    if module_parent(module_) == Main
-        push!(append_list, module_)
-    end
     all_names = names(module_, true)
     for each in all_names
         inner_module = module_.(each)
