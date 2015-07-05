@@ -46,3 +46,8 @@ Code indentation
 ----------------
 We use 4 spaces like in Python. [See issue #5](https://github.com/JuliaFEM/JuliaFEM.jl/issues/5)
 
+Function docstrings
+-------------------
+We use numpy documentation style in our functions. See https://github.com/numpy/numpy/blob/master/doc/HOWTO_DOCUMENT.rst.txt. See issue #5.
+
+
