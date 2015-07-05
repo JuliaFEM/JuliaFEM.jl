@@ -174,13 +174,13 @@ function write_rst_table(rows)
 end
 
 
-function main(;filename="tutorials/notebooks.rst")
+function main()
     results = run_notebooks()
     rows = makerows(results)
     table = write_rst_table(rows)
     println(table)
     cd(dirname(@__FILE__)) do
-        open(filename, "w") do fid
+        open("tutorials/notebooks.rst", "w") do fid
             write(fid, table)
         end
     end
