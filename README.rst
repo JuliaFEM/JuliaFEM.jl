@@ -20,6 +20,9 @@ The JuliaFEM project develops open-source software for reliable, scalable, distr
 .. image:: http://juliafem.kapsi.fi/_static/notebooks-status.svg
   :target: http://juliafem.kapsi.fi/tutorials/index.html
 
+.. image:: https://img.shields.io/github/issues/JuliaFEM/JuliaFEM.jl.svg
+  :target: https://github.com/JuliaFEM/JuliaFEM.jl/issues
+
 Documentation: http://www.juliaFEM.org
 
 GitHub respository: https://github.com/JuliaFEM/JuliaFEM.jl
