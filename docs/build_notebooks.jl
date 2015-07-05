@@ -47,10 +47,10 @@ function run_notebooks()
             runtime = 0
             status = 1
             println("Running notebook tutorials/$ipynb")
-            port = 34211+k  # we're having some weird port issue with zmq
-            k += 1
+            # port = 34211+k  # we're having some weird port issue with zmq
+            # k += 1
             try
-                run(`runipy -o tutorials/$ipynb --kernel=julia-0.4 --port=$port`)
+                run(`runipy -o tutorials/$ipynb --kernel=julia-0.4`)
                 status = 0
             catch
                 println("did not work")
