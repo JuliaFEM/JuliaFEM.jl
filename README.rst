@@ -1,3 +1,6 @@
+
+.. image:: https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/docs/logo/JuliaFEMLogo_256x256.png
+
 ========
 JuliaFEM
 ========
