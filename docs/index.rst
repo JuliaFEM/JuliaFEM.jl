@@ -1,4 +1,3 @@
-.. include:: last_updated.rst
 .. include:: ../README.rst
 
 .. toctree::
