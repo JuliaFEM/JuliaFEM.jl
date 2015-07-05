@@ -19,8 +19,10 @@ import shlex
 import sphinx_rtd_theme
 import datetime
 
-with open("last_updated.rst", "w") as fh:
-    fh.write("Documentation last updated (UTC): {0}".format(str(datetime.datetime.utcnow())))
+#with open("last_updated.rst", "w") as fh:
+#    fh.write("Documentation last updated (UTC): {0}".format(str(datetime.datetime.utcnow())))
+
+html_last_updated_fmt = "%Y-%m-%d %H:%M:%S"
 
 extensions = ['juliadoc.julia', 'juliadoc.jlhelp']
 html_theme_path = [juliadoc.get_theme_dir(), sphinx_rtd_theme.get_html_theme_path()]

@@ -2,6 +2,9 @@
 JuliaFEM
 ========
 
+.. image:: https://raw.githubusercontent.com/JuliaFEM/JuliaFEM.jl/master/docs/logo/JuliaFEMLogo_256x256.png
+  :target: https://github.com/JuliaFEM/JuliaFEM.jl
+
 The JuliaFEM project develops open-source software for reliable, scalable, distributed Finite Element Method.
 
 .. image:: https://badges.gitter.im/Join%20Chat.svg
@@ -15,6 +18,8 @@ The JuliaFEM project develops open-source software for reliable, scalable, distr
 
 
 Documentation: http://www.juliaFEM.org
+
+GitHub respository: https://github.com/JuliaFEM/JuliaFEM.jl
 
 
 The JuliaFEM software library is a framework that allows for the distributed processing of large Finite Element Models across clusters of computers using simple programming models. It is designed to scale up from single servers to thousands of machines, each offering local computation and storage. The basic design principle is: everything is nonlinear. All physics models are nonlinear from which the linearization are made as a special cases. 
@@ -41,15 +46,18 @@ We strongly believe in the test driven development as well as building on top of
 
 `The Zen of Python <https://www.python.org/dev/peps/pep-0020/>`_
 
-|    Beautiful is better than ugly.
-|    Explicit is better than implicit.
-|    Simple is better than complex.
-|    Complex is better than complicated.
-|    Flat is better than nested.
-|    Sparse is better than dense.
-|    Readability counts.
-|    Errors should never pass silently.
+| Beautiful is better than ugly.
+| Explicit is better than implicit.
+| Simple is better than complex.
+| Complex is better than complicated.
+| Flat is better than nested.
+| Sparse is better than dense.
+| Readability counts.
+| Errors should never pass silently.
+|
 
+Contributing
+------------
 
 Interested in participating? Please start by reading `CONTRIBUTING.md <https://github.com/JuliaFEM/JuliaFEM/blob/master/CONTRIBUTING.md>`_.
 
