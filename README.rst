@@ -8,6 +8,9 @@ JuliaFEM
 
 The JuliaFEM project develops open-source software for reliable, scalable, distributed Finite Element Method.
 
+.. image:: https://img.shields.io/github/license/JuliaFEM/Juliafem.jl.svg
+  :target: https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+
 .. image:: https://badges.gitter.im/Join%20Chat.svg
   :target: https://gitter.im/JuliaFEM/JuliaFEM?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
 
