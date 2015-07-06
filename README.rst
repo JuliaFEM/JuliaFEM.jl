@@ -23,6 +23,10 @@ The JuliaFEM project develops open-source software for reliable, scalable, distr
 .. image:: http://juliafem.kapsi.fi/_static/notebooks-status.svg
   :target: http://juliafem.kapsi.fi/tutorials/index.html
 
+.. image:: http://juliafem.kapsi.fi/_static/doctests-status.svg
+
+.. image:: http://juliafem.kapsi.fi/_static/unittests-status.svg
+
 .. image:: http://juliafem.kapsi.fi/_static/lint-status.svg
   :target: http://juliafem.kapsi.fi/quality/index.html#lint-report
 
