@@ -1,5 +1,7 @@
 # Automatically run notebooks and generate rst table for results
 
+include("badges.jl")
+
 """ rst file parser to find title, author and factcheck status.
 """
 function parse_rst(filename)
@@ -82,7 +84,7 @@ end
 Make rows from results ready to tabular form
 """
 function makerows(results)
-    rows = ["id" "author" "description" "last run" "runtime (s)" "status" "ipynb" "pdf"]
+    rows = ["id" "author" "description" "status" "ipynb" "pdf" "last run" "runtime (s)"]
     for (i, data) in enumerate(results)
         row = ["na" "unknown" "unknown" "unknown" "unknown" "unknown" "na" "na"]
         println(i)
@@ -94,17 +96,20 @@ function makerows(results)
         row[2] = data["author"]
         fn = data["filename"][1:end-6]
         row[3] = ":doc:`$desc <$fn>`"
-        row[4] = Libc.strftime("%Y-%m-%d %H:%M:%S", data["last_run"])
-        row[5] = string(round(data["runtime"], 2))
+
         if data["status"] == 0
-            row[6] = "PASS"
+            row[4] = ".. image:: /badges/notebook-passing.svg"
         else
-            row[6] = "FAIL"
+            row[4] = ".. image:: /badges/notebook-failing.svg"
         end
+
         fn = data["filename"]
-        row[7] = ":download:`ipynb <$fn>`"
+        row[5] = ":download:`ipynb <$fn>`"
         fn = data["filename"][1:end-6]*".pdf"
-        row[8] = ":download:`pdf <$fn>`"
+        row[6] = ":download:`pdf <$fn>`"
+
+        row[7] = Libc.strftime("%Y-%m-%d %H:%M:%S", data["last_run"])
+        row[8] = string(round(data["runtime"], 2))
         rows = vcat(rows, row)
     end
     return rows
@@ -176,6 +181,14 @@ end
 
 function main()
     results = run_notebooks()
+    notebooks_total = 0
+    notebooks_passing = 0
+    for result in results
+        notebooks_total += 1
+        if result["status"] == 0
+            notebooks_passing += 1
+        end
+    end
     rows = makerows(results)
     table = write_rst_table(rows)
     println(table)
@@ -183,6 +196,7 @@ function main()
         open("tutorials/notebooks.rst", "w") do fid
             write(fid, table)
         end
+        make_badge("notebooks", notebooks_passing, notebooks_total, "badges/notebooks-status.svg")
     end
 end
 
