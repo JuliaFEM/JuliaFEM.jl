@@ -7,3 +7,4 @@
    tutorials/index
    api/index
    quality/index
+   ../CONTRIBUTING
