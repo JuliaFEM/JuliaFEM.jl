@@ -45,6 +45,9 @@ fix_permissions:
 lint:
 	julia docs/build_lint.jl
 
+unittests:
+	julia docs/build_unittests.jl
+
 #coverage_report:
 #	julia -e 'Pkg.test("JuliaFEM"; coverage=true); cd(Pkg.dir("JuliaFEM")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
 
