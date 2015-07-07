@@ -1,6 +1,9 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+# should this stuff be in package? see FactCheck docs.
+
+
 using JuliaFEM
 using FactCheck
 using Logging
@@ -75,21 +78,13 @@ facts("Looking the [src,test] folders *.jl files header information") do
 end
 
 test_files = readdir(Pkg.dir("JuliaFEM")*"/test")
-#println("test files: $test_files")
 for test_file in test_files
-  println("checking is $test_file is real test file")
-  #if contains("test_", test_file)
-  if beginswith(test_file, "test_")
+  Logging.info("checking is $test_file is real test file")
+  if (startswith(test_file, "test_")) & (endswith(test_file, ".jl"))
     Logging.info("Running tests from file $test_file")
     include(test_file)
   end
 end
-
-#include("test_xdmf.jl")
-#include("test_elasticity_solver.jl")
-#include("test_model.jl")
-#include("test_abaqus_reader.jl")
-#include("test_interfaces.jl")
 
 # Keep this at the end of this file (include statements above this)
 @Logging.configure(level=DEBUG)
