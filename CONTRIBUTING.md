@@ -1,6 +1,6 @@
-===============================
-Notes for JuliaFEM contributors
-===============================
+========================
+Contributing to JuliaFEM
+========================
 
 This very important document need to be done.
 
