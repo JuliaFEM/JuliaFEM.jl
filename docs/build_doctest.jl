@@ -34,13 +34,16 @@ const modules = append_list
 
 cd(dirname(@__FILE__)) do
     # Run the doctests *before* we start to generate *any* documentation.
+    fid = open("./quality/doctests_report.rst", "w")
     for m in modules
-        failures = failed(doctest(m))
-        if !isempty(failures.results)
-            println("\nDoctests failed, aborting commit.\n")
-            display(failures)
-            exit(1) # Bail when doctests fail.
-        end
+	results = doctest(m)
+	write(fid, results)
+        #failures = failed(doctest(m))
+        #if !isempty(failures.results)
+        #    println("\nDoctests failed, aborting commit.\n")
+        #    display(failures)
+        #    exit(1) # Bail when doctests fail.
+        #end
     end
-
+    close(fid)
 end
