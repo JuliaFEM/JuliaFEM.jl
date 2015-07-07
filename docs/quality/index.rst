@@ -9,6 +9,10 @@ Lint report
 Doctest report
 --------------
 
-.. include:: doctest_report.rst
+.. include:: doctests_report.rst
 
+Unittest report
+---------------
+
+.. include:: unittests_report.rst
 
