@@ -1,5 +1,7 @@
 using Docile, Lexicon, JuliaFEM
 
+include("badges.jl")
+
 """
 Searches recursively all the modules from packages. As documentation grows, it's a bit
 troublesome to add all the new modules manually, so this function searches all the modules
@@ -33,17 +35,21 @@ search_modules!(JuliaFEM, append_list)
 const modules = append_list
 
 cd(dirname(@__FILE__)) do
-    # Run the doctests *before* we start to generate *any* documentation.
+    npassed = 0
+    nfailed = 0
+    nskipped = 0
+
     fid = open("./quality/doctests_report.rst", "w")
     for m in modules
-	results = doctest(m)
-	write(fid, results)
-        #failures = failed(doctest(m))
-        #if !isempty(failures.results)
-        #    println("\nDoctests failed, aborting commit.\n")
-        #    display(failures)
-        #    exit(1) # Bail when doctests fail.
-        #end
+        s = doctest(m)
+        writemime(fid, "text/plain", s)
+	# local stats for this module
+        lnpassed, lnfailed, lnskipped = map(length, (passed(s), failed(s), skipped(s)))
+	npassed += lnpassed
+	nfailed += lnfailed
+	nskipped += lnskipped
     end
     close(fid)
+    make_badge("doctests", npassed, (npassed+nfailed+nskipped), "badges/doctests-status.svg")
 end
+
