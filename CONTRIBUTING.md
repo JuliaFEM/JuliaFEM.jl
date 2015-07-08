@@ -50,4 +50,6 @@ Function docstrings
 -------------------
 We use numpy documentation style in our functions. See https://github.com/numpy/numpy/blob/master/doc/HOWTO_DOCUMENT.rst.txt. See issue #5.
 
-
+Documentation
+-------------
+We use restructured text to document this project. Information how to write rst format is described `here <http://sphinx-doc.org/rest.html>`_. `See issue #49 <https://github.com/JuliaFEM/JuliaFEM.jl/issues/49>`_.
