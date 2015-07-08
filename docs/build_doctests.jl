@@ -39,17 +39,17 @@ cd(dirname(@__FILE__)) do
     nfailed = 0
     nskipped = 0
 
-    fid = open("./quality/doctests_report.rst", "w")
+    #fid = open("./quality/doctests_report.rst", "w")
     for m in modules
         s = doctest(m)
-        writemime(fid, "text/plain", s)
+        #writemime(fid, "text/plain", s)
 	# local stats for this module
         lnpassed, lnfailed, lnskipped = map(length, (passed(s), failed(s), skipped(s)))
 	npassed += lnpassed
 	nfailed += lnfailed
 	nskipped += lnskipped
     end
-    close(fid)
+    #close(fid)
     make_badge("doctests", npassed, (npassed+nfailed+nskipped), "badges/doctests-status.svg")
 end
 
