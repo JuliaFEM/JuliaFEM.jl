@@ -7,4 +7,4 @@
    tutorials/index
    api/index
    quality/index
-   ../CONTRIBUTING
+   ../CONTRIBUTING.rst
