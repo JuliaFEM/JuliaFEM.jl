@@ -23,3 +23,5 @@ Integration
 
 Hierarchial shape functions
 - https://www.math.vt.edu/people/adjerids/research/papers/basis.pdf
+
+- edited by Ari
