@@ -9,6 +9,21 @@ For now, read
 https://github.com/JuliaLang/julia/blob/master/CONTRIBUTING.md
 
 
+How to contribute
+-----------------
+Here are the basic steps for contributing to JuliaFEM:
+1) Create an account or sign in to GitHub
+2) Install Git to your computer
+3) Fork Julia to your repository (https://github.com/JuliaLang/julia)
+4) Build Julia (v0.4+) to your computer
+5) Fork JuliaFEM to your repository
+6) Use Pkg.add() or git clone to access JuliaFEM
+7) Make your contribution to the project
+8) Add all updated files to the staging area: git add .
+9) Commit the files to your repository and add a description message:
+git commit -m "your_message_here"
+10) At your repository, create a pull request
+
 Developing
 ----------
 ```bash
