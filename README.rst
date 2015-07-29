@@ -20,15 +20,15 @@ The JuliaFEM project develops open-source software for reliable, scalable, distr
 .. image:: https://coveralls.io/repos/JuliaFEM/JuliaFEM.jl/badge.svg?branch=master
   :target: https://coveralls.io/r/JuliaFEM/JuliaFEM.jl?branch=master
 
-.. image:: http://juliafem.kapsi.fi/_static/notebooks-status.svg?ts=1
-  :target: http://juliafem.kapsi.fi/tutorials/index.html
+.. image:: http://juliafem.org/_static/notebooks-status.svg?ts=1
+  :target: http://juliafem.org/tutorials/index.html
 
-.. image:: http://juliafem.kapsi.fi/_static/doctests-status.svg?ts=1
+.. image:: http://juliafem.org/_static/doctests-status.svg?ts=1
 
-.. image:: http://juliafem.kapsi.fi/_static/unittests-status.svg?ts=1
+.. image:: http://juliafem.org/_static/unittests-status.svg?ts=1
 
-.. image:: http://juliafem.kapsi.fi/_static/lint-status.svg?ts=1
-  :target: http://juliafem.kapsi.fi/quality/index.html#lint-report
+.. image:: http://juliafem.org/_static/lint-status.svg?ts=1
+  :target: http://juliafem.org/quality/index.html#lint-report
 
 .. image:: https://img.shields.io/github/issues/JuliaFEM/JuliaFEM.jl.svg
   :target: https://github.com/JuliaFEM/JuliaFEM.jl/issues
