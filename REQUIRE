@@ -2,7 +2,7 @@ julia 0.4-
 Logging
 LightXML
 Docile
-https://github.com/JuliaFEM/Lexicon.jl.git
+Lexicon
 FactCheck
 HDF5
 Lint
