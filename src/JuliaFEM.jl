@@ -2,7 +2,6 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 module JuliaFEM
 
-
 VERSION < v"0.4-" && using Docile
 using Lexicon
 
