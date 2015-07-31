@@ -46,7 +46,7 @@ cd(dirname(@__FILE__)) do
     for mod in modules
         Lexicon.update!(index, save(joinpath(api_directory, "$(mod).rst"), mod))
     end
-    # save(joinpath(api_directory, "index.rst"), index; md_subheader = :category)
+    save(joinpath(api_directory, "index.rst"), index)
 
     # info("Adding all documentation changes in $(api_directory) to this commit.")
     # success(`git add $(api_directory)`) || exit(1)
