@@ -41,7 +41,6 @@ const modules = append_list
 # run(`cp $main_folder/$file_ $this_folder`)
 
 cd(dirname(@__FILE__)) do
-<<<<<<< HEAD
     # Run the doctests *before* we start to generate *any* documentation.
 #    for m in modules
 #        failures = failed(doctest(m))
@@ -51,15 +50,12 @@ cd(dirname(@__FILE__)) do
 #            exit(1) # Bail when doctests fail.
 #        end
 #    end
-=======
->>>>>>> origin/master
     # Generate and save the contents of docstrings as markdown files.
     index  = Index()
     for mod in modules
         Lexicon.update!(index, save(joinpath(api_directory, "$(mod).rst"), mod))
     end
-<<<<<<< HEAD
-    #save(joinpath(api_directory, "index.rst"))
+    save(joinpath(api_directory, "index.rst"), index)
 
     # Add a reminder not to edit the generated files.
   #  open(joinpath(api_directory, "README.md"), "w") do f
@@ -68,10 +64,7 @@ cd(dirname(@__FILE__)) do
   #      all changes to the originating docstrings/files rather than these ones.
   #      """)
   #  end
-=======
     # save(joinpath(api_directory, "index.rst"), index; md_subheader = :category)
->>>>>>> origin/master
-
     # info("Adding all documentation changes in $(api_directory) to this commit.")
     # success(`git add $(api_directory)`) || exit(1)
 
