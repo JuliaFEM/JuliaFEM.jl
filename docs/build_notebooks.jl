@@ -55,7 +55,7 @@ function run_notebooks()
             # port = 34211+k  # we're having some weird port issue with zmq
             # k += 1
             try
-                run(`runipy -o tutorials/$ipynb --kernel=julia-0.4`)
+                run(`timeout 180 runipy -o tutorials/$ipynb --kernel=julia-0.4`)
                 status = 0
             catch
                 println("did not work")
