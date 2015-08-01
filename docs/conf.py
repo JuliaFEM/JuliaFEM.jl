@@ -24,7 +24,11 @@ import datetime
 
 html_last_updated_fmt = "%Y-%m-%d %H:%M:%S"
 
-extensions = ['juliadoc.julia', 'juliadoc.jlhelp']
+extensions = ['sphinx.ext.autodoc',
+    'sphinx.ext.doctest',
+    'sphinx.ext.coverage',
+    'sphinx.ext.viewcode',
+'juliadoc.julia', 'juliadoc.jlhelp', 'numpydoc']
 html_theme_path = [juliadoc.get_theme_dir(), sphinx_rtd_theme.get_html_theme_path()]
 html_sidebars = juliadoc.default_sidebars()
 
