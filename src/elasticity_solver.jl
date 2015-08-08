@@ -12,6 +12,37 @@ VERSION < v"0.4-" && using Docile
 # directly if needed or using general interface combining data model and
 # solver.
 
+"""
+This is dummy function. Testing doctests and documentation.
+
+Parameters
+----------
+x : Array{Float64, 1}
+
+Returns
+-------
+Array{float64, 1}
+  x + 1
+
+Notes
+-----
+This is dummy function
+
+Raises
+------
+Exception
+  if things are not going right
+
+Examples
+--------
+>>> a = [1.0, 2.0, 3.0]
+>>> dummy(a)
+[2.0, 3.0, 4.0]
+"""
+function dummy(a)
+  return a+1
+end
+
 
 """
 Interpolate field variable using basis functions f for point ip.
