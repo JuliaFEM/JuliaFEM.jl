@@ -9,6 +9,35 @@ For now, read
 https://github.com/JuliaLang/julia/blob/master/CONTRIBUTING.md
 
 
+How to contribute
+-----------------
+Here are the basic steps for contributing to JuliaFEM:
+
+1) Create an account or sign in to `GitHub <https://github.com/>`_.
+
+2) Go to `Git home page <http://git-scm.com/>`_ and download the Git installer. Run the installer to get Git on your computer. It is a version control system used by GitHub. To learn its basics, go through this `Git tutorial <https://try.github.io/levels/1/challenges/1>`_.
+
+3) Install Julia (v0.4+) to your computer. At `Julia readme
+<https://github.com/JuliaLang/julia/blob/master/README.md>`_ you'll find complete instructions for installing it for your platform.
+
+4) Go to the `JuliaFEM GitHub page <https://github.com/JuliaFEM/JuliaFEM.jl>`_. At the top-right corner, press the ``Fork``-button to fork your own copy of JuliaFEM to your repository.
+
+5) Clone JuliaFEM from your repository to your computer. Navigate to the folder you want to clone it to, and type the following command (inserting your GitHub username to its place):
+``git clone https://github.com/your_github_username/JuliaFEM.jl.git``
+
+6) You can now navigate to JuliaFEM in the folder you chose at step 5. There you'll find the same contents as you see in your GitHub JuliaFEM repository. Now, locate the file you want to modify, open it with your desired text editor, make the changes and save the new version. If you type ``git status``, you'll see that the files you've created or modified are listed under ``untracked files``.
+
+7) Add the files you want to update to the staging area by typing ``git add <file1> <file2>...``. If you type ``git status``, you'll see that the files added to the staging area are listed under ``Changes to be committed``. This process also supports wildcard symbols. If you want to add all the files to the staging area, just type ``git add .``. If you want to remove a file from the staging area, type ``git reset <file>``.
+
+8) To store the staged files, commit the files to your repository and add a description message by typing ``git commit -m "your_message_here"``. The message should describe the changes that were made.
+
+9) When you are happy with the commits and want to update them to your repository, type ``git push origin master``.
+
+10) Go to your GitHub JuliaFEM repository. You'll notice that the commit you have made and pushed is now visible above the JuliaFEM file branch. If you click the ``latest commit`` link, you can see the changes made to the file. Finally, click ``Pull request`` to create a pull request of the commits you've made, so that other contributors can review it.
+
+11) If other contributors ask you to make changes to your pull request, just repeat steps 6-9. Your commits will be updated to your original pull request. Do this until everyone is satisfied and your pull request can be merged to the master branch.
+
+
 Developing
 ----------
 ```bash
