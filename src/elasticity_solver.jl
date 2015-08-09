@@ -40,6 +40,7 @@ Examples
 [2.0, 3.0, 4.0]
 """
 function dummy(a)
+  # not doing anything useful.
   return a+1
 end
 
