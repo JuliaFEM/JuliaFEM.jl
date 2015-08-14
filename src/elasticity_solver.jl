@@ -3,6 +3,8 @@
 
 module elasticity_solver
 
+using ForwardDiff
+
 using Logging
 @Logging.configure(level=INFO)
 
@@ -40,8 +42,8 @@ Examples
 [2.0, 3.0, 4.0]
 """
 function dummy(a)
-  # not doing anything useful.
-  return a+1
+    # not doing anything useful.
+    return a+1
 end
 
 
@@ -93,54 +95,71 @@ function interpolate{T<:Real}(field::Array{T,2}, basis::Function, ip)
 end
 
 
-
 """
-Calculate local tangent stiffness matrix and residual force vector R = T - F
+Calculate local tangent stiffness matrix and residual force vector
+R = T - F for elasticity problem.
+
+Parameters
+----------
+X : Element coordinates
+u : Displacement field
+R : Residual force vector
+K : Tangent stiffness matrix
+basis : Basis functions
+dbasis : Derivative of basis functions
+lambda : Material parameter
+mu : Material parameter
+ipoints : integration points
+iweights : integration weights
+
+Returns
+-------
+None
+
+Notes
+-----
+If material parameters are given in list, they are interpolated to gauss
+points using shape functions.
 """
-function calc_local_matrices!(X, u, R, Kt, N, dNdchi, lambda_, mu_, ipoints, iweights)
-  dim, nnodes = size(X)
-  I = eye(dim)
-  R[:,:] = 0.0
-  Kt[:,:] = 0.0
+function calc_local_matrices!(X, u, R, K, basis, dbasis, lambda_, mu_, ipoints, iweights)
+    dim, nnodes = size(X)
+    I = eye(dim)
+    R[:,:] = 0.0
 
-  dF = zeros(dim, dim)
+    #dF = zeros(dim, dim)
 
-  for m = 1:length(iweights)
-    w = iweights[m]
-    chi = ipoints[m, :]
-    # interpolate material parameters from element node fields
-    #lambda = (lambda_*N(chi))[1]
-    #mu = (mu_*N(chi))[1]
-    #    Jt = X*dNdchi(chi)
-    #@debug("Jt:\n",Jt)
-    lambda = interpolate(lambda_, N, chi)
-    mu = interpolate(mu_, N, chi)
-    Jt = interpolate(X, dNdchi, chi)
-        detJ = det(Jt)
-    deltaN = inv(Jt)*dNdchi(chi)'
-        delta_u = u*deltaN'
-        F = I + delta_u  # Deformation gradient
-        E = 1/2*(delta_u' + delta_u + delta_u'*delta_u)  # Green-Lagrange strain tensor
-        S = lambda*trace(E)*I + 2*mu*E  # PK2 stress tensor
-        P = F*S  # PK1 stress tensor
-        R[:,:] += w*P*deltaN*detJ
+    function calc_R!(u, R)
+        for m = 1:length(iweights)
+            w = iweights[m]
+            xi = ipoints[m, :]
+            # calculate material parameters
+            lambda = typeof(lambda_) == Float64 ? lambda_ : dot(lambda_, basis(xi))
+            mu = typeof(mu_) == Float64 ? mu_ : dot(mu_, basis(xi))
+            Jt = X*dbasis(xi)
+            detJ = det(Jt)
+            dbasisdX = dbasis(xi)*inv(Jt)
 
-        for p = 1:nnodes
-            for i = 1:dim
-                dF[:,:] = 0.0
-                dF[i,:] = deltaN[:,p]
-                dE = 1/2*(F'*dF + dF'*F)
-                dS = lambda*trace(dE)*I + 2*mu*dE
-                dP = dF*S + F*dS
-                for q = 1:nnodes
-                    for j = 1:dim
-                        Kt[dim*(p-1)+i,dim*(q-1)+j] += w*(dP[j,:]*deltaN[:,q])[1]*detJ
-                    end
-                end
-            end
+            gradu = u*dbasisdX
+            F = I + gradu  # Deformation gradient
+            E = 1/2*(gradu' + gradu + gradu'*gradu)  # Green-Lagrange strain tensor
+            S = lambda*trace(E)*I + 2*mu*E  # PK2 stress tensor
+            P = F*S  # PK1 stress tensor
+
+            R[:,:] += w*P*dbasisdX'*detJ
         end
-
     end
+
+    # herlper for tangent stiffness matrix
+    function R!(u, R)
+        R[:] = 0
+        calc_R!(reshape(u, dim, nnodes), reshape(R, dim, nnodes))
+        #calc_Wext!(reshape(u, 2, 4), reshape(R, 2, 4))
+    end
+    Jacobian = ForwardDiff.forwarddiff_jacobian(R!, Float64, fadtype=:dual, n=dim*nnodes, m=dim*nnodes)
+
+    K[:, :] = Jacobian(reshape(u, dim*nnodes))
+    R!(reshape(u, dim*nnodes), reshape(R, dim*nnodes))
+
 end
 
 
