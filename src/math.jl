@@ -103,18 +103,46 @@ el::Element
     well defined element
 f::Function
     Function to integrate
-target::ASCIIString
-    Where to save result (el.attributes[target])
 """
-function integrate!(el::Element, f::Function, target::ASCIIString)
-    # set target to zero
-    el.attributes[target][:] = 0.0
+function integrate(f::Function, el::JuliaFEM.Element)
+    target = []
     for m = 1:length(el.iweights)
         w = el.iweights[m]
         xi = el.ipoints[:, m]
-        J = interpolate(el, "coordinates", xi; derivative=true)
-        el.attributes[target] += w*f(el, xi)*det(J)
+        J = JuliaFEM.interpolate(el, "coordinates", xi; derivative=true)
+        push!(target, w*f(el, xi)*det(J))
     end
+    return sum(target)
 end
 
+"""
+This version returns a function which must be operated with element e
+"""
+function integrate(f::Function)
+    function integrate(el::JuliaFEM.Element)
+        target = []
+        for m = 1:length(el.iweights)
+            w = el.iweights[m]
+            xi = el.ipoints[:, m]
+            J = JuliaFEM.interpolate(el, "coordinates", xi; derivative=true)
+            push!(target, w*f(el, xi)*det(J))
+        end
+        return sum(target)
+    end
+    return integrate
+end
+
+"""
+This version saves results inplace to target, garbage collection free
+"""
+function integrate!(f::Function, el::JuliaFEM.Element, target)
+    # set target to zero
+    target[:] = 0.0
+    for m = 1:length(el.iweights)
+        w = el.iweights[m]
+        xi = el.ipoints[:, m]
+        J = JuliaFEM.interpolate(el, "coordinates", xi; derivative=true)
+        target[:,:] += w*f(el, xi)*det(J)
+    end
+end
 
