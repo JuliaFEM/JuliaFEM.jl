@@ -1,6 +1,10 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+"""
+This module contains math stuff, including interpolation, integration, linearization, ...
+"""
+
 using JuliaFEM
 using ForwardDiff
 
@@ -59,15 +63,22 @@ function interpolate(e::Element, field::ASCIIString, x::Array{Float64,1}; deriva
 end
 
 
+"""
+
+"""
 function get_basis(el::Element, xi)
     return el.basis(xi)
 end
 
+"""
+Return partial derivatives of shape functions w.r.t X using chain rule.
+"""
 function get_dbasisdX(el::Element, xi)
     J = interpolate(el, "coordinates", xi; derivative=true)
     dbasisdX = el.dbasis(xi)*inv(J)
     return dbasisdX
 end
+
 
 """
 Linearize function f w.r.t some given field, i.e. calculate dR/du
@@ -78,14 +89,35 @@ f::Function
     (possibly) nonlinear function to linearize
 field::ASCIIString
     field variable
+
+Returns
+-------
+Array{Float64, 2}
+    jacobian / "tangent stiffness matrix"
+
+"""
+function linearize(f::Function, el::JuliaFEM.Element, field::ASCIIString)
+    dim, nnodes = size(el.attributes[field])
+    function helper!(x, y)
+        orig = copy(el.attributes[field])
+        el.attributes[field] = reshape(x, dim, nnodes)
+        y[:] = f(el)
+        el.attributes[field] = copy(orig)
+    end
+    jac = ForwardDiff.forwarddiff_jacobian(helper!, Float64, fadtype=:dual, n=dim*nnodes, m=dim*nnodes)
+    return jac(el.attributes[field][:])
+end
+
+"""
+This version returns another function which can be then evaluated against field
 """
 function linearize(f::Function, field::ASCIIString)
-    function jacobian(el::Element, xi)
+    function jacobian(el::JuliaFEM.Element, args...)
         dim, nnodes = size(el.attributes[field])
         function helper!(x, y)
             orig = copy(el.attributes[field])
             el.attributes[field] = reshape(x, dim, nnodes)
-            y[:] = f(el, xi)
+            y[:] = f(el, args...)
             el.attributes[field] = copy(orig)
         end
         jac = ForwardDiff.forwarddiff_jacobian(helper!, Float64, fadtype=:dual, n=dim*nnodes, m=dim*nnodes)
@@ -93,6 +125,23 @@ function linearize(f::Function, field::ASCIIString)
     end
     return jacobian
 end
+
+"""
+In-place version, no additional garbage collection.
+"""
+function linearize!(f::Function, el::JuliaFEM.Element, field::ASCIIString, target::ASCIIString)
+    el.attributes[target][:] = 0.0
+    dim, nnodes = size(el.attributes[field])
+    function helper!(x, y)
+        orig = copy(el.attributes[field])
+        el.attributes[field] = reshape(x, dim, nnodes)
+        y[:] = f(el)
+        el.attributes[field] = copy(orig)
+    end
+    jac! = ForwardDiff.forwarddiff_jacobian!(helper!, Float64, fadtype=:dual, n=dim*nnodes, m=dim*nnodes)
+    jac!(el.attributes[field][:], el.attributes[target])
+end
+
 
 
 """
@@ -138,12 +187,11 @@ This version saves results inplace to target, garbage collection free
 """
 function integrate!(f::Function, el::JuliaFEM.Element, target)
     # set target to zero
-    target[:] = 0.0
+    el.attributes[target][:] = 0.0
     for m = 1:length(el.iweights)
         w = el.iweights[m]
         xi = el.ipoints[:, m]
         J = JuliaFEM.interpolate(el, "coordinates", xi; derivative=true)
-        target[:,:] += w*f(el, xi)*det(J)
+        el.attributes[target][:,:] += w*f(el, xi)*det(J)
     end
 end
-
