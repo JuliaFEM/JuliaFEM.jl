@@ -7,7 +7,8 @@ VERSION < v"0.4-" && using Docile
 using Lexicon
 
 include("types.jl") # type definitions
-include("interpolation.jl")
+include("math.jl") # basic mathematical operations
+
 include("elasticity_solver.jl")
 include("xdmf.jl")
 include("abaqus_reader.jl")

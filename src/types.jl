@@ -4,7 +4,7 @@
 
 type Element
     id :: Int
-    element_type :: Int
+#   element_type :: Int
     node_ids :: Array{Int, 1}
     basis :: Function
     dbasis :: Function
