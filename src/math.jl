@@ -75,7 +75,7 @@ Return partial derivatives of shape functions w.r.t X using chain rule.
 """
 function get_dbasisdX(el::Element, xi)
     J = interpolate(el, "coordinates", xi; derivative=true)
-    dbasisdX = el.dbasis(xi)*inv(J)
+    dbasisdX = el.dbasis(xi)*inv(J')
     return dbasisdX
 end
 
