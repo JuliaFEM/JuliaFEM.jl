@@ -8,7 +8,9 @@ using Logging
 
 VERSION < v"0.4-" && using Docile
 
-eldims = Dict({"C3D10" => 10})
+eldims = Dict(
+    "C3D10" => 10,
+    "C3D4" => 4)
 global handlers = Dict()
 
 
@@ -29,7 +31,7 @@ end
 function parse_header(header_line)
     args = map(s -> strip(s), split(header_line, ","))
     args[1] = strip(args[1], '*')
-    d = Dict({"section" => args[1]})
+    d = Dict("section" => args[1])
     options = Dict()
     for k in args[2:end]
         args2 = split(k, "=")
