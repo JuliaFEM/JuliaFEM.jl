@@ -31,13 +31,12 @@ end
 function parse_header(header_line)
     args = map(s -> strip(s), split(header_line, ","))
     args[1] = strip(args[1], '*')
-    d = Dict("section" => args[1])
-    options = Dict()
+    d = Dict("section" => args[1], "options" => Dict())
+    options = d["options"]
     for k in args[2:end]
         args2 = split(k, "=")
         options[args2[1]] = args2[2]
     end
-    d["options"] = options
     return d
 end
 
@@ -112,10 +111,10 @@ function parse_abaqus(fid)
     end
 
     for line in eachline(fid)
-        if beginswith(line, "**")
+        if startswith(line, "**")
             continue
         end
-        if beginswith(line, "*")
+        if startswith(line, "*")
             process_section(section)
             header = parse_header(line)
             Logging.debug("Found ", header["section"], " section")
