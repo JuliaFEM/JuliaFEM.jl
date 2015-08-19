@@ -73,9 +73,9 @@ end
 """
 Return partial derivatives of shape functions w.r.t X using chain rule.
 """
-function get_dbasisdX(el::Element, xi)
-    J = interpolate(el, "coordinates", xi; derivative=true)
-    dbasisdX = el.dbasis(xi)*inv(J')
+function get_dbasisdX(el::Element, ip)
+    J = interpolate(el, "coordinates", ip.xi; derivative=true)
+    dbasisdX = el.dbasis(ip.xi)*inv(J')
     return dbasisdX
 end
 
@@ -156,11 +156,9 @@ f::Function
 """
 function integrate(f::Function, el::JuliaFEM.Element)
     target = []
-    for m = 1:length(el.iweights)
-        w = el.iweights[m]
-        xi = el.ipoints[:, m]
-        J = JuliaFEM.interpolate(el, "coordinates", xi; derivative=true)
-        push!(target, w*f(el, xi)*det(J))
+    for ip in el.integration_points
+        J = JuliaFEM.interpolate(el, "coordinates", ip.xi; derivative=true)
+        push!(target, ip.weight*f(el, ip)*det(J))
     end
     return sum(target)
 end
@@ -171,11 +169,9 @@ This version returns a function which must be operated with element e
 function integrate(f::Function)
     function integrate(el::JuliaFEM.Element)
         target = []
-        for m = 1:length(el.iweights)
-            w = el.iweights[m]
-            xi = el.ipoints[:, m]
-            J = JuliaFEM.interpolate(el, "coordinates", xi; derivative=true)
-            push!(target, w*f(el, xi)*det(J))
+        for ip in el.integration_points
+            J = JuliaFEM.interpolate(el, "coordinates", ip.xi; derivative=true)
+            push!(target, ip.weight*f(el, ip)*det(J))
         end
         return sum(target)
     end
@@ -188,10 +184,8 @@ This version saves results inplace to target, garbage collection free
 function integrate!(f::Function, el::JuliaFEM.Element, target)
     # set target to zero
     el.attributes[target][:] = 0.0
-    for m = 1:length(el.iweights)
-        w = el.iweights[m]
-        xi = el.ipoints[:, m]
-        J = JuliaFEM.interpolate(el, "coordinates", xi; derivative=true)
-        el.attributes[target][:,:] += w*f(el, xi)*det(J)
+    for ip in el.integration_points
+        J = JuliaFEM.interpolate(el, "coordinates", ip.xi; derivative=true)
+        el.attributes[target][:,:] += ip.weight*f(el, ip)*det(J)
     end
 end
