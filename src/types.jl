@@ -1,6 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+export IntegrationPoint, Element, Assembly, FunctionSpace
+
 """
 Integration point
 
@@ -18,17 +20,20 @@ type IntegrationPoint
     attributes :: Dict{ASCIIString, Any}
 end
 
-type Element
-    id :: Int
-#   element_type :: Int
-    node_ids :: Array{Int, 1}
+type FunctionSpace
     basis :: Function
     dbasis :: Function
-    integration_points :: Array{IntegrationPoint, 1}
-    attributes :: Dict{ASCIIString, Any}
-#   ipoints :: Array{Float64, 2}
-#   iweights :: Array{Float64, 1}
 end
+
+abstract Element
+
+#type Element
+#    id :: Int
+#    node_ids :: Array{Int, 1}
+#    shape_functions :: FunctionSpace
+#    integration_points :: Array{IntegrationPoint, 1}
+#    attributes :: Dict{ASCIIString, Any}
+#end
 
 
 type Assembly
@@ -42,4 +47,6 @@ type Assembly
     # global dofs for each element
     gdofs :: Dict{Int64, Array{Int64, 1}}
 end
+Assembly() = Assembly(Int64[], Int64[], Float64[], Int64[], Float64[], Dict{Int64,Array{Int64,1}}())
+Assembly(gdofs::Dict{Int64,Array{Int64,1}}) = Assembly(Int64[], Int64[], Float64[], Int64[], Float64[], gdofs)
 

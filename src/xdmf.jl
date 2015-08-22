@@ -1,16 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-module xdmf
-
-using Logging
-@Logging.configure(level=INFO)
-
 using LightXML
-
-VERSION < v"0.4-" && using Docile
-
-# i add docstrings later
 
 # element codes: http://www.paraview.org/pipermail/paraview/2013-July/028859.html
 # > from  ./VTK/ThirdParty/xdmf2/vtkxdmf2/libsrc/XdmfTopology.h
@@ -75,28 +66,67 @@ function xdmf_new_grid(temporal_collection; time=0)
     return grid
 end
 
+#function xdmf_new_mesh(grid, X, elmap)
+#    geometry = new_child(grid, "Geometry")
+#    set_attribute(geometry, "Type", "XYZ")
+#    dataitem = new_child(geometry, "DataItem")
+#    set_attribute(dataitem, "DataType", "Float")
+#    set_attribute(dataitem, "Dimensions", length(X))
+#    set_attribute(dataitem, "Format", "XML")
+#    set_attribute(dataitem, "Precision", "4")
+#    add_text(dataitem, join(X, " "))
+#    topology = new_child(grid, "Topology")
+#    set_attribute(topology, "Dimensions", "1")
+#    set_attribute(topology, "Type", "Mixed")
+#    dataitem = new_child(topology, "DataItem")
+#    set_attribute(dataitem, "DataType", "Int")
+#    set_attribute(dataitem, "Dimensions", length(elmap))
+#    set_attribute(dataitem, "Format", "XML")
+#    set_attribute(dataitem, "Precision", 4)
+#    elmap2 = copy(elmap)
+#    elmap2[2:end,:] -= 1
+#    add_text(dataitem, join(elmap2, " "))
+#end
+
 function xdmf_new_mesh(grid, X, elmap)
+    dim, nnodes = size(X)
     geometry = new_child(grid, "Geometry")
     set_attribute(geometry, "Type", "XYZ")
     dataitem = new_child(geometry, "DataItem")
     set_attribute(dataitem, "DataType", "Float")
-    set_attribute(dataitem, "Dimensions", length(X))
+    set_attribute(dataitem, "Dimensions", "$nnodes $dim")
     set_attribute(dataitem, "Format", "XML")
-    set_attribute(dataitem, "Precision", "4")
-    add_text(dataitem, join(X, " "))
+    set_attribute(dataitem, "Precision", 8)
+    #add_text(dataitem, join(X, " "))
+    s = "\n"
+    
+    for i=1:nnodes
+        s *= "\t\t" * join(X[:,i], " ") * "\n"
+    end
+    s *= "       "
+    add_text(dataitem, s)
 
-    topology = new_child(grid, "Topology")
-    set_attribute(topology, "Dimensions", "1")
-    set_attribute(topology, "Type", "Mixed")
-    dataitem = new_child(topology, "DataItem")
-    set_attribute(dataitem, "DataType", "Int")
-    set_attribute(dataitem, "Dimensions", length(elmap))
-    set_attribute(dataitem, "Format", "XML")
-    set_attribute(dataitem, "Precision", 4)
     elmap2 = copy(elmap)
     elmap2[2:end,:] -= 1
-    add_text(dataitem, join(elmap2, " "))
+    dim, nelements = size(elmap2)
+
+    topology = new_child(grid, "Topology")
+    #set_attribute(topology, "Dimensions", "1")
+    set_attribute(topology, "TopologyType", "Mixed")
+    set_attribute(topology, "NumberOfElements", nelements)
+    dataitem = new_child(topology, "DataItem")
+    set_attribute(dataitem, "DataType", "Int")
+    set_attribute(dataitem, "Dimensions", "$nelements $dim")
+    set_attribute(dataitem, "Format", "XML")
+    set_attribute(dataitem, "Precision", 8)
+    s = "\n"
+    for i=1:nelements
+        s *= "\t\t" * join(elmap2[:,i], " ") * "\n"
+    end
+    add_text(dataitem, s)
+    #add_text(dataitem, join(elmap2, " "))    
 end
+
 
 function xdmf_new_field(grid, name, source, data)
     loc = Dict("elements" => "Cell",
@@ -140,4 +170,3 @@ function xdmf_save_model(xdoc, filename)
   save_file(xdoc, filename)
 end
 
-end
