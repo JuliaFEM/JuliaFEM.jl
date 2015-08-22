@@ -5,8 +5,9 @@
 This module contains math stuff, including interpolation, integration, linearization, ...
 """
 
-using JuliaFEM
 using ForwardDiff
+
+export interpolate, integrate, linearize
 
 """
 Interpolate field variable using basis functions f for point ip.
@@ -59,7 +60,7 @@ function interpolate{T<:Real}(field::Array{T,2}, basis::Function, ip)
     return result
 end
 function interpolate(e::Element, field::ASCIIString, x::Array{Float64,1}; derivative=false)
-    return interpolate(e.attributes[field], derivative ? e.dbasis : e.basis, x)
+    return interpolate(e.attributes[field], derivative ? e.shape_functions.dbasis : e.shape_functions.basis, x)
 end
 
 
@@ -67,15 +68,15 @@ end
 
 """
 function get_basis(el::Element, xi)
-    return el.basis(xi)
+    return el.shape_functions.basis(xi)
 end
 
 """
 Return partial derivatives of shape functions w.r.t X using chain rule.
 """
-function get_dbasisdX(el::Element, ip)
-    J = interpolate(el, "coordinates", ip.xi; derivative=true)
-    dbasisdX = el.dbasis(ip.xi)*inv(J')
+function get_dbasisdX(el::Element, xi)
+    J = interpolate(el, "coordinates", xi; derivative=true)
+    dbasisdX = el.shape_functions.dbasis(xi)*inv(J')
     return dbasisdX
 end
 
@@ -96,7 +97,7 @@ Array{Float64, 2}
     jacobian / "tangent stiffness matrix"
 
 """
-function linearize(f::Function, el::JuliaFEM.Element, field::ASCIIString)
+function linearize(f::Function, el::Element, field::ASCIIString)
     dim, nnodes = size(el.attributes[field])
     function helper!(x, y)
         orig = copy(el.attributes[field])
@@ -112,7 +113,7 @@ end
 This version returns another function which can be then evaluated against field
 """
 function linearize(f::Function, field::ASCIIString)
-    function jacobian(el::JuliaFEM.Element, args...)
+    function jacobian(el::Element, args...)
         dim, nnodes = size(el.attributes[field])
         function helper!(x, y)
             orig = copy(el.attributes[field])
@@ -129,7 +130,7 @@ end
 """
 In-place version, no additional garbage collection.
 """
-function linearize!(f::Function, el::JuliaFEM.Element, field::ASCIIString, target::ASCIIString)
+function linearize!(f::Function, el::Element, field::ASCIIString, target::ASCIIString)
     el.attributes[target][:] = 0.0
     dim, nnodes = size(el.attributes[field])
     function helper!(x, y)
@@ -154,23 +155,31 @@ el::Element
 f::Function
     Function to integrate
 """
-function integrate(f::Function, el::JuliaFEM.Element)
+function integrate(f::Function, el::Element)
     target = []
     for ip in el.integration_points
-        J = JuliaFEM.interpolate(el, "coordinates", ip.xi; derivative=true)
+        J = interpolate(el, "coordinates", ip.xi; derivative=true)
         push!(target, ip.weight*f(el, ip)*det(J))
     end
     return sum(target)
 end
+#function integrate(f::Function, integration_points::Array{IntegrationPoint, 1}, Xargs...)
+#    target = []
+#    for ip in integration_points
+#        J = interpolate(el, "coordinates", ip.xi; derivative=true)
+#        push!(target, ip.weight*f(ip, args...)*det(J))
+#    end
+#    return sum(target)
+#end
 
 """
 This version returns a function which must be operated with element e
 """
 function integrate(f::Function)
-    function integrate(el::JuliaFEM.Element)
+    function integrate(el::Element)
         target = []
         for ip in el.integration_points
-            J = JuliaFEM.interpolate(el, "coordinates", ip.xi; derivative=true)
+            J = interpolate(el, "coordinates", ip.xi; derivative=true)
             push!(target, ip.weight*f(el, ip)*det(J))
         end
         return sum(target)
@@ -181,11 +190,12 @@ end
 """
 This version saves results inplace to target, garbage collection free
 """
-function integrate!(f::Function, el::JuliaFEM.Element, target)
+function integrate!(f::Function, el::Element, target)
     # set target to zero
     el.attributes[target][:] = 0.0
     for ip in el.integration_points
-        J = JuliaFEM.interpolate(el, "coordinates", ip.xi; derivative=true)
+        J = interpolate(el, "coordinates", ip.xi; derivative=true)
         el.attributes[target][:,:] += ip.weight*f(el, ip)*det(J)
     end
 end
+

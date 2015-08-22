@@ -1,18 +1,11 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-module abaqus_reader
-
-using Logging
-@Logging.configure(level=DEBUG)
-
-VERSION < v"0.4-" && using Docile
-
 eldims = Dict(
     "C3D10" => 10,
     "C3D4" => 4)
-global handlers = Dict()
 
+global handlers = Dict()
 
 """
 Register new handler for parser
@@ -57,7 +50,7 @@ function parse_element_section(model, header, data)
     end
     eldim = eldims[eltype]
     m = matchall(r"[0-9]+", data)
-    m = map(integer, m)
+    m = map((s) -> parse(Int, s), m)
     elements = create_or_get(model, "elements")
     m = reshape(m, eldim+1, round(Int, length(m)/(eldim+1)))
     nel = size(m)[2]
@@ -81,7 +74,7 @@ function parse_nodeset_section(model, header, data)
     nset_name = header["options"]["NSET"]
     Logging.debug("Creating node set $nset_name")
     m = matchall(r"[0-9]+", data)
-    node_ids = map(integer, m)
+    node_ids = map((s) -> parse(Int, s), m)
     nsets = create_or_get(model, "nsets")
     nsets[nset_name] = Int64[]
     for j in node_ids
@@ -131,6 +124,4 @@ end
 add_handler("NODE", parse_node_section)
 add_handler("ELEMENT", parse_element_section)
 add_handler("NSET", parse_nodeset_section)
-
-end
 
