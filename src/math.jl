@@ -60,25 +60,10 @@ function interpolate{T<:Real}(field::Array{T,2}, basis::Function, ip)
     return result
 end
 function interpolate(e::Element, field::ASCIIString, x::Array{Float64,1}; derivative=false)
-    return interpolate(e.attributes[field], derivative ? e.shape_functions.dbasis : e.shape_functions.basis, x)
+    basis = derivative ? get_dbasisdxi(e) : get_basis(e)
+    return interpolate(e.attributes[field], basis, x)
 end
 
-
-"""
-
-"""
-function get_basis(el::Element, xi)
-    return el.shape_functions.basis(xi)
-end
-
-"""
-Return partial derivatives of shape functions w.r.t X using chain rule.
-"""
-function get_dbasisdX(el::Element, xi)
-    J = interpolate(el, "coordinates", xi; derivative=true)
-    dbasisdX = el.shape_functions.dbasis(xi)*inv(J')
-    return dbasisdX
-end
 
 
 """
