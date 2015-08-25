@@ -7,7 +7,7 @@ This module contains math stuff, including interpolation, integration, lineariza
 
 using ForwardDiff
 
-export interpolate, integrate, linearize
+#export interpolate, integrate, linearize
 
 """
 Interpolate field variable using basis functions f for point ip.
@@ -59,10 +59,10 @@ function interpolate{T<:Real}(field::Array{T,2}, basis::Function, ip)
     end
     return result
 end
-function interpolate(e::Element, field::ASCIIString, x::Array{Float64,1}; derivative=false)
-    basis = derivative ? get_dbasisdxi(e) : get_basis(e)
-    return interpolate(e.attributes[field], basis, x)
-end
+#function interpolate(e::Element, field::ASCIIString, x::Array{Float64,1}; derivative=false)
+#    basis = derivative ? get_dbasisdxi(e) : get_basis(e)
+#    return interpolate(e.attributes[field], basis, x)
+#end
 
 
 
