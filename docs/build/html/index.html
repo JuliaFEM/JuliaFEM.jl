@@ -1,0 +1,256 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>JuliaFEM &mdash; JuliaFEM - A Finite Element Method Solver</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="_static/JuliaFEMLogo_32x32.png"/>
+  
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Roboto+Slab:400,700|Inconsolata:400,700&subset=latin,cyrillic' rel='stylesheet' type='text/css'>
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="JuliaFEM - A Finite Element Method Solver" href="#"/>
+        <link rel="next" title="Tutorials" href="tutorials/index.html"/> 
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-nav-search">
+        
+          <a href="#" class="fa fa-home"> JuliaFEM</a>
+        
+        
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        
+          
+          
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="">JuliaFEM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/index.html">API Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api/JuliaFEM.abaqus_reader.html">JuliaFEM.abaqus_reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/JuliaFEM.elasticity_solver.html">JuliaFEM.elasticity_solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/JuliaFEM.interfaces.html">JuliaFEM.interfaces</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quality/index.html">Code quality</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quality/index.html#lint-report">Lint report</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quality/index.html#doctest-report">Doctest report</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quality/index.html#unittest-report">Unittest report</a></li>
+</ul>
+</li>
+</ul>
+
+          
+        
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="#">JuliaFEM</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="#">Docs</a> &raquo;</li>
+      
+    <li>JuliaFEM</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          <a href="_sources/index.txt" rel="nofollow"> View page source</a>
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document">
+            
+  <a class="reference external image-reference" href="https://github.com/JuliaFEM/JuliaFEM.jl"><img alt="https://raw.githubusercontent.com/JuliaFEM/JuliaFEM.jl/master/docs/logo/JuliaFEMLogo_256x256.png" src="https://raw.githubusercontent.com/JuliaFEM/JuliaFEM.jl/master/docs/logo/JuliaFEMLogo_256x256.png" /></a>
+<div class="section" id="juliafem">
+<h1>JuliaFEM<a class="headerlink" href="#juliafem" title="Permalink to this headline">¶</a></h1>
+<p>The JuliaFEM project develops open-source software for reliable, scalable, distributed Finite Element Method.</p>
+<a class="reference external image-reference" href="https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md"><img src="https://img.shields.io/github/license/JuliaFEM/Juliafem.jl.svg" /></a>
+<a class="reference external image-reference" href="https://gitter.im/JuliaFEM/JuliaFEM?utm_source=badge&amp;utm_medium=badge&amp;utm_campaign=pr-badge&amp;utm_content=badge"><img src="https://badges.gitter.im/Join%20Chat.svg" /></a>
+<a class="reference external image-reference" href="https://travis-ci.org/JuliaFEM/JuliaFEM.jl"><img alt="https://travis-ci.org/JuliaFEM/JuliaFEM.jl.svg?branch=master" src="https://travis-ci.org/JuliaFEM/JuliaFEM.jl.svg?branch=master" /></a>
+<a class="reference external image-reference" href="https://coveralls.io/r/JuliaFEM/JuliaFEM.jl?branch=master"><img alt="https://coveralls.io/repos/JuliaFEM/JuliaFEM.jl/badge.svg?branch=master" src="https://coveralls.io/repos/JuliaFEM/JuliaFEM.jl/badge.svg?branch=master" /></a>
+<a class="reference external image-reference" href="http://juliafem.org/tutorials/index.html"><img alt="http://juliafem.org/_static/notebooks-status.svg?ts=1" src="http://juliafem.org/_static/notebooks-status.svg?ts=1" /></a>
+<img alt="http://juliafem.org/_static/doctests-status.svg?ts=1" src="http://juliafem.org/_static/doctests-status.svg?ts=1" />
+<img alt="http://juliafem.org/_static/unittests-status.svg?ts=1" src="http://juliafem.org/_static/unittests-status.svg?ts=1" />
+<a class="reference external image-reference" href="http://juliafem.org/quality/index.html#lint-report"><img alt="http://juliafem.org/_static/lint-status.svg?ts=1" src="http://juliafem.org/_static/lint-status.svg?ts=1" /></a>
+<a class="reference external image-reference" href="https://github.com/JuliaFEM/JuliaFEM.jl/issues"><img src="https://img.shields.io/github/issues/JuliaFEM/JuliaFEM.jl.svg" /></a>
+<p>Documentation: <a class="reference external" href="http://www.juliaFEM.org">http://www.juliaFEM.org</a></p>
+<p>GitHub respository: <a class="reference external" href="https://github.com/JuliaFEM/JuliaFEM.jl">https://github.com/JuliaFEM/JuliaFEM.jl</a></p>
+<p>The JuliaFEM software library is a framework that allows for the distributed processing of large Finite Element Models across clusters of computers using simple programming models. It is designed to scale up from single servers to thousands of machines, each offering local computation and storage. The basic design principle is: everything is nonlinear. All physics models are nonlinear from which the linearization are made as a special cases.</p>
+<p>JuliaFEM current status: project planning</p>
+<p>Initial road map for JuliaFEM:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="16%" />
+<col width="53%" />
+<col width="31%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">version</th>
+<th class="head">number of degree of freedom</th>
+<th class="head">number of cores</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>0.1.0</td>
+<td>1 000 000</td>
+<td>10</td>
+</tr>
+<tr class="row-odd"><td>0.2.0</td>
+<td>10 000 000</td>
+<td>100</td>
+</tr>
+<tr class="row-even"><td>1.0.0</td>
+<td>100 000 000</td>
+<td>1 000</td>
+</tr>
+<tr class="row-odd"><td>2.0.0</td>
+<td>1 000 000 000</td>
+<td>10 000</td>
+</tr>
+<tr class="row-even"><td>3.0.0</td>
+<td>10 000 000 000</td>
+<td>100 000</td>
+</tr>
+</tbody>
+</table>
+<p>We strongly believe in the test driven development as well as building on top of previous work. Thus all the new code in this project should be 100% tested. Also other people have wisdom in style as well:</p>
+<p><a class="reference external" href="https://www.python.org/dev/peps/pep-0020/">The Zen of Python</a></p>
+<div class="line-block">
+<div class="line">Beautiful is better than ugly.</div>
+<div class="line">Explicit is better than implicit.</div>
+<div class="line">Simple is better than complex.</div>
+<div class="line">Complex is better than complicated.</div>
+<div class="line">Flat is better than nested.</div>
+<div class="line">Sparse is better than dense.</div>
+<div class="line">Readability counts.</div>
+<div class="line">Errors should never pass silently.</div>
+<div class="line"><br /></div>
+</div>
+<div class="section" id="contributing">
+<h2>Contributing<a class="headerlink" href="#contributing" title="Permalink to this headline">¶</a></h2>
+<p>Interested in participating? Please start by reading <a class="reference external" href="https://github.com/JuliaFEM/JuliaFEM/blob/master/CONTRIBUTING.md">CONTRIBUTING.md</a>.</p>
+<p>Contributors: see <a class="reference external" href="https://github.com/JuliaFEM/JuliaFEM/blob/master/contributors">contributors</a></p>
+<div class="toctree-wrapper compound">
+</div>
+</div>
+</div>
+
+
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="tutorials/index.html" class="btn btn-neutral float-right" title="Tutorials">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+      Last updated on 2015-08-01 15:56:03.
+    </p>
+  </div>
+
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+  
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

@@ -44,7 +44,16 @@ VERSION < v"0.4-" && using Docile
 # > #define XDMF_3DSMESH        0x1100
 # > #define XDMF_3DRECTMESH     0x1101
 # > #define XDMF_3DCORECTMESH   0x1102
+"""
+Build a new model for outout
 
+Parameters
+----------
+
+Example
+-------
+    >>> xdmf_new_model()
+"""
 function xdmf_new_model(xdmf_version="2.1")
     xdoc = XMLDocument()
     xroot = create_root(xdoc, "Xdmf")

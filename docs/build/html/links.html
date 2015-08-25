@@ -1,0 +1,200 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Discretization &mdash; JuliaFEM - A Finite Element Method Solver</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="_static/JuliaFEMLogo_32x32.png"/>
+  
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Roboto+Slab:400,700|Inconsolata:400,700&subset=latin,cyrillic' rel='stylesheet' type='text/css'>
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="JuliaFEM - A Finite Element Method Solver" href="index.html"/> 
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-nav-search">
+        
+          <a href="index.html" class="fa fa-home"> JuliaFEM</a>
+        
+        
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        
+          
+          
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="index.html">JuliaFEM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/index.html">API Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api/JuliaFEM.abaqus_reader.html">JuliaFEM.abaqus_reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/JuliaFEM.elasticity_solver.html">JuliaFEM.elasticity_solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/JuliaFEM.interfaces.html">JuliaFEM.interfaces</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quality/index.html">Code quality</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quality/index.html#lint-report">Lint report</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quality/index.html#doctest-report">Doctest report</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quality/index.html#unittest-report">Unittest report</a></li>
+</ul>
+</li>
+</ul>
+
+          
+        
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">JuliaFEM</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+    <li>Discretization</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          <a href="_sources/links.txt" rel="nofollow"> View page source</a>
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document">
+            
+  <div class="section" id="discretization">
+<h1>Discretization<a class="headerlink" href="#discretization" title="Permalink to this headline">¶</a></h1>
+<p><a class="reference external" href="http://code.activestate.com/recipes/579021-delaunay-triangulation/">http://code.activestate.com/recipes/579021-delaunay-triangulation/</a></p>
+</div>
+<div class="section" id="interpolation">
+<h1>Interpolation<a class="headerlink" href="#interpolation" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><a class="reference external" href="http://www.cs.rpi.edu/~flaherje/pdf/fea4.pdf">http://www.cs.rpi.edu/~flaherje/pdf/fea4.pdf</a></li>
+<li><a class="reference external" href="http://www.sd.ruhr-uni-bochum.de/downloads/Shape_funct.pdf">http://www.sd.ruhr-uni-bochum.de/downloads/Shape_funct.pdf</a></li>
+<li><a class="reference external" href="http://what-when-how.com/the-finite-element-method/fem-for-3d-solids-finite-element-method-part-1/">http://what-when-how.com/the-finite-element-method/fem-for-3d-solids-finite-element-method-part-1/</a></li>
+<li><a class="reference external" href="http://www.uni-tuebingen.de/zag/teaching/environmental_modeling/S4B_FiniteElements.pdf">http://www.uni-tuebingen.de/zag/teaching/environmental_modeling/S4B_FiniteElements.pdf</a></li>
+<li><a class="reference external" href="http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch10.d/AFEM.Ch10.pdf">http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch10.d/AFEM.Ch10.pdf</a></li>
+<li><a class="reference external" href="http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch10.d/AFEM.Ch10.Slides.d/AFEM.Ch10.Slides.pdf">http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch10.d/AFEM.Ch10.Slides.d/AFEM.Ch10.Slides.pdf</a></li>
+<li><a class="reference external" href="http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.AppI.d/AFEM.AppI.pdf">http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.AppI.d/AFEM.AppI.pdf</a></li>
+<li><a class="reference external" href="http://www.code-aster.org/V2/doc/default/en/man_r/r3/r3.01.01.pdf">http://www.code-aster.org/V2/doc/default/en/man_r/r3/r3.01.01.pdf</a></li>
+<li><a class="reference external" href="http://www.researchgate.net/publication/267082822_Unified_isoparametric_3D_Lagrange_finite_elements">http://www.researchgate.net/publication/267082822_Unified_isoparametric_3D_Lagrange_finite_elements</a></li>
+</ul>
+</div>
+<div class="section" id="integration">
+<h1>Integration<a class="headerlink" href="#integration" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><a class="reference external" href="http://arxiv.org/pdf/1411.1341.pdf">http://arxiv.org/pdf/1411.1341.pdf</a></li>
+</ul>
+<p>Hierarchial shape functions
+- <a class="reference external" href="https://www.math.vt.edu/people/adjerids/research/papers/basis.pdf">https://www.math.vt.edu/people/adjerids/research/papers/basis.pdf</a></p>
+</div>
+
+
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+      Last updated on 2015-08-01 15:56:03.
+    </p>
+  </div>
+
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+  
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

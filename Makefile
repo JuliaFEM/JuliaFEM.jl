@@ -49,7 +49,7 @@ unittests:
 	julia docs/build_unittests.jl
 
 doctests:
-	julia docs/build_doctests.jl
+	julia4 docs/build_doctests.jl
 
 #coverage_report:
 #	julia -e 'Pkg.test("JuliaFEM"; coverage=true); cd(Pkg.dir("JuliaFEM")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
