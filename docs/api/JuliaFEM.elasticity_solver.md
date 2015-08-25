@@ -22,7 +22,7 @@ is calculated and eldofs are "extended" to problem dimension.
 
 
 *source:*
-[JuliaFEM/src/elasticity_solver.jl:171](https://github.com/JuliaFEM/JuliaFEM.jl/tree/b8194d0c137963b44aab6b223a22491f9b0f7774/src/elasticity_solver.jl#L171)
+[JuliaFEM/src/elasticity_solver.jl:174](https://github.com/JuliaFEM/JuliaFEM.jl/tree/33a7fe664e9808c57564b507f0b8d5dcb451365a/src/elasticity_solver.jl#L174)
 
 ---
 
@@ -44,17 +44,74 @@ is calculated and eldofs are "extended" to problem dimension.
 
 
 *source:*
-[JuliaFEM/src/elasticity_solver.jl:130](https://github.com/JuliaFEM/JuliaFEM.jl/tree/b8194d0c137963b44aab6b223a22491f9b0f7774/src/elasticity_solver.jl#L130)
+[JuliaFEM/src/elasticity_solver.jl:133](https://github.com/JuliaFEM/JuliaFEM.jl/tree/33a7fe664e9808c57564b507f0b8d5dcb451365a/src/elasticity_solver.jl#L133)
 
 ---
 
 <a id="method__calc_local_matrices.1" class="lexicon_definition"></a>
-#### calc_local_matrices!(X,  u,  R,  Kt,  N,  dNdchi,  lambda_,  mu_,  ipoints,  iweights) [¶](#method__calc_local_matrices.1)
-Calculate local tangent stiffness matrix and residual force vector R = T - F
+#### calc_local_matrices!(X,  u,  R,  K,  basis,  dbasis,  lambda_,  mu_,  ipoints,  iweights) [¶](#method__calc_local_matrices.1)
+Calculate local tangent stiffness matrix and residual force vector
+R = T - F for elasticity problem.
+
+Parameters
+----------
+X : Element coordinates
+u : Displacement field
+R : Residual force vector
+K : Tangent stiffness matrix
+basis : Basis functions
+dbasis : Derivative of basis functions
+lambda : Material parameter
+mu : Material parameter
+ipoints : integration points
+iweights : integration weights
+
+Returns
+-------
+None
+
+Notes
+-----
+If material parameters are given in list, they are interpolated to gauss
+points using shape functions.
 
 
 *source:*
-[JuliaFEM/src/elasticity_solver.jl:68](https://github.com/JuliaFEM/JuliaFEM.jl/tree/b8194d0c137963b44aab6b223a22491f9b0f7774/src/elasticity_solver.jl#L68)
+[JuliaFEM/src/elasticity_solver.jl:76](https://github.com/JuliaFEM/JuliaFEM.jl/tree/33a7fe664e9808c57564b507f0b8d5dcb451365a/src/elasticity_solver.jl#L76)
+
+---
+
+<a id="method__dummy.1" class="lexicon_definition"></a>
+#### dummy(a) [¶](#method__dummy.1)
+This is dummy function. Testing doctests and documentation.
+
+Parameters
+----------
+x : Array{Float64, 1}
+
+Returns
+-------
+Array{float64, 1}
+  x + 1
+
+Notes
+-----
+This is dummy function
+
+Raises
+------
+Exception
+  if things are not going right
+
+Examples
+--------
+>>> a = [1.0, 2.0, 3.0]
+>>> dummy(a)
+[2.0, 3.0, 4.0]
+
+
+*source:*
+[JuliaFEM/src/elasticity_solver.jl:44](https://github.com/JuliaFEM/JuliaFEM.jl/tree/33a7fe664e9808c57564b507f0b8d5dcb451365a/src/elasticity_solver.jl#L44)
 
 ---
 
@@ -87,7 +144,7 @@ DX=2 for some node, for example.
 
 
 *source:*
-[JuliaFEM/src/elasticity_solver.jl:218](https://github.com/JuliaFEM/JuliaFEM.jl/tree/b8194d0c137963b44aab6b223a22491f9b0f7774/src/elasticity_solver.jl#L218)
+[JuliaFEM/src/elasticity_solver.jl:221](https://github.com/JuliaFEM/JuliaFEM.jl/tree/33a7fe664e9808c57564b507f0b8d5dcb451365a/src/elasticity_solver.jl#L221)
 
 ---
 
@@ -119,28 +176,7 @@ DX=2 for some node, for example.
 
 
 *source:*
-[JuliaFEM/src/elasticity_solver.jl:257](https://github.com/JuliaFEM/JuliaFEM.jl/tree/b8194d0c137963b44aab6b223a22491f9b0f7774/src/elasticity_solver.jl#L257)
-
----
-
-<a id="method__interpolate.1" class="lexicon_definition"></a>
-#### interpolate{T<:Real}(field::Array{T<:Real, 1},  basis::Function,  ip) [¶](#method__interpolate.1)
-Interpolate field variable using basis functions f for point ip.
-This function tries to be as general as possible and allows interpolating
-lot of different fields.
-
-Parameters
-----------
-field :: Array{Number, dim}
-  Field variable
-basis :: Function
-  Basis functions
-ip :: Array{Number, 1}
-  Point to interpolate
-
-
-*source:*
-[JuliaFEM/src/elasticity_solver.jl:30](https://github.com/JuliaFEM/JuliaFEM.jl/tree/b8194d0c137963b44aab6b223a22491f9b0f7774/src/elasticity_solver.jl#L30)
+[JuliaFEM/src/elasticity_solver.jl:260](https://github.com/JuliaFEM/JuliaFEM.jl/tree/33a7fe664e9808c57564b507f0b8d5dcb451365a/src/elasticity_solver.jl#L260)
 
 ---
 
@@ -150,5 +186,5 @@ Solve one increment of elasticity problem
 
 
 *source:*
-[JuliaFEM/src/elasticity_solver.jl:278](https://github.com/JuliaFEM/JuliaFEM.jl/tree/b8194d0c137963b44aab6b223a22491f9b0f7774/src/elasticity_solver.jl#L278)
+[JuliaFEM/src/elasticity_solver.jl:281](https://github.com/JuliaFEM/JuliaFEM.jl/tree/33a7fe664e9808c57564b507f0b8d5dcb451365a/src/elasticity_solver.jl#L281)
 

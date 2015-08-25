@@ -53,7 +53,7 @@ cd(dirname(@__FILE__)) do
     # Generate and save the contents of docstrings as markdown files.
     index  = Index()
     for mod in modules
-        Lexicon.update!(index, save(joinpath(api_directory, "$(mod).md"), mod))
+        Lexicon.update!(index, save(joinpath(api_directory, "$(mod).rst"), mod))
     end
     save(joinpath(api_directory, "index.rst"), index)
 
