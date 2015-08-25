@@ -4,118 +4,100 @@ JuliaFEM.elasticity_solver
 Internal
 --------
 
-.. jl:function:: assemble!(fe,  eldofs_,  I,  V)
+ .. function:: assemble!(fe,  eldofs_,  I,  V)
 
     Assemble global RHS to I,V ready for sparse format
-    
-    Parameters
-    ----------
-    fe : local vector
-    eldofs_ : Array
-      degrees of freedom
-    I,V : Arrays for sparse matrix
-    
-    Notes
-    -----
-    eldofs can also be node ids for convenience. In that case dimension
-    is calculated and eldofs are "extended" to problem dimension.
-    
 
-.. jl:function:: assemble!(ke,  eldofs_,  I,  J,  V)
+    :param fe :  local vector
+    :param eldofs_ :  Array
+    :param I,V :  Arrays for sparse matrix
+    :notes: eldofs can also be node ids for convenience. In that case dimension
+            is calculated and eldofs are "extended" to problem dimension.
+**source**
+[JuliaFEM/src/elasticity_solver.jl:174]
+
+ .. function:: assemble!(ke,  eldofs_,  I,  J,  V)
 
     Assemble global stiffness matrix to I,J,V ready for sparse format
-    
-    Parameters
-    ----------
-    ke : local matrix
-    eldofs_ : Array
-      degrees of freedom
-    I,J,V : Arrays for sparse matrix
-    
-    Notes
-    -----
-    eldofs can also be node ids for convenience. In that case dimension
-    is calculated and eldofs are "extended" to problem dimension.
-    
 
-.. jl:function:: calc_local_matrices!(X,  u,  R,  Kt,  N,  dNdchi,  lambda_,  mu_,  ipoints,  iweights)
+    :param ke :  local matrix
+    :param eldofs_ :  Array
+    :param I,J,V :  Arrays for sparse matrix
+    :notes: eldofs can also be node ids for convenience. In that case dimension
+            is calculated and eldofs are "extended" to problem dimension.
+**source**
+[JuliaFEM/src/elasticity_solver.jl:133]
 
-    Calculate local tangent stiffness matrix and residual force vector R = T - F
-    
+ .. function:: calc_local_matrices!(X,  u,  R,  K,  basis,  dbasis,  lambda_,  mu_,  ipoints,  iweights)
 
-.. jl:function:: eliminate_boundary_conditions(dirichletbc,  I,  J,  V)
+    Calculate local tangent stiffness matrix and residual force vector
+    R = T - F for elasticity problem.
+
+    :param X :  Element coordinates
+    :param u :  Displacement field
+    :param R :  Residual force vector
+    :param K :  Tangent stiffness matrix
+    :param basis :  Basis functions
+    :param dbasis :  Derivative of basis functions
+    :param lambda :  Material parameter
+    :param mu :  Material parameter
+    :param ipoints :  integration points
+    :param iweights :  integration weights
+    :returns: None
+    :notes: If material parameters are given in list, they are interpolated to gauss
+            points using shape functions.
+**source**
+[JuliaFEM/src/elasticity_solver.jl:76]
+
+ .. function:: dummy(a)
+
+    This is dummy function. Testing doctests and documentation.
+
+    :param x :  Array{Float64, 1}
+    :returns: Array{float64, 1}
+                x + 1
+    :notes: This is dummy function
+    :raises: Exception
+               if things are not going right
+**source**
+[JuliaFEM/src/elasticity_solver.jl:44]
+
+ .. function:: eliminate_boundary_conditions(dirichletbc,  I,  J,  V)
 
     Eliminate Dirichlet boundary conditions from matrix
-    
-    Parameters
-    ----------
-    dirichletbc : array [dim x nnodes]
-    I, J, V : sparse matrix arrays
-    
-    Returns
-    -------
-    I, J, V : boundary conditions removed
-    
-    Notes
-    -----
-    pros:
-    - matrix assembly remains positive definite
-    cons:
-    - maybe inefficient because of extra sparse matrix operations. (It's hard to remove stuff from sparse matrix.)
-    - if u != 0 in dirichlet boundary requires extra care
-    
-    Raises
-    ------
-    Exception, if displacement boundary conditions given, i.e.
-    DX=2 for some node, for example.
-    
-    
 
-.. jl:function:: eliminate_boundary_conditions(dirichletbc,  I,  V)
+    :param dirichletbc :  array [dim x nnodes]
+    :param I, J, V :  sparse matrix arrays
+    :returns: I, J, V : boundary conditions removed
+    :notes: pros:
+            - matrix assembly remains positive definite
+            cons:
+            - maybe inefficient because of extra sparse matrix operations. (It's hard to remove stuff from sparse matrix.)
+            - if u != 0 in dirichlet boundary requires extra care
+    :raises: Exception, if displacement boundary conditions given, i.e.
+             DX=2 for some node, for example.
+**source**
+[JuliaFEM/src/elasticity_solver.jl:221]
+
+ .. function:: eliminate_boundary_conditions(dirichletbc,  I,  V)
 
     Eliminate Dirichlet boundary conditions from vector
-    
-    Parameters
-    ----------
-    dirichletbc : array [dim x nnodes]
-    I, V : sparse vector arrays
-    
-    Returns
-    -------
-    I, V : boundary conditions removed
-    
-    Notes
-    -----
-    pros:
-    - matrix assembly remains positive definite
-    cons:
-    - maybe inefficient because of extra sparse matrix operations. (It's hard to remove stuff from sparse matrix.)
-    - if u != 0 in dirichlet boundary requires extra care
-    
-    Raises
-    ------
-    Exception, if displacement boundary conditions given, i.e.
-    DX=2 for some node, for example.
-    
 
-.. jl:function:: interpolate{T<:Real}(field::Array{T<:Real, 1},  basis::Function,  ip)
+    :param dirichletbc :  array [dim x nnodes]
+    :param I, V :  sparse vector arrays
+    :returns: I, V : boundary conditions removed
+    :notes: pros:
+            - matrix assembly remains positive definite
+            cons:
+            - maybe inefficient because of extra sparse matrix operations. (It's hard to remove stuff from sparse matrix.)
+            - if u != 0 in dirichlet boundary requires extra care
+    :raises: Exception, if displacement boundary conditions given, i.e.
+             DX=2 for some node, for example.
+**source**
+[JuliaFEM/src/elasticity_solver.jl:260]
 
-    Interpolate field variable using basis functions f for point ip.
-    This function tries to be as general as possible and allows interpolating
-    lot of different fields.
-    
-    Parameters
-    ----------
-    field :: Array{Number, dim}
-      Field variable
-    basis :: Function
-      Basis functions
-    ip :: Array{Number, 1}
-      Point to interpolate
-    
+ .. function:: solve_elasticity_increment!(X,  u,  du,  elmap,  nodalloads,  dirichletbc,  lambda,  mu,  N,  dNdchi,  ipoints,  iweights)
 
-.. jl:function:: solve_elasticity_increment!(X,  u,  du,  elmap,  nodalloads,  dirichletbc,  lambda,  mu,  N,  dNdchi,  ipoints,  iweights)
-
-    Solve one increment of elasticity problem
-    
+**source**
+[JuliaFEM/src/elasticity_solver.jl:281]
 

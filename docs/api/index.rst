@@ -7,8 +7,8 @@ Automatically generated api documentation
 Contents:
 
 .. toctree::
-   :maxdepth: 5
+   :maxdepth: 3
 
-   JuliaFEM.abaqus_reader
+   JuliaFEM
    JuliaFEM.elasticity_solver
    JuliaFEM.interfaces

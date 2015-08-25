@@ -18,6 +18,6 @@ include("xdmf.jl")
 include("abaqus_reader.jl")
 include("interfaces.jl")
 
-export set_coordinates, get_coordinates, set_material
+export set_coordinates, get_coordinates #,  set_material
 
 end # module

@@ -4,13 +4,12 @@ JuliaFEM.interfaces
 Exported
 --------
 
-.. jl:function:: solve_elasticity_interface!()
+ .. function:: solve_elasticity_interface!()
 
     This is generic interface that reads data from data model, solves elasticity
     problem and updates model.
-    
-    Parameters
-    ----------
-    model : to be defined
-    
+
+    :param model :  to be defined
+**source**
+[JuliaFEM/src/interfaces.jl:22]
 
