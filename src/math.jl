@@ -99,15 +99,16 @@ This version returns another function which can be then evaluated against field
 """
 function linearize(f::Function, field::ASCIIString)
     function jacobian(el::Element, args...)
-        dim, nnodes = size(el.attributes[field])
+        fld = get_field(el, field)
+        dim, nnodes = size(fld)
         function helper!(x, y)
-            orig = copy(el.attributes[field])
-            el.attributes[field] = reshape(x, dim, nnodes)
+            orig = copy(fld)
+            set_field(el, field,  reshape(x, dim, nnodes))
             y[:] = f(el, args...)
-            el.attributes[field] = copy(orig)
+            set_field(el, field, copy(orig))
         end
         jac = ForwardDiff.forwarddiff_jacobian(helper!, Float64, fadtype=:dual, n=dim*nnodes, m=dim*nnodes)
-        return jac(el.attributes[field][:])
+        return jac(fld[:])
     end
     return jacobian
 end

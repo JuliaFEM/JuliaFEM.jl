@@ -19,7 +19,7 @@ type IntegrationPoint
     weight :: Float64
     attributes :: Dict{ASCIIString, Any}
 end
-IntegrationPoint(xi, weight) = IntegrationPoint(xi, weight, Dict{AsciiString, Any}())
+IntegrationPoint(xi, weight) = IntegrationPoint(xi, weight, Dict{ASCIIString, Any}())
 
 type Assembly
     # LHS
