@@ -1,7 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-export IntegrationPoint, Element, Assembly, FunctionSpace
+export IntegrationPoint, Assembly
 
 """
 Integration point
@@ -19,22 +19,7 @@ type IntegrationPoint
     weight :: Float64
     attributes :: Dict{ASCIIString, Any}
 end
-
-type FunctionSpace
-    basis :: Function
-    dbasis :: Function
-end
-
-abstract Element
-
-#type Element
-#    id :: Int
-#    node_ids :: Array{Int, 1}
-#    shape_functions :: FunctionSpace
-#    integration_points :: Array{IntegrationPoint, 1}
-#    attributes :: Dict{ASCIIString, Any}
-#end
-
+IntegrationPoint(xi, weight) = IntegrationPoint(xi, weight, Dict{AsciiString, Any}())
 
 type Assembly
     # LHS
