@@ -8,7 +8,7 @@ Get jacobian of element evaluated at point xi
 """
 function get_jacobian(el::Element, xi)
     dbasisdxi(xi) = get_dbasisdxi(el, xi)
-    X = get_coordinates(el)
+    X = get_field(el, "coordinates")
     J = interpolate(X, dbasisdxi, xi)'
     return J
 end
@@ -24,27 +24,25 @@ function get_dbasisdX(el::Element, xi)
 end
 
 """
-Return coordinates of element in array of size dim x nnodes
+Set field variable.
 """
-function get_coordinates(el::Element)
-    el.coordinates
+function set_field(el::Element, field_name, field_value)
+    el.fields[field_name] = field_value
 end
 
 """
-Set coordinates for element
+Get field variable.
 """
-function set_coordinates(el::Element, coordinates)
-    el.coordinates = coordinates
+function get_field(el::Element, field_name)
+    el.fields[field_name]
 end
 
 """
-Get element id
+Evaluate field in point xi using basis functions.
 """
-function get_element_id(el::Element)
-    el.id
+function interpolate(el::Element, field::ASCIIString, xi::Array{Float64,1})
+    (get_basis(el, xi)'*get_field(el, field))'
 end
-
-
 
 ### Lagrange family ###
 
@@ -73,21 +71,13 @@ function create_lagrange_element(element_name, X, P, dP)
         invA = inv(A)'
 
         type $element_name
-            element_id :: Int
             node_ids :: Array{Int, 1}
-            coordinates :: Array{Float64, 2}
             fields :: Dict{ASCIIString, Any}
         end
 
-        function $element_name(element_id, node_ids)
-            coordinates = zeros(dim, nnodes)
+        function $element_name(node_ids)
             fields = Dict{ASCIIString, Any}()
-            $element_name(element_id, node_ids, coordinates, fields)
-        end
-
-        function $element_name(element_id, node_ids, coordinates)
-            fields = Dict{ASCIIString, Any}()
-            $element_name(element_id, node_ids, coordinates, fields)
+            $element_name(node_ids, fields)
         end
 
         function get_basis(el::$element_name, xi)
@@ -110,9 +100,7 @@ end
 1 node point element
 """
 type Point1 <: CG
-    element_id :: Int
     node_ids :: Array{Int, 1}
-    coordinates :: Array{Float64, 2}
     fields :: Dict{ASCIIString, Any}
 end
 
@@ -122,9 +110,7 @@ end
 2 node linear line element
 """
 type Seg2 <: CG
-    element_id :: Int
     node_ids :: Array{Int, 1}
-    coordinates :: Array{Float64, 2}
     fields :: Dict{ASCIIString, Any}
 end
 
@@ -137,9 +123,7 @@ end
 3 node quadratic line element
 """
 type Seg2 <: CG
-    element_id :: Int
     node_ids :: Array{Int, 1}
-    coordinates :: Array{Float64, 2}
     fields :: Dict{ASCIIString, Any}
 end
 #X = [-1.0 1.0 0.0]'
@@ -153,10 +137,12 @@ end
 4 node bilinear quadrangle element
 """
 type Quad4 <: CG
-    element_id :: Int
     node_ids :: Array{Int, 1}
-    coordinates :: Array{Float64, 2}
     fields :: Dict{ASCIIString, Any}
+end
+function Quad4(node_ids)
+    fields = Dict{ASCIIString, Any}()
+    Quad4(node_ids, fields)
 end
 function get_basis(el::Quad4, xi)
     [(1-xi[1])*(1-xi[2])/4
@@ -193,9 +179,7 @@ end
 10 node quadratic tethahedron
 """
 type Tet10 <: CG
-    element_id :: Int
     node_ids :: Array{Int, 1}
-    coordinates :: Array{Float64, 2}
     fields :: Dict{ASCIIString, Any}
 end
 # X = [
