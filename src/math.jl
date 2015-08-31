@@ -1,9 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-"""
-This module contains math stuff, including interpolation, integration, linearization, ...
-"""
+## This module contains math stuff, including interpolation, integration, linearization, ...
 
 using ForwardDiff
 
@@ -99,15 +97,16 @@ This version returns another function which can be then evaluated against field
 """
 function linearize(f::Function, field::ASCIIString)
     function jacobian(el::Element, args...)
-        dim, nnodes = size(el.attributes[field])
+        fld = get_field(el, field)
+        dim, nnodes = size(fld)
         function helper!(x, y)
-            orig = copy(el.attributes[field])
-            el.attributes[field] = reshape(x, dim, nnodes)
+            orig = copy(fld)
+            set_field(el, field,  reshape(x, dim, nnodes))
             y[:] = f(el, args...)
-            el.attributes[field] = copy(orig)
+            set_field(el, field, copy(orig))
         end
         jac = ForwardDiff.forwarddiff_jacobian(helper!, Float64, fadtype=:dual, n=dim*nnodes, m=dim*nnodes)
-        return jac(el.attributes[field][:])
+        return jac(fld[:])
     end
     return jacobian
 end
@@ -183,4 +182,64 @@ function integrate!(f::Function, el::Element, target)
         el.attributes[target][:,:] += ip.weight*f(el, ip)*det(J)
     end
 end
+
+get_integration_points(eq::Equation) = eq.integration_points
+
+"""
+Integrate f over element using Gaussian quadrature rules.
+
+Parameters
+----------
+el::Element
+    well defined element
+f::Function
+    Function to integrate
+"""
+function integrate(eq::Equation, f::Function)
+    target = []
+    for ip in get_integration_points(eq)
+        J = get_jacobian(eq.element, ip.xi)
+        push!(target, ip.weight*f(eq, ip)*det(J))
+    end
+    return sum(target)
+end
+
+
+"""
+Evaluate field in point xi using basis functions.
+"""
+function interpolate(el::Element, field::ASCIIString, xi::Array{Float64,1})
+    f = get_field(el, field)
+    if !isa(f, Array)
+        # This is scalar, nothing to interpolate
+        return f
+    end
+    basis = get_basis(el, xi)
+    dim, nnodes = size(f)
+    result = zeros(dim)
+    for i=1:nnodes
+        result += basis[i]*f[:,i]
+    end
+    return result
+end
+
+
+function linearize(eq::Equation, f::Function, field::ASCIIString)
+    function jacobian(eq::Equation, args...)
+        el = get_element(eq)
+        fld = get_field(el, field)
+        dim, nnodes = size(fld)
+        function helper(x::Vector)
+            orig = copy(fld)
+            set_field(el, field,  reshape(x, dim, nnodes))
+            y = f(eq, args...)
+            set_field(el, field, orig)
+            return y[:]
+        end
+        jac = ForwardDiff.jacobian(helper)
+        return jac(fld[:])
+    end
+    return jacobian
+end
+
 
