@@ -1,16 +1,70 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+using FactCheck
+
 abstract Element
 
-get_element(eq::Equation) = eq.element
+export get_number_of_nodes
+
+get_number_of_nodes(el::Type{Element}) = -1
+get_element_dimension(el::Element) = -1
+get_dbasisdx(el::Element) = nothing
+get_basis(el::Element) = nothing
+
+function test_element(eltype)
+    local el
+    n = get_number_of_nodes(eltype)
+    Logging.info("number of connectivity points (nodes) in this element: $n")
+    @fact n --> not(-1) """Unable to determine number of nodes for $eltype
+    define a function 'get_number_of_nodes' which returns the number of nodes for this element."""
+
+    Logging.info("Constructing element..")
+    try
+        el = eltype(collect(1:n))
+    catch
+        Logging.error("""Unable to create element with default constructor
+        define function $eltype(connectivity) which initializes this element.
+        """)
+    end
+    dim = get_element_dimension(el)
+    Logging.info("Element dimension: $dim")
+    @fact dim --> not(-1) """Unable to get element dimension
+    define function 'get_element_dimension' which return the dimension of this element (1, 2, 3)"""
+
+    # try to interpolate some scalar field
+    fld = collect(1:n)'
+    Logging.info("Setting scalar field $fld to element.")
+    set_field(el, "field1", fld)
+    @fact get_field(el, "field1") --> fld
+
+    try
+        get_basis(el, zeros(dim))
+    catch
+        Logging.error("""Unable to evaluate basis, define function 'get_basis' for this element.
+        """)
+    end
+    try
+        get_dbasisdxi(el, zeros(dim))
+    catch
+        Logging.error("""Unable to evaluate partial derivatives of basis, define function 'get_dbasisdxi' for this element.
+        """)
+    end
+
+    xi = zeros(dim)
+    Logging.info("Interpolating scalar field at $xi")
+    i = interpolate(el, "field1", zeros(dim))
+    Logging.info("Value: $i")
+    Logging.info("Element $eltype passed tests.")
+end
+
 
 """
 Get jacobian of element evaluated at point xi
 """
 function get_jacobian(el::Element, xi)
     dbasisdxi = get_dbasisdxi(el, xi)
-    X = get_field(el, "coordinates")
+    X = get_field(el, :coordinates)
     #J = interpolate(X, dbasisdxi, xi)'
     J = X*dbasisdxi
     return J
@@ -40,11 +94,29 @@ function get_field(el::Element, field_name)
     el.fields[field_name]
 end
 
+#"""
+#Evaluate field in point xi using basis functions.
+#"""
+#function interpolate(el::Element, field::ASCIIString, xi::Array{Float64,1})
+#    (get_basis(el, xi)'*get_field(el, field))'
+#end
+
 """
 Evaluate field in point xi using basis functions.
 """
-function interpolate(el::Element, field::ASCIIString, xi::Array{Float64,1})
-    (get_basis(el, xi)'*get_field(el, field))'
+function interpolate(el::Element, field::Union(ASCIIString, Symbol), xi::Array{Float64,1})
+    f = get_field(el, field)
+    basis = get_basis(el, xi)
+    dim, nnodes = size(f)
+    result = zeros(dim)
+    for i=1:nnodes
+        result += basis[i]*f[:,i]
+    end
+    if dim == 1
+        return result[1]
+    else
+        return result
+    end
 end
 
 ### Lagrange family ###
