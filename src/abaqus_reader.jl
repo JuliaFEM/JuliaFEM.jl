@@ -1,9 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-eldims = Dict(
-    "C3D10" => 10,
-    "C3D4" => 4)
+
 
 global handlers = Dict()
 
@@ -43,13 +41,19 @@ function parse_node_section(model, header, data)
     end
 end
 
+
 function parse_element_section(model, header, data)
+    Logging.debug("Parsing elements")
+    eldims = Dict(
+        "C3D10" => 10,
+        "C3D4" => 4)
     eltype = header["options"]["TYPE"]
     if !(eltype in keys(eldims))
         throw("Element $eltype dimension information missing")
     end
     eldim = eldims[eltype]
-    m = matchall(r"[0-9]+", data)
+    test_match = matchall(r"[0-9]+", "234, 242")
+    m = matchall(r"[0-9]+", data)   
     m = map((s) -> parse(Int, s), m)
     elements = create_or_get(model, "elements")
     m = reshape(m, eldim+1, round(Int, length(m)/(eldim+1)))
@@ -87,7 +91,7 @@ function parse_abaqus(fid)
     model = Dict()
     section = None
     header = None
-    data = ""
+    data = String[]
     Logging.info("Registered handlers: $(keys(handlers))")
 
     function process_section(section)
@@ -99,23 +103,29 @@ function parse_abaqus(fid)
             Logging.info("Skipping $(length(data)) bytes of unknown data")
             return
         end
-        handlers[section](model, header, strip(data))
-        data = ""
+        Logging.debug("Starting to process")
+        println(length(data))
+        joined = join(data, "")
+        handlers[section](model, header, strip(joined))
+        data = []
     end
 
+    line_idx = 0
     for line in eachline(fid)
         if startswith(line, "**")
             continue
         end
         if startswith(line, "*")
+            Logging.debug("processing -- section")
             process_section(section)
             header = parse_header(line)
             Logging.debug("Found ", header["section"], " section")
             section = header["section"]
+            Logging.debug("processing ++ section")
             continue
         end
-        data *= line
-    end
+        push!(data, line)
+    end            
     process_section(section)
     return model
 end
