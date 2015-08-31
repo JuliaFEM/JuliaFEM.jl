@@ -129,32 +129,6 @@ end
 
 
 
-"""
-Integrate f over element using Gaussian quadrature rules.
-
-Parameters
-----------
-el::Element
-    well defined element
-f::Function
-    Function to integrate
-"""
-function integrate(f::Function, el::Element)
-    target = []
-    for ip in el.integration_points
-        J = interpolate(el, "coordinates", ip.xi; derivative=true)
-        push!(target, ip.weight*f(el, ip)*det(J))
-    end
-    return sum(target)
-end
-#function integrate(f::Function, integration_points::Array{IntegrationPoint, 1}, Xargs...)
-#    target = []
-#    for ip in integration_points
-#        J = interpolate(el, "coordinates", ip.xi; derivative=true)
-#        push!(target, ip.weight*f(ip, args...)*det(J))
-#    end
-#    return sum(target)
-#end
 
 """
 This version returns a function which must be operated with element e
@@ -182,28 +156,6 @@ function integrate!(f::Function, el::Element, target)
         el.attributes[target][:,:] += ip.weight*f(el, ip)*det(J)
     end
 end
-
-get_integration_points(eq::Equation) = eq.integration_points
-
-"""
-Integrate f over element using Gaussian quadrature rules.
-
-Parameters
-----------
-el::Element
-    well defined element
-f::Function
-    Function to integrate
-"""
-function integrate(eq::Equation, f::Function)
-    target = []
-    for ip in get_integration_points(eq)
-        J = get_jacobian(eq.element, ip.xi)
-        push!(target, ip.weight*f(eq, ip)*det(J))
-    end
-    return sum(target)
-end
-
 
 """
 Evaluate field in point xi using basis functions.
