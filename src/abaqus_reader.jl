@@ -104,7 +104,6 @@ function parse_abaqus(fid)
             return
         end
         Logging.debug("Starting to process")
-        println(length(data))
         joined = join(data, "")
         handlers[section](model, header, strip(joined))
         data = []
