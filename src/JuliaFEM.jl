@@ -7,10 +7,9 @@ using Lexicon
 using Logging
 @Logging.configure(level=DEBUG)
 
-Logging.info("loading types")
 include("types.jl") # type definitions
-Logging.info("loading elements")
 include("elements.jl") # elements
+include("equations.jl") # formulations
 include("math.jl") # basic mathematical operations
 
 include("elasticity_solver.jl")
