@@ -3,13 +3,16 @@
 
 abstract Element
 
+get_element(eq::Equation) = eq.element
+
 """
 Get jacobian of element evaluated at point xi
 """
 function get_jacobian(el::Element, xi)
-    dbasisdxi(xi) = get_dbasisdxi(el, xi)
+    dbasisdxi = get_dbasisdxi(el, xi)
     X = get_field(el, "coordinates")
-    J = interpolate(X, dbasisdxi, xi)'
+    #J = interpolate(X, dbasisdxi, xi)'
+    J = X*dbasisdxi
     return J
 end
 
@@ -102,6 +105,10 @@ end
 type Point1 <: CG
     node_ids :: Array{Int, 1}
     fields :: Dict{ASCIIString, Any}
+end
+function Point1(node_ids)
+    fields = Dict{ASCIIString, Any}()
+    Point1(node_ids, fields)
 end
 
 # 1d Lagrange elements

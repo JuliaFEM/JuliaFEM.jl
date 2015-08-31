@@ -1,7 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-export IntegrationPoint, Assembly
+abstract Equation
+
 
 """
 Integration point
@@ -19,7 +20,7 @@ type IntegrationPoint
     weight :: Float64
     attributes :: Dict{ASCIIString, Any}
 end
-IntegrationPoint(xi, weight) = IntegrationPoint(xi, weight, Dict{AsciiString, Any}())
+IntegrationPoint(xi, weight) = IntegrationPoint(xi, weight, Dict{ASCIIString, Any}())
 
 type Assembly
     # LHS
