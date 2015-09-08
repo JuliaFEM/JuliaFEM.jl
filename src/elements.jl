@@ -64,7 +64,7 @@ Get jacobian of element evaluated at point xi
 """
 function get_jacobian(el::Element, xi)
     dbasisdxi = get_dbasisdxi(el, xi)
-    X = get_field(el, :coordinates)
+    X = get_field(el, :geometry)
     #J = interpolate(X, dbasisdxi, xi)'
     J = X*dbasisdxi
     return J

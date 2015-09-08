@@ -137,7 +137,7 @@ function integrate(f::Function)
     function integrate(el::Element)
         target = []
         for ip in el.integration_points
-            J = interpolate(el, "coordinates", ip.xi; derivative=true)
+            J = interpolate(el, :geometry, ip.xi; derivative=true)
             push!(target, ip.weight*f(el, ip)*det(J))
         end
         return sum(target)
@@ -152,7 +152,7 @@ function integrate!(f::Function, el::Element, target)
     # set target to zero
     el.attributes[target][:] = 0.0
     for ip in el.integration_points
-        J = interpolate(el, "coordinates", ip.xi; derivative=true)
+        J = interpolate(el, :geometry, ip.xi; derivative=true)
         el.attributes[target][:,:] += ip.weight*f(el, ip)*det(J)
     end
 end
