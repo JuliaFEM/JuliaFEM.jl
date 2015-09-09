@@ -21,7 +21,9 @@ type IntegrationPoint
 end
 IntegrationPoint(xi, weight) = IntegrationPoint(xi, weight, Dict{ASCIIString, Any}())
 
+has_lhs(eq::Equation) = false
 get_lhs(eq::Equation, xi) = nothing
+has_rhs(eq::Equation) = false
 get_rhs(eq::Equation, xi) = nothing
 get_element(eq::Equation) = eq.element
 get_integration_points(eq::Equation) = eq.integration_points
@@ -29,8 +31,8 @@ get_integration_points(eq::Equation) = eq.integration_points
 get_basis(eq::Equation, ip::IntegrationPoint) = get_basis(get_element(eq), ip.xi)
 get_dbasisdx(eq::Equation, ip::IntegrationPoint) = get_dbasisdx(get_element(eq), ip.xi)
 interpolate(eq::Equation, field::Union(ASCIIString, Symbol), ip::IntegrationPoint) = interpolate(get_element(el), field, ip.xi)
-integrate_lhs(eq::Equation) = integrate(eq, get_lhs)
-integrate_rhs(eq::Equation) = integrate(eq, get_rhs)
+integrate_lhs(eq::Equation) = has_lhs(eq) ? integrate(eq, get_lhs) : nothing
+integrate_rhs(eq::Equation) = has_rhs(eq) ? integrate(eq, get_rhs) : nothing
 
 """
 Return determinant of Jacobian for numerical integration.
