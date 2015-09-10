@@ -24,10 +24,10 @@ everything should be ok. I use Quad4 as an example element here.
 Several functions are inherited from Element abstract type:
 
 - get_connectivity
-- get_number_of_basis_functions
+- get_number_of_basis_functions*
 - get_element_dimension *
 - get_basis *
-- get_dbasisdxi
+- get_dbasisdxi*
 - get_dbasisdX
 - get_field
 - set_field
@@ -39,33 +39,41 @@ Which should work if element is defined following some rules. Functions marked w
 =#
 
 # These must be implemented for your own element
+get_number_of_basis_functions(el::Type{Element}) = nothing
 get_element_dimension(el::Element) = nothing
 get_basis(el::Element, xi) = nothing
-""" Return partial derivatives of basis using ForwardDiff """
-function get_dbasisdxi(el::Element, xi)
-    f(xi) = get_basis(el, xi)
-    ForwardDiff.jacobian(f, xi)
-end
-function get_number_of_basis_functions(el::Type{Element})
-    Logging.info("You really should define get_number_of_basis_functions")
-    # this is hack, evaluate basis in some point and return length of vector.
-    bf = get_basis([0.0, 0.0, 0.0])
-    length(bf)
-end
-
-abstract CG <: Element # Lagrange (continous Galerkin) element family
+get_dbasisdxi(el::Element, xi) = nothing
 
 """
-4 node bilinear quadrangle element
+Create new element with element_name to family element_family
 
-X = [-1.0  1.0  1.0 -1.0
-     -1.0 -1.0  1.0  1.0]
-
-P(xi) = [1.0, xi[1], xi[2], xi[1]*xi[2]]
-
-dP(xi) = [0.0 1.0 0.0 xi[2]
-          0.0 0.0 1.0 xi[1]]
+Examples
+--------
+>>> @create_element(Seg2, CG, "2 node linear segment")
 """
+macro create_element(element_name, element_family, element_description)
+    print("Creating element ", element_name, ": ", element_description, "\n")
+    eltype = esc(element_name)
+    elfam = esc(element_family)
+    quote
+        global get_element_description
+        type $eltype <: $elfam
+            connectivity :: Array{Int, 1}
+            fields :: Dict{Any, Any}
+        end
+        $eltype(connectivity) = $eltype(connectivity, Dict{Any, Any}())
+        get_element_description(el::Type{$eltype}) = $element_description
+    end
+end
+
+#=
+
+Start of example
+
+Example how to create new element. This is commented because I use code
+generation for simple elements like Lagrage elements. Feel free to use
+code generation but elements can be of course created manually too!
+
 type Quad4 <: CG
     connectivity :: Array{Int, 1}
     fields :: Dict{Any, Any}
@@ -75,7 +83,7 @@ end
 Quad4(connectivity) = Quad4(connectivity, Dict{Any, Any}())
 
 """ Return number of basis functions of this element. """
-get_number_of_basis_functions(el::Type{Quad4})
+get_number_of_basis_functions(el::Type{Quad4}) = 4
 
 """ Return element dimension (length of xi vector). """
 get_element_dimension(el::Type{Quad4}) = 2
@@ -95,9 +103,92 @@ function get_dbasisdxi(el::Quad4, xi)
       (1+xi[2])/4.0     (1+xi[1])/4.0
      -(1+xi[2])/4.0     (1-xi[1])/4.0]
 end
-# TODO: create_lagrange_element(:Quad4, X, P, dP)
+
+End of example.
+
+=#
+
+abstract CG <: Element # Lagrange (continous Galerkin) element family
+
+"""
+Given polynomial P and coordinates of reference element, calculate
+Lagrange basis function and partial derivatives.
+"""
+function calculate_lagrange_basis(P, X)
+    dim, nbasis = size(X)
+    A = zeros(nbasis, nbasis)
+    for i=1:nbasis
+        A[i,:] = P(X[:, i])
+    end
+    println("Calculating inverse of A")
+    invA = inv(A)'
+    basis(xi) = invA*P(xi)
+    dbasisdxi = ForwardDiff.jacobian(basis)
+    basis, dbasisdxi
+end
+
+"""
+Assign Lagrange basis for element.
+"""
+macro create_lagrange_basis(element_name, X, P)
+    
+    print("Creating Lagrange basis for element ", element_name, ". ")
+    eltype = esc(element_name)
+
+    quote
+
+        global get_number_of_basis_functions, get_element_dimension
+        global get_basis, get_dbasisdxi
+
+        dim = size($X, 1)
+        nbasis = size($X, 2)
+        print("Number of basis functions: ", nbasis, ". ")
+        println("Element dimension: ", dim)
+
+        get_number_of_basis_functions(el::Type{$(esc(element_name))}) = nbasis
+        get_element_dimension(el::$(esc(element_name))) = dim
+
+        basis, dbasisdxi = calculate_lagrange_basis($P, $X)
+        get_basis(el::$eltype, xi) = basis(xi)
+        get_dbasisdxi(el::$eltype, xi) = dbasisdxi(xi)
+        println("Element ", $element_name, " created.")
+    end
+
+end
+
+# 0d Lagrange element
+
+@create_element(Point1, CG, "1 node point element")
+
+
+# 1d Lagrange elements
+
+@create_element(Seg2, CG, "2 node linear line element")
+@create_lagrange_basis(Seg2, [-1.0 1.0], (xi) -> [1.0, xi[1]])
+
+@create_element(Seg3, CG, "3 node quadratic line element")
+@create_lagrange_basis(Seg3, [-1.0 1.0 0.0], (xi) -> [1.0, xi[1], xi[1]^2])
+
+# 2d Lagrange elements
+
+@create_element(Quad4, CG, "4 node bilinear quadrangle element")
+@create_lagrange_basis(Quad4,
+    [-1.0  1.0 1.0 -1.0
+     -1.0 -1.0 1.0  1.0],
+    (xi) -> [1.0, xi[1], xi[2], xi[1]*xi[2]])
+
+
+# 3d Lagrange elements
+@create_element(Tet10, CG, "10 node quadratic tetrahedron")
+@create_lagrange_basis(Tet10,
+    [0.0 1.0 0.0 0.0 0.5 0.5 0.0 0.0 0.5 0.0
+     0.0 0.0 1.0 0.0 0.0 0.5 0.5 0.0 0.0 0.5
+     0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.5 0.5 0.5],
+    (xi) -> [    1.0,   xi[1],       xi[2],       xi[3],     xi[1]^2,
+             xi[2]^2, xi[3]^2, xi[1]*xi[2], xi[2]*xi[3], xi[3]*xi[1]])
 
 # Common element routines
+
 
 """
 Test routine for element.
@@ -112,25 +203,30 @@ Raises
 This uses FactCheck and throws exception if element is not passing.
 """
 function test_element(eltype)
+    Logging.info("Testing element $eltype")
     local el
-    n = get_number_of_nodes(eltype)
-    Logging.info("number of connectivity points (nodes) in this element: $n")
-    @fact n --> not(-1) """Unable to determine number of nodes for $eltype
-    define a function 'get_number_of_nodes' which returns the number of nodes for this element."""
+    n = get_number_of_basis_functions(eltype)
+    Logging.info("number of basis functions in this element: $n")
+    @fact n --> not(nothing) """
+    Unable to determine number of nodes for $eltype define a function
+    'get_number_of_basis_functions' which returns the number of nodes
+    for this element."""
 
-    Logging.info("Constructing element..")
+    Logging.info("Initializing element")
     try
         el = eltype(collect(1:n))
     catch
-        Logging.error("""Unable to create element with default constructor
-        define function $eltype(connectivity) which initializes this element.
-        """)
+        Logging.error("""
+        Unable to create element with default constructor define function
+        $eltype(connectivity) which initializes this element.""")
         return false
     end
+
     dim = get_element_dimension(el)
     Logging.info("Element dimension: $dim")
-    @fact dim --> not(-1) """Unable to get element dimension
-    define function 'get_element_dimension' which return the dimension of this element (1, 2, 3)"""
+    @fact dim --> not(nothing) """
+    Unable to get element dimension define function 'get_element_dimension'
+    which return the dimension of this element (1, 2, 3)"""
 
     # try to interpolate some scalar field
     fld = collect(1:n)'
@@ -141,14 +237,16 @@ function test_element(eltype)
     try
         get_basis(el, zeros(dim))
     catch
-        Logging.error("""Unable to evaluate basis, define function 'get_basis' for this element.
-        """)
+        Logging.error("""
+        Unable to evaluate basis, define function 'get_basis' for
+        this element.""")
     end
     try
         get_dbasisdxi(el, zeros(dim))
     catch
-        Logging.error("""Unable to evaluate partial derivatives of basis, define function 'get_dbasisdxi' for this element.
-        """)
+        Logging.error("""
+        Unable to evaluate partial derivatives of basis,
+        define function 'get_dbasisdxi' for this element.""")
     end
 
     xi = zeros(dim)
@@ -207,143 +305,3 @@ function interpolate(el::Element, field, xi)
         return result
     end
 end
-
-#=
-"""
-Create new Lagrange element
-
-FIXME: this is not working
-
-LoadError: error compiling anonymous: type definition not allowed inside a local scope
-
-It's the for loop which is causing problems. See
-https://github.com/JuliaLang/julia/issues/10555
-
-"""
-function create_lagrange_element(element_name, X, P, dP)
-
-    @eval begin
-
-        nnodes, dim = size(X)
-        A = zeros(nnodes, nnodes)
-        for i=1:nnodes
-            A[i,:] = P(X[i,:])
-        end
-        invA = inv(A)'
-
-        type $element_name
-            node_ids :: Array{Int, 1}
-            fields :: Dict{ASCIIString, Any}
-        end
-
-        function $element_name(node_ids)
-            fields = Dict{ASCIIString, Any}()
-            $element_name(node_ids, fields)
-        end
-
-        function get_basis(el::$element_name, xi)
-            invA*P(xi)
-        end
-
-        function get_dbasisdxi(el::$element_name, xi)
-            invA*dP(xi)
-        end
-
-        $element_name
-
-    end
-
-end
-
-=#
-
-# 0d Lagrange elements
-
-#=
-"""
-1 node point element
-"""
-type Point1 <: CG
-    node_ids :: Array{Int, 1}
-    fields :: Dict{ASCIIString, Any}
-end
-function Point1(node_ids)
-    fields = Dict{ASCIIString, Any}()
-    Point1(node_ids, fields)
-end
-
-# 1d Lagrange elements
-
-"""
-2 node linear line element
-"""
-type Seg2 <: CG
-    node_ids :: Array{Int, 1}
-    fields :: Dict{ASCIIString, Any}
-end
-
-# X = [-1.0 1.0]'
-# P = (xi) -> [1.0 xi[1]]'
-# dP = (xi) -> [0.0 1.0]'
-# create_lagrange_element(:Seg2, X, P, dP)
-
-"""
-3 node quadratic line element
-"""
-type Seg2 <: CG
-    node_ids :: Array{Int, 1}
-    fields :: Dict{ASCIIString, Any}
-end
-#X = [-1.0 1.0 0.0]'
-#P = (xi) -> [1.0 xi[1] xi[1]^2]'
-#dP = (xi) -> [0.0 1.0 2*xi[1]]'
-#create_lagrange_element(:Seg3, X, P, dP)
-
-# 2d Lagrange elements
-=#
-
-# 3d Lagrange elements
-#=
-"""
-10 node quadratic tethahedron
-"""
-type Tet10 <: CG
-    node_ids :: Array{Int, 1}
-    fields :: Dict{ASCIIString, Any}
-end
-=#
-# X = [
-#    0.0 0.0 0.0
-#    1.0 0.0 0.0
-#    0.0 1.0 0.0
-#    0.0 0.0 1.0
-#    0.5 0.0 0.0
-#    0.5 0.5 0.0
-#    0.0 0.5 0.0
-#    0.0 0.0 0.5
-#    0.5 0.0 0.5
-#    0.0 0.5 0.5]
-#    P(xi) = [
-#        1
-#        xi[1]
-#        xi[2]
-#        xi[3]
-#        xi[1]^2
-#        xi[2]^2
-#        xi[3]^2
-#        xi[1]*xi[2]
-#        xi[2]*xi[3]
-#        xi[3]*xi[1]]
-#    dP(xi) = [
-#        0 0 0
-#        1 0 0
-#        0 1 0
-#        0 0 1
-#        2*xi[1] 0 0
-#        0       2*xi[2] 0
-#        0       0       2*xi[3]
-#        xi[2]   xi[1]   0
-#        0       xi[3]   xi[2]
-#        xi[3]   0       xi[1]
-#    ]
-#create_lagrange_element(:Tet10, X, P, dP)
