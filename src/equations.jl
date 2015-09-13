@@ -42,7 +42,7 @@ function get_detJ(eq::Equation, ip::IntegrationPoint)
     get_detJ(el, ip)
 end
 function get_detJ(el::Element, ip::IntegrationPoint)
-    J = get_jacobian(el, ip.xi)
+    J = get_Jacobian(el, ip.xi)
     n, m = size(J)
     if n != m # for manifolds
         return norm(J)
