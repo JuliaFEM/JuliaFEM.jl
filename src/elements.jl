@@ -40,9 +40,11 @@ Which should work if element is defined following some rules. Functions marked w
 
 # These must be implemented for your own element
 get_number_of_basis_functions(el::Type{Element}) = nothing
+get_number_of_basis_functions(el::Element) = nothing
 get_element_dimension(el::Element) = nothing
 get_basis(el::Element, xi) = nothing
 get_dbasisdxi(el::Element, xi) = nothing
+get_connectivity(el::Element) = el.connectivity
 
 """
 Create new element with element_name to family element_family
@@ -52,7 +54,7 @@ Examples
 >>> @create_element(Seg2, CG, "2 node linear segment")
 """
 macro create_element(element_name, element_family, element_description)
-    print("Creating element ", element_name, ": ", element_description, "\n")
+#   Logging.debug("Creating element ", element_name, ": ", element_description, "\n")
     eltype = esc(element_name)
     elfam = esc(element_family)
     quote
@@ -108,6 +110,8 @@ End of example.
 
 =#
 
+### LAGRANGE ELEMENTS ###
+
 abstract CG <: Element # Lagrange (continous Galerkin) element family
 
 """
@@ -120,7 +124,7 @@ function calculate_lagrange_basis(P, X)
     for i=1:nbasis
         A[i,:] = P(X[:, i])
     end
-    println("Calculating inverse of A")
+#   Logging.debug("Calculating inverse of A")
     invA = inv(A)'
     basis(xi) = invA*P(xi)
     dbasisdxi = ForwardDiff.jacobian(basis)
@@ -132,7 +136,7 @@ Assign Lagrange basis for element.
 """
 macro create_lagrange_basis(element_name, X, P)
     
-    print("Creating Lagrange basis for element ", element_name, ". ")
+#   Logging.debug("Creating Lagrange basis for element ", element_name, ". ")
     eltype = esc(element_name)
 
     quote
@@ -142,16 +146,17 @@ macro create_lagrange_basis(element_name, X, P)
 
         dim = size($X, 1)
         nbasis = size($X, 2)
-        print("Number of basis functions: ", nbasis, ". ")
-        println("Element dimension: ", dim)
+#       Logging.debug("Number of basis functions: ", nbasis, ". ")
+#       Logging.debug("Element dimension: ", dim)
 
         get_number_of_basis_functions(el::Type{$(esc(element_name))}) = nbasis
+        get_number_of_basis_functions(el::$(esc(element_name))) = nbasis
         get_element_dimension(el::$(esc(element_name))) = dim
 
         basis, dbasisdxi = calculate_lagrange_basis($P, $X)
         get_basis(el::$eltype, xi) = basis(xi)
         get_dbasisdxi(el::$eltype, xi) = dbasisdxi(xi)
-        println("Element ", $element_name, " created.")
+#       Logging.debug("Element ", $element_name, " created.")
     end
 
 end
@@ -159,7 +164,6 @@ end
 # 0d Lagrange element
 
 @create_element(Point1, CG, "1 node point element")
-
 
 # 1d Lagrange elements
 
@@ -177,8 +181,8 @@ end
      -1.0 -1.0 1.0  1.0],
     (xi) -> [1.0, xi[1], xi[2], xi[1]*xi[2]])
 
-
 # 3d Lagrange elements
+
 @create_element(Tet10, CG, "10 node quadratic tetrahedron")
 @create_lagrange_basis(Tet10,
     [0.0 1.0 0.0 0.0 0.5 0.5 0.0 0.0 0.5 0.0
@@ -187,8 +191,12 @@ end
     (xi) -> [    1.0,   xi[1],       xi[2],       xi[3],     xi[1]^2,
              xi[2]^2, xi[3]^2, xi[1]*xi[2], xi[2]*xi[3], xi[3]*xi[1]])
 
-# Common element routines
 
+### HIERARCHICAL ELEMENTS ###
+
+include("hierarchical.jl")
+
+# Common element routines
 
 """
 Test routine for element.
@@ -257,13 +265,13 @@ function test_element(eltype)
 end
 
 """
-Get jacobian of element evaluated at point ξ on element.
+Get jacobian of element evaluated at point ξ on element in reference configuration.
 
 Notes
 -----
 This function assumes that element has field :geometry defined.
 """
-function get_jacobian(el::Element, xi)
+function get_Jacobian(el::Element, xi)
     dbasisdxi = get_dbasisdxi(el, xi)
     X = get_field(el, :geometry)
     J = X*dbasisdxi
@@ -271,13 +279,36 @@ function get_jacobian(el::Element, xi)
 end
 
 """
-Evaluate partial derivatives of basis function w.r.t
-material description X, i.e. dbasis/dX
+Get jacobian of element evaluated at point ξ on element in current configuration.
+
+Notes
+-----
+This function assumes that element has fields :geometry and :displacement defined.
+"""
+function get_jacobian(el::Element, xi)
+    dbasisdxi = get_dbasisdxi(el, xi)
+    X = get_field(el, :geometry)
+    u = get_field(el, :displacement)
+    j = (X+u)*dbasisdxi
+    return j
+end
+
+"""
+Evaluate partial derivatives of basis, dbasis/dX
 """
 function get_dbasisdX(el::Element, xi)
     dbasisdxi = get_dbasisdxi(el, xi)
-    J = get_jacobian(el, xi)
+    J = get_Jacobian(el, xi)
     dbasisdxi*inv(J)
+end
+
+"""
+Evaluate partial derivatives of basis, dbasis/dx
+"""
+function get_dbasisdx(el::Element, xi)
+    dbasisdxi = get_dbasisdxi(el, xi)
+    j = get_jacobian(el, xi)
+    dbasisdxi*inv(j)
 end
 
 """ Set field variable. """
@@ -290,18 +321,44 @@ function get_field(el::Element, field_name)
     el.fields[field_name]
 end
 
-""" Evaluate some field in point ξ on element using basis functions. """
-function interpolate(el::Element, field, xi)
-    f = get_field(el, field)
-    basis = get_basis(el, xi)
-    dim, nnodes = size(f)
-    result = zeros(dim)
-    for i=1:nnodes
-        result += basis[i]*f[:,i]
+"""Evaluate some field in point ξ on element using basis functions.
+
+Parameters
+----------
+el :: Element
+field :: Union{ASCIIString, Symbol}
+xi :: Vector
+
+Returns
+-------
+Scalar, Vector, Tensor, depending on what is type of field to interpolate.
+
+Notes
+-----
+This has another version which returns multiple values for set of coordinates {ξᵢ}.
+dinterpolate returns derivatives.
+
+Examples
+--------
+>>> field = [1.0, 2.0, 3.0, 4.0]
+>>> set_field(el, :temperature, field)
+>>> interpolate(el, :temperature, [0.0, 0.0])
+15.0
+"""
+function interpolate(el::Element, field, xi::Vector)
+    field = get_field(el, field)
+    sum(get_basis(el, xi) .* field)
+end
+function interpolate(el::Element, field, xis::Array{Vector, 1})
+    field = get_field(el, field)
+    interpolate_(xi) = sum(get_basis(el, xi) .* field)
+    map(interpolate_, xis)
+end
+function dinterpolate(el::Element, field, xi::Vector)
+    field = get_field(el, field)
+    dbasis = get_dbasisdxi(el, xi)
+    if isa(dbasis, Vector)
+        return sum(dbasis .* field)
     end
-    if dim == 1
-        return result[1]
-    else
-        return result
-    end
+    return sum([fld[i]*g[i,:] for i in 1:length(fld)])
 end
