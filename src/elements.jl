@@ -371,7 +371,7 @@ function dinterpolate(el::Element, field, xi::Vector)
     fld = get_field(el, field)
     dbasis = get_dbasisdxi(el, xi)
     if isa(dbasis, Vector)
-        return sum(dbasis .* field)
+        return sum(dbasis .* fld)
     end
     return sum([fld[i]*dbasis[i,:] for i in 1:length(fld)])
 end
