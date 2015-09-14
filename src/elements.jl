@@ -135,7 +135,7 @@ end
 Assign Lagrange basis for element.
 """
 macro create_lagrange_basis(element_name, X, P)
-    
+
 #   Logging.debug("Creating Lagrange basis for element ", element_name, ". ")
     eltype = esc(element_name)
 
@@ -271,11 +271,14 @@ Notes
 -----
 This function assumes that element has field :geometry defined.
 """
-function get_Jacobian(el::Element, xi)
-    dbasisdxi = get_dbasisdxi(el, xi)
-    X = get_field(el, :geometry)
-    J = X*dbasisdxi
-    return J
+#function get_Jacobian(el::Element, xi)
+#    dbasisdxi = get_dbasisdxi(el, xi)
+#    X = get_field(el, :geometry)
+#    J = X*dbasisdxi
+#    return J
+#end
+function get_Jacobian(el::Element, xi, geometry_field=:geometry)
+    dinterpolate(el, geometry_field, xi)
 end
 
 """
@@ -314,6 +317,16 @@ end
 """ Set field variable. """
 function set_field(el::Element, field_name, field_value)
     el.fields[field_name] = field_value
+end
+
+""" Create new empty field of some type. """
+function new_field(el::Element, field_name, field_type)
+    el.fields[field_name] = field_type[]
+end
+
+""" Push to existing field. """
+function push_field!(el::Element, field_name, field_value)
+    push!(el.fields[field_name], field_value)
 end
 
 """ Get field variable. """
@@ -355,10 +368,10 @@ function interpolate(el::Element, field, xis::Array{Vector, 1})
     map(interpolate_, xis)
 end
 function dinterpolate(el::Element, field, xi::Vector)
-    field = get_field(el, field)
+    fld = get_field(el, field)
     dbasis = get_dbasisdxi(el, xi)
     if isa(dbasis, Vector)
         return sum(dbasis .* field)
     end
-    return sum([fld[i]*g[i,:] for i in 1:length(fld)])
+    return sum([fld[i]*dbasis[i,:] for i in 1:length(fld)])
 end
