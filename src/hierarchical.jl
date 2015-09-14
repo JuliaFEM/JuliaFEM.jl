@@ -29,7 +29,7 @@ end
 Return derivative of Legendgre polynomial of order n to inverval ξ ∈  [-1, 1]
 """
 function get_legendre_polynomial_derivative(n::Int)
-    dP(xi) = 2^n*sum([k*xi.^(k-1)*bin(n, k)*bin(1/2*(n+k-1), n) for k=0:n])
+    dP(xi) = 2^n*sum([k*xi.^(k-1)*bin(n, k)*bin(1/2*(n+k-1), n) for k=1:n])
     dP
 end
 
