@@ -57,7 +57,7 @@ Integrate f over element
 Parameters
 ----------
 eq::Equation
-    
+
 f::Function
     Function to integrate
 """
@@ -69,3 +69,13 @@ function integrate(eq::Equation, f::Function)
     return sum(target)
 end
 
+function get_global_dofs(eq::Equation)
+    eq.global_dofs
+end
+
+function set_global_dofs(eq::Equation, dofs)
+    eq.global_dofs = dofs
+end
+
+# Equations for heat problems
+include("heat_equations.jl")
