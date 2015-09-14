@@ -50,6 +50,15 @@ function get_detJ(el::Element, ip::IntegrationPoint)
         return det(J)
     end
 end
+function get_detJ(el::Element, xi::Vector)
+    J = get_Jacobian(el, xi)
+    n, m = size(J)
+    if n != m # for manifolds
+        return norm(J)
+    else
+        return det(J)
+    end
+end
 
 """
 Integrate f over element
