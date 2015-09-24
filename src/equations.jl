@@ -27,12 +27,15 @@ has_rhs(eq::Equation) = false
 get_rhs(eq::Equation, xi) = nothing
 get_element(eq::Equation) = eq.element
 get_integration_points(eq::Equation) = eq.integration_points
+
 # couple convenient functions -- could make weak form definition easier
+get_connectivity(eq::Equation) = get_connectivity(get_element(eq))
 get_basis(eq::Equation, ip::IntegrationPoint) = get_basis(get_element(eq), ip.xi)
 get_dbasisdx(eq::Equation, ip::IntegrationPoint) = get_dbasisdx(get_element(eq), ip.xi)
 interpolate(eq::Equation, field::Union(ASCIIString, Symbol), ip::IntegrationPoint) = interpolate(get_element(el), field, ip.xi)
 integrate_lhs(eq::Equation) = has_lhs(eq) ? integrate(eq, get_lhs) : nothing
 integrate_rhs(eq::Equation) = has_rhs(eq) ? integrate(eq, get_rhs) : nothing
+
 
 """
 Return determinant of Jacobian for numerical integration.
@@ -72,7 +75,7 @@ function get_global_dofs(eq::Equation)
     eq.global_dofs
 end
 
-function set_global_dofs(eq::Equation, dofs)
+function set_global_dofs!(eq::Equation, dofs)
     eq.global_dofs = dofs
 end
 

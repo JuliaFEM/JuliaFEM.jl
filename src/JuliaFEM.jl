@@ -10,7 +10,9 @@ using Logging
 include("types.jl") # type definitions
 include("elements.jl") # elements
 include("equations.jl") # formulations
-include("math.jl") # basic mathematical operations
+include("problems.jl") # problems
+
+include("math.jl") # basic mathematical operations -- obsolete ..?
 
 include("elasticity_solver.jl")
 include("xdmf.jl")
