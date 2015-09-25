@@ -88,6 +88,12 @@ end
 
 # 2d Lagrange elements
 
+@create_element(Tri3, CG, "3 node bilinear triangle element")
+@create_lagrange_basis(Tri3,
+    [0.0 1.0 0.0
+     0.0 0.0 1.0],
+    (xi) -> [1.0, xi[1]^2, xi[2]^2])
+
 @create_element(Quad4, CG, "4 node bilinear quadrangle element")
 @create_lagrange_basis(Quad4,
     [-1.0  1.0 1.0 -1.0
