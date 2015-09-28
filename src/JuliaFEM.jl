@@ -8,7 +8,13 @@ using Logging
 @Logging.configure(level=DEBUG)
 
 include("types.jl") # type definitions
-include("elements.jl") # elements
+
+### ELEMENTS ###
+include("elements.jl")
+include("lagrange.jl") # Lagrange elements
+#include("hierarchical.jl") # P-elements
+
+
 include("equations.jl") # formulations
 include("problems.jl") # problems
 

@@ -32,23 +32,23 @@ get_integration_points(eq::Equation) = eq.integration_points
 get_connectivity(eq::Equation) = get_connectivity(get_element(eq))
 get_basis(eq::Equation, ip::IntegrationPoint) = get_basis(get_element(eq), ip.xi)
 get_dbasisdx(eq::Equation, ip::IntegrationPoint) = get_dbasisdx(get_element(eq), ip.xi)
-interpolate(eq::Equation, field::Union(ASCIIString, Symbol), ip::IntegrationPoint) = interpolate(get_element(el), field, ip.xi)
-integrate_lhs(eq::Equation) = has_lhs(eq) ? integrate(eq, get_lhs) : nothing
-integrate_rhs(eq::Equation) = has_rhs(eq) ? integrate(eq, get_rhs) : nothing
+interpolate(eq::Equation, field::Union{ASCIIString, Symbol}, ip::IntegrationPoint) = interpolate(get_element(el), field, ip.xi)
+integrate_lhs(eq::Equation, t::Number) = has_lhs(eq) ? integrate(eq, get_lhs, t) : nothing
+integrate_rhs(eq::Equation, t::Number) = has_rhs(eq) ? integrate(eq, get_rhs, t) : nothing
 
 
 """
 Return determinant of Jacobian for numerical integration.
 """
-function get_detJ(eq::Equation, ip::IntegrationPoint)
+function get_detJ(eq::Equation, ip::IntegrationPoint, t::Float64)
     el = get_element(eq)
-    get_detJ(el, ip)
+    get_detJ(el, ip, t)
 end
-function get_detJ(el::Element, ip::IntegrationPoint)
-    J = get_detJ(el, ip.xi)
+function get_detJ(el::Element, ip::IntegrationPoint, t::Float64)
+    get_detJ(el, ip.xi, t)
 end
-function get_detJ(el::Element, xi::Vector)
-    J = get_Jacobian(el, xi)
+function get_detJ(el::Element, xi::Vector, t::Float64)
+    J = get_Jacobian(el, xi, t)
     s = size(J)
     return s[1] == s[2] ? det(J) : norm(J)
 end
@@ -63,10 +63,10 @@ eq::Equation
 f::Function
     Function to integrate
 """
-function integrate(eq::Equation, f::Function)
+function integrate(eq::Equation, f::Function, t::Float64)
     target = []
     for ip in get_integration_points(eq)
-        push!(target, ip.weight*f(eq, ip)*get_detJ(eq, ip))
+        push!(target, ip.weight*f(eq, ip, t)*get_detJ(eq, ip, t))
     end
     return sum(target)
 end
@@ -80,4 +80,4 @@ function set_global_dofs!(eq::Equation, dofs)
 end
 
 # Equations for heat problems
-include("heat_equations.jl")
+#include("heat_equations.jl")

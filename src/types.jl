@@ -10,7 +10,7 @@ using ForwardDiff
 type Field{T}
     time :: Float64
     increment :: Int64
-    values :: Array{T, 1}
+    values :: T
 end
 
 """ Initialize field. """
@@ -25,8 +25,16 @@ Base.length(f::Field) = length(f.values)
 Base.getindex(f::Field, i::Int64) = f.values[i]
 
 """ Interpolate field h(ξ)*f = x*f """
-Base.(:*)(x::Array{Float64, 1}, f::Field) = sum(x .* f.values)
-Base.(:*)(x::Array{Float64, 2}, f::Field) = sum([f[i]*x[i,:] for i in 1:length(f)])
+function interpolate{T}(x::Vector, f::Field{Vector{T}})
+    sum([f[i]*x[i] for i in 1:length(f)])
+end
+function interpolate{T}(x::Matrix, f::Field{Vector{T}})
+    sum([f[i]*x[i,:] for i in 1:length(f)])
+end
+function interpolate(x::Vector, f::Field)
+    f.values*x
+end
+Base.(:*)(x::Union{Vector, Matrix}, f::Field) = interpolate(x, f)
 
 """ Interpolate field (h*f)(ξ) """
 Base.(:*)(f::Function, fld::Field) = (x) -> f(x)*fld

@@ -57,4 +57,8 @@ facts("test fields and interpolation") do
    @fact diff(h)([0.0, 0.0])*X --> [0.5 0.0; 0.0 0.5]
    @fact (diff(h)*X)([0.0, 0.0]) --> [0.5 0.0; 0.0 0.5]
 
+   b = Basis((xi) -> [1/2*(1-xi[1]), 1/2*(1+xi[1])])
+   f = Field(0.0, 100.0)
+   @fact b(0.0) * f --> [50.0, 50.0]
+
 end
