@@ -1,12 +1,21 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+#=
+Related notebooks
+-----------------
+
+2015-08-29-developing-juliafem.ipynb
+=#
+
 using FactCheck
 using ForwardDiff
 
 abstract Element
 
 #= ELEMENT DEFINITIONS
+
+TODO: rewrite instructions after notebook.
 
 Each element must have
 
@@ -83,7 +92,6 @@ End of example.
 get_number_of_basis_functions(el::Type{Element}) = nothing
 get_number_of_basis_functions(el::Element) = nothing
 get_element_dimension(el::Element) = nothing
-get_basis(el::Element, xi) = nothing
 get_dbasisdxi(el::Element, xi) = nothing
 get_connectivity(el::Element) = el.connectivity
 
@@ -128,40 +136,49 @@ function test_element(eltype)
         return false
     end
 
-    dim = get_element_dimension(el)
+    dim = get_element_dimension(eltype)
     Logging.info("Element dimension: $dim")
     @fact dim --> not(nothing) """
     Unable to get element dimension define function 'get_element_dimension'
     which return the dimension of this element (1, 2, 3)"""
 
     # try to interpolate some scalar field
-    fld = collect(1:n)'
-    Logging.info("Setting scalar field $fld to element.")
-    set_field(el, "field1", fld)
-    @fact get_field(el, "field1") --> fld
+    fld = Field(0.0, collect(1:n))
+    Logging.info("Pushing scalar field $fld to element.")
+    new_field!(el, :field1)
+    push_field!(el, :field1, fld)
+    @fact el[:field1][1] --> fld
 
+    mid = zeros(dim)
     try
-        get_basis(el, zeros(dim))
+        f = get_basis(el)(mid)
     catch
         Logging.error("""
         Unable to evaluate basis, define function 'get_basis' for
         this element.""")
     end
     try
-        get_dbasisdxi(el, zeros(dim))
+        get_dbasisdxi(el)(mid)
     catch
         Logging.error("""
         Unable to evaluate partial derivatives of basis,
         define function 'get_dbasisdxi' for this element.""")
     end
 
-    xi = zeros(dim)
-    Logging.info("Interpolating scalar field at $xi")
-    i = interpolate(el, "field1", zeros(dim))
+    Logging.info("Interpolating scalar field at $mid")
+    f(field, xi, t) = el(xi)*el[field](t)
+    i = f(:field, mid, 0.0)
     Logging.info("Value: $i")
     Logging.info("Element $eltype passed tests.")
 end
 
+
+"""
+Get basis functions of element.
+"""
+get_basis(el::Element) = el.basis
+get_basis(el::Element, xi::Vector) = el.basis(xi)
+Base.call(el::Element, xi::Vector) = el.basis(xi)
 
 """
 Get jacobian of element evaluated at point ξ on element in reference configuration.
@@ -221,22 +238,15 @@ function get_dbasisdx(el::Element, xi)
     dbasisdxi*inv(j)
 end
 
-
-""" Set field variable. """
-function set_field(el::Element, field_name, field_value)
-    el.fields[field_name] = field_value
-end
-
-
 """ Create new empty field of some type. """
-function new_field!(el::Element, field_name, field_type)
-    el.fields[field_name] = field_type[]
+function new_field!(el::Element, field_name)
+    el.fields[field_name] = Field[]
 end
 
 
-""" Push to existing field. """
-function push_field!(el::Element, field_name, field_value)
-    push!(el.fields[field_name], field_value)
+""" Push to existing set field of fields. """
+function push_field!(el::Element, field_name, field::Field)
+    push!(el.fields[field_name], field)
 end
 
 
@@ -244,7 +254,9 @@ end
 function get_field(el::Element, field_name)
     el.fields[field_name]
 end
-
+function Base.getindex(el::Element, field_name)
+    el.fields[field_name]
+end
 
 """
 Evaluate some field in point ξ on element using basis functions.
