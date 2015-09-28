@@ -90,16 +90,13 @@ End of example.
 
 # These must be implemented for your own element
 get_number_of_basis_functions(el::Type{Element}) = nothing
-get_number_of_basis_functions(el::Element) = nothing
-get_element_dimension(el::Element) = nothing
-get_dbasisdxi(el::Element, xi) = nothing
-get_connectivity(el::Element) = el.connectivity
+get_element_dimension(el::Type{Element}) = nothing
 
 ### LAGRANGE ELEMENTS ###
-include("lagrange.jl")
+#include("lagrange.jl")
 
 ### HIERARCHICAL P-ELEMENTS ###
-include("hierarchical.jl")
+#include("hierarchical.jl")
 
 ### COMMON ELEMENT ROUTINES ###
 
@@ -144,14 +141,15 @@ function test_element(eltype)
 
     # try to interpolate some scalar field
     fld = Field(0.0, collect(1:n))
-    Logging.info("Pushing scalar field $fld to element.")
+    Logging.info("Creating new scalar field $fld")
+    Logging.info("Pushing field to element.")
     new_field!(el, :field1)
     push_field!(el, :field1, fld)
     @fact el[:field1][1] --> fld
 
     mid = zeros(dim)
     try
-        f = get_basis(el)(mid)
+        get_basis(el)(mid)
     catch
         Logging.error("""
         Unable to evaluate basis, define function 'get_basis' for
@@ -167,11 +165,12 @@ function test_element(eltype)
 
     Logging.info("Interpolating scalar field at $mid")
     f(field, xi, t) = el(xi)*el[field](t)
-    i = f(:field, mid, 0.0)
+    i = f(:field1, mid, 0.0)
     Logging.info("Value: $i")
     Logging.info("Element $eltype passed tests.")
 end
 
+get_connectivity(el::Element) = el.connectivity
 
 """
 Get basis functions of element.
@@ -181,6 +180,32 @@ get_basis(el::Element, xi::Vector) = el.basis(xi)
 Base.call(el::Element, xi::Vector) = el.basis(xi)
 
 """
+Get partial derivatives of basis functions of element.
+"""
+get_dbasisdxi(el::Element) = el.basis.dbasisdxi
+get_dbasisdxi(el::Element, xi::Vector) = el.basis.dbasisdxi(xi)
+
+"""
+Interpolate field on element.
+"""
+function interpolate(el::Element, field::Symbol, xi::Vector, t::Number)
+    get_basis(el, xi)*el[field](t)
+end
+function interpolate(el::Element, field::ASCIIString, xi::Vector, t::Number)
+    interpolate(el, Symbol(field), xi, t)
+end
+
+"""
+Interpolate derivative of field on element.
+"""
+function dinterpolate(el::Element, field::Symbol, xi::Vector, t::Number)
+    get_dbasisdxi(el, xi)*el[field](t)
+end
+function dinterpolate(el::Element, field::ASCIIString, xi::Vector, t::Number)
+    dinterpolate(el, Symbol(field), xi, t)
+end
+
+"""
 Get jacobian of element evaluated at point ξ on element in reference configuration.
 
 Parameters
@@ -188,6 +213,7 @@ Parameters
 el::Element
 xi::Vector
 geometry_field::Any, optional
+time::Number, optional, default=0.0
 
 Returns
 -------
@@ -198,8 +224,8 @@ Notes
 -----
 Big "J" comes from reference (undeformed) configuration.
 """
-function get_Jacobian(el::Element, xi, geometry_field=:Geometry)
-    dinterpolate(el, geometry_field, xi)
+function get_Jacobian(el::Element, xi, t, geometry_field=:Geometry)
+    dinterpolate(el, geometry_field, xi, t)
 end
 
 
@@ -210,11 +236,11 @@ Notes
 -----
 Small "j" comes from current (deformed) configuration.
 """
-function get_jacobian(el::Element, xi, geometry_field=:Geometry, displacement_field=:displacement)
+function get_jacobian(el::Element, xi, t, geometry_field=:Geometry, displacement_field=:displacement)
     dbasisdxi = get_dbasisdxi(el, xi)
-    X = get_field(el, geometry_field)
-    u = get_field(el, displacement_field)
-    j = (X+u)*dbasisdxi
+    X = get_field(el, geometry_field)(t)
+    u = get_field(el, displacement_field)(t)
+    j = dbasisdxi*(X+u)
     return j
 end
 
@@ -222,9 +248,9 @@ end
 """
 Evaluate partial derivatives of basis, dbasis/dX
 """
-function get_dbasisdX(el::Element, xi)
+function get_dbasisdX(el::Element, xi, t)
     dbasisdxi = get_dbasisdxi(el, xi)
-    J = get_Jacobian(el, xi)
+    J = get_Jacobian(el, xi, t)
     dbasisdxi*inv(J)
 end
 
@@ -232,32 +258,48 @@ end
 """
 Evaluate partial derivatives of basis, dbasis/dx
 """
-function get_dbasisdx(el::Element, xi)
+function get_dbasisdx(el::Element, xi, t)
     dbasisdxi = get_dbasisdxi(el, xi)
-    j = get_jacobian(el, xi)
+    j = get_jacobian(el, xi, t)
     dbasisdxi*inv(j)
 end
 
+
 """ Create new empty field of some type. """
-function new_field!(el::Element, field_name)
+function new_field!(el::Element, field_name::Symbol)
     el.fields[field_name] = Field[]
+end
+function new_field!(el::Element, field_name::Symbol, field::Field)
+    new_field!(el, field_name)
+    push_field!(el, field_name, field)
+end
+function new_field!(el::Element, field_name::ASCIIString, field::Field)
+    new_field!(el, Symbol(field_name), field)
 end
 
 
 """ Push to existing set field of fields. """
-function push_field!(el::Element, field_name, field::Field)
+function push_field!(el::Element, field_name::Symbol, field::Field)
     push!(el.fields[field_name], field)
+end
+function push_field!(el::Element, field_name::ASCIIString, field::Field)
+    push_field!(el, Symbol(field_name), field)
 end
 
 
 """ Get field variable. """
-function get_field(el::Element, field_name)
+function get_field(el::Element, field_name::Symbol)
     el.fields[field_name]
 end
-function Base.getindex(el::Element, field_name)
-    el.fields[field_name]
+function get_field(el::Element, field_name::ASCIIString)
+    el.fields[Symbol(field_name)]
+end
+function Base.getindex(el::Element, field_name::Union{ASCIIString, Symbol})
+    get_field(el, field_name)
 end
 
+
+#=
 """
 Evaluate some field in point ξ on element using basis functions.
 
@@ -296,8 +338,6 @@ function interpolate(el::Element, field, xis::Array{Vector, 1})
     map(interpolate_, xis)
 end
 
-"""
-"""
 function dinterpolate(el::Element, field, xi::Number)
     dinterpolate(el, field, [xi])
 end
@@ -309,12 +349,13 @@ function dinterpolate(el::Element, field, xi::Vector)
     end
     return sum([fld[i]*dbasis[i,:] for i in 1:length(fld)])
 end
+=#
 
 """
 calculate "local" normals in elements, in a way that
 n = Nᵢnᵢ gives some reasonable results for ξ ∈ [-1, 1]
 """
-function calculate_normals!(el::Element, field_name=:Normals)
+function calculate_normals!(el::Element, t, field_name=:Normals)
     new_field!(el, field_name, Vector)
     for xi in Vector[[-1.0], [1.0]]
         t = dinterpolate(el, :Geometry, xi)
