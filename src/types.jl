@@ -49,9 +49,12 @@ Base.(:*)(f::Function, fld::Field) = (x) -> f(x)*fld
 """
 Interpolate a field from finite set of fields some time t ∈ R.
 """
-function call(fields :: Array{Field, 1}, t::Float64)
+function call(fields :: Array{Field, 1}, t::Number)
+    if length(fields) == 0
+        throw("Empty set of fields.")
+    end
     if t <= fields[1].time
-        return fields[1]
+        return Field(t, fields[1].values)
     end
     if t >= fields[end].time
         return fields[end]
