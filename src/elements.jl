@@ -276,6 +276,9 @@ end
 function new_field!(el::Element, field_name::ASCIIString, field::Field)
     new_field!(el, Symbol(field_name), field)
 end
+function new_field!(el::Element, field_name::ASCIIString)
+    new_field!(el, Symbol(field_name))
+end
 
 
 """ Push to existing set field of fields. """
