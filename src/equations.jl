@@ -35,6 +35,8 @@ get_dbasisdx(eq::Equation, ip::IntegrationPoint) = get_dbasisdx(get_element(eq),
 interpolate(eq::Equation, field::Union{ASCIIString, Symbol}, ip::IntegrationPoint) = interpolate(get_element(el), field, ip.xi)
 integrate_lhs(eq::Equation, t::Number) = has_lhs(eq) ? integrate(eq, get_lhs, t) : nothing
 integrate_rhs(eq::Equation, t::Number) = has_rhs(eq) ? integrate(eq, get_rhs, t) : nothing
+get_lhs(eq::Equation, t::Number) = has_lhs(eq) ? integrate(eq, get_lhs, t) : nothing
+get_rhs(eq::Equation, t::Number) = has_rhs(eq) ? integrate(eq, get_rhs, t) : nothing
 
 
 """
@@ -48,7 +50,7 @@ function get_detJ(el::Element, ip::IntegrationPoint, t::Float64)
     get_detJ(el, ip.xi, t)
 end
 function get_detJ(el::Element, xi::Vector, t::Float64)
-    J = get_Jacobian(el, xi, t)
+    J = get_jacobian(el, xi, t)
     s = size(J)
     return s[1] == s[2] ? det(J) : norm(J)
 end
@@ -79,5 +81,3 @@ function set_global_dofs!(eq::Equation, dofs)
     eq.global_dofs = dofs
 end
 
-# Equations for heat problems
-#include("heat_equations.jl")

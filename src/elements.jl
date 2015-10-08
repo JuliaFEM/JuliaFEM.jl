@@ -8,8 +8,10 @@ Related notebooks
 2015-08-29-developing-juliafem.ipynb
 =#
 
+using JuliaFEM: interpolate
 using FactCheck
 using ForwardDiff
+
 
 abstract Element
 
@@ -143,9 +145,10 @@ function test_element(eltype)
     fld = Field(0.0, collect(1:n))
     Logging.info("Creating new scalar field $fld")
     Logging.info("Pushing field to element.")
-    new_field!(el, :field1)
-    push_field!(el, :field1, fld)
-    @fact el[:field1][1] --> fld
+    new_fieldset!(el, "field1")
+    add_field!(el, "field1", fld)
+    fieldset = get_fieldset(el, "field1")
+    @fact fieldset[1] --> fld
 
     mid = zeros(dim)
     try
@@ -164,8 +167,9 @@ function test_element(eltype)
     end
 
     Logging.info("Interpolating scalar field at $mid")
-    f(field, xi, t) = el(xi)*el[field](t)
-    i = f(:field1, mid, 0.0)
+    #f(field, xi, t) = el(xi)*el[field](t)
+    #i = f(:field1, mid, 0.0)
+    i = interpolate(el, "field1", mid, 0.0)
     Logging.info("Value: $i")
     Logging.info("Element $eltype passed tests.")
 end
@@ -188,21 +192,22 @@ get_dbasisdxi(el::Element, xi::Vector) = el.basis.dbasisdxi(xi)
 """
 Interpolate field on element.
 """
-function interpolate(el::Element, field::Symbol, xi::Vector, t::Number)
-    get_basis(el, xi)*el[field](t)
-end
-function interpolate(el::Element, field::ASCIIString, xi::Vector, t::Number)
-    interpolate(el, Symbol(field), xi, t)
+function interpolate(el::Element, field_name::Union{Symbol, ASCIIString}, xi::Vector, t::Number)
+    fieldset = get_fieldset(el, symbol(field_name))
+    field = interpolate(fieldset, t)
+    basis = get_basis(el)
+    interpolate(basis, field, xi)
 end
 
 """
 Interpolate derivative of field on element.
 """
-function dinterpolate(el::Element, field::Symbol, xi::Vector, t::Number)
-    get_dbasisdxi(el, xi)*el[field](t)
-end
-function dinterpolate(el::Element, field::ASCIIString, xi::Vector, t::Number)
-    dinterpolate(el, Symbol(field), xi, t)
+function dinterpolate(el::Element, field_name::Union{Symbol, ASCIIString}, xi::Vector, t::Number)
+    #get_dbasisdxi(el, xi)*el[field](t)
+    fieldset = get_fieldset(el, symbol(field_name))
+    field = interpolate(fieldset, t)
+    basis = get_basis(el)
+    dinterpolate(basis, field, xi)
 end
 
 """
@@ -210,155 +215,64 @@ Get jacobian of element evaluated at point ξ on element in reference configurat
 
 Parameters
 ----------
-el::Element
-xi::Vector
-geometry_field::Any, optional
-time::Number, optional, default=0.0
+el :: Element
+xi :: Vector
+geometry_field :: Any, optional
+time :: Number
 
 Returns
 -------
 Vector or Matrix
     depending on element type
 
-Notes
------
-Big "J" comes from reference (undeformed) configuration.
 """
-function get_Jacobian(el::Element, xi, t, geometry_field=:Geometry)
+function get_jacobian(el::Element, xi, t, geometry_field=symbol("geometry"))
     dinterpolate(el, geometry_field, xi, t)
 end
-
-
-"""
-Get jacobian of element evaluated at point ξ on element in current configuration.
-
-Notes
------
-Small "j" comes from current (deformed) configuration.
-"""
-function get_jacobian(el::Element, xi, t, geometry_field=:Geometry, displacement_field=:displacement)
-    dbasisdxi = get_dbasisdxi(el, xi)
-    X = get_field(el, geometry_field)(t)
-    u = get_field(el, displacement_field)(t)
-    j = dbasisdxi*(X+u)
-    return j
-end
-
 
 """
 Evaluate partial derivatives of basis, dbasis/dX
 """
 function get_dbasisdX(el::Element, xi, t)
     dbasisdxi = get_dbasisdxi(el, xi)
-    J = get_Jacobian(el, xi, t)
+    J = get_jacobian(el, xi, t)
     dbasisdxi*inv(J)
 end
 
 
-"""
-Evaluate partial derivatives of basis, dbasis/dx
-"""
-function get_dbasisdx(el::Element, xi, t)
-    dbasisdxi = get_dbasisdxi(el, xi)
-    j = get_jacobian(el, xi, t)
-    dbasisdxi*inv(j)
+""" Create new empty set of fields for element. """
+function new_fieldset!(el::Element, field_name::Union{Symbol, ASCIIString})
+    el.fields[symbol(field_name)] = FieldSet()
+end
+function new_fieldset!(el::Element, field_name::Union{Symbol, ASCIIString}, field::Field)
+    new_fieldset!(el, symbol(field_name))
+    add_field!(el, symbol(field_name), field)
 end
 
 
-""" Create new empty field of some type. """
-function new_field!(el::Element, field_name::Symbol)
-    el.fields[field_name] = Field[]
-end
-function new_field!(el::Element, field_name::Symbol, field::Field)
-    new_field!(el, field_name)
-    push_field!(el, field_name, field)
-end
-function new_field!(el::Element, field_name::ASCIIString, field::Field)
-    new_field!(el, Symbol(field_name), field)
-end
-function new_field!(el::Element, field_name::ASCIIString)
-    new_field!(el, Symbol(field_name))
+""" Add new field to fieldset of element. """
+function add_field!(el::Element, field_name::Union{Symbol, ASCIIString}, field::Field)
+    push!(el.fields[symbol(field_name)], field)
 end
 
 
-""" Push to existing set field of fields. """
-function push_field!(el::Element, field_name::Symbol, field::Field)
-    push!(el.fields[field_name], field)
+""" Get fieldset. """
+function get_fieldset(el::Element, field_name::Union{Symbol, ASCIIString})
+    el.fields[symbol(field_name)]
 end
-function push_field!(el::Element, field_name::ASCIIString, field::Field)
-    push_field!(el, Symbol(field_name), field)
-end
-
-
-""" Get field variable. """
-function get_field(el::Element, field_name::Symbol)
-    el.fields[field_name]
-end
-function get_field(el::Element, field_name::ASCIIString)
-    el.fields[Symbol(field_name)]
-end
-function Base.getindex(el::Element, field_name::Union{ASCIIString, Symbol})
-    get_field(el, field_name)
+""" Get fieldset, convenient function. """
+function Base.getindex(el::Element, field_name::Union{Symbol, ASCIIString})
+    get_fieldset(el, field_name)
 end
 
 
-#=
-"""
-Evaluate some field in point ξ on element using basis functions.
 
-Parameters
-----------
-el :: Element
-field :: Any
-xi :: Vector
-
-Returns
--------
-Scalar, Vector, Tensor, depending on what is type of field to interpolate.
-
-Notes
------
-This has another version which returns multiple values for set of coordinates {ξᵢ}.
-dinterpolate returns derivatives.
-
-Examples
---------
->>> field = [1.0, 2.0, 3.0, 4.0]
->>> set_field(el, :temperature, field)
->>> interpolate(el, :temperature, [0.0, 0.0])
-15.0
-"""
-function interpolate(el::Element, field, xi::Number)
-    interpolate(el, field, [xi])
-end
-function interpolate(el::Element, field, xi::Vector)
-    field = get_field(el, field)
-    sum(get_basis(el, xi) .* field)
-end
-function interpolate(el::Element, field, xis::Array{Vector, 1})
-    field = get_field(el, field)
-    interpolate_(xi) = sum(get_basis(el, xi) .* field)
-    map(interpolate_, xis)
-end
-
-function dinterpolate(el::Element, field, xi::Number)
-    dinterpolate(el, field, [xi])
-end
-function dinterpolate(el::Element, field, xi::Vector)
-    fld = get_field(el, field)
-    dbasis = get_dbasisdxi(el, xi)
-    if isa(dbasis, Vector)
-        return sum(dbasis .* fld)
-    end
-    return sum([fld[i]*dbasis[i,:] for i in 1:length(fld)])
-end
-=#
 
 """
 calculate "local" normals in elements, in a way that
 n = Nᵢnᵢ gives some reasonable results for ξ ∈ [-1, 1]
 """
-function calculate_normals!(el::Element, t, field_name=:Normals)
+function calculate_normals!(el::Element, t, field_name=symbol("normals"))
     new_field!(el, field_name, Vector)
     for xi in Vector[[-1.0], [1.0]]
         t = dinterpolate(el, :Geometry, xi)
@@ -371,7 +285,7 @@ end
 """
 Alter normal field such that normals of adjacent elements are averaged.
 """
-function average_normals!(elements, normal_field=:Normals)
+function average_normals!(elements, normal_field=symbol("normals"))
     d = Dict()
     for el in elements
         c = get_connectivity(el)

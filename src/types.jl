@@ -5,89 +5,55 @@
 
 using ForwardDiff
 
-
-""" Field. """
+""" Field is a fundamental type which holds some values in some time t """
 type Field{T}
     time :: Float64
     increment :: Int64
     values :: T
 end
-
 """ Initialize field. """
 function Field(time, values)
     Field(time, 1, values)
 end
-
 """ Get length of a field (number of basis functions in practice). """
-Base.length(f::Field) = length(f.values)
-
+function Base.length(f::Field)
+    length(f.values)
+end
 """ Get field discrete value at point i. """
-Base.getindex(f::Field, i::Int64) = f.values[i]
-
-""" Interpolate field h(ξ)*f = x*f """
-function interpolate{T}(x::Vector, f::Field{Vector{T}})
+function Base.getindex(f::Field, i::Int64)
+    f.values[i]
+end
+""" Multiply field with some constant k. """
+function Base.(:*)(k::Number, f::Field)
+    Field(f.time, k*f.values)
+end
+""" Multiply field with some vector x. """
+function Base.(:*)(x::Vector, f::Field)
+    @assert length(x) == length(f)
     sum([f[i]*x[i] for i in 1:length(f)])
 end
-function interpolate{T}(x::Matrix, f::Field{Vector{T}})
+""" Multiply field with some matrix x. """
+# function Base.(:*){T}(x::Matrix, f::Field{Vector{T}})
+function Base.(:*)(x::Matrix, f::Field)
     sum([f[i]*x[i,:] for i in 1:length(f)])
 end
-function interpolate(x::Vector, f::Field)
-    f.values*x
-end
-Base.(:*)(x::Union{Vector, Matrix}, f::Field) = interpolate(x, f)
-
-""" Interpolate field (h*f)(ξ) """
-Base.(:*)(f::Function, fld::Field) = (x) -> f(x)*fld
-
-""" Multiply field with some constant k. """
-Base.(:*)(k::Float64, f::Field) = Field(f.time, k*f.values)
-
 """ Sum two fields. """
 function Base.(:+)(f1::Field, f2::Field)
     @assert(f1.time == f2.time, "Cannot add fields: time mismatch, $(f1.time) != $(f2.time)")
     Field(f1.time, f1.values + f2.values)
 end
 
-""" Interpolate from set of fields x*[f1, f2] where x is evaluated basis. """
+"""
+FieldSet is array of fields, each field maybe having different time and/or increment.
+"""
+typealias FieldSet Array{Field, 1}
+""" Multiply fieldset with some vector x. """
 Base.(:*)(x::Array{Float64, 1}, f::Array{Field}) = sum(x .* f)
 
-""" Interpolate from set of fields with basis b, i.e. f(t) = b(t)*[f1, f2] """
-Base.(:*)(f::Function, fld::Field) = (x) -> f(x)*fld
-
-"""
-Interpolate a field from finite set of fields some time t ∈ R.
-"""
-function call(fields :: Array{Field, 1}, t::Number)
-    if length(fields) == 0
-        throw("Empty set of fields.")
-    end
-    if t <= fields[1].time
-        return Field(t, fields[1].values)
-    end
-    if t >= fields[end].time
-        return fields[end]
-    end
-    i = length(fields)
-    while fields[i].time >= t
-        i -= 1
-    end
-    if fields[i].time == t
-        return fields[i]
-    end
-    #Logging.debug("doing linear interpolation between fields $i and $(i+1)")
-    f1 = fields[i]
-    t1 = f1.time
-    f2 = fields[i+1]
-    t2 = f2.time
-    dt = t2 - t1
-    nw = (t2-t)/dt*f1.values + (t-t1)/dt*f2.values
-    f = Field(t, nw)
-    return f
+""" Add new field to fieldset. """
+function add_field!(fs::FieldSet, field::Field)
+    push!(fs, field)
 end
-function call(field::Field, t::Float64)
-    Field(t, field.increment, field.values)
-end
-
 
 
 """ Basis function. """
@@ -95,21 +61,23 @@ type Basis
     basis :: Function
     dbasisdxi :: Function
 end
-
 """ Constructor of basis function. """
 function Basis(basis)
     Basis(basis, ForwardDiff.jacobian(basis))
 end
-
-""" Interpolate field f using basis b. """
-Base.(:*)(b::Basis, f::Field) = (x) -> b(x)*f
-Base.(:*)(b::Basis, f::Array{Field}) = (t) -> b(t)*f
-
-""" Evaluate basis function in point ξ. """
-call(b::Basis, xi) = b.basis(xi)
-
 """ Get partial derivative of basis function. """
-∂(h::Basis) = h.dbasisdxi
 diff(h::Basis) = h.dbasisdxi
 derivative(h::Basis) = h.dbasisdxi
+
+
+# convenient functions
+""" Evaluate basis function in point ξ. """
+call(b::Basis, xi) = b.basis(xi)
+#""" Interpolate field (h*f)(ξ) """
+#Base.(:*)(f::Function, fld::Field) = (x) -> f(x)*fld
+#""" Interpolate from set of fields with basis b, i.e. f(t) = b(t)*[f1, f2] """
+#Base.(:*)(f::Function, fld::Field) = (x) -> f(x)*fld
+#""" Interpolate field f using basis b. """
+#Base.(:*)(b::Basis, f::Field) = (x) -> b(x)*f
+#Base.(:*)(b::Basis, f::Array{Field}) = (t) -> b(t)*f
 
