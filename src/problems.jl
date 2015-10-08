@@ -10,9 +10,9 @@ get_equation(pr::Type{Problem}, el::Type{Element}) = nothing
 """
 Add new element to problem
 """
-function add_element!(pr::Problem, el::Element)
-    eq = get_equation(typeof(pr), typeof(el))
-    push!(pr.equations, eq(el))
+function add_element!(problem::Problem, element::Element)
+    equation = get_equation(typeof(problem), typeof(element))
+    push!(problem.equations, equation(element))
 end
 
 """

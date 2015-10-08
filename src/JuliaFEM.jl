@@ -7,7 +7,9 @@ using Lexicon
 using Logging
 @Logging.configure(level=DEBUG)
 
-include("types.jl") # type definitions
+include("types.jl")  # type definitions
+
+include("interpolate.jl")  # interpolation routines
 
 ### ELEMENTS ###
 include("elements.jl")
