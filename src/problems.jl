@@ -2,10 +2,18 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 abstract Problem
+abstract BoundaryProblem <: Problem
+abstract FieldProblem <: Problem
 
 get_equations(pr::Problem) = pr.equations
-get_dimension(pr::Type{Problem}) = nothing
-get_equation(pr::Type{Problem}, el::Type{Element}) = nothing
+
+function get_dimension(pr::Type{Problem})
+    throw("Unable to determine problem dimension for problem $pr")
+end
+
+function get_equation(pr::Type{Problem}, el::Type{Element})
+    throw("Could not find corresponding equation for element $el in problem $pr")
+end
 
 """
 Add new element to problem
@@ -50,3 +58,83 @@ function set_global_dofs!(pr::Problem)
         set_global_dofs!(eq, gconn)
     end
 end
+
+function get_connectivity(pr::Problem)
+    conn = Int[]
+    for eq in get_equations(pr)
+        el = get_element(eq)
+        append!(conn, get_connectivity(el))
+    end
+    conn = unique(conn)
+    return conn
+end
+
+"""
+Calculate global dofs for equations, maybe using some bandwidth
+minimizing or fill reducing algorithm
+"""
+function calculate_global_dofs(pr::Problem)
+    conn = get_connectivity(pr)
+    dim = get_dimension(typeof(pr))
+    ndofs = dim*length(conn)
+    Logging.debug("total dofs: $ndofs")
+
+    mconn = maximum(conn)
+    gdofs = reshape(collect(1:mconn), dim, mconn)
+    dofmap = Dict{Int64, Array{Int64, 1}}()
+    for (i, c) in enumerate(conn)
+        dofmap[c] = gdofs[:, i]
+    end
+    return dofmap
+end
+
+"""
+Assign global dofs for equations.
+"""
+function assign_global_dofs!(pr::Problem, dofmap)
+    for eq in get_equations(pr)
+        el = get_element(eq)
+        c = get_connectivity(el)
+        #gdofs = [dofmap[ci] for ci in c]
+        gdofs = Int64[]
+        for ci in c
+            append!(gdofs, dofmap[ci])
+        end
+        set_global_dofs!(eq, gdofs)
+    end
+end
+
+function get_lhs(pr::Problem, t::Float64)
+    I = Int64[]
+    J = Int64[]
+    V = Float64[]
+    dim = get_dimension(typeof(pr))
+    for eq in filter(has_lhs, get_equations(pr))
+        dofs = get_global_dofs(eq)
+        lhs = integrate_lhs(eq, t)
+        for (li, i) in enumerate(dofs)
+            for (lj, j) in enumerate(dofs)
+                push!(I, i)
+                push!(J, j)
+                push!(V, lhs[li, lj])
+            end
+        end
+    end
+    return I, J, V
+end
+
+function get_rhs(pr::Problem, t::Float64)
+    I = Int64[]
+    V = Float64[]
+    dim = get_dimension(typeof(pr))
+    for eq in filter(has_rhs, get_equations(pr))
+        dofs = get_global_dofs(eq)
+        rhs = integrate_rhs(eq, t)
+        for (li, i) in enumerate(dofs)
+            push!(I, i)
+            push!(V, rhs[li])
+        end
+    end
+    return I, V
+end
+
