@@ -1,9 +1,12 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+
+"""
+This is JuliaFEM -- Finite Element Package
+"""
 module JuliaFEM
 
 using Lexicon
-
 using Logging
 @Logging.configure(level=DEBUG)
 
@@ -24,7 +27,6 @@ end
 
 
 include("types.jl")  # type definitions
-
 include("interpolate.jl")  # interpolation routines
 
 ### ELEMENTS ###
@@ -47,3 +49,5 @@ include("heat.jl")
 #include("elasticity_solver.jl")
 
 end # module
+
+FEM = JuliaFEM

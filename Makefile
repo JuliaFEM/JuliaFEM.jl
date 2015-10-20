@@ -54,6 +54,11 @@ unittests:
 doctests:
 	julia docs/build_doctests.jl
 
+.PHONY: test
+
+test:
+	julia -e 'Pkg.test("JuliaFEM")'
+
 #coverage_report:
 #	julia -e 'Pkg.test("JuliaFEM"; coverage=true); cd(Pkg.dir("JuliaFEM")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
 
