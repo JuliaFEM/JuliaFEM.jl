@@ -99,7 +99,7 @@ facts("test test data") do
   @fact string(xdoc) => testdata
 end
 
-using JuliaFEM.xdmf: xdmf_new_model, xdmf_new_grid, xdmf_new_temporal_collection, xdmf_new_mesh, xdmf_new_field, xdmf_save_model
+using JuliaFEM: xdmf_new_model, xdmf_new_grid, xdmf_new_temporal_collection, xdmf_new_mesh, xdmf_new_field, xdmf_save_model
 
 facts("test model write XML") do
   X = [0 0 0; 1 0 0; 0 1 0; 0 0 1]'

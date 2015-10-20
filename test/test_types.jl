@@ -29,7 +29,7 @@ facts("test interpolation of fields") do
     # interpolation of fieldset in time domain
     u1 = Field(0.0, [0.0, 1.0])
     u2 = Field(1.0, [1.0, 2.0])
-    u = FieldSet([u1, u2])
+    u = FieldSet("displacement", [u1, u2])
     @fact interpolate(u, 0.5).values --> [0.5, 1.5]
     @fact interpolate(u, 0.5).time --> 0.5
 
@@ -37,7 +37,7 @@ facts("test interpolation of fields") do
     u1 = Field(0.0, [0.0, 0.0])
     u2 = Field(1.0, [1.0, 2.0])
     u3 = Field(2.0, [0.5, 1.5])
-    u = FieldSet([u1, u2, u3])
+    u = FieldSet("displacement", [u1, u2, u3])
     @fact interpolate(u, -1.0).values --> [0.0, 0.0]  # "out of range -" -> first known value
     @fact interpolate(u, 0.0).values --> [0.0, 0.0]
     @fact interpolate(u, 1.0).values --> [1.0, 2.0]
