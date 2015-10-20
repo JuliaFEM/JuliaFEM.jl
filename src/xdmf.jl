@@ -41,9 +41,13 @@ Build a new model for outout
 Parameters
 ----------
 
-Example
+Examples
 -------
-    >>> xdmf_new_model()
+
+```julia
+@assert 1+1 == 3
+```
+
 """
 function xdmf_new_model(xdmf_version="2.1")
     xdoc = XMLDocument()
