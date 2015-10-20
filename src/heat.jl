@@ -36,19 +36,19 @@ type DC2D4 <: HeatEquation
     integration_points :: Array{IntegrationPoint, 1}
     global_dofs :: Array{Int64, 1}
 end
-function DC2D4(el::Quad4)
+function DC2D4(element::Quad4)
     integration_points = [
         IntegrationPoint(1.0/sqrt(3.0)*[-1, -1], 1.0),
         IntegrationPoint(1.0/sqrt(3.0)*[ 1, -1], 1.0),
         IntegrationPoint(1.0/sqrt(3.0)*[ 1,  1], 1.0),
         IntegrationPoint(1.0/sqrt(3.0)*[-1,  1], 1.0)]
-    new_fieldset!(el, "temperature")
-    DC2D4(el, integration_points, [])
+    push!(element, FieldSet("temperature"))
+    DC2D4(element, integration_points, [])
 end
-function get_lhs(eq::DC2D4, ip, t)
-    el = get_element(eq)
-    dNdX = get_dbasisdX(el, ip.xi, t)
-    k = interpolate(el, "temperature thermal conductivity", ip.xi, t)
+function get_lhs(equation::DC2D4, ip, time)
+    element = get_element(equation)
+    dNdX = get_dbasisdX(element, ip.xi, time)
+    k = interpolate(element, "temperature thermal conductivity", ip.xi, time)
     return dNdX*k*dNdX'
 end
 JuliaFEM.has_lhs(eq::DC2D4) = true
@@ -59,17 +59,15 @@ type DC2D2 <: HeatEquation
     integration_points :: Array{IntegrationPoint, 1}
     global_dofs :: Array{Int64, 1}
 end
-function DC2D2(el::Seg2)
-    integration_points = [IntegrationPoint([0.0], 1.0)]
-    new_fieldset!(el, "temperature")
-    DC2D2(el, integration_points, [])
+function DC2D2(element::Seg2)
+    integration_points = [IntegrationPoint([0.0], 2.0)]
+    push!(element, FieldSet("temperature"))
+    DC2D2(element, integration_points, [])
 end
-function get_rhs(eq::DC2D2, ip, t)
-    el = get_element(eq)
-    h = get_basis(el, ip.xi)
-    f = interpolate(el, "temperature flux", ip.xi, t)
-    println("h = $h")
-    println("f = $f")
+function get_rhs(equation::DC2D2, ip, time)
+    element = get_element(equation)
+    h = get_basis(element, ip.xi)
+    f = interpolate(element, "temperature flux", ip.xi, time)
     return h*f
 end
 JuliaFEM.has_rhs(eq::DC2D2) = true

@@ -3,3 +3,4 @@
 .ipynb_checkpoints
 docs/build/html
 *.swp
+*.lnk

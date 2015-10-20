@@ -22,6 +22,10 @@ function add_element!(problem::Problem, element::Element)
     equation = get_equation(typeof(problem), typeof(element))
     push!(problem.equations, equation(element))
 end
+function Base.push!(problem::Problem, element::Element)
+    equation = get_equation(typeof(problem), typeof(element))
+    push!(problem.equations, equation(element))
+end
 
 """
 Return total number of basis functions in problem
@@ -59,14 +63,15 @@ function set_global_dofs!(pr::Problem)
     end
 end
 
-function get_connectivity(pr::Problem)
-    conn = Int[]
-    for eq in get_equations(pr)
-        el = get_element(eq)
-        append!(conn, get_connectivity(el))
+""" Return unique list of connectivity (i.e. node ids). """
+function get_connectivity(problem::Problem)
+    connectivity = Int[]
+    for equation in get_equations(problem)
+        element = get_element(equation)
+        append!(connectivity, get_connectivity(element))
     end
-    conn = unique(conn)
-    return conn
+    connectivity = unique(connectivity)
+    return connectivity
 end
 
 """
