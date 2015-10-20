@@ -1,4 +1,5 @@
-using Docile, Lexicon, JuliaFEM
+using JuliaFEM
+using Lexicon
 
 include("badges.jl")
 
@@ -42,10 +43,10 @@ cd(dirname(@__FILE__)) do
     for m in modules
         s = doctest(m)
         lnpassed, lnfailed, lnskipped = map(length, (passed(s), failed(s), skipped(s)))
-	npassed += lnpassed
-	nfailed += lnfailed
-	nskipped += lnskipped
+        npassed += lnpassed
+        nfailed += lnfailed
+        nskipped += lnskipped
     end
+    println("""DOCTEST: {"failed": $nfailed, "skipped": $nskipped, "passed": $npassed}""")
     make_badge("doctests", npassed, (npassed+nfailed+nskipped), "badges/doctests-status.svg")
 end
-

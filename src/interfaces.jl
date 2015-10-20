@@ -6,8 +6,6 @@ module interfaces
 using Logging
 @Logging.configure(level=DEBUG)
 
-VERSION < v"0.4-" && using Docile
-
 #using JuliaFEM.elasticity_solver
 export solve_elasticity_interface!
 

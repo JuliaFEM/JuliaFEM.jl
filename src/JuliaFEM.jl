@@ -7,8 +7,16 @@ using Lexicon
 using Logging
 @Logging.configure(level=DEBUG)
 
-"""
-Simple linspace extension to multidimensional values. Contribute to julialang?
+""" Simple linspace extension to arrays.
+
+Examples
+--------
+>>> linspace([0.0], [1.0], 3)
+3-element Array{Array{Float64,1},1}:
+ [0.0]
+ [0.5]
+ [1.0]
+
 """
 function Base.linspace(X1, X2, n)
     [1/2*(1-ti)*X1 + 1/2*(1+ti)*X2 for ti in linspace(-1, 1, n)]
