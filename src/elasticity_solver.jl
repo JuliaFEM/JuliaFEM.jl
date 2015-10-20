@@ -8,8 +8,6 @@ using ForwardDiff
 using Logging
 @Logging.configure(level=INFO)
 
-VERSION < v"0.4-" && using Docile
-
 # Below this line is internal functions related to solver. They can be used
 # directly if needed or using general interface combining data model and
 # solver.
