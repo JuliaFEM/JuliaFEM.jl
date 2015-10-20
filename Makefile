@@ -24,8 +24,11 @@ I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) source
 #build:
 #	julia -e 'Pkg.init(); Pkg.clone(pwd()); Pkg.build("JuliaFEM")'
 
+#build:
+#	julia -e 'Pkg.init(); Pkg.clone(pwd(), "JuliaFEM"); Pkg.build("JuliaFEM")'
+
 build:
-	julia -e 'Pkg.init(); Pkg.clone(pwd(), "JuliaFEM"); Pkg.build("JuliaFEM")'
+	julia -e 'Pkg.build("JuliaFEM")'
 
 # create .md files from function docstrings
 apidoc:
