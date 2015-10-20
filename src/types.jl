@@ -5,7 +5,7 @@
 
 using ForwardDiff
 
-""" Field is a fundamental type which holds some values in some time t """
+""" Field is a fundamental data type which holds some values in some time t """
 type Field{T}
     time :: Float64
     increment :: Int64
@@ -18,6 +18,10 @@ end
 """ Get length of a field (number of basis functions in practice). """
 function Base.length(f::Field)
     length(f.values)
+end
+""" Push value to field. """
+function Base.push!(f::Field, value)
+    push!(f.values, value)
 end
 """ Get field discrete value at point i. """
 function Base.getindex(f::Field, i::Int64)
@@ -43,17 +47,39 @@ function Base.(:+)(f1::Field, f2::Field)
     Field(f1.time, f1.values + f2.values)
 end
 
-"""
-FieldSet is array of fields, each field maybe having different time and/or increment.
-"""
-typealias FieldSet Array{Field, 1}
-""" Multiply fieldset with some vector x. """
-Base.(:*)(x::Array{Float64, 1}, f::Array{Field}) = sum(x .* f)
 
-""" Add new field to fieldset. """
-function add_field!(fs::FieldSet, field::Field)
-    push!(fs, field)
+
+""" FieldSet is set of fields, each field can have different time and/or increment. """
+type FieldSet
+    name :: Symbol
+    fields :: Array{Field, 1}
 end
+""" Initializer for FieldSet. """
+function FieldSet(field_name)
+    FieldSet(Symbol(field_name), [])
+end
+function FieldSet()
+    FieldSet(Symbol("unknown field"), [])
+end
+""" Add new field to fieldset. """
+function Base.push!(fs::FieldSet, field::Field)
+    push!(fs.fields, field)
+end
+""" Multiply fieldset with some vector x. """
+Base.(:*)(x::Array{Float64, 1}, fs::FieldSet) = sum(x .* fs.fields)
+""" Get length of a fieldset. """
+function Base.length(fieldset::FieldSet)
+    length(fieldset.fields)
+end
+""" Return ith field from fieldset. """
+function Base.getindex(fieldset::FieldSet, i::Int64)
+    fieldset.fields[i]
+end
+#""" Return last field from fieldset. """
+function Base.endof(fieldset::FieldSet)
+    length(fieldset)
+end
+
 
 
 """ Basis function. """
@@ -70,7 +96,7 @@ diff(h::Basis) = h.dbasisdxi
 derivative(h::Basis) = h.dbasisdxi
 
 
-# convenient functions
+# convenient functions -- maybe this is not correct place for them
 """ Evaluate basis function in point ξ. """
 call(b::Basis, xi) = b.basis(xi)
 #""" Interpolate field (h*f)(ξ) """

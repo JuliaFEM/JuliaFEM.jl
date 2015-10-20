@@ -31,7 +31,7 @@ function interpolate(fields::FieldSet, t::Number)
         return Field(t, fields[1].values)
     end
     if t >= fields[end].time
-        return fields[end]
+        return Field(t, fields[end].values)
     end
     i = length(fields)
     while fields[i].time >= t

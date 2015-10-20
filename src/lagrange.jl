@@ -36,14 +36,14 @@ macro create_lagrange_element(element_name, element_description, X, P)
         global get_number_of_basis_functions, get_element_dimension
         dim = size($X, 1)
         nbasis = size($X, 2)
-        h = calculate_lagrange_basis($P, $X)
+        basis = calculate_lagrange_basis($P, $X)
         type $eltype <: CG
             connectivity :: Array{Int, 1}
             basis :: Basis
-            fields :: Dict{Symbol, Array{Field, 1}}
+            fields :: Dict{Symbol, FieldSet}
         end
         function $eltype(connectivity, args...)
-            $eltype(connectivity, Basis(h), Dict())
+            $eltype(connectivity, Basis(basis), Dict())
         end
         get_element_description(el::Type{$eltype}) = $element_description
         get_number_of_basis_functions(el::Type{$eltype}) = nbasis

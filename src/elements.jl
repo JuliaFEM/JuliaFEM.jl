@@ -15,40 +15,25 @@ using ForwardDiff
 
 abstract Element
 
+""" Get FieldSet from element. """
+function Base.getindex(element::Element, field_name::Union{Symbol, ASCIIString})
+    element.fields[symbol(field_name)]
+end
+
+""" Add new FieldSet to element. """
+function Base.setindex!(element::Element, fieldset::FieldSet, fieldset_name::Union{Symbol, ASCIIString})
+    fieldset.name = symbol(fieldset_name)
+    element.fields[fieldset.name] = fieldset
+end
+function Base.push!(element::Element, fieldset::FieldSet)
+    element[fieldset.name] = fieldset
+end
+
+
 #= ELEMENT DEFINITIONS
 
-TODO: rewrite instructions after notebook.
-
-Each element must have
-
-1. Connectivity information. How element is connected to other elements.
-   This is typically node ids in Lagrange elements.
-2. Ability to store fields, in array of shape dim × nnodes, where dim is
-   dimension of field and nnodes is number of nodes of element. Note that
-   this is always 2d array.
-3. Default constructor which takes connectivity as argument.
-4. Basis functions and derivative of basis functions.
-
-These rules probably will change, but there's a test_element function which
-tests element and that it obeys current rules. If test_element passes,
-everything should be ok. I use Quad4 as an example element here.
-Several functions are inherited from Element abstract type:
-
-- get_connectivity
-- get_number_of_basis_functions*
-- get_element_dimension *
-- get_basis *
-- get_dbasisdxi *
-- get_dbasisdX
-- get_field
-- set_field
-- interpolate
-- ...
-
-Which should work if element is defined following some rules. Functions marked with asterisk * are the ones which must necessarily to implement by your own.
-
-Start of example
-----------------
+Example
+-------
 
 This is example how to create new element. This is commented because I use code
 generation for simple elements like Lagrage elements. Feel free to use
@@ -94,12 +79,6 @@ End of example.
 get_number_of_basis_functions(el::Type{Element}) = nothing
 get_element_dimension(el::Type{Element}) = nothing
 
-### LAGRANGE ELEMENTS ###
-#include("lagrange.jl")
-
-### HIERARCHICAL P-ELEMENTS ###
-#include("hierarchical.jl")
-
 ### COMMON ELEMENT ROUTINES ###
 
 """
@@ -115,10 +94,10 @@ Raises
 ------
 This uses FactCheck and throws exceptions if element is not passing all tests.
 """
-function test_element(eltype)
-    Logging.info("Testing element $eltype")
-    local el
-    n = get_number_of_basis_functions(eltype)
+function test_element(element_type)
+    Logging.info("Testing element $element_type")
+    local element
+    n = get_number_of_basis_functions(element_type)
     Logging.info("number of basis functions in this element: $n")
     @fact n --> not(nothing) """
     Unable to determine number of nodes for $eltype define a function
@@ -127,7 +106,7 @@ function test_element(eltype)
 
     Logging.info("Initializing element")
     try
-        el = eltype(collect(1:n))
+        element = element_type(collect(1:n))
     catch
         Logging.error("""
         Unable to create element with default constructor define function
@@ -135,31 +114,31 @@ function test_element(eltype)
         return false
     end
 
-    dim = get_element_dimension(eltype)
+    dim = get_element_dimension(element_type)
     Logging.info("Element dimension: $dim")
     @fact dim --> not(nothing) """
     Unable to get element dimension define function 'get_element_dimension'
     which return the dimension of this element (1, 2, 3)"""
 
     # try to interpolate some scalar field
-    fld = Field(0.0, collect(1:n))
-    Logging.info("Creating new scalar field $fld")
-    Logging.info("Pushing field to element.")
-    new_fieldset!(el, "field1")
-    add_field!(el, "field1", fld)
-    fieldset = get_fieldset(el, "field1")
-    @fact fieldset[1] --> fld
+    field = Field(0.0, collect(1:n))
+    Logging.info("Creating new scalar field $field")
+    fieldset = FieldSet("field1")
+    push!(fieldset, field)
+    push!(element, fieldset)
+    @fact element["field1"][1] --> fld
 
+    # evaluate basis functions at middle point of element
     mid = zeros(dim)
     try
-        get_basis(el)(mid)
+        get_basis(element)(mid)
     catch
         Logging.error("""
         Unable to evaluate basis, define function 'get_basis' for
         this element.""")
     end
     try
-        get_dbasisdxi(el)(mid)
+        get_dbasisdxi(element)(mid)
     catch
         Logging.error("""
         Unable to evaluate partial derivatives of basis,
@@ -167,46 +146,36 @@ function test_element(eltype)
     end
 
     Logging.info("Interpolating scalar field at $mid")
-    #f(field, xi, t) = el(xi)*el[field](t)
-    #i = f(:field1, mid, 0.0)
-    i = interpolate(el, "field1", mid, 0.0)
+    i = interpolate(element, "field1", mid, 0.0)
     Logging.info("Value: $i")
-    Logging.info("Element $eltype passed tests.")
+    Logging.info("Element $element_type passed tests.")
 end
+
 
 get_connectivity(el::Element) = el.connectivity
 
-"""
-Get basis functions of element.
-"""
+""" Get basis functions of element. """
 get_basis(el::Element) = el.basis
 get_basis(el::Element, xi::Vector) = el.basis(xi)
 Base.call(el::Element, xi::Vector) = el.basis(xi)
 
-"""
-Get partial derivatives of basis functions of element.
-"""
+""" Get partial derivatives of basis functions of element. """
 get_dbasisdxi(el::Element) = el.basis.dbasisdxi
 get_dbasisdxi(el::Element, xi::Vector) = el.basis.dbasisdxi(xi)
 
-"""
-Interpolate field on element.
-"""
-function interpolate(el::Element, field_name::Union{Symbol, ASCIIString}, xi::Vector, t::Number)
-    fieldset = get_fieldset(el, symbol(field_name))
-    field = interpolate(fieldset, t)
-    basis = get_basis(el)
+""" Interpolate field on element. """
+function interpolate(element::Element, field_name::Union{Symbol, ASCIIString}, xi::Vector, time::Number)
+    fieldset = element[field_name]
+    field = interpolate(fieldset, time)
+    basis = get_basis(element)
     interpolate(basis, field, xi)
 end
 
-"""
-Interpolate derivative of field on element.
-"""
-function dinterpolate(el::Element, field_name::Union{Symbol, ASCIIString}, xi::Vector, t::Number)
-    #get_dbasisdxi(el, xi)*el[field](t)
-    fieldset = get_fieldset(el, symbol(field_name))
-    field = interpolate(fieldset, t)
-    basis = get_basis(el)
+""" Interpolate derivative of field on element. """
+function dinterpolate(element::Element, field_name::Union{Symbol, ASCIIString}, xi::Vector, time::Number)
+    fieldset = element[field_name]
+    field = interpolate(fieldset, time)
+    basis = get_basis(element)
     dinterpolate(basis, field, xi)
 end
 
@@ -215,24 +184,24 @@ Get jacobian of element evaluated at point ξ on element in reference configurat
 
 Parameters
 ----------
-el :: Element
+element :: Element
 xi :: Vector
-geometry_field :: Any, optional
-time :: Number
+    spatial coordinate
+time :: Float64
+    temporal coordinate
+geometry_field :: optional
 
 Returns
 -------
 Vector or Matrix
-    depending on element type
+    depending on element dimension
 
 """
-function get_jacobian(el::Element, xi, t, geometry_field=symbol("geometry"))
-    dinterpolate(el, geometry_field, xi, t)
+function get_jacobian(element::Element, xi, time, geometry_field="geometry")
+    dinterpolate(element, geometry_field, xi, time)
 end
 
-"""
-Evaluate partial derivatives of basis, dbasis/dX
-"""
+""" Evaluate partial derivatives of basis, dbasis/dX, at some time t"""
 function get_dbasisdX(el::Element, xi, t)
     dbasisdxi = get_dbasisdxi(el, xi)
     J = get_jacobian(el, xi, t)
@@ -240,69 +209,7 @@ function get_dbasisdX(el::Element, xi, t)
 end
 
 
-""" Create new empty set of fields for element. """
-function new_fieldset!(el::Element, field_name::Union{Symbol, ASCIIString})
-    el.fields[symbol(field_name)] = FieldSet()
-end
-function new_fieldset!(el::Element, field_name::Union{Symbol, ASCIIString}, field::Field)
-    new_fieldset!(el, symbol(field_name))
-    add_field!(el, symbol(field_name), field)
-end
 
-
-""" Add new field to fieldset of element. """
-function add_field!(el::Element, field_name::Union{Symbol, ASCIIString}, field::Field)
-    push!(el.fields[symbol(field_name)], field)
-end
-
-
-""" Get fieldset. """
-function get_fieldset(el::Element, field_name::Union{Symbol, ASCIIString})
-    el.fields[symbol(field_name)]
-end
-""" Get fieldset, convenient function. """
-function Base.getindex(el::Element, field_name::Union{Symbol, ASCIIString})
-    get_fieldset(el, field_name)
-end
-
-
-
-
-"""
-calculate "local" normals in elements, in a way that
-n = Nᵢnᵢ gives some reasonable results for ξ ∈ [-1, 1]
-"""
-function calculate_normals!(el::Element, t, field_name=symbol("normals"))
-    new_field!(el, field_name, Vector)
-    for xi in Vector[[-1.0], [1.0]]
-        t = dinterpolate(el, :Geometry, xi)
-        n = [0 -1; 1 0]*t
-        n /= norm(n)
-        push_field!(el, field_name, n)
-    end
-end
-
-"""
-Alter normal field such that normals of adjacent elements are averaged.
-"""
-function average_normals!(elements, normal_field=symbol("normals"))
-    d = Dict()
-    for el in elements
-        c = get_connectivity(el)
-        n = get_field(el, normal_field)
-        for (ci, ni) in zip(c, n)
-            d[ci] = haskey(d, ci) ? d[ci] + ni : ni
-        end
-    end
-    for (ci, ni) in d
-        d[ci] /= norm(d[ci])
-    end
-    for el in elements
-        c = get_connectivity(el)
-        new_normals = [d[ci] for ci in c]
-        set_field(el, normal_field, new_normals)
-    end
-end
 
 
 # FIXME: These two needs integration -- maybe not in elements.jl ..?
@@ -326,7 +233,7 @@ function fit_field!(el::Element, field, f, fixed_coeffs=Int[])
     xi = Vector[
         [0.0],
         [ 1/3*sqrt(5 - 2*sqrt(10/7))],
-        [-1/3*sqrt(5 - 2*sqrt(10/7))], 
+        [-1/3*sqrt(5 - 2*sqrt(10/7))],
         [ 1/3*sqrt(5 + 2*sqrt(10/7))],
         [-1/3*sqrt(5 + 2*sqrt(10/7))]]
     n = get_number_of_basis_functions(el)
@@ -390,7 +297,7 @@ function fit_derivative_field!(el::Element, field, f, fixed_coeffs=Int[])
     xi = Vector[
         [0.0],
         [ 1/3*sqrt(5 - 2*sqrt(10/7))],
-        [-1/3*sqrt(5 - 2*sqrt(10/7))], 
+        [-1/3*sqrt(5 - 2*sqrt(10/7))],
         [ 1/3*sqrt(5 + 2*sqrt(10/7))],
         [-1/3*sqrt(5 + 2*sqrt(10/7))]]
     n = get_number_of_basis_functions(el)
@@ -441,68 +348,4 @@ function fit_derivative_field!(el::Element, field, f, fixed_coeffs=Int[])
     return
 end
 
-
-""" Find projection from slave nodes to master element. """
-function calc_projection_slave_nodes_to_master_element(sel, mel)
-    X1 = get_field(sel, :Geometry)
-    N1 = get_field(sel, :Normals)
-    X2(xi) = interpolate(mel, :Geometry, xi)
-    dX2(xi) = dinterpolate(mel, :Geometry, xi)
-    R(xi, k) = det([X2(xi) - X1[k] N1[k]]')
-    dR(xi, k) = det([dX2(xi) N1[k]]')
-    xi2 = Vector[[0.0], [0.0]]
-    for k=1:2
-        xi = xi2[k]
-        for i=1:3
-            dxi = -R(xi, k)/dR(xi, k)
-            xi += dxi
-            if abs(dxi) < 1.0e-9
-                break
-            end
-        end
-        xi2[k] = xi
-    end
-    clamp!(xi2, -1, 1)
-    return xi2
-end
-
-""" Find projection from master nodes to slave element. """
-function calc_projection_master_nodes_to_slave_element(sel, mel)
-    X1(xi) = interpolate(sel, :Geometry, xi)
-    dX1(xi) = dinterpolate(sel, :Geometry, xi)
-    N1(xi) = interpolate(sel, :Normals, xi)
-    dN1(xi) = dinterpolate(sel, :Normals, xi)
-    X2 = get_field(mel, :Geometry)
-    R(xi, k) = det([X1(xi) - X2[k] N1(xi)]')
-    dR(xi, k) = det([dX1(xi) N1(xi)]') + det([X1(xi) - X2[k] dN1(xi)]')
-    xi1 = Vector[[0.0], [0.0]]
-    for k=1:2
-        xi = xi1[k]
-        for i=1:3
-            dxi = -R(xi, k)/dR(xi, k)
-            xi += dxi
-            if abs(dxi) < 1.0e-9
-                break
-            end
-        end
-        xi1[k] = xi
-    end
-    clamp!(xi1, -1, 1)
-    return xi1
-end
-
-function has_projection(sel, mel)
-    xi1 = calc_projection_master_nodes_to_slave_element(sel, mel)
-    l = abs(xi1[2]-xi1[1])[1]
-    return l > 1.0e-9
-end
-
-"""
-Calculate projection between 1d boundary elements
-"""
-function calc_projection(sel, mel)
-    xi1 = calc_projection_master_nodes_to_slave_element(sel, mel)
-    xi2 = calc_projection_slave_nodes_to_master_element(sel, mel)
-    return xi1, xi2
-end
 

@@ -27,13 +27,13 @@ type DBC2D2 <: DirichletEquation
     global_dofs :: Array{Int64, 1}
     fieldval :: Function
 end
-function DBC2D2(el::Seg2)
+function DBC2D2(element::Seg2)
     integration_points = [
         IntegrationPoint([-sqrt(1/3)], 1.0),
         IntegrationPoint([+sqrt(1/3)], 1.0)]
-    new_fieldset!(el, "reaction force")
+    push!(element, FieldSet("reaction force"))
     fieldval(X, t) = 0.0
-    DBC2D2(el, integration_points, [], fieldval)
+    DBC2D2(element, integration_points, [], fieldval)
 end
 function get_lhs(eq::DBC2D2, ip, t)
     el = get_element(eq)

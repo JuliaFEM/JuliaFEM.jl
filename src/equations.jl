@@ -3,6 +3,11 @@
 
 abstract Equation
 
+function get_unknown_field_name(equation::Equation)
+    eqtype = typeof(equation)
+    error("define get_unknown_field_name for this equation type $eqtype")
+end
+
 """
 Integration point
 

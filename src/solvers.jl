@@ -5,10 +5,11 @@
 
 abstract Solver
 
-"""
-Add new problem to solver
-"""
+""" Add new problem to solver. """
 function add_problem!(solver::Solver, problem::Problem)
+    push!(solver.problems, problem)
+end
+function Base.push!(solver::Solver, problem::Problem)
     push!(solver.problems, problem)
 end
 
@@ -53,12 +54,10 @@ function call(solver::SimpleSolver, t)
     # assemble problem 2
     A2 = sparse(get_lhs(problem2, t)...)
     b2 = sparsevec(get_rhs(problem2, t)..., size(A2, 1))
-    
+
     # make one monolithic assembly
     A = [A1 A2; A2' zeros(A2)]
     b = [b1; b2]
-    dump(full(A))
-    dump(full(b))
 
     # solve problem
     nz = unique(rowvals(A))
@@ -80,7 +79,7 @@ function call(solver::SimpleSolver, t)
         element = get_element(equation)
         field_name = get_unknown_field_name(equation)  # field we are solving
         field = Field(t, full(x1[gdofs])[:])
-        add_field!(element, field_name, field)
+        push!(element[field_name], field)
     end
 
     # update field for elements in problem 2
@@ -89,7 +88,7 @@ function call(solver::SimpleSolver, t)
         element = get_element(equation)
         field_name = get_unknown_field_name(equation)
         field = Field(t, full(x2[gdofs]))
-        add_field!(element, field_name, field)
+        push!(element[field_name], field)
     end
 end
 
