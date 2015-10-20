@@ -4,7 +4,10 @@
 using FactCheck
 using JuliaFEM: Element, Basis, FieldSet
 
-# prototype element
+""" Prototype element
+
+This should always pass test_element if everything is ok.
+"""
 type MockElement <: Element
     connectivity :: Array{Int, 1}
     basis :: Basis
@@ -34,15 +37,15 @@ facts("test test_element against mock element") do
 end
 
 
-using JuliaFEM: new_fieldset!, add_field!, Field, get_fieldset
 facts("test adding fieldsets and fields to element") do
     el = MockElement([1, 2, 3, 4])
-    fieldset = new_fieldset!(el, "geometry")
-    field1 = Field(0.0, [0.0, 0.0, 0.0, 0.0])
-    add_field!(el, "geometry", field1)
-    field2 = Field(1.0, [1.0, 1.0, 1.0, 1.0])
-    add_field!(fieldset, field2)
-    fields = get_fieldset(el, "geometry")
+    fieldset = JuliaFEM.FieldSet("geometry")
+    field1 = JuliaFEM.Field(0.0, [0.0, 0.0, 0.0, 0.0])
+    push!(fieldset, field1)
+    field2 = JuliaFEM.Field(1.0, [1.0, 1.0, 1.0, 1.0])
+    push!(fieldset, field2)
+    push!(el, fieldset)
+    fields = el["geometry"]
     @fact length(fields) --> 2
     @fact fields[1] --> field1
     @fact fields[2] --> field2
