@@ -162,21 +162,28 @@ Base.call(el::Element, xi::Vector) = el.basis(xi)
 """ Get partial derivatives of basis functions of element. """
 get_dbasisdxi(el::Element) = el.basis.dbasisdxi
 get_dbasisdxi(el::Element, xi::Vector) = el.basis.dbasisdxi(xi)
+get_dbasisdxi(el::Element, ip::IntegrationPoint) = el.basis.dbasisdxi(ip.xi)
 
 """ Interpolate field on element. """
-function interpolate(element::Element, field_name::Union{Symbol, ASCIIString}, xi::Vector, time::Number)
+function interpolate(element::Element, field_name, xi::Vector, time::Number)
     fieldset = element[field_name]
     field = interpolate(fieldset, time)
     basis = get_basis(element)
     interpolate(basis, field, xi)
 end
+function interpolate(element::Element, field_name, ip::IntegrationPoint, time::Number)
+    interpolate(element, field_name, ip.xi, time)
+end
 
 """ Interpolate derivative of field on element. """
-function dinterpolate(element::Element, field_name::Union{Symbol, ASCIIString}, xi::Vector, time::Number)
+function dinterpolate(element::Element, field_name, xi::Vector, time::Number)
     fieldset = element[field_name]
     field = interpolate(fieldset, time)
     basis = get_basis(element)
     dinterpolate(basis, field, xi)
+end
+function dinterpolate(element::Element, field_name, ip::IntegrationPoint, time::Number)
+    dinterpolate(element, field_name, ip.xi, time)
 end
 
 """

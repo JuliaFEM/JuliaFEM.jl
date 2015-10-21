@@ -25,7 +25,7 @@ Interpolate a field from fieldset for some time t.
 """
 function interpolate(fields::FieldSet, t::Number)
     if length(fields) == 0
-        throw("Empty set of fields.")
+        throw("Empty set of fields: $fields")
     end
     if t <= fields[1].time
         return Field(t, fields[1].values)

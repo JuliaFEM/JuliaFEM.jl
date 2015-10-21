@@ -8,23 +8,6 @@ function get_unknown_field_name(equation::Equation)
     error("define get_unknown_field_name for this equation type $eqtype")
 end
 
-"""
-Integration point
-
-xi :: Array{Float64, 1}
-    (dimensionless) coordinates of integration point
-weight :: Float64
-    Integration weight
-attributes :: Dict{Any, Any}
-    This is used to save internal variables of IP needed e.g. for incremental
-    material models.
-"""
-type IntegrationPoint
-    xi :: Array{Float64, 1}
-    weight :: Float64
-    attributes :: Dict{Any, Any}
-end
-IntegrationPoint(xi, weight) = IntegrationPoint(xi, weight, Dict{ASCIIString, Any}())
 
 has_lhs(eq::Equation) = false
 get_lhs(eq::Equation, xi) = nothing
