@@ -96,6 +96,30 @@ diff(h::Basis) = h.dbasisdxi
 derivative(h::Basis) = h.dbasisdxi
 
 
+
+"""
+Integration point
+
+xi :: Array{Float64, 1}
+    (dimensionless) coordinates of integration point
+weight :: Float64
+    Integration weight
+attributes :: Dict{Any, Any}
+    This is used to save internal variables of IP needed e.g. for incremental
+    material models.
+"""
+type IntegrationPoint
+    xi :: Array{Float64, 1}
+    weight :: Float64
+    fields :: Dict{Symbol, FieldSet}
+end
+function IntegrationPoint(xi, weight)
+    IntegrationPoint(xi, weight, Dict())
+end
+
+
+
+
 # convenient functions -- maybe this is not correct place for them
 """ Evaluate basis function in point ξ. """
 call(b::Basis, xi) = b.basis(xi)
