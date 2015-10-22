@@ -1,0 +1,343 @@
+                                                                                
+                                                                                
+              -- CODE_ASTER -- VERSION : EXPLOITATION (stable) --               
+                                                                                
+                          Version 11.4.0 du 05/06/2013                          
+                         Copyright EDF R&D 1991 - 2015                          
+                                                                                
+                    Exécution du : Thu Oct 22 22:34:12 2015                     
+                       Nom de la machine : jukka-desktop                        
+                              Architecture : 64bit                              
+                          Type de processeur : x86_64                           
+                Système d'exploitation : Linux 3.13.0-66-generic                
+                        Langue des messages : en (UTF-8)                        
+                                                                                
+   
+   !------------------------------------------------------------------------------------!
+   ! <A> <SUPERVIS2_2>                                                                  !
+   !                                                                                    !
+   !     Vous utilisez une vieille version de Code_Aster.                               !
+   !                                                                                    !
+   !     En mettant à jour votre version, vous bénéficierez des dernières améliorations !
+   !     apportées au code depuis 15 mois.                                              !
+   !     Si vous avez des développements privés, vous risquez d'avoir un travail        !
+   !     important de portage si vous ne suivez pas les mises à jour.                   !
+   !                                                                                    !
+   !                                                                                    !
+   ! Ceci est une alarme. Si vous ne comprenez pas le sens de cette                     !
+   ! alarme, vous pouvez obtenir des résultats inattendus !                             !
+   !------------------------------------------------------------------------------------!
+   
+                           Parallélisme MPI : inactif                           
+                          Parallélisme OpenMP : actif                           
+                        Nombre de processus utilisés : 1                        
+                      Version de la librairie HDF5 : 1.8.8                      
+                      Version de la librairie MED : 3.0.6                       
+                          Librairie MUMPS : installée                           
+                    Version de la librairie SCOTCH : 5.1.10                     
+                  Mémoire limite pour l'exécution : 4096.00 Mo                  
+                   consommée par l'initialisation : 197.46 Mo                   
+                  par les objets du jeu de commandes : 1.53 Mo                  
+                 reste pour l'allocation dynamique : 3897.01 Mo                 
+                Taille limite des fichiers d'échange : 48.00 Go                 
+                                                                                
+
+ --------------------------------------------------------------------------------
+ ASTER 11.04.00 CONCEPT RESU CALCULE LE 22/10/2015 A 22:34:12 DE TYPE EVOL_NOLI  
+
+
+ ======>
+
+ ------>
+ CHAMP AUX NOEUDS DE NOM SYMBOLIQUE  DEPL                                        
+ NUMERO D'ORDRE: 0 INST:   0.00000000000000E+00                                  
+ NOEUD                 DX                    DY      
+ N1        0.00000000000000E+00  0.00000000000000E+00
+ N2        0.00000000000000E+00  0.00000000000000E+00
+ N3        0.00000000000000E+00  0.00000000000000E+00
+ N4        0.00000000000000E+00  0.00000000000000E+00
+ 
+
+ ------>
+ CHAMP PAR ELEMENT AUX POINTS DE GAUSS DE NOM SYMBOLIQUE  EPSI_ELGA              
+ NUMERO D'ORDRE: 0 INST:   0.00000000000000E+00                                  
+ E1                 EPXX                  EPYY                  EPZZ                  EPXY       
+        1  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+        2  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+        3  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+        4  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+  
+
+ ------>
+ CHAMP PAR ELEMENT AUX NOEUDS DE NOM SYMBOLIQUE  EPSI_ELNO                       
+ NUMERO D'ORDRE: 0 INST:   0.00000000000000E+00                                  
+ E1                 EPXX                  EPYY                  EPZZ                  EPXY       
+ N1        0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+ N2        0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+ N3        0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+ N4        0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+  
+
+ ------>
+ CHAMP PAR ELEMENT AUX POINTS DE GAUSS DE NOM SYMBOLIQUE  SIEF_ELGA              
+ NUMERO D'ORDRE: 0 INST:   0.00000000000000E+00                                  
+ E1                 SIXX                  SIYY                  SIZZ                  SIXY       
+        1  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+        2  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+        3  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+        4  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+  
+
+ ------>
+ CHAMP PAR ELEMENT AUX NOEUDS DE NOM SYMBOLIQUE  SIGM_ELNO                       
+ NUMERO D'ORDRE: 0 INST:   0.00000000000000E+00                                  
+ E1                 SIXX                  SIYY                  SIZZ                  SIXY       
+ N1        0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+ N2        0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+ N3        0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+ N4        0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+  
+
+ ------>
+ CHAMP AUX NOEUDS DE NOM SYMBOLIQUE  FORC_NODA                                   
+ NUMERO D'ORDRE: 0 INST:   0.00000000000000E+00                                  
+ NOEUD                 DX                    DY      
+ N1        0.00000000000000E+00  0.00000000000000E+00
+ N2        0.00000000000000E+00  0.00000000000000E+00
+ N3        0.00000000000000E+00  0.00000000000000E+00
+ N4        0.00000000000000E+00  0.00000000000000E+00
+ 
+
+ ------>
+ CHAMP PAR ELEMENT AUX POINTS DE GAUSS DE NOM SYMBOLIQUE  EPSG_ELGA              
+ NUMERO D'ORDRE: 0 INST:   0.00000000000000E+00                                  
+ E1                 EPXX                  EPYY                  EPZZ                  EPXY       
+        1  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+        2  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+        3  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+        4  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+  
+
+ ------>
+ CHAMP PAR ELEMENT AUX NOEUDS DE NOM SYMBOLIQUE  EPSG_ELNO                       
+ NUMERO D'ORDRE: 0 INST:   0.00000000000000E+00                                  
+ E1                 EPXX                  EPYY                  EPZZ                  EPXY       
+ N1        0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+ N2        0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+ N3        0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+ N4        0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+  
+
+ ------>
+ CHAMP PAR ELEMENT AUX POINTS DE GAUSS DE NOM SYMBOLIQUE  VARI_ELGA              
+ NUMERO D'ORDRE: 0 INST:   0.00000000000000E+00                                  
+ E1                 VARI       
+        1  0.00000000000000E+00
+        2  0.00000000000000E+00
+        3  0.00000000000000E+00
+        4  0.00000000000000E+00
+  
+
+ ------>
+ CARTE DE NOM SYMBOLIQUE  COMPORTEMENT                                           
+ NUMERO D'ORDRE: 0 INST:   0.00000000000000E+00                                  
+
+ ------>
+ CHAMP AUX NOEUDS DE NOM SYMBOLIQUE  ENEL_NOEU                                   
+ NUMERO D'ORDRE: 0 INST:   0.00000000000000E+00                                  
+ NOEUD                 TOTALE  
+ N1        0.00000000000000E+00
+ N2        0.00000000000000E+00
+ N3        0.00000000000000E+00
+ N4        0.00000000000000E+00
+ 
+
+ ------>
+ CHAMP PAR ELEMENT CONSTANT SUR L'ELEMENT DE NOM SYMBOLIQUE  ENEL_ELEM           
+ NUMERO D'ORDRE: 0 INST:   0.00000000000000E+00                                  
+ E1                 TOTALE     
+           0.00000000000000E+00
+  
+
+ ------>
+ CHAMP PAR ELEMENT CONSTANT SUR L'ELEMENT DE NOM SYMBOLIQUE  ETOT_ELEM           
+ NUMERO D'ORDRE: 0 INST:   0.00000000000000E+00                                  
+ E1                 TOTALE     
+           0.00000000000000E+00
+  
+
+ ------>
+ CHAMP AUX NOEUDS DE NOM SYMBOLIQUE  ETOT_NOEU                                   
+ NUMERO D'ORDRE: 0 INST:   0.00000000000000E+00                                  
+ NOEUD                 TOTALE  
+ N1        0.00000000000000E+00
+ N2        0.00000000000000E+00
+ N3        0.00000000000000E+00
+ N4        0.00000000000000E+00
+ 
+
+ ======>
+
+ ------>
+ CHAMP AUX NOEUDS DE NOM SYMBOLIQUE  DEPL                                        
+ NUMERO D'ORDRE: 1 INST:   1.00000000000000E+00                                  
+ NOEUD                 DX                    DY      
+ N1       -5.15692621618630E-24  3.92910790962688E-24
+ N2       -1.13385861994525E+00 -4.00638800902936E+00
+ N3       -5.36656635814853E-01 -4.15546385452579E+00
+ N4        8.27180612553028E-25  4.13590306276514E-25
+ 
+
+ ------>
+ CHAMP PAR ELEMENT AUX POINTS DE GAUSS DE NOM SYMBOLIQUE  EPSI_ELGA              
+ NUMERO D'ORDRE: 1 INST:   1.00000000000000E+00                                  
+ E1                 EPXX                  EPYY                  EPZZ                  EPXY       
+        1 -1.00765499102918E-01 -3.15034329846977E-02  5.66866851804068E-02 -1.38792757642670E-01
+        2 -1.00765499102918E-01 -1.17572412511733E-01  9.35733906919935E-02  3.36046055064611E-02
+        3 -6.62860264730919E-02 -1.17572412511733E-01  7.87964738506394E-02  2.93011565301093E-02
+        4 -6.62860264730919E-02 -3.15034329846977E-02  4.19097683390527E-02 -1.43096206619022E-01
+  
+
+ ------>
+ CHAMP PAR ELEMENT AUX NOEUDS DE NOM SYMBOLIQUE  EPSI_ELNO                       
+ NUMERO D'ORDRE: 1 INST:   1.00000000000000E+00                                  
+ E1                 EPXX                  EPYY                  EPZZ                  EPXY       
+ N1       -1.13385861994525E-01  2.42861286636753E-17  4.85939408547963E-02 -2.00319400451468E-01
+ N2       -1.13385861994525E-01 -1.49075845496431E-01  1.12483588924695E-01  9.82815916137292E-02
+ N3       -5.36656635814853E-02 -1.49075845496431E-01  8.68892181762499E-02  9.08277993389076E-02
+ N4       -5.36656635814853E-02  2.77555756156289E-17  2.29995701063508E-02 -2.07773192726290E-01
+  
+
+ ------>
+ CHAMP PAR ELEMENT AUX POINTS DE GAUSS DE NOM SYMBOLIQUE  SIEF_ELGA              
+ NUMERO D'ORDRE: 1 INST:   1.00000000000000E+00                                  
+ E1                 SIXX                  SIYY                  SIZZ                  SIXY       
+        1 -2.31942215770259E+01  2.75472596932288E+01 -1.95740315902075E-15 -4.42065108646296E+01
+        2  4.24930377564788E+00 -1.23108782596206E+01 -4.54133574898300E-16  9.80137080537897E+00
+        3  2.34925742118825E+01 -5.80349743042289E+00  0.00000000000000E+00  6.17854003054832E+00
+        4 -6.46229422958107E+00  3.75333879264263E+01  0.00000000000000E+00 -5.24880405947485E+01
+  
+
+ ------>
+ CHAMP PAR ELEMENT AUX NOEUDS DE NOM SYMBOLIQUE  SIGM_ELNO                       
+ NUMERO D'ORDRE: 1 INST:   1.00000000000000E+00                                  
+ E1                 SIXX                  SIYY                  SIZZ                  SIXY       
+ N1       -3.90271033126679E+01  3.80151103339302E+01 -3.42549723273148E-15 -6.03193699855925E+01
+ N2        6.91434921629353E+00 -2.88157722147076E+01  1.31276792038702E-16  3.02715282869615E+01
+ N3        4.18367990363141E+01 -1.97500954751241E+01 -3.51755104117185E-17  2.69500981067994E+01
+ N4       -1.16386827590164E+01  5.75170292855130E+01  9.17859217185445E-16 -7.76168970316193E+01
+  
+
+ ------>
+ CHAMP AUX NOEUDS DE NOM SYMBOLIQUE  FORC_NODA                                   
+ NUMERO D'ORDRE: 1 INST:   1.00000000000000E+00                                  
+ NOEUD                 DX                    DY      
+ N1        1.87539318526141E+02 -2.60102307081623E+01
+ N2       -5.27696481572235E-01  1.66617755509419E-01
+ N3        6.36360553319175E-01 -1.99738176845921E+01
+ N4       -1.87647982597888E+02  4.58174306372450E+01
+ 
+
+ ------>
+ CHAMP PAR ELEMENT AUX POINTS DE GAUSS DE NOM SYMBOLIQUE  EPSG_ELGA              
+ NUMERO D'ORDRE: 1 INST:   1.00000000000000E+00                                  
+ E1                 EPXX                  EPYY                  EPZZ                  EPXY       
+        1 -1.41658197107361E-02 -2.30435218639950E-02  1.59468606748847E-02 -1.38790871348685E-01
+        2 -1.41658197107361E-02  2.58948887482680E-04  5.96008749568003E-03  3.36116452514522E-02
+        3  2.09461399718909E-02  2.58948887482680E-04 -9.08789522544582E-03  3.79340506020240E-02
+        4  2.09461399718909E-02 -2.30435218639950E-02  8.98877953758883E-04 -1.40783029624109E-01
+  
+
+ ------>
+ CHAMP PAR ELEMENT AUX NOEUDS DE NOM SYMBOLIQUE  EPSG_ELNO                       
+ NUMERO D'ORDRE: 1 INST:   1.00000000000000E+00                                  
+ E1                 EPXX                  EPYY                  EPZZ                  EPXY       
+ N1       -2.70176889312325E-02 -3.15728181299796E-02  2.51102173119481E-02 -2.00319400451468E-01
+ N2       -2.70176889312325E-02  8.78824515346735E-03  7.81261876189937E-03  9.42872447276373E-02
+ N3        3.37980091923874E-02  8.78824515346735E-03 -1.82512518625092E-02  1.05777143330804E-01
+ N4        3.37980091923874E-02 -3.15728181299796E-02 -9.53653312460457E-04 -2.07773192726290E-01
+  
+
+ ------>
+ CHAMP PAR ELEMENT AUX POINTS DE GAUSS DE NOM SYMBOLIQUE  VARI_ELGA              
+ NUMERO D'ORDRE: 1 INST:   1.00000000000000E+00                                  
+ E1                 VARI       
+        1  0.00000000000000E+00
+        2  0.00000000000000E+00
+        3  0.00000000000000E+00
+        4  0.00000000000000E+00
+  
+
+ ------>
+ CARTE DE NOM SYMBOLIQUE  COMPORTEMENT                                           
+ NUMERO D'ORDRE: 1 INST:   1.00000000000000E+00                                  
+
+ ------>
+ CHAMP AUX NOEUDS DE NOM SYMBOLIQUE  ENEL_NOEU                                   
+ NUMERO D'ORDRE: 1 INST:   1.00000000000000E+00                                  
+ NOEUD                 TOTALE  
+ N1        8.11427653502166E+00
+ N2       -1.74924544273778E+00
+ N3       -2.26851577595122E+00
+ N4        1.26410781912352E+01
+ 
+
+ ------>
+ CHAMP PAR ELEMENT CONSTANT SUR L'ELEMENT DE NOM SYMBOLIQUE  ENEL_ELEM           
+ NUMERO D'ORDRE: 1 INST:   1.00000000000000E+00                                  
+ E1                 TOTALE     
+           4.18439837689196E+01
+  
+
+ ------>
+ CHAMP PAR ELEMENT CONSTANT SUR L'ELEMENT DE NOM SYMBOLIQUE  ETOT_ELEM           
+ NUMERO D'ORDRE: 1 INST:   1.00000000000000E+00                                  
+ E1                 TOTALE     
+           3.64664959689712E+01
+  
+
+ ------>
+ CHAMP AUX NOEUDS DE NOM SYMBOLIQUE  ETOT_NOEU                                   
+ NUMERO D'ORDRE: 1 INST:   1.00000000000000E+00                                  
+ NOEUD                 TOTALE  
+ N1        8.79924750872253E+00
+ N2       -7.85578326392019E-01
+ N3       -3.54443135219698E+00
+ N4        1.01173605574550E+01
+ 
+ <I> <FIN> FERMETURE DE LA BASE "GLOBALE" EFFECTUEE.
+
+ <FIN> Arrêt normal dans "FIN".
+ <I> <FIN> ARRET NORMAL DANS "FIN" PAR APPEL A "JEFINI".
+  
+ <I> <FIN> MEMOIRE JEVEUX MINIMALE REQUISE POUR L'EXECUTION :                      20.99 Mo
+ <I> <FIN> MEMOIRE JEVEUX OPTIMALE REQUISE POUR L'EXECUTION :                      27.32 Mo
+ <I> <FIN> MAXIMUM DE MEMOIRE UTILISEE PAR LE PROCESSUS LORS DE L'EXECUTION :     226.65 Mo
+
+ ********************************************************************************
+ * COMMAND                  :       USER :     SYSTEM :   USER+SYS :    ELAPSED *
+ ********************************************************************************
+ * init (jdc)               :       0.15 :       0.02 :       0.17 :       0.17 *
+ *  . compile               :       0.00 :       0.00 :       0.00 :       0.01 *
+ *  . exec_compile          :       0.06 :       0.00 :       0.06 :       0.06 *
+ *  . report                :       0.00 :       0.00 :       0.00 :       0.00 *
+ *  . build                 :       0.00 :       0.00 :       0.00 :       0.00 *
+ * DEBUT                    :       0.02 :       0.00 :       0.02 :       0.03 *
+ * LIRE_MAILLAGE            :       0.00 :       0.00 :       0.00 :       0.00 *
+ * AFFE_MODELE              :       0.01 :       0.00 :       0.01 :       0.00 *
+ * DEFI_MATERIAU            :       0.00 :       0.00 :       0.00 :       0.01 *
+ * AFFE_MATERIAU            :       0.00 :       0.00 :       0.00 :       0.00 *
+ * AFFE_CHAR_MECA           :       0.01 :       0.00 :       0.01 :       0.00 *
+ * AFFE_CHAR_MECA           :       0.00 :       0.00 :       0.00 :       0.00 *
+ * DEFI_LIST_REEL           :       0.00 :       0.00 :       0.00 :       0.01 *
+ * DEFI_FONCTION            :       0.00 :       0.00 :       0.00 :       0.00 *
+ * STAT_NON_LINE            :       0.07 :       0.00 :       0.07 :       0.07 *
+ * CALC_CHAMP               :       0.03 :       0.00 :       0.03 :       0.03 *
+ * IMPR_RESU                :       0.01 :       0.00 :       0.01 :       0.01 *
+ * FIN                      :       0.01 :       0.01 :       0.02 :       0.02 *
+ *  . part Superviseur      :       0.18 :       0.02 :       0.20 :       0.23 *
+ *  . part Fortran          :       0.14 :       0.01 :       0.15 :       0.13 *
+ ********************************************************************************
+ * TOTAL_JOB                :       0.32 :       0.03 :       0.35 :       0.36 *
+ ********************************************************************************
+

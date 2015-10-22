@@ -186,6 +186,11 @@ function dinterpolate(element::Element, field_name, ip::IntegrationPoint, time::
     dinterpolate(element, field_name, ip.xi, time)
 end
 
+""" Check does fieldset exist. """
+function Base.haskey(element::Element, what)
+    haskey(element.fields, symbol(what))
+end
+
 """
 Get jacobian of element evaluated at point ξ on element in reference configuration.
 
