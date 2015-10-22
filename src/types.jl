@@ -47,6 +47,42 @@ function Base.(:+)(f1::Field, f2::Field)
     Field(f1.time, f1.values + f2.values)
 end
 
+""" Return data from field as a long array.
+
+Examples
+--------
+>>> f = Field(0.0, Vector[[1.0, 2.0], [3.0, 4.0]])
+>>> f[:]
+[1.0, 2.0, 3.0, 4.0]
+
+"""
+function Base.getindex(field::Field, c::Colon)
+    [field.values...;]
+end
+
+""" Return field similar to input but with new data in it.
+
+Examples
+--------
+>>> f = Field(0.5, Vector[[1.0, 2.0], [3.0, 4.0]])
+>>> similar(f, ones(4))
+JuliaFEM.Field{Array{Array{T,1},1}}(0.5,1,Array{T,1}[[1.0,1.0],[1.0,1.0]])
+
+"""
+function Base.similar(field::Field, data::Vector)
+    new_field = Field(field.time, similar(field.values))
+    data = reshape(data, round(Int, length(data)/length(field)), length(field))
+    for i=1:length(new_field)
+        new_field.values[i] = data[:,i]
+    end
+    new_field
+end
+
+
+
+
+
+
 
 
 """ FieldSet is set of fields, each field can have different time and/or increment. """
