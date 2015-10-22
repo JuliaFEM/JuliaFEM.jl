@@ -13,7 +13,7 @@ type Field{T}
 end
 """ Initialize field. """
 function Field(time, values)
-    Field(time, 1, values)
+    Field(time, 0, values)
 end
 """ Get length of a field (number of basis functions in practice). """
 function Base.length(f::Field)
