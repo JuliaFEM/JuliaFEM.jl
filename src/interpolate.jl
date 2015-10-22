@@ -51,7 +51,16 @@ function interpolate(fields::FieldSet, t::Number)
     return f
 end
 
+function call(fieldset::FieldSet, time::Number)
+    interpolate(fieldset, time)
+end
+
+function interpolate(basis::Basis, field::Field, ip::IntegrationPoint)
+    interpolate(basis, field, ip.xi)
+end
+
 function dinterpolate(N::Basis, u::Field, xi::Array{Float64, 1})
     dN = diff(N)
     dN(xi)*u
 end
+
