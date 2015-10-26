@@ -70,12 +70,17 @@ JuliaFEM.Field{Array{Array{T,1},1}}(0.5,1,Array{T,1}[[1.0,1.0],[1.0,1.0]])
 
 """
 function Base.similar(field::Field, data::Vector)
+    fdim = round(Int, length(data)/length(field))  # dimension of field variable
+    if fdim == 1
+        new_field = Field(field.time, data)
+        return new_field
+    end
     new_field = Field(field.time, similar(field.values))
-    data = reshape(data, round(Int, length(data)/length(field)), length(field))
+    data = reshape(data, fdim, length(field))
     for i=1:length(new_field)
         new_field.values[i] = data[:,i]
     end
-    new_field
+    return new_field
 end
 
 
@@ -117,7 +122,6 @@ function Base.endof(fieldset::FieldSet)
 end
 
 
-
 """ Basis function. """
 type Basis
     basis :: Function
@@ -128,9 +132,9 @@ function Basis(basis)
     Basis(basis, ForwardDiff.jacobian(basis))
 end
 """ Get partial derivative of basis function. """
-diff(h::Basis) = h.dbasisdxi
-derivative(h::Basis) = h.dbasisdxi
-
+function grad(basis::Basis)
+    (ip) -> basis.dbasisdxi(ip.xi)
+end
 
 
 """
@@ -158,7 +162,10 @@ end
 
 # convenient functions -- maybe this is not correct place for them
 """ Evaluate basis function in point ξ. """
-call(b::Basis, xi) = b.basis(xi)
+call(b::Basis, xi::Vector) = b.basis(xi)
+call(b::Basis, ip::IntegrationPoint) = b.basis(ip.xi)
+Base.(:*)(basis::Basis, fs::FieldSet) = (xi, t) -> basis(xi)*fs(t)
+
 #""" Interpolate field (h*f)(ξ) """
 #Base.(:*)(f::Function, fld::Field) = (x) -> f(x)*fld
 #""" Interpolate from set of fields with basis b, i.e. f(t) = b(t)*[f1, f2] """

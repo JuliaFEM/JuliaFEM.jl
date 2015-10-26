@@ -8,20 +8,18 @@ Related notebooks
 2015-08-29-developing-juliafem.ipynb
 =#
 
-using JuliaFEM: interpolate
 using FactCheck
 using ForwardDiff
-
 
 abstract Element
 
 """ Get FieldSet from element. """
-function Base.getindex(element::Element, field_name::Union{Symbol, ASCIIString})
+function Base.getindex(element::Element, field_name)
     element.fields[symbol(field_name)]
 end
 
 """ Add new FieldSet to element. """
-function Base.setindex!(element::Element, fieldset::FieldSet, fieldset_name::Union{Symbol, ASCIIString})
+function Base.setindex!(element::Element, fieldset::FieldSet, fieldset_name)
     fieldset.name = symbol(fieldset_name)
     element.fields[fieldset.name] = fieldset
 end
@@ -126,102 +124,149 @@ function test_element(element_type)
     fieldset = FieldSet("field1")
     push!(fieldset, field)
     push!(element, fieldset)
-    @fact element["field1"][1] --> fld
+    push!(element, FieldSet("geometry", [Field(0.0, Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])]))
 
     # evaluate basis functions at middle point of element
     mid = zeros(dim)
     try
-        get_basis(element)(mid)
+        basis = get_basis(element)
+        val1 = basis(mid, 0.0)
+        Logging.info("basis at $mid: $val1")
+        val2 = basis("field1", mid, 0.0)
+        Logging.info("field val at $mid: $val2")
     catch
         Logging.error("""
         Unable to evaluate basis, define function 'get_basis' for
         this element.""")
     end
     try
-        get_dbasisdxi(element)(mid)
+        basis = get_basis(element)
+        dbasis = grad(basis)
+        val3 = dbasis(mid, 0.0)
+        Logging.info("derivative of basis at $mid: $val3")
+        val4 = dbasis("field1", mid, 0.0)
+        Logging.info("field val at $mid: $val4")
     catch
         Logging.error("""
         Unable to evaluate partial derivatives of basis,
         define function 'get_dbasisdxi' for this element.""")
     end
 
-    Logging.info("Interpolating scalar field at $mid")
-    i = interpolate(element, "field1", mid, 0.0)
-    Logging.info("Value: $i")
     Logging.info("Element $element_type passed tests.")
 end
 
 
-get_connectivity(el::Element) = el.connectivity
-
-""" Get basis functions of element. """
-get_basis(el::Element) = el.basis
-get_basis(el::Element, xi::Vector) = el.basis(xi)
-Base.call(el::Element, xi::Vector) = el.basis(xi)
-
-""" Get partial derivatives of basis functions of element. """
-get_dbasisdxi(el::Element) = el.basis.dbasisdxi
-get_dbasisdxi(el::Element, xi::Vector) = el.basis.dbasisdxi(xi)
-get_dbasisdxi(el::Element, ip::IntegrationPoint) = el.basis.dbasisdxi(ip.xi)
-
-""" Interpolate field on element. """
-function interpolate(element::Element, field_name, xi::Vector, time::Number)
-    fieldset = element[field_name]
-    field = interpolate(fieldset, time)
-    basis = get_basis(element)
-    interpolate(basis, field, xi)
-end
-function interpolate(element::Element, field_name, ip::IntegrationPoint, time::Number)
-    interpolate(element, field_name, ip.xi, time)
+function get_connectivity(el::Element)
+    el.connectivity
 end
 
-""" Interpolate derivative of field on element. """
-function dinterpolate(element::Element, field_name, xi::Vector, time::Number)
-    fieldset = element[field_name]
-    field = interpolate(fieldset, time)
-    basis = get_basis(element)
-    dinterpolate(basis, field, xi)
+type MixedFunctionSpace
+    element1 :: Element
+    element2 :: Element
 end
-function dinterpolate(element::Element, field_name, ip::IntegrationPoint, time::Number)
-    dinterpolate(element, field_name, ip.xi, time)
+
+type FunctionSpace
+    element :: Element
 end
+
+type GradientFunctionSpace
+    element :: Element
+end
+
+function grad(u::FunctionSpace)
+    GradientFunctionSpace(u.element)
+end
+
+""" Evaluate field on element function space. """
+function call(u::FunctionSpace, field_name, xi::Vector, t::Number=Inf, variation=nothing)
+    f = !isa(variation, Void) ? variation : u.element[field_name](t)
+    if length(f) == 1
+        return f.values
+    end
+    h = u.element.basis.basis(xi)
+    return h*f
+end
+
+""" If basis is called without a field, return basis functions evaluated at that point. """
+function call(u::FunctionSpace, xi::Vector, t::Number=Inf)
+    return u.element.basis.basis(xi)'
+end
+
+""" Evaluate gradient of field on element function space. """
+function call(gradu::GradientFunctionSpace, field_name, xi::Vector, t::Number=Inf, variation=nothing)
+    f = !isa(variation, Void) ? variation : gradu.element[field_name](t)
+    X = gradu.element["geometry"](t)
+    b = gradu.element.basis.dbasisdxi(xi)
+    return b*f*inv(b*X)
+end
+
+""" If gradient of basis is called without a field, return "empty" gradient evaluated at that point. """
+function call(gradu::GradientFunctionSpace, xi::Vector, t::Number=Inf)
+    X = gradu.element["geometry"](t)
+    b = gradu.element.basis.dbasisdxi(xi)
+    return (b*inv(b*X))'
+end
+
+# on-line functions to get api more easy to use, ip -> xi.ip
+call(u::FunctionSpace, ip::IntegrationPoint, t::Number) = call(u, ip.xi, t)
+call(u::FunctionSpace, ip::IntegrationPoint) = call(u, ip.xi)
+call(u::GradientFunctionSpace, ip::IntegrationPoint, t::Number) = call(u, ip.xi, t)
+call(u::GradientFunctionSpace, ip::IntegrationPoint) = call(u, ip.xi)
+
+""" Return field from function space. """
+function get_field(u::FunctionSpace, field_name, time=Inf)
+    return u.element[field_name](time)
+end
+
+""" Return field from function space. """
+function get_field(u::FunctionSpace, field_name, time=Inf, variation=nothing)
+    return !isa(variation, Void) ? variation : u.element[field_name](time)
+end
+
+""" Return fieldset from function space. """
+function get_fieldset(u::FunctionSpace, field_name)
+    return u.element[field_name]
+end
+
+# i think these will be the most called functions.
+call(u::FunctionSpace, field_name, ip::IntegrationPoint, t::Number, variation=nothing) = call(u, field_name, ip.xi, t, variation)
+call(u::GradientFunctionSpace, field_name, ip::IntegrationPoint, t::Number, variation=nothing) = call(u, field_name, ip.xi, t, variation)
+
+function jacobian(u::FunctionSpace, xi, t)
+    u.element.basis.dbasisdxi(xi)*u.element["geometry"](t)
+end
+
+function jacobian(u::FunctionSpace, ip::IntegrationPoint, t::Number)
+    jacobian(u, ip.xi, t)
+end
+
+function jacobian(u::FunctionSpace, xi)
+    jacobian(u, xi, Inf)
+end
+
+function LinAlg.det(u::FunctionSpace)
+    function detJ(args...)
+        J = jacobian(u, args...)
+        m, n = size(J)
+        return m == n ? det(J) : norm(J)
+    end
+    return detJ
+end
+
+function get_basis(element::Element)
+    return FunctionSpace(element)
+end
+
+Base.(:+)(u::FunctionSpace, v::FunctionSpace) = (args...) -> u(args...) + v(args...)
+Base.(:-)(u::FunctionSpace, v::FunctionSpace) = (args...) -> u(args...) - v(args...)
+Base.(:+)(u::GradientFunctionSpace, v::GradientFunctionSpace) = (args...) -> u(args...) + v(args...)
+Base.(:-)(u::GradientFunctionSpace, v::GradientFunctionSpace) = (args...) -> u(args...) - v(args...)
+
 
 """ Check does fieldset exist. """
 function Base.haskey(element::Element, what)
     haskey(element.fields, symbol(what))
 end
-
-"""
-Get jacobian of element evaluated at point ξ on element in reference configuration.
-
-Parameters
-----------
-element :: Element
-xi :: Vector
-    spatial coordinate
-time :: Float64
-    temporal coordinate
-geometry_field :: optional
-
-Returns
--------
-Vector or Matrix
-    depending on element dimension
-
-"""
-function get_jacobian(element::Element, xi, time, geometry_field="geometry")
-    dinterpolate(element, geometry_field, xi, time)
-end
-
-""" Evaluate partial derivatives of basis, dbasis/dX, at some time t"""
-function get_dbasisdX(el::Element, xi, t)
-    dbasisdxi = get_dbasisdxi(el, xi)
-    J = get_jacobian(el, xi, t)
-    dbasisdxi*inv(J)
-end
-
-
-
 
 
 # FIXME: These two needs integration -- maybe not in elements.jl ..?
