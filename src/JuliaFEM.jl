@@ -10,6 +10,9 @@ using Lexicon
 using Logging
 @Logging.configure(level=DEBUG)
 
+using ForwardDiff
+autodiffcache = ForwardDiffCache()
+
 """ Simple linspace extension to arrays.
 
 Examples

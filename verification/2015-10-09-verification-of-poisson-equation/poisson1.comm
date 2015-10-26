@@ -1,0 +1,39 @@
+# heat source f=12
+
+DEBUT()
+
+MAIL = LIRE_MAILLAGE()
+
+MO = AFFE_MODELE(
+    MAILLAGE=MAIL,
+    AFFE = _F(MAILLE='E1', PHENOMENE='THERMIQUE', MODELISATION='PLAN'))
+
+MAT = DEFI_MATERIAU(
+    THER = _F(LAMBDA = 6.0))
+
+CHMAT = AFFE_MATERIAU(
+    MAILLAGE = MAIL,
+    AFFE = _F(MAILLE = 'E1', MATER = MAT))
+
+BC = AFFE_CHAR_THER( # Dirichlet boundary condition on 0 <= X <= 1, Y = 1
+    MODELE = MO,
+    TEMP_IMPO = (_F(NOEUD = ('N3','N4'), TEMP=0)))
+
+# Heat source f = 12
+LO = AFFE_CHAR_THER(
+    MODELE = MO,
+    SOURCE = _F(MAILLE='E1', SOUR=12.0))
+
+RESU = THER_LINEAIRE(
+    MODELE=MO,
+    CHAM_MATER=CHMAT,
+    EXCIT=(
+        _F(CHARGE=BC),
+        _F(CHARGE=LO)))
+
+IMPR_RESU(
+    MODELE = MO,
+    FORMAT = 'RESULTAT',
+    RESU = _F(RESULTAT = RESU))
+
+FIN()

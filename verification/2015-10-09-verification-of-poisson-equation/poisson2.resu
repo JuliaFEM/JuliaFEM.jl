@@ -1,0 +1,92 @@
+                                                                                
+                                                                                
+              -- CODE_ASTER -- VERSION : EXPLOITATION (stable) --               
+                                                                                
+                          Version 11.4.0 du 05/06/2013                          
+                         Copyright EDF R&D 1991 - 2015                          
+                                                                                
+                    Exécution du : Fri Oct 23 23:52:48 2015                     
+                       Nom de la machine : jukka-desktop                        
+                              Architecture : 64bit                              
+                          Type de processeur : x86_64                           
+                Système d'exploitation : Linux 3.13.0-66-generic                
+                        Langue des messages : en (UTF-8)                        
+                                                                                
+   
+   !------------------------------------------------------------------------------------!
+   ! <A> <SUPERVIS2_2>                                                                  !
+   !                                                                                    !
+   !     Vous utilisez une vieille version de Code_Aster.                               !
+   !                                                                                    !
+   !     En mettant à jour votre version, vous bénéficierez des dernières améliorations !
+   !     apportées au code depuis 15 mois.                                              !
+   !     Si vous avez des développements privés, vous risquez d'avoir un travail        !
+   !     important de portage si vous ne suivez pas les mises à jour.                   !
+   !                                                                                    !
+   !                                                                                    !
+   ! Ceci est une alarme. Si vous ne comprenez pas le sens de cette                     !
+   ! alarme, vous pouvez obtenir des résultats inattendus !                             !
+   !------------------------------------------------------------------------------------!
+   
+                           Parallélisme MPI : inactif                           
+                          Parallélisme OpenMP : actif                           
+                        Nombre de processus utilisés : 1                        
+                      Version de la librairie HDF5 : 1.8.8                      
+                      Version de la librairie MED : 3.0.6                       
+                          Librairie MUMPS : installée                           
+                    Version de la librairie SCOTCH : 5.1.10                     
+                  Mémoire limite pour l'exécution : 4096.00 Mo                  
+                   consommée par l'initialisation : 197.46 Mo                   
+                  par les objets du jeu de commandes : 1.14 Mo                  
+                 reste pour l'allocation dynamique : 3897.26 Mo                 
+                Taille limite des fichiers d'échange : 48.00 Go                 
+                                                                                
+
+ --------------------------------------------------------------------------------
+ ASTER 11.04.00 CONCEPT RESU CALCULE LE 23/10/2015 A 23:52:48 DE TYPE EVOL_THER  
+
+
+ ======>
+
+ ------>
+ CHAMP AUX NOEUDS DE NOM SYMBOLIQUE  TEMP                                        
+ NUMERO D'ORDRE: 0 INST:   0.00000000000000E+00                                  
+ NOEUD                 TEMP    
+ N1        1.00000000000000E+00
+ N2        1.00000000000000E+00
+ N3        5.55111512312578E-17
+ N4        5.55111512312578E-17
+ 
+ <I> <FIN> FERMETURE DE LA BASE "GLOBALE" EFFECTUEE.
+
+ <FIN> Arrêt normal dans "FIN".
+ <I> <FIN> ARRET NORMAL DANS "FIN" PAR APPEL A "JEFINI".
+  
+ <I> <FIN> MEMOIRE JEVEUX MINIMALE REQUISE POUR L'EXECUTION :                      21.00 Mo
+ <I> <FIN> MEMOIRE JEVEUX OPTIMALE REQUISE POUR L'EXECUTION :                      27.32 Mo
+ <I> <FIN> MAXIMUM DE MEMOIRE UTILISEE PAR LE PROCESSUS LORS DE L'EXECUTION :     226.59 Mo
+
+ ********************************************************************************
+ * COMMAND                  :       USER :     SYSTEM :   USER+SYS :    ELAPSED *
+ ********************************************************************************
+ * init (jdc)               :       0.16 :       0.01 :       0.17 :       0.17 *
+ *  . compile               :       0.00 :       0.00 :       0.00 :       0.00 *
+ *  . exec_compile          :       0.04 :       0.01 :       0.05 :       0.06 *
+ *  . report                :       0.01 :       0.00 :       0.01 :       0.00 *
+ *  . build                 :       0.00 :       0.00 :       0.00 :       0.00 *
+ * DEBUT                    :       0.02 :       0.01 :       0.03 :       0.04 *
+ * LIRE_MAILLAGE            :       0.00 :       0.00 :       0.00 :       0.00 *
+ * AFFE_MODELE              :       0.00 :       0.00 :       0.00 :       0.00 *
+ * DEFI_MATERIAU            :       0.00 :       0.00 :       0.00 :       0.00 *
+ * AFFE_MATERIAU            :       0.00 :       0.00 :       0.00 :       0.01 *
+ * AFFE_CHAR_THER           :       0.01 :       0.00 :       0.01 :       0.00 *
+ * AFFE_CHAR_THER           :       0.00 :       0.00 :       0.00 :       0.00 *
+ * THER_LINEAIRE            :       0.01 :       0.01 :       0.02 :       0.02 *
+ * IMPR_RESU                :       0.00 :       0.00 :       0.00 :       0.00 *
+ * FIN                      :       0.01 :       0.01 :       0.02 :       0.03 *
+ *  . part Superviseur      :       0.18 :       0.03 :       0.21 :       0.23 *
+ *  . part Fortran          :       0.03 :       0.02 :       0.05 :       0.04 *
+ ********************************************************************************
+ * TOTAL_JOB                :       0.21 :       0.05 :       0.26 :       0.27 *
+ ********************************************************************************
+
