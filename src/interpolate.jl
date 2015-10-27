@@ -59,7 +59,7 @@ function interpolate(basis::Basis, field::Field, ip::IntegrationPoint)
     interpolate(basis, field, ip.xi)
 end
 
-function dinterpolate(basis::Basis, u::Field, xi::Array{Float64, 1})
-    basis.dbasisdxi(xi)*u
-end
+#function dinterpolate(basis::Basis, u::Field, xi::Array{Float64, 1})
+#    basis.dbasisdxi(xi)*u
+#end
 

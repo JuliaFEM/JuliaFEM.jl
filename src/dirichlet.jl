@@ -5,48 +5,56 @@
 
 abstract DirichletEquation <: Equation
 
-get_unknown_field_name(eq::DirichletEquation) = symbol("reaction force")
-
 ### Dirichlet problem + equations
 
 type DirichletProblem <: BoundaryProblem
+    unknown_field_name :: ASCIIString
+    unknown_field_dimension :: Int
     equations :: Array{DirichletEquation, 1}
+    element_mapping :: Dict{DataType, DataType}
+    field_value :: Function
 end
-function DirichletProblem()
-    DirichletProblem([])
-end
-get_dimension(pr::Type{DirichletProblem}) = 1  # ..?
-get_equation(pr::Type{DirichletProblem}, el::Type{Seg2}) = DBC2D2
 
-"""
-Dirichlet boundary condition element for 2 node line segment
-"""
+function DirichletProblem(dimension::Int, field_value::Function=(X)->[0.0,0.0,0.0])
+    element_mapping = nothing
+    if dimension == 1
+        element_mapping = Dict(
+            Seg2 => DBC2D2
+            )
+    end
+    DirichletProblem("reaction force", dimension, [], element_mapping, field_value)
+end
+
+""" Dirichlet boundary condition element for 2 node line segment """
 type DBC2D2 <: DirichletEquation
     element :: Seg2
     integration_points :: Array{IntegrationPoint, 1}
-    global_dofs :: Array{Int64, 1}
-    fieldval :: Function
 end
 function DBC2D2(element::Seg2)
     integration_points = [
         IntegrationPoint([-sqrt(1/3)], 1.0),
         IntegrationPoint([+sqrt(1/3)], 1.0)]
     push!(element, FieldSet("reaction force"))
-    fieldval(X, t) = 0.0
-    DBC2D2(element, integration_points, [], fieldval)
+    DBC2D2(element, integration_points)
 end
-function get_lhs(eq::DBC2D2, ip, t)
-    el = get_element(eq)
-    h = get_basis(el)(ip.xi)
-    return h*h'
+Base.size(equation::DBC2D2) = (1, 2)
+
+function calculate_local_assembly!(assembly::LocalAssembly, equation::DirichletEquation,
+                                   unknown_field_name::ASCIIString, time::Number=Inf,
+                                   problem=nothing)
+    initialize_local_assembly!(assembly, equation)
+    element = get_element(equation)
+    basis = get_basis(element)
+    detJ = det(basis)
+    for ip in get_integration_points(equation)
+        w = ip.weight * detJ(ip)
+        N = basis(ip, time)
+        assembly.stiffness_matrix += w * N'*N
+        if !isa(problem, Void)
+            X = basis("geometry", ip, time)
+            u = problem.field_value(X)
+            assembly.force_vector += w * N'*u
+        end
+    end
 end
-function get_rhs(eq::DBC2D2, ip, t)
-    el = get_element(eq)
-    h = get_basis(el, ip.xi)
-    f = eq.fieldval
-    X = interpolate(el, "geometry", ip.xi, t)
-    return h*f(X, t)
-end
-has_lhs(eq::DBC2D2) = true
-has_rhs(eq::DBC2D2) = true
 
