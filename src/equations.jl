@@ -11,17 +11,12 @@ type LocalAssembly <: Assembly
     mass_matrix :: Matrix
     stiffness_matrix :: Matrix
     force_vector :: Matrix
-    potential_energy# :: Union{Array, Float64}
+    potential_energy
     residual_vector :: Vector
 end
 
-function LocalAssembly(ndofs, mass_matrix, stiffness_matrix, force_vector::Matrix)
-    LocalAssembly(ndofs, mass_matrix, stiffness_matrix, force_vector[:])
-end
-
-""" Initialize workspace for local assembly. """
-function LocalAssembly(equation::Equation)
-    ndofs = size(equation)
+""" Initialize workspace for local matrices for dimension ndofs. """
+function initialize_local_assembly(ndofs::Int=1)
     mass_matrix = zeros(ndofs, ndofs)
     stiffness_matrix = zeros(ndofs, ndofs)
     force_vector = zeros(ndofs, 1)
@@ -31,14 +26,24 @@ function LocalAssembly(equation::Equation)
                          potential_energy, residual_vector)
 end
 
+""" Initialize workspace for local matrices, get dimension from equation. """
 function initialize_local_assembly(equation::Equation)
-    LocalAssembly(equation)
+    ndofs = prod(size(equation))
+    return initialize_local_assembly(ndofs)
 end
 
-function initialize_local_assembly(equation::Equation, assembly::LocalAssembly)
-    if size(equation) != assembly.ndofs
+""" Initialize or zero workspace. """
+function initialize_local_assembly!(assembly::LocalAssembly, equation::Equation)
+    ndofs = prod(size(equation))
+    if ndofs != assembly.ndofs
         # if problem size changes, automatically initialize new work space
-        return initialize_local_assembly(equation)
+        assembly.ndofs = ndofs
+        assembly.mass_matrix = zeros(ndofs, ndofs)
+        assembly.stiffness_matrix = zeros(ndofs, ndofs)
+        assembly.force_vector = zeros(ndofs, 1)
+        assembly.potential_energy = 0.0
+        assembly.residual_vector = zeros(ndofs)
+        return
     end
     # otherwise, empty workspace ready for next iteration
     fill!(assembly.mass_matrix, 0.0)
@@ -46,15 +51,7 @@ function initialize_local_assembly(equation::Equation, assembly::LocalAssembly)
     fill!(assembly.force_vector, 0.0)
     assembly.potential_energy = 0.0
     fill!(assembly.residual_vector, 0.0)
-    return assembly
-end
-function initialize_local_assembly(assembly::LocalAssembly, equation::Equation)
-    initialize_local_assembly(equation, assembly)
-end
-
-function get_unknown_field_name(equation::Equation)
-    eqtype = typeof(equation)
-    error("define get_unknown_field_name for this equation type $eqtype")
+    return
 end
 
 has_mass_matrix(equation::Equation) = false
@@ -73,14 +70,15 @@ get_integration_points(equation::Equation) = equation.integration_points
 
 
 """ Return a local assembly for element. """
-function calculate_local_assembly!(assembly::LocalAssembly, equation::Equation, time::Number=Inf)
+function calculate_local_assembly!(assembly::LocalAssembly, equation::Equation,
+                                   unknown_field_name::ASCIIString, time::Number=Inf,
+                                   problem=nothing)
 
-    initialize_local_assembly(assembly, equation) # zero all
+    initialize_local_assembly!(assembly, equation) # zero all
 
     element = get_element(equation)
     basis = get_basis(element)
     detJ = det(basis)
-    field_name = get_unknown_field_name(equation)
 
     # 1. if equations are defined we just integrate them
     if has_mass_matrix(equation) || has_stiffness_matrix(equation) || has_force_vector(equation)
@@ -96,17 +94,16 @@ function calculate_local_assembly!(assembly::LocalAssembly, equation::Equation, 
                 assembly.force_vector += s*get_force_vector(equation, ip, time)[:]
             end
             # external loads -- if any nodal loads is defined add to force vector
-            if haskey(element, "$field_name nodal load")
-                assembly.force_vector += element["$field_name nodal load"](time)[:]
+            if haskey(element, "$unknown_field_name nodal load")
+                assembly.force_vector += element["$unknown_field_name nodal load"](time)[:]
             end
         end
     end
 
     # 2. variational / energy form - user has defined some potential energy / variational form
     if has_potential_energy(equation)
-        field_name = get_unknown_field_name(equation)
         element = get_element(equation)
-        field = element[field_name](time)
+        field = element[unknown_field_name](time)
         function potential_energy(data::Vector)
             # calculate potential energy for some setting. this is needed by forwarddiff
             assembly.potential_energy = 0.0
@@ -117,8 +114,8 @@ function calculate_local_assembly!(assembly::LocalAssembly, equation::Equation, 
                 assembly.potential_energy += ip.weight * dw * detJ(ip)
             end
             # external energy -- if any nodal loads is defined, decrease from potential energy
-            if haskey(element, "$field_name nodal load")
-                P = element["$field_name nodal load"](time)
+            if haskey(element, "$unknown_field_name nodal load")
+                P = element["$unknown_field_name nodal load"](time)
                 assembly.potential_energy -= dot(P[:], df[:])
             end
             if isa(assembly.potential_energy, Array)
@@ -135,9 +132,8 @@ function calculate_local_assembly!(assembly::LocalAssembly, equation::Equation, 
 
     # 3. virtual work form - user has defined residual vector δW_int(u,δu) + δW_ext(u,δu) = 0 ∀ v
     if has_residual_vector(equation)
-        field_name = get_unknown_field_name(equation)
         element = get_element(equation)
-        field = element[field_name](time)
+        field = element[unknown_field_name](time)
         function residual_vector(data::Vector)
             fill!(assembly.residual_vector, 0.0)
             df = similar(field, data)
@@ -147,8 +143,8 @@ function calculate_local_assembly!(assembly::LocalAssembly, equation::Equation, 
                 assembly.residual_vector += ip.weight*dr*detJ(ip)
             end
             # external loads -- if any nodal loads is defined, remove from residual
-            if haskey(element, "$field_name nodal load")
-                assembly.residual_vector -= element["$field_name nodal load"](time)[:]
+            if haskey(element, "$unknown_field_name nodal load")
+                assembly.residual_vector -= element["$unknown_field_name nodal load"](time)[:]
             end
             return assembly.residual_vector
         end
@@ -158,20 +154,5 @@ function calculate_local_assembly!(assembly::LocalAssembly, equation::Equation, 
         assembly.force_vector -= ForwardDiff.value(allresults)  # <-- minus explained in tutorial
     end
 
-end
-
-function calculate_local_assembly!(equation::Equation, assembly::LocalAssembly, time::Number=Inf)
-    calculate_local_assembly!(assembly, equation)
-end
-
-
-""" Get global degrees of freedom for this element. """
-function get_global_dofs(eq::Equation)
-    eq.global_dofs
-end
-
-""" Set global degrees of freedom for this element. """
-function set_global_dofs!(eq::Equation, dofs)
-    eq.global_dofs = dofs
 end
 

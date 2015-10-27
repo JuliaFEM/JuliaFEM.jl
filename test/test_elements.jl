@@ -11,25 +11,20 @@ This should always pass test_element if everything is ok.
 type MockElement <: Element
     connectivity :: Array{Int, 1}
     basis :: Basis
-    fields :: Dict{Symbol, FieldSet}
+    fields :: Dict{ASCIIString, FieldSet}
 end
 function MockElement(connectivity)
-    h(xi) = [
-        (1-xi[1])*(1-xi[2])/4
-        (1+xi[1])*(1-xi[2])/4
-        (1+xi[1])*(1+xi[2])/4
-        (1-xi[1])*(1+xi[2])/4]
-    dh(xi) = [
-        -(1-xi[2])/4.0   -(1-xi[1])/4.0
-         (1-xi[2])/4.0   -(1+xi[1])/4.0
-         (1+xi[2])/4.0    (1+xi[1])/4.0
-        -(1+xi[2])/4.0    (1-xi[1])/4.0]
+
+    h(xi) = 1/4*[(1-xi[1])*(1-xi[2])   (1+xi[1])*(1-xi[2])   (1+xi[1])*(1+xi[2])   (1-xi[1])*(1+xi[2])]
+
+    dh(xi) = 1/4*[
+        -(1-xi[2])    (1-xi[2])   (1+xi[2])  -(1+xi[2])
+        -(1-xi[1])   -(1+xi[1])   (1+xi[1])   (1-xi[1])]
+
     basis = Basis(h, dh)
     MockElement(connectivity, basis, Dict())
 end
-JuliaFEM.get_number_of_basis_functions(el::Type{MockElement}) = 4
-JuliaFEM.get_element_dimension(el::Type{MockElement}) = 2
-
+Base.size(element::Type{MockElement}) = (2, 4)
 
 using JuliaFEM: test_element
 facts("test test_element against mock element") do

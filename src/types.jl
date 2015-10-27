@@ -15,6 +15,9 @@ end
 function Field(time, values)
     Field(time, 0, values)
 end
+function Field(values)
+    Field(0.0, 0, values)
+end
 """ Get length of a field (number of basis functions in practice). """
 function Base.length(f::Field)
     length(f.values)
@@ -31,16 +34,23 @@ end
 function Base.(:*)(k::Number, f::Field)
     Field(f.time, k*f.values)
 end
-""" Multiply field with some vector x. """
-function Base.(:*)(x::Vector, f::Field)
+
+""" Inner product of field and vector x. """
+function Base.dot(x::Vector, f::Field)
     @assert length(x) == length(f)
     sum([f[i]*x[i] for i in 1:length(f)])
 end
-""" Multiply field with some matrix x. """
-# function Base.(:*){T}(x::Matrix, f::Field{Vector{T}})
-function Base.(:*)(x::Matrix, f::Field)
-    sum([f[i]*x[i,:] for i in 1:length(f)])
+
+function Base.size(field::Field)
+    (length(field.values[1]), length(field.values))
 end
+
+#""" Multiply field with some matrix x. """
+# function Base.(:*){T}(x::Matrix, f::Field{Vector{T}})
+#function Base.(:*)(x::Matrix, f::Field)
+#    sum([f[i]*x[:,i]' for i in 1:length(f)])
+#end
+
 """ Sum two fields. """
 function Base.(:+)(f1::Field, f2::Field)
     @assert(f1.time == f2.time, "Cannot add fields: time mismatch, $(f1.time) != $(f2.time)")
@@ -57,6 +67,9 @@ Examples
 
 """
 function Base.getindex(field::Field, c::Colon)
+    [field.values...;]
+end
+function Base.vec(field::Field)
     [field.values...;]
 end
 
@@ -87,20 +100,17 @@ end
 
 
 
-
-
-
 """ FieldSet is set of fields, each field can have different time and/or increment. """
 type FieldSet
-    name :: Symbol
+    name :: ASCIIString
     fields :: Array{Field, 1}
 end
 """ Initializer for FieldSet. """
 function FieldSet(field_name)
-    FieldSet(Symbol(field_name), [])
+    FieldSet(field_name, [])
 end
 function FieldSet()
-    FieldSet(Symbol("unknown field"), [])
+    FieldSet("unknown field", [])
 end
 """ Add new field to fieldset. """
 function Base.push!(fs::FieldSet, field::Field)
@@ -127,15 +137,10 @@ type Basis
     basis :: Function
     dbasisdxi :: Function
 end
-""" Constructor of basis function. """
-function Basis(basis)
-    Basis(basis, ForwardDiff.jacobian(basis))
-end
-""" Get partial derivative of basis function. """
-function grad(basis::Basis)
-    (ip) -> basis.dbasisdxi(ip.xi)
-end
-
+#""" Constructor of basis function. """
+#function Basis(basis)
+#    Basis(basis, ForwardDiff.jacobian(basis))
+#end
 
 """
 Integration point
@@ -151,7 +156,7 @@ attributes :: Dict{Any, Any}
 type IntegrationPoint
     xi :: Array{Float64, 1}
     weight :: Float64
-    fields :: Dict{Symbol, FieldSet}
+    fields :: Dict{ASCIIString, FieldSet}
 end
 function IntegrationPoint(xi, weight)
     IntegrationPoint(xi, weight, Dict())

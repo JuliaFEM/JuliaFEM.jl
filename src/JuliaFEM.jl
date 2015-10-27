@@ -36,12 +36,12 @@ include("interpolate.jl")  # interpolation routines
 include("elements.jl")
 include("lagrange.jl") # Lagrange elements
 #include("hierarchical.jl") # P-elements
+include("integrate.jl")  # integration points
 
 include("equations.jl")
 include("problems.jl")
 include("solvers.jl")
 
-#include("math.jl") # basic mathematical operations -- obsolete ..?
 # pre- and postprocess
 include("xdmf.jl")
 include("abaqus_reader.jl")

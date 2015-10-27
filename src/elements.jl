@@ -15,12 +15,12 @@ abstract Element
 
 """ Get FieldSet from element. """
 function Base.getindex(element::Element, field_name)
-    element.fields[symbol(field_name)]
+    element.fields[field_name]
 end
 
 """ Add new FieldSet to element. """
 function Base.setindex!(element::Element, fieldset::FieldSet, fieldset_name)
-    fieldset.name = symbol(fieldset_name)
+    fieldset.name = fieldset_name
     element.fields[fieldset.name] = fieldset
 end
 function Base.push!(element::Element, fieldset::FieldSet)
@@ -73,9 +73,8 @@ End of example.
 
 =#
 
-# These must be implemented for your own element
-get_number_of_basis_functions(el::Type{Element}) = nothing
-get_element_dimension(el::Type{Element}) = nothing
+# define size of your element as (dim, nbasis) tuple where first integer is spatial dimension and second is number of basis functions.
+# Base.size(element::Type{Element}) = nothing
 
 ### COMMON ELEMENT ROUTINES ###
 
@@ -95,12 +94,14 @@ This uses FactCheck and throws exceptions if element is not passing all tests.
 function test_element(element_type)
     Logging.info("Testing element $element_type")
     local element
-    n = get_number_of_basis_functions(element_type)
-    Logging.info("number of basis functions in this element: $n")
-    @fact n --> not(nothing) """
-    Unable to determine number of nodes for $eltype define a function
-    'get_number_of_basis_functions' which returns the number of nodes
-    for this element."""
+    dim = nothing
+    n = nothing
+    try
+        dim, n = size(element_type)
+    catch
+        Logging.error("Unable to determine element dimensions. Define Base.size(element::Type{$elementtype}) = (dim, nbasis) where dim is spatial dimension of element and nbasis is number of basis functions of element.")
+    end
+    Logging.info("element dimension: $dim x $n")
 
     Logging.info("Initializing element")
     try
@@ -112,45 +113,23 @@ function test_element(element_type)
         return false
     end
 
-    dim = get_element_dimension(element_type)
-    Logging.info("Element dimension: $dim")
-    @fact dim --> not(nothing) """
-    Unable to get element dimension define function 'get_element_dimension'
-    which return the dimension of this element (1, 2, 3)"""
-
     # try to interpolate some scalar field
-    field = Field(0.0, collect(1:n))
-    Logging.info("Creating new scalar field $field")
-    fieldset = FieldSet("field1")
-    push!(fieldset, field)
-    push!(element, fieldset)
+    push!(element, FieldSet("field1", [Field(0.0, collect(1:n))]))
+    # TODO: how to parametrize this?
     push!(element, FieldSet("geometry", [Field(0.0, Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])]))
 
     # evaluate basis functions at middle point of element
+    basis = get_basis(element)
+    dbasis = grad(basis)
     mid = zeros(dim)
-    try
-        basis = get_basis(element)
-        val1 = basis(mid, 0.0)
-        Logging.info("basis at $mid: $val1")
-        val2 = basis("field1", mid, 0.0)
-        Logging.info("field val at $mid: $val2")
-    catch
-        Logging.error("""
-        Unable to evaluate basis, define function 'get_basis' for
-        this element.""")
-    end
-    try
-        basis = get_basis(element)
-        dbasis = grad(basis)
-        val3 = dbasis(mid, 0.0)
-        Logging.info("derivative of basis at $mid: $val3")
-        val4 = dbasis("field1", mid, 0.0)
-        Logging.info("field val at $mid: $val4")
-    catch
-        Logging.error("""
-        Unable to evaluate partial derivatives of basis,
-        define function 'get_dbasisdxi' for this element.""")
-    end
+    val1 = basis(mid, 0.0)
+    Logging.info("basis at $mid: $val1")
+    val2 = basis("field1", mid, 0.0)
+    Logging.info("field val at $mid: $val2")
+    val3 = dbasis(mid, 0.0)
+    Logging.info("derivative of basis at $mid: $val3")
+    val4 = dbasis("field1", mid, 0.0)
+    Logging.info("field val at $mid: $val4")
 
     Logging.info("Element $element_type passed tests.")
 end
@@ -184,73 +163,70 @@ function call(u::FunctionSpace, field_name, xi::Vector, t::Number=Inf, variation
         return f.values
     end
     h = u.element.basis.basis(xi)
-    return h*f
+    return dot(vec(h), f)
 end
 
 """ If basis is called without a field, return basis functions evaluated at that point. """
 function call(u::FunctionSpace, xi::Vector, t::Number=Inf)
-    return u.element.basis.basis(xi)'
+    return u.element.basis.basis(xi)
 end
 
 """ Evaluate gradient of field on element function space. """
 function call(gradu::GradientFunctionSpace, field_name, xi::Vector, t::Number=Inf, variation=nothing)
     f = !isa(variation, Void) ? variation : gradu.element[field_name](t)
     X = gradu.element["geometry"](t)
-    b = gradu.element.basis.dbasisdxi(xi)
-    return b*f*inv(b*X)
+    dN = gradu.element.basis.dbasisdxi(xi)
+    J = sum([dN[:,i]*X[i]' for i=1:length(X)])
+    grad = inv(J)*dN
+    gradf = sum([grad[:,i]*f[i]' for i=1:length(f)])'
+    return gradf
 end
 
 """ If gradient of basis is called without a field, return "empty" gradient evaluated at that point. """
 function call(gradu::GradientFunctionSpace, xi::Vector, t::Number=Inf)
     X = gradu.element["geometry"](t)
-    b = gradu.element.basis.dbasisdxi(xi)
-    return (b*inv(b*X))'
+    dN = gradu.element.basis.dbasisdxi(xi)
+    J = sum([dN[:,i]*X[i]' for i=1:length(X)])
+    grad = inv(J)*dN
+    return grad
 end
 
 # on-line functions to get api more easy to use, ip -> xi.ip
-call(u::FunctionSpace, ip::IntegrationPoint, t::Number) = call(u, ip.xi, t)
-call(u::FunctionSpace, ip::IntegrationPoint) = call(u, ip.xi)
-call(u::GradientFunctionSpace, ip::IntegrationPoint, t::Number) = call(u, ip.xi, t)
-call(u::GradientFunctionSpace, ip::IntegrationPoint) = call(u, ip.xi)
+call(u::FunctionSpace, ip::IntegrationPoint, t::Number=Inf) = call(u, ip.xi, t)
+call(u::GradientFunctionSpace, ip::IntegrationPoint, t::Number=Inf) = call(u, ip.xi, t)
+# i think these will be the most called functions.
+call(u::FunctionSpace, field_name, ip::IntegrationPoint, t::Number, variation=nothing) = call(u, field_name, ip.xi, t, variation)
+call(u::GradientFunctionSpace, field_name, ip::IntegrationPoint, t::Number, variation=nothing) = call(u, field_name, ip.xi, t, variation)
+call(u::FunctionSpace, field_name) = (args...) -> call(u, field_name, args...)
+call(u::GradientFunctionSpace, field_name) = (args...) -> call(u, field_name, args...)
 
-""" Return field from function space. """
+""" Return a field from function space. """
 function get_field(u::FunctionSpace, field_name, time=Inf)
     return u.element[field_name](time)
 end
 
-""" Return field from function space. """
+""" Return a field from function space. """
 function get_field(u::FunctionSpace, field_name, time=Inf, variation=nothing)
     return !isa(variation, Void) ? variation : u.element[field_name](time)
 end
 
-""" Return fieldset from function space. """
+""" Return a fieldset from function space. """
 function get_fieldset(u::FunctionSpace, field_name)
     return u.element[field_name]
 end
 
-# i think these will be the most called functions.
-call(u::FunctionSpace, field_name, ip::IntegrationPoint, t::Number, variation=nothing) = call(u, field_name, ip.xi, t, variation)
-call(u::GradientFunctionSpace, field_name, ip::IntegrationPoint, t::Number, variation=nothing) = call(u, field_name, ip.xi, t, variation)
-
-function jacobian(u::FunctionSpace, xi, t)
-    u.element.basis.dbasisdxi(xi)*u.element["geometry"](t)
+function LinAlg.det(u::FunctionSpace, xi::Vector, t::Number=Inf)
+    X = u.element["geometry"](t)
+    dN = u.element.basis.dbasisdxi(xi)
+    J = sum([dN[:,i]*X[i]' for i=1:length(X)])
+    m, n = size(J)
+    return m == n ? det(J) : norm(J)
 end
-
-function jacobian(u::FunctionSpace, ip::IntegrationPoint, t::Number)
-    jacobian(u, ip.xi, t)
+function LinAlg.det(u::FunctionSpace, ip::IntegrationPoint, t::Number=Inf)
+    LinAlg.det(u, ip.xi, t)
 end
-
-function jacobian(u::FunctionSpace, xi)
-    jacobian(u, xi, Inf)
-end
-
 function LinAlg.det(u::FunctionSpace)
-    function detJ(args...)
-        J = jacobian(u, args...)
-        m, n = size(J)
-        return m == n ? det(J) : norm(J)
-    end
-    return detJ
+    return (args...) -> det(u, args...)
 end
 
 function get_basis(element::Element)
@@ -265,7 +241,7 @@ Base.(:-)(u::GradientFunctionSpace, v::GradientFunctionSpace) = (args...) -> u(a
 
 """ Check does fieldset exist. """
 function Base.haskey(element::Element, what)
-    haskey(element.fields, symbol(what))
+    haskey(element.fields, what)
 end
 
 
