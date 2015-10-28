@@ -15,7 +15,6 @@ function calculate_lagrange_basis(P, X)
     for i=1:nbasis
         A[i,:] = P(X[:, i])
     end
-#   Logging.debug("Calculating inverse of A")
     invA = inv(A)'
     basis(xi) = (invA*P(xi))'
     dbasisdxi(xi) = (ForwardDiff.jacobian((xi) -> invA*P(xi), xi, cache=autodiffcache))'
@@ -34,9 +33,6 @@ macro create_lagrange_element(element_name, element_description, X, P)
     eltype = esc(element_name)
     quote
         global get_element_description
-        #global get_number_of_basis_functions, get_element_dimension
-        #dim = size($X, 1)
-        #nbasis = size($X, 2)
         basis, dbasisdxi = calculate_lagrange_basis($P, $X)
         type $eltype <: CG
             connectivity :: Array{Int, 1}
@@ -47,8 +43,6 @@ macro create_lagrange_element(element_name, element_description, X, P)
             $eltype(connectivity, Basis(basis, dbasisdxi), Dict())
         end
         get_element_description(el::Type{$eltype}) = $element_description
-        #get_number_of_basis_functions(el::Type{$eltype}) = nbasis
-        #get_element_dimension(el::Type{$eltype}) = dim
         Base.size(el::Type{$eltype}) = Base.size($X)
     end
 end

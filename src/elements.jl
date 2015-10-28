@@ -1,82 +1,10 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-#=
-Related notebooks
------------------
-
-2015-08-29-developing-juliafem.ipynb
-=#
-
 using FactCheck
 using ForwardDiff
 
 abstract Element
-
-""" Get FieldSet from element. """
-function Base.getindex(element::Element, field_name)
-    element.fields[field_name]
-end
-
-""" Add new FieldSet to element. """
-function Base.setindex!(element::Element, fieldset::FieldSet, fieldset_name)
-    fieldset.name = fieldset_name
-    element.fields[fieldset.name] = fieldset
-end
-function Base.push!(element::Element, fieldset::FieldSet)
-    element[fieldset.name] = fieldset
-end
-
-
-#= ELEMENT DEFINITIONS
-
-Example
--------
-
-This is example how to create new element. This is commented because I use code
-generation for simple elements like Lagrage elements. Feel free to use
-code generation but elements can be of course created manually too!
-
-abstract CG <: Element # create new element family "Continous Galerkin"
-
-type Quad4 <: CG
-    connectivity :: Array{Int, 1}
-    fields :: Dict{Any, Any}
-end
-
-""" Default contructor. """
-Quad4(connectivity) = Quad4(connectivity, Dict{Any, Any}())
-
-""" Return number of basis functions of this element. """
-get_number_of_basis_functions(el::Type{Quad4}) = 4
-
-""" Return element dimension (length of xi vector). """
-get_element_dimension(el::Type{Quad4}) = 2
-
-""" Return basis functions for this element (xi dim = 2, functions = 4). """
-function get_basis(el::Quad4, xi)
-    [(1-xi[1])*(1-xi[2])/4
-     (1+xi[1])*(1-xi[2])/4
-     (1+xi[1])*(1+xi[2])/4
-     (1-xi[1])*(1+xi[2])/4]
-end
-
-""" Return partial derivatives of basis functions. """
-function get_dbasisdxi(el::Quad4, xi)
-    [-(1-xi[2])/4.0    -(1-xi[1])/4.0
-      (1-xi[2])/4.0    -(1+xi[1])/4.0
-      (1+xi[2])/4.0     (1+xi[1])/4.0
-     -(1+xi[2])/4.0     (1-xi[1])/4.0]
-end
-
-End of example.
-
-=#
-
-# define size of your element as (dim, nbasis) tuple where first integer is spatial dimension and second is number of basis functions.
-# Base.size(element::Type{Element}) = nothing
-
-### COMMON ELEMENT ROUTINES ###
 
 """
 Test routine for element. If this passes, element interface is properly
@@ -114,9 +42,9 @@ function test_element(element_type)
     end
 
     # try to interpolate some scalar field
-    push!(element, FieldSet("field1", [Field(0.0, collect(1:n))]))
+    element["field1"] = Field(0.0, collect(1:n))
     # TODO: how to parametrize this?
-    push!(element, FieldSet("geometry", [Field(0.0, Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])]))
+    element["geometry"] = Field(0.0, Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
 
     # evaluate basis functions at middle point of element
     basis = get_basis(element)
@@ -134,26 +62,94 @@ function test_element(element_type)
     Logging.info("Element $element_type passed tests.")
 end
 
+""" Get FieldSet from element. """
+function Base.getindex(element::Element, field_name)
+    element.fields[field_name]
+end
+
+"""Add new FieldSet to element.
+
+Examples
+--------
+>>> field = Field(0.0, [1, 2, 3, 4])
+>>> fieldset = FieldSet("geometry", Field[field])
+>>> element["geometry"] = fieldset
+JuliaFEM.Quad4([1,2,3,4],JuliaFEM.Basis(basis,dbasisdxi),Dict("geometry"=>JuliaFEM.FieldSet("geometry",JuliaFEM.Field[JuliaFEM.Field{Array{Int64,1}}(0.0,0,[1,2,3,4])])))
+"""
+function Base.setindex!(element::Element, fieldset::FieldSet, fieldset_name)
+    fieldset.name = fieldset_name
+    element.fields[fieldset.name] = fieldset
+end
+
+"""Add new FieldSet to element.
+
+Examples
+--------
+>>> field = Field(0.0, [1, 2, 3, 4])
+>>> element["geometry"] = field
+JuliaFEM.Quad4([1,2,3,4],JuliaFEM.Basis(basis,dbasisdxi),Dict("geometry"=>JuliaFEM.FieldSet("geometry",JuliaFEM.Field[JuliaFEM.Field{Array{Int64,1}}(0.0,0,[1,2,3,4])])))
+"""
+function Base.setindex!(element::Element, field::Field, fieldset_name)
+    element[fieldset_name] = FieldSet(field)
+end
+
+"""Add new FieldSet to element.
+
+Examples
+--------
+>>> element["geometry"] = [1, 2, 3, 4]
+JuliaFEM.Quad4([1,2,3,4],JuliaFEM.Basis(basis,dbasisdxi),Dict("geometry"=>JuliaFEM.FieldSet("geometry",JuliaFEM.Field[JuliaFEM.Field{Array{Int64,1}}(0.0,0,[1,2,3,4])])))
+"""
+function Base.setindex!(element::Element, field_data::Union{Number, Array}, fieldset_name)
+    element[fieldset_name] = Field(field_data)
+end
+
+"""Add new FieldSet to element.
+
+Notes
+-----
+This last version takes tuple and each cell in tuple is converted to new field.
+Time in field is 0.0, 1.0, ..., n
+
+Examples
+--------
+>>> element["load"] = (1, 2)
+JuliaFEM.Quad4([1,2,3,4],JuliaFEM.Basis(basis,dbasisdxi),Dict("load"=>JuliaFEM.FieldSet("load",JuliaFEM.Field[JuliaFEM.Field{Int64}(0.0,0,1),JuliaFEM.Field{Int64}(1.0,0,2)])))
+"""
+function Base.setindex!(element::Element, field_data::Tuple, fieldset_name)
+    fields = Field[Field(Float64(i-1), field) for (i,field) in enumerate(field_data)]
+    element.fields[fieldset_name] = FieldSet(fieldset_name, fields)
+end
 
 function get_connectivity(el::Element)
     el.connectivity
 end
 
-type MixedFunctionSpace
+abstract AbstractFunctionSpace
+
+type FunctionSpace <: AbstractFunctionSpace
+    element :: Element
+end
+
+type GradientFunctionSpace <: AbstractFunctionSpace
+    element :: Element
+end
+
+type MixedFunctionSpace <: AbstractFunctionSpace
     element1 :: Element
     element2 :: Element
 end
 
-type FunctionSpace
-    element :: Element
+function get_basis(element::Element)
+    return FunctionSpace(element)
 end
 
-type GradientFunctionSpace
-    element :: Element
+function get_dbasis(element::Element)
+    return GradientFunctionSpace(element)
 end
 
 function grad(u::FunctionSpace)
-    GradientFunctionSpace(u.element)
+    return GradientFunctionSpace(u.element)
 end
 
 """ Evaluate field on element function space. """
@@ -195,8 +191,8 @@ end
 call(u::FunctionSpace, ip::IntegrationPoint, t::Number=Inf) = call(u, ip.xi, t)
 call(u::GradientFunctionSpace, ip::IntegrationPoint, t::Number=Inf) = call(u, ip.xi, t)
 # i think these will be the most called functions.
-call(u::FunctionSpace, field_name, ip::IntegrationPoint, t::Number, variation=nothing) = call(u, field_name, ip.xi, t, variation)
-call(u::GradientFunctionSpace, field_name, ip::IntegrationPoint, t::Number, variation=nothing) = call(u, field_name, ip.xi, t, variation)
+call(u::FunctionSpace, field_name, ip::IntegrationPoint, t::Number=Inf, variation=nothing) = call(u, field_name, ip.xi, t, variation)
+call(u::GradientFunctionSpace, field_name, ip::IntegrationPoint, t::Number=Inf, variation=nothing) = call(u, field_name, ip.xi, t, variation)
 call(u::FunctionSpace, field_name) = (args...) -> call(u, field_name, args...)
 call(u::GradientFunctionSpace, field_name) = (args...) -> call(u, field_name, args...)
 
@@ -215,6 +211,7 @@ function get_fieldset(u::FunctionSpace, field_name)
     return u.element[field_name]
 end
 
+""" Get a determinant of element in point ξ. """
 function LinAlg.det(u::FunctionSpace, xi::Vector, t::Number=Inf)
     X = u.element["geometry"](t)
     dN = u.element.basis.dbasisdxi(xi)
@@ -229,156 +226,13 @@ function LinAlg.det(u::FunctionSpace)
     return (args...) -> det(u, args...)
 end
 
-function get_basis(element::Element)
-    return FunctionSpace(element)
-end
-
 Base.(:+)(u::FunctionSpace, v::FunctionSpace) = (args...) -> u(args...) + v(args...)
 Base.(:-)(u::FunctionSpace, v::FunctionSpace) = (args...) -> u(args...) - v(args...)
 Base.(:+)(u::GradientFunctionSpace, v::GradientFunctionSpace) = (args...) -> u(args...) + v(args...)
 Base.(:-)(u::GradientFunctionSpace, v::GradientFunctionSpace) = (args...) -> u(args...) - v(args...)
 
-
 """ Check does fieldset exist. """
 function Base.haskey(element::Element, what)
     haskey(element.fields, what)
 end
-
-
-# FIXME: These two needs integration -- maybe not in elements.jl ..?
-"""
-Fit field s.t. || ∫ (Nᵢ(ξ)αᵢ - f(el, ξ)) dS || -> min!
-
-Parameters
-----------
-f::Function
-    Needs to take (el::Element, xi::Vector) as argument
-fixed_coeffs::Int[]
-    These coefficients are not changed during fitting -> constrained optimizatio
-"""
-function fit_field!(el::Element, field, f, fixed_coeffs=Int[])
-    w = [
-        128/225,
-        (332+13*sqrt(70))/900,
-        (332+13*sqrt(70))/900,
-        (332-13*sqrt(70))/900,
-        (332-13*sqrt(70))/900]
-    xi = Vector[
-        [0.0],
-        [ 1/3*sqrt(5 - 2*sqrt(10/7))],
-        [-1/3*sqrt(5 - 2*sqrt(10/7))],
-        [ 1/3*sqrt(5 + 2*sqrt(10/7))],
-        [-1/3*sqrt(5 + 2*sqrt(10/7))]]
-    n = get_number_of_basis_functions(el)
-    fld = get_field(el, field)
-    nfld = length(fld[1])
-    #Logging.debug("dim of field $field: $nfld")
-
-    M = zeros(n, n)
-    b = zeros(n, nfld)
-    for i=1:length(w)
-        detJ = get_detJ(el, xi[i])
-        N = get_basis(el, xi[i])
-        M += w[i]*N*N'*detJ
-        fi = f(el, xi[i])
-        for j=1:nfld
-            b[:, j] += w[i]*N*fi[j]*detJ
-        end
-    end
-
-    coeffs = zeros(n)
-    for j=1:nfld
-        for k=1:n
-            coeffs[k] = fld[k][j]
-        end
-        if length(fixed_coeffs) != 0
-            # constrained problem, some coefficients are fixed
-            N = Int[] # rest of coeffs
-            S = Int[] # fixed coeffs
-            for i = 1:n
-                if i in fixed_coeffs
-                    push!(S, i)
-                else
-                    push!(N, i)
-                end
-            end
-            lhs = M[N,N]
-            rhs = b[N,j] - M[N,S]*coeffs[S]
-            coeffs[N] = lhs \ rhs
-        else
-            coeffs[:] = M \ b[:,j]
-        end
-        for k=1:n
-            fld[k][j] = coeffs[k]
-        end
-    end
-    set_field(el, field, fld)
-    return
-end
-
-
-"""
-Fit field s.t. || ∫ ∂/∂ξ(∑Nᵢ(ξ)αᵢ)f(el, ξ) dS || -> min!
-"""
-function fit_derivative_field!(el::Element, field, f, fixed_coeffs=Int[])
-    w = [
-        128/225,
-        (332+13*sqrt(70))/900,
-        (332+13*sqrt(70))/900,
-        (332-13*sqrt(70))/900,
-        (332-13*sqrt(70))/900]
-    xi = Vector[
-        [0.0],
-        [ 1/3*sqrt(5 - 2*sqrt(10/7))],
-        [-1/3*sqrt(5 - 2*sqrt(10/7))],
-        [ 1/3*sqrt(5 + 2*sqrt(10/7))],
-        [-1/3*sqrt(5 + 2*sqrt(10/7))]]
-    n = get_number_of_basis_functions(el)
-    fld = get_field(el, field)
-    nfld = length(fld[1])
-    #Logging.debug("dim of field $field: $nfld")
-
-    M = zeros(n, n)
-    b = zeros(n, nfld)
-    for i=1:length(w)
-        detJ = get_detJ(el, xi[i])
-        dNdxi = get_dbasisdxi(el, xi[i])
-        dNdX = dNdxi / detJ
-        M += w[i]*dNdX*dNdX'*detJ
-        fi = f(el, xi[i])
-        for j=1:nfld
-            b[:, j] += w[i]*dNdX*fi[j]*detJ
-        end
-    end
-
-    coeffs = zeros(n)
-    for j=1:nfld
-        for k=1:n
-            coeffs[k] = fld[k][j]
-        end
-        if length(fixed_coeffs) != 0
-            #Logging.info("constrained problem, some coefficients are fixed")
-            N = Int[] # rest of coeffs
-            S = Int[] # fixed coeffs
-            for i = 1:n
-                if i in fixed_coeffs
-                    push!(S, i)
-                else
-                    push!(N, i)
-                end
-            end
-            lhs = M[N,N]
-            rhs = b[N,j] - M[N,S]*coeffs[S]
-            coeffs[N] = lhs \ rhs
-        else
-            coeffs[:] = M \ b[:,j]
-        end
-        for k=1:n
-            fld[k][j] = coeffs[k]
-        end
-    end
-    set_field(el, field, fld)
-    return
-end
-
 

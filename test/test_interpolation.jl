@@ -4,28 +4,17 @@
 using JuliaFEM: get_basis, grad, FieldSet, Field, Quad4
 using FactCheck
 
-element = Quad4([1, 2, 3, 4])
-
-geometry_field = Field(0.0, Vector[])  # Create empty field at time t=0.0
-push!(geometry_field, [ 0.0, 0.0])  # push some values for field
-push!(geometry_field, [ 1.0, 0.0])
-push!(geometry_field, [ 1.0, 1.0])
-push!(geometry_field, [ 0.0, 1.0])
-geometry_fieldset = FieldSet("geometry")  # create fieldset "geometry"
-push!(geometry_fieldset, geometry_field)  # add field to fieldset
-push!(element, geometry_fieldset) # add fieldset to element
-
-temperature_fieldset = FieldSet("temperature")
-push!(temperature_fieldset, Field(0.0, [0.0, 0.0, 0.0, 0.0]))
-push!(temperature_fieldset, Field(1.0, [1.0, 2.0, 3.0, 4.0]))
-push!(element, temperature_fieldset)
-
-displacement_fieldset = FieldSet("displacement")
-push!(displacement_fieldset, Field(0.0, Vector[[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]))
-push!(displacement_fieldset, Field(1.0, Vector[[0.0, 0.0], [0.0, 0.0], [0.25, 0.0], [0.0, 0.0]]))
-push!(element, displacement_fieldset)
 
 facts("basic continuum interpolations") do
+
+    element = Quad4([1, 2, 3, 4])
+
+    element["geometry"] = Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+    element["temperature"] = ([0.0, 0.0, 0.0, 0.0], [1.0, 2.0, 3.0, 4.0])
+    element["displacement"] = (
+        Vector[[0.0, 0.0], [0.0, 0.0], [0.00, 0.0], [0.0, 0.0]],
+        Vector[[0.0, 0.0], [0.0, 0.0], [0.25, 0.0], [0.0, 0.0]])
+
     # from my old home works
     basis = get_basis(element)
     dbasis = grad(basis)

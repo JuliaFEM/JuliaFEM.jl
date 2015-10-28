@@ -6,10 +6,10 @@ This is JuliaFEM -- Finite Element Package
 """
 module JuliaFEM
 
-using Lexicon
 using Logging
 @Logging.configure(level=DEBUG)
 
+using Lexicon
 using ForwardDiff
 autodiffcache = ForwardDiffCache()
 
@@ -28,7 +28,6 @@ function Base.linspace(X1, X2, n)
     [1/2*(1-ti)*X1 + 1/2*(1+ti)*X2 for ti in linspace(-1, 1, n)]
 end
 
-
 include("types.jl")  # type definitions
 include("interpolate.jl")  # interpolation routines
 
@@ -36,21 +35,26 @@ include("interpolate.jl")  # interpolation routines
 include("elements.jl")
 include("lagrange.jl") # Lagrange elements
 #include("hierarchical.jl") # P-elements
-include("integrate.jl")  # integration points
 
+### EQUATIONS ###
+include("integrate.jl")  # default integration points for elements
 include("equations.jl")
 include("problems.jl")
-include("solvers.jl")
 
-# pre- and postprocess
-include("xdmf.jl")
-include("abaqus_reader.jl")
-#include("interfaces.jl")
-
+### FORMULATIION ###
 include("dirichlet.jl")
 include("heat.jl")
-#include("elasticity_solver.jl")
+include("elasticity.jl")
+
+### ASSEMBLY + SOLVE ###
+include("assembly.jl")
+include("solvers.jl")
+
+# PRE AND POSTPROCESS
+include("xdmf.jl")
+include("abaqus_reader.jl")
 
 end # module
 
 FEM = JuliaFEM
+
