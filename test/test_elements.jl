@@ -34,12 +34,14 @@ end
 
 facts("test adding fieldsets and fields to element") do
     el = MockElement([1, 2, 3, 4])
+ 
     fieldset = JuliaFEM.FieldSet("geometry")
     field1 = JuliaFEM.Field(0.0, [0.0, 0.0, 0.0, 0.0])
     push!(fieldset, field1)
     field2 = JuliaFEM.Field(1.0, [1.0, 1.0, 1.0, 1.0])
     push!(fieldset, field2)
-    push!(el, fieldset)
+
+    el["geometry"] = fieldset
     fields = el["geometry"]
     @fact length(fields) --> 2
     @fact fields[1] --> field1
@@ -57,13 +59,13 @@ facts("interpolation of fields in some function space") do
     fieldset6 = FieldSet("vector field 3", [Field(0.0, Vector[[1.0, 5.0, 9.0], [2.0, 6.0, 10.0], [3.0, 7.0, 11.0], [4.0, 8.0, 12.0]])])
     fieldset7 = FieldSet("tensor field 1", [Field(0.0, Matrix[[1.0 5.0; 9.0 13.0], [2.0 6.0; 10.0 14.0], [3.0 7.0; 11.0 15.0], [4.0 8.0; 12.0 16.0]])])
 
-    push!(element, fieldset1)
-    push!(element, fieldset2)
-    push!(element, fieldset3)
-    push!(element, fieldset4)
-    push!(element, fieldset5)
-    push!(element, fieldset6)
-    push!(element, fieldset7)
+    element["geometry"] = fieldset1
+    element["constant scalar field"] = fieldset2
+    element["scalar field"] = fieldset3
+    element["vector field 1"] = fieldset4
+    element["vector field 2"] = fieldset5
+    element["vector field 3"] = fieldset6
+    element["tensor field 1"] = fieldset7
 
     xi = [0.0, 0.0]
     t = 0.0

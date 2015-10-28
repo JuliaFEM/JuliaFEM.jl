@@ -7,7 +7,7 @@ using ForwardDiff
 
 """ Field is a fundamental data type which holds some values in some time t """
 type Field{T}
-    time :: Float64
+    time :: Number
     increment :: Int64
     values :: T
 end
@@ -106,11 +106,14 @@ type FieldSet
     fields :: Array{Field, 1}
 end
 """ Initializer for FieldSet. """
-function FieldSet(field_name)
+function FieldSet(field_name::ASCIIString)
     FieldSet(field_name, [])
 end
 function FieldSet()
     FieldSet("unknown field", [])
+end
+function FieldSet(fields::Array{Field, 1})
+    FieldSet("unknown field", fields)
 end
 """ Add new field to fieldset. """
 function Base.push!(fs::FieldSet, field::Field)
@@ -129,6 +132,9 @@ end
 #""" Return last field from fieldset. """
 function Base.endof(fieldset::FieldSet)
     length(fieldset)
+end
+function Base.convert(fieldset::Type{FieldSet}, field::Field)
+    FieldSet(Field[field])
 end
 
 

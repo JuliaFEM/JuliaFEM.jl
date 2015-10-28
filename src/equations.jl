@@ -1,6 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+# Functions to handle element level things -- integration, assembly, ...
+
 abstract Equation
 
 abstract Assembly
@@ -55,17 +57,61 @@ function initialize_local_assembly!(assembly::LocalAssembly, equation::Equation)
 end
 
 has_mass_matrix(equation::Equation) = false
-get_mass_matrix(equation::Equation, ip, time) = nothing
+function get_mass_matrix(equation::Equation, ip, time=Inf, problem=nothing)
+    get_mass_matrix(equation, ip, time)
+end
+function get_mass_matrix(equation::Equation, ip, time=Inf)
+    get_mass_matrix(equation, ip)
+end
+function get_mass_matrix(equation::Equation, ip)
+    nothing
+end
+
 has_stiffness_matrix(equation::Equation) = false
-get_stiffness_matrix(equation::Equation, ip, time) = nothing
+function get_stiffness_matrix(equation::Equation, ip, time=Inf, problem=nothing)
+    get_stiffness_matrix(equation, ip, time)
+end
+function get_stiffness_matrix(equation::Equation, ip, time=Inf)
+    get_stiffness_matrix(equation, ip)
+end
+function get_stiffness_matrix(equation::Equation, ip)
+    nothing
+end
+
 has_force_vector(equation::Equation) = false
-get_force_vector(equation::Equation, ip, time) = nothing
+function get_force_vector(equation::Equation, ip, time=Inf, problem=nothing)
+    get_force_vector(equation, ip, time)
+end
+function get_force_vector(equation::Equation, ip, time=Inf)
+    get_force_vector(equation, ip)
+end
+function get_force_vector(equation::Equation, ip)
+    nothing
+end
+
 has_residual_vector(equation::Equation) = false
-get_residual_vector(equation::Equation, ip, time) = nothing
+function get_residual_vector(equation::Equation, ip, time=Inf, problem=nothing)
+    get_residual_vector(equation, ip, time)
+end
+function get_residual_vector(equation::Equation, ip, time=Inf)
+    get_residual_vector(equation, ip)
+end
+function get_residual_vector(equation::Equation, ip)
+    nothing
+end
+
 has_potential_energy(equation::Equation) = false
-get_potential_energy(equation::Equation, ip, time) = nothing
+function get_potential_energy(equation::Equation, ip, time=Inf, problem=nothing)
+    get_potential_energy(equation, ip, time)
+end
+function get_potential_energy(equation::Equation, ip, time=Inf)
+    get_potential_energy(equation, ip)
+end
+function get_potential_energy(equation::Equation, ip)
+    nothing
+end
+
 get_element(equation::Equation) = equation.element
-get_number_of_dofs(equation::Equation) = nothing
 get_integration_points(equation::Equation) = equation.integration_points
 
 
@@ -85,18 +131,18 @@ function calculate_local_assembly!(assembly::LocalAssembly, equation::Equation,
         for ip in get_integration_points(equation)
             s = ip.weight*detJ(ip)
             if has_mass_matrix(equation)
-                assembly.mass_matrix += s*get_mass_matrix(equation, ip, time)
+                assembly.mass_matrix += s*get_mass_matrix(equation, ip, time, problem)
             end
             if has_stiffness_matrix(equation)
-                assembly.stiffness_matrix += s*get_stiffness_matrix(equation, ip, time)
+                assembly.stiffness_matrix += s*get_stiffness_matrix(equation, ip, time, problem)
             end
             if has_force_vector(equation)
-                assembly.force_vector += s*get_force_vector(equation, ip, time)[:]
+                assembly.force_vector += s*get_force_vector(equation, ip, time, problem)
             end
-            # external loads -- if any nodal loads is defined add to force vector
-            if haskey(element, "$unknown_field_name nodal load")
-                assembly.force_vector += element["$unknown_field_name nodal load"](time)[:]
-            end
+        end
+        # external loads -- if any nodal loads is defined add to force vector
+        if haskey(element, "$unknown_field_name nodal load")
+            assembly.force_vector += vec(element["$unknown_field_name nodal load"](time))
         end
     end
 
@@ -116,14 +162,14 @@ function calculate_local_assembly!(assembly::LocalAssembly, equation::Equation,
             # external energy -- if any nodal loads is defined, decrease from potential energy
             if haskey(element, "$unknown_field_name nodal load")
                 P = element["$unknown_field_name nodal load"](time)
-                assembly.potential_energy -= dot(P[:], df[:])
+                assembly.potential_energy -= dot(vec(P), vec(df))
             end
             if isa(assembly.potential_energy, Array)
                 return assembly.potential_energy[1]
             end
             return assembly.potential_energy
         end
-        hessian, allresults = ForwardDiff.hessian(potential_energy, field[:],
+        hessian, allresults = ForwardDiff.hessian(potential_energy, vec(field),
                                                   AllResults, cache=autodiffcache)
         assembly.stiffness_matrix += hessian
         assembly.force_vector -= ForwardDiff.gradient(allresults)  # <--- minus explained in tutorial
@@ -144,15 +190,14 @@ function calculate_local_assembly!(assembly::LocalAssembly, equation::Equation,
             end
             # external loads -- if any nodal loads is defined, remove from residual
             if haskey(element, "$unknown_field_name nodal load")
-                assembly.residual_vector -= element["$unknown_field_name nodal load"](time)[:]
+                assembly.residual_vector -= vec(element["$unknown_field_name nodal load"](time))
             end
             return assembly.residual_vector
         end
-        jacobian, allresults = ForwardDiff.jacobian(residual_vector, field[:],
+        jacobian, allresults = ForwardDiff.jacobian(residual_vector, vec(field),
                                                     AllResults, cache=autodiffcache)
         assembly.stiffness_matrix += jacobian
         assembly.force_vector -= ForwardDiff.value(allresults)  # <-- minus explained in tutorial
     end
 
 end
-
