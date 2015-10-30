@@ -37,13 +37,14 @@ macro create_lagrange_element(element_name, element_description, X, P)
         type $eltype <: CG
             connectivity :: Array{Int, 1}
             basis :: Basis
-            fields :: Dict{ASCIIString, FieldSet}
+            fields :: FieldSet
         end
         function $eltype(connectivity, args...)
-            $eltype(connectivity, Basis(basis, dbasisdxi), Dict())
+            $eltype(connectivity, Basis(basis, dbasisdxi), FieldSet())
         end
         get_element_description(el::Type{$eltype}) = $element_description
-        Base.size(el::Type{$eltype}) = Base.size($X)
+        Base.size(element::Type{$eltype}) = Base.size($X)
+        Base.size(element::$eltype) = Base.size($X)
     end
 end
 

@@ -67,9 +67,7 @@ function solve!(problem::Problem, free_dofs::Array{Int, 1}, time::Number=Inf;
             gdofs = vec(vcat([dim*conn'-i for i=dim-1:-1:0]...))
             old_field = element[field_name](Inf)
             new_field = similar(old_field, full(x[gdofs]))
-            new_field.time = time
-            new_field.increment = i
-            push!(element[field_name], new_field)
+            push!(element[field_name][end], new_field)
         end
         if norm(dx) < tolerance
             return

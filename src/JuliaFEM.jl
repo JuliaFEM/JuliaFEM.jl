@@ -6,10 +6,14 @@ This is JuliaFEM -- Finite Element Package
 """
 module JuliaFEM
 
-using Logging
-@Logging.configure(level=DEBUG)
+#using Logging
+#@Logging.configure(level=DEBUG)
+#using Lexicon
 
-using Lexicon
+macro debug(msg)
+    return :( println("DEBUG: ", $msg) )
+end
+
 using ForwardDiff
 autodiffcache = ForwardDiffCache()
 
@@ -24,12 +28,12 @@ Examples
  [1.0]
 
 """
-function Base.linspace(X1, X2, n)
+function Base.linspace{T<:Array}(X1::T, X2::T, n)
     [1/2*(1-ti)*X1 + 1/2*(1+ti)*X2 for ti in linspace(-1, 1, n)]
 end
 
 include("types.jl")  # type definitions
-include("interpolate.jl")  # interpolation routines
+#include("interpolate.jl")  # interpolation routines
 
 ### ELEMENTS ###
 include("elements.jl")

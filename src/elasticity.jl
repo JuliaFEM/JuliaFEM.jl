@@ -121,8 +121,7 @@ end
 function CPS4(element::Quad4)
     integration_points = get_default_integration_points(element)
     if !haskey(element, "displacement")
-        element["displacement"] = FieldSet()
-        push!(element["displacement"], Field(Vector[[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]))
+        element["displacement"] = zeros(2, 4)
     end
     CPS4(element, integration_points)
 end

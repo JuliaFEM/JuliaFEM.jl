@@ -71,54 +71,11 @@ end
 
 Examples
 --------
->>> field = Field(0.0, [1, 2, 3, 4])
->>> fieldset = FieldSet("geometry", Field[field])
->>> element["geometry"] = fieldset
-JuliaFEM.Quad4([1,2,3,4],JuliaFEM.Basis(basis,dbasisdxi),Dict("geometry"=>JuliaFEM.FieldSet("geometry",JuliaFEM.Field[JuliaFEM.Field{Array{Int64,1}}(0.0,0,[1,2,3,4])])))
-"""
-function Base.setindex!(element::Element, fieldset::FieldSet, fieldset_name)
-    fieldset.name = fieldset_name
-    element.fields[fieldset.name] = fieldset
-end
-
-"""Add new FieldSet to element.
-
-Examples
---------
->>> field = Field(0.0, [1, 2, 3, 4])
->>> element["geometry"] = field
-JuliaFEM.Quad4([1,2,3,4],JuliaFEM.Basis(basis,dbasisdxi),Dict("geometry"=>JuliaFEM.FieldSet("geometry",JuliaFEM.Field[JuliaFEM.Field{Array{Int64,1}}(0.0,0,[1,2,3,4])])))
-"""
-function Base.setindex!(element::Element, field::Field, fieldset_name)
-    element[fieldset_name] = FieldSet(field)
-end
-
-"""Add new FieldSet to element.
-
-Examples
---------
 >>> element["geometry"] = [1, 2, 3, 4]
 JuliaFEM.Quad4([1,2,3,4],JuliaFEM.Basis(basis,dbasisdxi),Dict("geometry"=>JuliaFEM.FieldSet("geometry",JuliaFEM.Field[JuliaFEM.Field{Array{Int64,1}}(0.0,0,[1,2,3,4])])))
 """
-function Base.setindex!(element::Element, field_data::Union{Number, Array}, fieldset_name)
-    element[fieldset_name] = Field(field_data)
-end
-
-"""Add new FieldSet to element.
-
-Notes
------
-This last version takes tuple and each cell in tuple is converted to new field.
-Time in field is 0.0, 1.0, ..., n
-
-Examples
---------
->>> element["load"] = (1, 2)
-JuliaFEM.Quad4([1,2,3,4],JuliaFEM.Basis(basis,dbasisdxi),Dict("load"=>JuliaFEM.FieldSet("load",JuliaFEM.Field[JuliaFEM.Field{Int64}(0.0,0,1),JuliaFEM.Field{Int64}(1.0,0,2)])))
-"""
-function Base.setindex!(element::Element, field_data::Tuple, fieldset_name)
-    fields = Field[Field(Float64(i-1), field) for (i,field) in enumerate(field_data)]
-    element.fields[fieldset_name] = FieldSet(fieldset_name, fields)
+function Base.setindex!(element::Element, field_data, field_name)
+    element.fields[field_name] = field_data
 end
 
 function get_connectivity(el::Element)
@@ -156,10 +113,13 @@ end
 function call(u::FunctionSpace, field_name, xi::Vector, t::Number=Inf, variation=nothing)
     f = !isa(variation, Void) ? variation : u.element[field_name](t)
     if length(f) == 1
-        return f.values
+        return f.data[1]
     end
     h = u.element.basis.basis(xi)
-    return dot(vec(h), f)
+    #@debug("vec(h) = $(vec(h)), size(h) = $(size(vec(h)))")
+    #@debug("f = $f, size(f) = $(size(f))")
+    #return dot(vec(h), f)
+    return sum(vec(h).*f)
 end
 
 """ If basis is called without a field, return basis functions evaluated at that point. """

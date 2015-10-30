@@ -49,8 +49,8 @@ function calculate_global_assembly!(assembly::GlobalAssembly, problem::Problem, 
     unknown_field_name = get_unknown_field_name(problem)
     initialize_global_assembly!(assembly, problem) # zero all
     dim, ndofs = size(problem)
-    Logging.info("assembling problem for $unknown_field_name")
-    Logging.info("dimension of unknown field: $dim, problem dofs: $ndofs")
+    info("assembling problem for $unknown_field_name")
+    info("dimension of unknown field: $dim, problem dofs: $ndofs")
     local_assembly = initialize_local_assembly()
     for (i, equation) in enumerate(get_equations(problem))
         calculate_local_assembly!(local_assembly, equation, unknown_field_name, time)

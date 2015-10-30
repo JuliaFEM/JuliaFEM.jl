@@ -46,8 +46,8 @@ function calculate_local_assembly!(assembly::LocalAssembly, equation::HeatEquati
         w = ip.weight * detJ(ip)
         N = basis(ip, time)
         if haskey(element, "density")
-            ρ = basis("density", ip, time)
-            assembly.mass_matrix += w * ρ*N'*N
+            rho = basis("density", ip, time)
+            assembly.mass_matrix += w * rho*N'*N
         end
         if haskey(element, "temperature thermal conductivity")
             dN = dbasis(ip, time)
@@ -92,7 +92,7 @@ end
 function DC2D4(element::Quad4)
     integration_points = get_default_integration_points(element)
     if !haskey(element, "temperature")
-        element["temperature"] = FieldSet()
+        element["temperature"] = zeros(4)
     end
     DC2D4(element, integration_points)
 end
@@ -106,7 +106,7 @@ end
 function DC2D2(element::Seg2)
     integration_points = get_default_integration_points(element)
     if !haskey(element, "temperature")
-        element["temperature"] = FieldSet()
+        element["temperature"] = zeros(2)
     end
     DC2D2(element, integration_points)
 end

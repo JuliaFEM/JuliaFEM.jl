@@ -182,7 +182,10 @@ function calculate_local_assembly!(assembly::LocalAssembly, equation::Equation,
         field = element[unknown_field_name](time)
         function residual_vector(data::Vector)
             fill!(assembly.residual_vector, 0.0)
-            df = similar(field, data)
+            #@debug("field: $field, length = $(size(field))")
+            #@debug("data: $data, size = $(size(data))")
+            #df = similar(field, data)
+            df = Increment(reshape(data, size(equation)...))
             # integrate W
             for ip in get_integration_points(equation)
                 dr = get_residual_vector(equation, ip, time; variation=df)

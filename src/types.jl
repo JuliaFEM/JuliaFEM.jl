@@ -3,150 +3,272 @@
 
 # https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/notebooks/2015-06-14-data-structures.ipynb
 
-using ForwardDiff
+#abstract AbstractField{T,N} <: AbstractArray{T,N}
 
-""" Field is a fundamental data type which holds some values in some time t """
-type Field{T}
-    time :: Number
-    increment :: Int64
-    values :: T
+abstract AbstractField
+
+abstract DiscreteField <: AbstractField
+
+abstract ContinuousField <: AbstractField
+abstract TimeContinuousField <: ContinuousField
+abstract SpatialContinuousField <: ContinuousField
+abstract TimeAndSpatialContinuousField <: ContinuousField
+# should we introduce time and spatial discontinuous fields
+# for discontinuous galerkin?
+
+### DEFAULT DISCRETE FIELD ###
+
+# 1. Increment
+
+# FIXME: This should be Vector.
+#typealias Increment Vector
+type Increment{T} <: AbstractVector{T}
+    data :: Vector{T}
 end
-""" Initialize field. """
-function Field(time, values)
-    Field(time, 0, values)
+Base.size(increment::Increment) = Base.size(increment.data)
+Base.linearindexing(::Type{Increment}) = Base.LinearFast()
+Base.getindex(increment::Increment, i::Int) = increment.data[i]
+Base.setindex!(increment::Increment, v, i::Int) = (increment.data[i] = v)
+Base.similar{T}(increment::Increment, ::Type{T}) = Increment(similar(increment.data))
+Base.dot(v::Number, i::Increment) = v*i
+
+function Base.convert(::Type{Increment}, data::Number)
+    Increment([data])
 end
-function Field(values)
-    Field(0.0, 0, values)
+function Base.convert{T}(::Type{Increment}, data::Array{T, 2})
+    Increment([data[:,i] for i=1:size(data, 2)])
 end
-""" Get length of a field (number of basis functions in practice). """
-function Base.length(f::Field)
-    length(f.values)
+function Base.convert{T}(::Type{Increment}, data::Array{T, 3})
+    Increment([data[:,:,i] for i=1:size(data, 3)])
 end
-""" Push value to field. """
-function Base.push!(f::Field, value)
-    push!(f.values, value)
+function Base.convert{T}(::Type{Increment}, data::Array{T, 4})
+    Increment([data[:,:,:,i] for i=1:size(data, 4)])
 end
-""" Get field discrete value at point i. """
-function Base.getindex(f::Field, i::Int64)
-    f.values[i]
+function Base.convert{T}(::Type{Increment}, data::Array{T, 5})
+    Increment([data[:,:,:,:,i] for i=1:size(data, 5)])
 end
-""" Multiply field with some constant k. """
-function Base.(:*)(k::Number, f::Field)
-    Field(f.time, k*f.values)
+function Base.zeros(::Type{Increment}, dims...)
+    Increment(zeros(dims...))
+end
+function Base.vec(increment::Increment)
+    [increment.data...;]
+end
+function Base.similar{T}(increment::Increment{Vector{T}}, data::Vector{T})
+    Increment(reshape(data, round(Int, length(data)/length(increment)), length(increment)))
 end
 
-""" Inner product of field and vector x. """
-function Base.dot(x::Vector, f::Field)
-    @assert length(x) == length(f)
-    sum([f[i]*x[i] for i in 1:length(f)])
+# 2. TimeStep
+
+type TimeStep{T} <: AbstractVector{T}
+    time :: Float64
+    increments :: Vector{T}
+end
+Base.size(timestep::TimeStep) = Base.size(timestep.increments)
+Base.linearindexing(::Type{TimeStep}) = Base.LinearFast()
+Base.getindex(timestep::TimeStep, i::Int) = timestep.increments[i]
+
+function Base.convert(::Type{TimeStep}, time::Number, increment::Increment)
+    TimeStep(time, Increment[increment])
 end
 
-function Base.size(field::Field)
-    (length(field.values[1]), length(field.values))
+function Base.push!(timestep::TimeStep, increment::Increment)
+    push!(timestep.increments, increment)
 end
 
-#""" Multiply field with some matrix x. """
-# function Base.(:*){T}(x::Matrix, f::Field{Vector{T}})
-#function Base.(:*)(x::Matrix, f::Field)
-#    sum([f[i]*x[:,i]' for i in 1:length(f)])
+# 3. DefaultDiscreteField
+
+type DefaultDiscreteField <: DiscreteField
+    timesteps :: Vector{TimeStep}
+end
+Base.size(field::DefaultDiscreteField) = Base.size(field.timesteps)
+Base.linearindexing(::Type{DefaultDiscreteField}) = Base.LinearFast()
+Base.getindex(field::DefaultDiscreteField, i::Int) = field.timesteps[i]
+Base.length(field::DefaultDiscreteField) = length(field.timesteps)
+Base.endof(field::DefaultDiscreteField) = endof(field.timesteps)
+Base.first(field::DefaultDiscreteField) = field[1][end]
+Base.last(field::DefaultDiscreteField) = field[end][end]
+function Base.push!(field::DefaultDiscreteField, timestep::TimeStep)
+    push!(field.timesteps, timestep)
+end
+
+
+typealias Field DefaultDiscreteField
+
+### CONTINUOUS FIELDS ###
+
+
+# fix print_matrix
+#function Base.print_matrix(::Base.AbstractIOBuffer, field::ContinuousField, args...)
+    # TODO: anything nice to print?
 #end
 
-""" Sum two fields. """
-function Base.(:+)(f1::Field, f2::Field)
-    @assert(f1.time == f2.time, "Cannot add fields: time mismatch, $(f1.time) != $(f2.time)")
-    Field(f1.time, f1.values + f2.values)
-end
+### FIELDSET ###
 
-""" Return data from field as a long array.
+typealias FieldSet Dict{ASCIIString, AbstractField}
+
+"""Quicky add discrete field to fieldset.
 
 Examples
 --------
->>> f = Field(0.0, Vector[[1.0, 2.0], [3.0, 4.0]])
->>> f[:]
-[1.0, 2.0, 3.0, 4.0]
-
+>>> fs = FieldSet()
+>>> fs["myfield"] = [1, 2, 3, 4]
 """
-function Base.getindex(field::Field, c::Colon)
-    [field.values...;]
-end
-function Base.vec(field::Field)
-    [field.values...;]
+function Base.convert(::Type{AbstractField}, data::Union{Array, Number})
+    increment = Increment(data)
+    timestep = TimeStep(0.0, Increment[increment])
+    field = DefaultDiscreteField(TimeStep[timestep])
+    return field
 end
 
-""" Return field similar to input but with new data in it.
+""" Quicky add several time steps at once in tuple.
 
 Examples
 --------
->>> f = Field(0.5, Vector[[1.0, 2.0], [3.0, 4.0]])
->>> similar(f, ones(4))
-JuliaFEM.Field{Array{Array{T,1},1}}(0.5,1,Array{T,1}[[1.0,1.0],[1.0,1.0]])
+>>> fs = FieldSet()
+>>> fs["myfield"] = (0.0, [1, 2, 3, 4]), (0.5, [2, 3, 4, 5])
+
+or
+
+>>> fs["myfield"] = [1, 2, 3, 4], [2, 3, 4, 5]
 
 """
-function Base.similar(field::Field, data::Vector)
-    fdim = round(Int, length(data)/length(field))  # dimension of field variable
-    if fdim == 1
-        new_field = Field(field.time, data)
-        return new_field
+function Base.convert(::Type{AbstractField}, data::Tuple)
+    timesteps = TimeStep[]
+    for (i, timestep) in enumerate(data)
+        if isa(timestep, Tuple)
+            push!(timesteps, TimeStep(Float64(timestep[1]), Increment(timestep[2])))
+        else
+            push!(timesteps, TimeStep(Float64(i-1), Increment(timestep)))
+        end
     end
-    new_field = Field(field.time, similar(field.values))
-    data = reshape(data, fdim, length(field))
-    for i=1:length(new_field)
-        new_field.values[i] = data[:,i]
-    end
-    return new_field
+    return DefaultDiscreteField(timesteps)
 end
 
+### BASIS ###
 
+abstract AbstractBasis
 
-
-
-""" FieldSet is set of fields, each field can have different time and/or increment. """
-type FieldSet
-    name :: ASCIIString
-    fields :: Array{Field, 1}
-end
-""" Initializer for FieldSet. """
-function FieldSet(field_name::ASCIIString)
-    FieldSet(field_name, [])
-end
-function FieldSet()
-    FieldSet("unknown field", [])
-end
-function FieldSet(fields::Array{Field, 1})
-    FieldSet("unknown field", fields)
-end
-""" Add new field to fieldset. """
-function Base.push!(fs::FieldSet, field::Field)
-    push!(fs.fields, field)
-end
-""" Multiply fieldset with some vector x. """
-Base.(:*)(x::Array{Float64, 1}, fs::FieldSet) = sum(x .* fs.fields)
-""" Get length of a fieldset. """
-function Base.length(fieldset::FieldSet)
-    length(fieldset.fields)
-end
-""" Return ith field from fieldset. """
-function Base.getindex(fieldset::FieldSet, i::Int64)
-    fieldset.fields[i]
-end
-#""" Return last field from fieldset. """
-function Base.endof(fieldset::FieldSet)
-    length(fieldset)
-end
-function Base.convert(fieldset::Type{FieldSet}, field::Field)
-    FieldSet(Field[field])
-end
-
-
-""" Basis function. """
-type Basis
+""" Defined to dimensionless coordinate ξ∈[-1,1]^n. """
+type SpatialBasis <: AbstractBasis
     basis :: Function
     dbasisdxi :: Function
 end
-#""" Constructor of basis function. """
-#function Basis(basis)
-#    Basis(basis, ForwardDiff.jacobian(basis))
-#end
+
+typealias Basis SpatialBasis
+
+""" Defined to to interval t∈[0, 1]. """
+type TemporalBasis <: AbstractBasis
+    basis :: Function
+    dbasisdt :: Function
+end
+function TemporalBasis()
+    basis(t) = [1-t, t]
+    dbasis(t) = [-1, 1]
+    return TemporalBasis(basis, dbasis)
+end
+
+function call(b::TemporalBasis, value::Number)
+    b.basis(value)
+end
+
+function call(b::SpatialBasis, value::Vector)
+    b.basis(value)
+end
+
+### INTERPOLATION IN TIME DOMAIN ###
+
+function Base.call(field::Field, basis::TemporalBasis, time)
+    # FieldSet -> Field -> TimeStep -> Increment -> data
+    # special cases, -Inf, +Inf and ~0.0
+    if time > field[end].time
+        return field[end][end]
+    end
+    if (time < field[1].time) || abs(time-field[1].time) < 1.0e-12
+        return field[1][end]
+    end
+    i = length(field)
+    while field[i].time >= time
+        i -= 1
+    end
+    field[i].time == time && return field[i][end]
+    t1 = field[i].time
+    t2 = field[i+1].time
+    inc1 = field[i][end]
+    inc2 = field[i+1][end]
+    # TODO: may there be some reasons for "unphysical" jumps in
+    # fields w.r.t time which should be taken account in some way?
+    # i.e. dt between two fields → 0
+    dt = t2 - t1
+    b = basis.basis((time-t1)/dt)
+    r = Increment[inc1, inc2]
+    return dot(b, r)
+end
+function Base.call(field::DiscreteField, time)
+    return Base.call(field, TemporalBasis(), time)
+end
+
+function Base.call(field::Field, basis::TemporalBasis, time,
+                   derivative::Type{Val{:derivative}})
+    # FieldSet -> Field -> TimeStep -> Increment -> data
+
+    if length(field) == 1
+        # just one timestep, time derivative cannot be evaluated.
+        error("Field length = $(length(field)), cannot evaluate time derivative")
+    end
+
+    function eval_field(i, j)
+        timesteps = TimeStep[field[i], field[j]]
+        increments = Increment[timesteps[1][end], timesteps[2][end]]
+        J = norm(timesteps[2].time - timesteps[1].time)
+        dbasisdt = basis.dbasisdt( (time-timesteps[1].time)/J )
+        return dot(dbasisdt, increments)/J
+    end
+
+    # special cases, +Inf, -Inf, ~0.0
+    if (time > field[end].time) || isapprox(time, field[end].time)
+        return eval_field(endof(field)-1, endof(field))
+    end
+    if (time < field[1].time) || isapprox(time, field[1].time)
+        return eval_field(1, 2)
+    end
+
+    # search for a correct "bin" between time steps
+    i = length(field)
+    #while field[i].time >= time + 1.0e-12
+    while (field[i].time > time) && !isapprox(field[i].time, time)
+        i -= 1
+    end
+
+    if isapprox(field[i].time, time)
+        # This is the hard case, maybe discontinuous time
+        # derivative if linear approximation.
+        # we are on the "mid node" in time axis
+        field1 = eval_field(i-1,i)
+        field2 = eval_field(i,i+1)
+        return 1/2*(field1 + field2)
+    end
+
+    return eval_field(i, i+1)
+
+end
+
+### INTERPOLATION IN SPATIAL DOMAIN ###
+
+function Base.call(increment::Increment, basis::SpatialBasis, xi::Vector)
+    basis = basis.basis(xi)
+    sum([basis[i]*increment[i] for i=1:length(increment)])
+end
+
+function Base.call(increment::Increment, basis::SpatialBasis, xi::Vector,
+                   geometry::Increment, gradient::Type{Val{:gradient}})
+    dbasis = basis.dbasisdxi(xi)
+    J = sum([dbasis[:,i]*geometry[i]' for i=1:length(geometry)])
+    grad = inv(J)*dbasis
+    gradf = sum([grad[:,i]*increment[i]' for i=1:length(increment)])'
+    return gradf
+end
+
+### INTEGRATIONPOINT ###
 
 """
 Integration point
@@ -160,7 +282,7 @@ attributes :: Dict{Any, Any}
     material models.
 """
 type IntegrationPoint
-    xi :: Array{Float64, 1}
+    xi :: Vector
     weight :: Float64
     fields :: Dict{ASCIIString, FieldSet}
 end
@@ -168,20 +290,6 @@ function IntegrationPoint(xi, weight)
     IntegrationPoint(xi, weight, Dict())
 end
 
+call(b::SpatialBasis, ip::IntegrationPoint) = b.basis(ip.xi)
 
-
-
-# convenient functions -- maybe this is not correct place for them
-""" Evaluate basis function in point ξ. """
-call(b::Basis, xi::Vector) = b.basis(xi)
-call(b::Basis, ip::IntegrationPoint) = b.basis(ip.xi)
-Base.(:*)(basis::Basis, fs::FieldSet) = (xi, t) -> basis(xi)*fs(t)
-
-#""" Interpolate field (h*f)(ξ) """
-#Base.(:*)(f::Function, fld::Field) = (x) -> f(x)*fld
-#""" Interpolate from set of fields with basis b, i.e. f(t) = b(t)*[f1, f2] """
-#Base.(:*)(f::Function, fld::Field) = (x) -> f(x)*fld
-#""" Interpolate field f using basis b. """
-#Base.(:*)(b::Basis, f::Field) = (x) -> b(x)*f
-#Base.(:*)(b::Basis, f::Array{Field}) = (t) -> b(t)*f
 
