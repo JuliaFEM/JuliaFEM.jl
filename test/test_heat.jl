@@ -10,16 +10,16 @@ facts("tests on [0x1]x[0x1] domain") do
 
     # volume element
     element = Quad4([1, 2, 3, 4])
-    element["geometry"] = FieldSet(Field(Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]))
-    element["temperature thermal conductivity"] = FieldSet(Field(0.0, 6.0))
-    element["temperature load"] = FieldSet(Field(0.0, [12.0, 12.0, 12.0, 12.0]))
-    element["density"] = FieldSet(Field(0.0, 36.0))
+    element["geometry"] = Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+    element["temperature thermal conductivity"] = 6.0
+    element["temperature load"] = [12.0, 12.0, 12.0, 12.0]
+    element["density"] = 36.0
 
     # boundary element 
     boundary_element = Seg2([1, 2])
-    boundary_element["geometry"] = FieldSet(Field(Vector[[0.0, 0.0], [1.0, 0.0]]))
+    boundary_element["geometry"] = Vector[[0.0, 0.0], [1.0, 0.0]]
     # linear ramp from 1 to 6 in time 0 to 1
-    boundary_element["temperature flux"] = FieldSet(Field[Field(0.0, 0.0), Field(1.0, 6.0)])
+    boundary_element["temperature flux"] = (0.0, 0.0), (1.0, 6.0)
 
     # Set constant source f=12 with k=6. Accurate solution is
     # T=1 on free boundary, u(x,y) = -1/6*(1/2*f*x^2 - f*x)
