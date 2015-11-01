@@ -5,11 +5,13 @@
 
 
 using JuliaFEM
-using FactCheck
-using Logging
-@Logging.configure(level=DEBUG)
+using JuliaFEM.Test
 
+#using FactCheck
+#using Logging
+#@Logging.configure(level=DEBUG)
 
+#=
 facts("Testing if somebody used print, println(), @sprint in src directory") do
   # TODO: make better reqular expression. Currently it will match all print words
   lines_with_print = Dict()
@@ -77,6 +79,7 @@ facts("Looking the [src,test] folders *.jl files header information") do
   @fact files_no_license => isempty out_str
 end
 
+#=
 test_files = readdir(Pkg.dir("JuliaFEM")*"/test")
 for test_file in test_files
   Logging.info("checking is $test_file is real test file")
@@ -85,6 +88,7 @@ for test_file in test_files
     include(test_file)
   end
 end
+=#
 
 # Keep this at the end of this file (include statements above this)
 @Logging.configure(level=DEBUG)
@@ -92,3 +96,33 @@ end
 for dic in FactCheck.getstats()
   @debug(dic[1], ": ",dic[2])
 end
+=#
+
+
+### NEW STYLE OF TESTING
+
+using JuliaFEM.Test
+
+function run_tests()
+
+    for test_file in readdir(Pkg.dir("JuliaFEM")*"/test")
+        info("checking is $test_file is real test file")
+        if (startswith(test_file, "test_")) & (endswith(test_file, ".jl"))
+            run_test(test_file)
+        end
+    end
+
+    passed, failed, errors, critical = print_test_statistics()
+
+    # at the very end throw error if something is failed
+    if failed + errors critical != 0
+        error("Some tests has failed. Fix them. Now.")
+        exit(1)
+    else
+        info("""All tests has passed \o/ .""")
+        exit(0)
+    end
+
+end
+
+run_tests()

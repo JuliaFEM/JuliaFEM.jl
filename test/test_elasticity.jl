@@ -1,13 +1,13 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+module ElasticityTests
 
-using Base.Test
-
+using JuliaFEM.Test
 using JuliaFEM: Quad4, Field, FieldSet, CPS4, get_basis, solve!, PlaneStressElasticityProblem
 
 
-function run()
+function test_elasticity_one_element()
     element = Quad4([1, 2, 3, 4])
     element["geometry"] = Vector[[0.0, 0.0], [10.0, 0.0], [10.0, 1.0], [0.0, 1.0]]
     element["youngs modulus"] = 500.0
@@ -24,4 +24,5 @@ function run()
     @test disp ≈ -8.77303119819776
 end
 
-run()
+
+end

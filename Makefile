@@ -59,6 +59,14 @@ doctests:
 test:
 	julia -e 'Pkg.test("JuliaFEM")'
 
+# usage: make test_file FILE=test/test_heat.jl
+# or even: watch make test_file FILE=test/test_heat.jl
+test_file:
+	julia -e 'using JuliaFEM.Test; run_test("$(FILE)"); print_test_statistics()'
+
+test_function:
+	julia -e 'using JuliaFEM.Test; run_test("$(FILE)", :$(FUNCTION)); print_test_statistics()'
+
 #coverage_report:
 #	julia -e 'Pkg.test("JuliaFEM"; coverage=true); cd(Pkg.dir("JuliaFEM")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
 

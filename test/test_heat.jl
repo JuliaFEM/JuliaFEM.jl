@@ -3,10 +3,17 @@
 
 # unit tests for heat equations
 
-using FactCheck
-using JuliaFEM: Seg2, Quad4, Field, FieldSet, DC2D4, initialize_local_assembly, calculate_local_assembly!, DC2D2
+module HeatTests  # always wrap tests to module ending with "Tests"
 
-facts("tests on [0x1]x[0x1] domain") do
+using JuliaFEM.Test  # always use JuliaFEM.Test, not Base.Test
+
+using JuliaFEM: Seg2, Quad4, Field, FieldSet, DC2D4,
+                initialize_local_assembly, calculate_local_assembly!,
+                DC2D2
+
+
+"tests on [0x1]x[0x1] domain"
+function test_one_element()  # always start test function with name test_
 
     # volume element
     element = Quad4([1, 2, 3, 4])
@@ -29,7 +36,7 @@ facts("tests on [0x1]x[0x1] domain") do
     fdofs = [1, 2]
     A = la.stiffness_matrix
     b = la.force_vector
-    @fact A[fdofs, fdofs] \ b[fdofs] --> roughly([1.0, 1.0])
+    @test isapprox(A[fdofs, fdofs] \ b[fdofs], [1.0, 1.0])
 
     # Set constant flux g=6 on boundary. Accurate solution is
     # u(x,y) = x which equals T=1 on boundary.
@@ -37,7 +44,8 @@ facts("tests on [0x1]x[0x1] domain") do
 
     calculate_local_assembly!(la, boundary_equation, "temperature")
     b = la.force_vector
-    @fact A[fdofs, fdofs] \ b[fdofs] --> roughly([1.0, 1.0])
+    @test isapprox(A[fdofs, fdofs] \ b[fdofs], [1.0, 1.0])  # always use @test to test things.
 
 end
 
+end

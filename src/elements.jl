@@ -20,22 +20,22 @@ Raises
 This uses FactCheck and throws exceptions if element is not passing all tests.
 """
 function test_element(element_type)
-    Logging.info("Testing element $element_type")
+    info("Testing element $element_type")
     local element
     dim = nothing
     n = nothing
     try
         dim, n = size(element_type)
     catch
-        Logging.error("Unable to determine element dimensions. Define Base.size(element::Type{$elementtype}) = (dim, nbasis) where dim is spatial dimension of element and nbasis is number of basis functions of element.")
+        error("Unable to determine element dimensions. Define Base.size(element::Type{$elementtype}) = (dim, nbasis) where dim is spatial dimension of element and nbasis is number of basis functions of element.")
     end
-    Logging.info("element dimension: $dim x $n")
+    info("element dimension: $dim x $n")
 
-    Logging.info("Initializing element")
+    info("Initializing element")
     try
         element = element_type(collect(1:n))
     catch
-        Logging.error("""
+        error("""
         Unable to create element with default constructor define function
         $eltype(connectivity) which initializes this element.""")
         return false
@@ -51,15 +51,15 @@ function test_element(element_type)
     dbasis = grad(basis)
     mid = zeros(dim)
     val1 = basis(mid, 0.0)
-    Logging.info("basis at $mid: $val1")
+    info("basis at $mid: $val1")
     val2 = basis("field1", mid, 0.0)
-    Logging.info("field val at $mid: $val2")
+    info("field val at $mid: $val2")
     val3 = dbasis(mid, 0.0)
-    Logging.info("derivative of basis at $mid: $val3")
+    info("derivative of basis at $mid: $val3")
     val4 = dbasis("field1", mid, 0.0)
-    Logging.info("field val at $mid: $val4")
+    info("field val at $mid: $val4")
 
-    Logging.info("Element $element_type passed tests.")
+    info("Element $element_type passed tests.")
 end
 
 """ Get FieldSet from element. """
@@ -75,7 +75,8 @@ Examples
 JuliaFEM.Quad4([1,2,3,4],JuliaFEM.Basis(basis,dbasisdxi),Dict("geometry"=>JuliaFEM.FieldSet("geometry",JuliaFEM.Field[JuliaFEM.Field{Array{Int64,1}}(0.0,0,[1,2,3,4])])))
 """
 function Base.setindex!(element::Element, field_data, field_name)
-    element.fields[field_name] = field_data
+    #element.fields[field_name] = field_data
+    setindex!(element.fields, field_data, field_name)
 end
 
 function get_connectivity(el::Element)

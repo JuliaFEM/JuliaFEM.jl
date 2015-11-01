@@ -1,11 +1,14 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+module GlobalAssemblyTests
+
+using JuliaFEM.Test
 using JuliaFEM: Quad4, Seg2, FieldSet, Field, PlaneHeatProblem
 using JuliaFEM: initialize_global_assembly, calculate_global_assembly!
-using FactCheck
 
-facts("assemble a simple two element problem and solve") do 
+"""assemble a simple two element problem and solve"""
+function test_asssembly()
     el1 = Quad4([1, 2, 3, 4])
     el1["geometry"] = Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
     el1["temperature thermal conductivity"] = 6.0
@@ -28,5 +31,7 @@ facts("assemble a simple two element problem and solve") do
     A = lufact(global_assembly.stiffness_matrix[free_dofs, free_dofs])
     b = full(global_assembly.force_vector)[free_dofs]
     u = A \ b
-    @fact u --> roughly([101.0, 101.0])
+    @test isapprox(u, roughly([101.0, 101.0]))
+end
+
 end

@@ -1,18 +1,22 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using FactCheck
-using JuliaFEM: Element, Basis, Field, FieldSet, FunctionSpace
+module ElementTests
+
+using JuliaFEM.Test
+
+using JuliaFEM: Element, Basis, Field, FieldSet, FunctionSpace, test_element
 
 """ Prototype element
 
 This should always pass test_element if everything is ok.
 """
 type MockElement <: Element
-    connectivity :: Array{Int, 1}
+    connectivity :: Vector{Int}
     basis :: Basis
-    fields :: Dict{ASCIIString, FieldSet}
+    fields :: FieldSet
 end
+
 function MockElement(connectivity)
 
     h(xi) = 1/4*[(1-xi[1])*(1-xi[2])   (1+xi[1])*(1-xi[2])   (1+xi[1])*(1+xi[2])   (1-xi[1])*(1+xi[2])]
@@ -24,33 +28,26 @@ function MockElement(connectivity)
     basis = Basis(h, dh)
     MockElement(connectivity, basis, Dict())
 end
+
 Base.size(element::Type{MockElement}) = (2, 4)
 
-using JuliaFEM: test_element
-facts("test test_element against mock element") do
+"""test test_element against mock element"""
+function test_mockelement()
     test_element(MockElement)
 end
 
-
-facts("test adding fieldsets and fields to element") do
+""" test adding fieldsets and fields to element"""
+function test_add_fields_to_element()
     el = MockElement([1, 2, 3, 4])
- 
-    fieldset = JuliaFEM.FieldSet("geometry")
-    field1 = JuliaFEM.Field(0.0, [0.0, 0.0, 0.0, 0.0])
-    push!(fieldset, field1)
-    field2 = JuliaFEM.Field(1.0, [1.0, 1.0, 1.0, 1.0])
-    push!(fieldset, field2)
-
-    el["geometry"] = fieldset
-    fields = el["geometry"]
-    @fact length(fields) --> 2
-    @fact fields[1] --> field1
-    @fact fields[2] --> field2
+    el["geometry"] = [0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]
+    field = el["geometry"]
+    @test length(field) == 2  # two time steps
 end
 
+#=
 facts("interpolation of fields in some function space") do
 
-    element = MockElement([1, 2, 3, 4])
+    el = MockElement([1, 2, 3, 4])
     fieldset1 = FieldSet("geometry", [Field(0.0, Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])])
     fieldset2 = FieldSet("constant scalar field", [Field(0.0, 1.0)])
     fieldset3 = FieldSet("scalar field", [Field(0.0, [1.0, 2.0, 3.0, 4.0])])
@@ -79,4 +76,6 @@ facts("interpolation of fields in some function space") do
     @fact v("vector field 3", xi, t) --> 1/4*[1+2+3+4, 5+6+7+8, 9+10+11+12]
     @fact v("tensor field 1", xi, t) --> 1/4*[1+2+3+4 5+6+7+8; 9+10+11+12 13+14+15+16]
 end
+=#
 
+end
