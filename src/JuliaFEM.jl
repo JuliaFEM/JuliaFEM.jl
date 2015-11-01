@@ -11,6 +11,9 @@ module JuliaFEM
 #using Lexicon
 
 macro debug(msg)
+    if !haskey(ENV, "JuliaFEM_LOG_LEVEL")
+        return :()
+    end
     return :( println("DEBUG: ", $msg) )
 end
 
@@ -32,8 +35,10 @@ function Base.linspace{T<:Array}(X1::T, X2::T, n)
     [1/2*(1-ti)*X1 + 1/2*(1+ti)*X2 for ti in linspace(-1, 1, n)]
 end
 
+
+include("fields.jl")  # fields, see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/notebooks/2015-06-14-data-structures.ipynb
+include("basis.jl")  # interpolation of discrete fields
 include("types.jl")  # type definitions
-#include("interpolate.jl")  # interpolation routines
 
 ### ELEMENTS ###
 include("elements.jl")
@@ -57,6 +62,8 @@ include("solvers.jl")
 # PRE AND POSTPROCESS
 include("xdmf.jl")
 include("abaqus_reader.jl")
+
+include("test.jl")
 
 end # module
 
