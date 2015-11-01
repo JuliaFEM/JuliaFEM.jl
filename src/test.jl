@@ -50,7 +50,7 @@ function run_test(filename::ASCIIString, test_function=nothing)
     catch error
         warn("Unable to include file $filename for testing.")
         err = Base.showerror(Base.STDOUT, error)
-        push!(test_results, TestResult(filename, "Unable to include file: $err"))
+        push!(test_results, TestResult(filename, "Unable to include file: $error"))
         return
     end
     if isa(test_function, Void)

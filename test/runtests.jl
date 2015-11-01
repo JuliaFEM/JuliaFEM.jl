@@ -115,7 +115,7 @@ function run_tests()
     passed, failed, errors, critical = print_test_statistics()
 
     # at the very end throw error if something is failed
-    if failed + errors critical != 0
+    if failed + errors + critical > 0
         error("Some tests has failed. Fix them. Now.")
         exit(1)
     else
