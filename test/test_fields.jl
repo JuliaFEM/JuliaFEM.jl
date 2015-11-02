@@ -6,8 +6,7 @@ module FieldTests
 
 using JuliaFEM
 using JuliaFEM: Increment, TimeStep, Field, DefaultDiscreteField, FieldSet
-using JuliaFEM: TemporalBasis, SpatialBasis, ContinuousField, DiscreteField
-using JuliaFEM: DefaultContinuousField
+using JuliaFEM: ContinuousField, DiscreteField, DefaultContinuousField
 
 using JuliaFEM.Test
 
@@ -189,7 +188,9 @@ function test_default_discrete_field_quick_way_two_timesteps_with_vector_value()
 end
 
 function test_default_discrete_field_quick_way_set_time_vector_also()
-    f1 = DefaultDiscreteField( (0.5, [1, 2, 3]), (1.0, [3, 4, 5]) )
+    f1 = DefaultDiscreteField(
+        (0.5, [1, 2, 3]),
+        (1.0, [3, 4, 5]))
     @test isa(f1[1], TimeStep)
     @test isa(f1[2], TimeStep)
     @test isa(f1[1][1], Increment)
@@ -198,6 +199,20 @@ function test_default_discrete_field_quick_way_set_time_vector_also()
     @test f1[2][1] == [3, 4, 5]
     @test f1[1].time == 0.5
     @test f1[2].time == 1.0
+end
+
+function test_default_discrete_field_for_loop()
+    field = DefaultDiscreteField(
+        (0.5, [1, 2, 3]),
+        (1.0, [3, 4, 5]),
+        (1.5, [4, 5, 6]))
+    timesteps = [ts for ts in field]
+    @test timesteps[1].time == 0.5
+    @test timesteps[2].time == 1.0
+    @test timesteps[3].time == 1.5
+    @test timesteps[1][end] == [1, 2, 3]
+    @test timesteps[2][end] == [3, 4, 5]
+    @test timesteps[3][end] == [4, 5, 6]
 end
 
 function test_default_continuous_field()
@@ -244,13 +259,10 @@ function test_adding_timesteps()
     fs = FieldSet()
     fs["temperature"] = [1, 2, 3, 4]
     T0 = last(fs["temperature"])  # last increment of last field
-    @debug("last temperature T0 = $T0")
     T1 = Increment(T0 + 1)
-    @debug("typeof T1 = $(typeof(T1))")
     timestep = TimeStep(1.0, Increment[T1])  # new list of increments for timestep
     push!(fs["temperature"], timestep)
     T2 = last(fs["temperature"])
-    @debug("last temperature T2 = $T2")
     @test length(fs["temperature"]) == 2
     @test last(fs["temperature"]) == [2, 3, 4, 5]
     @test fs["temperature"][end].time == 1.0
