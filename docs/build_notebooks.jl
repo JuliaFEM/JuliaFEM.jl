@@ -57,13 +57,30 @@ function run_notebooks()
             try
                 run(`timeout 180 runipy -o tutorials/$ipynb --kernel=julia-0.4`)
                 status = 0
-            catch
-                println("did not work")
+            catch error
+                warning("running notebook failed")
+                Base.showerror(Base.STDOUT, error)
             end
             runtime = toc()
             bn = "tutorials/$(ipynb[1:end-6])"
-            run(`ipython nbconvert tutorials/$ipynb --to rst --output=$bn`)
-            run(`ipython nbconvert tutorials/$ipynb --to pdf --output=$bn`)
+            try
+                run(`ipython nbconvert tutorials/$ipynb --to rst --output=$bn`)
+            catch error
+                warn("unable to convert notebook to rst format")
+                Base.showerror(Base.STDOUT, error)
+            end
+            try
+                run(`ipython nbconvert tutorials/$ipynb --to pdf --output=$bn`)
+            catch error
+                warn("unable to convert notebook to tex format")
+                Base.showerror(Base.STDOUT, error)
+            end
+            try
+                run(`lualatex $bn.tex`)
+            catch error
+                warn("unable to convert notebook from tex to pdf")
+                Base.showerror(Base.STDOUT, error)
+            end
             data = Dict("author" => "unknown", "status" => status, "runtime" => runtime,
                         "filename" => ipynb, "last_run" => time(), "description"=>"")
             res = parse_rst("$bn.rst")

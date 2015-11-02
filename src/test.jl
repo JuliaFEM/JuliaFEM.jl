@@ -71,36 +71,53 @@ end
 """ Run single test set. """
 function run_test(test_function::Function)
 
+    allok = true
+
     function test_handler(r::Base.Test.Success)
+        print(".")
         result = TestResult(test_function, r)
         push!(test_results, result)
     end 
 
     function test_handler(r::Base.Test.Failure)
+        allok = false
+        print(" [\x1b[31mFAIL\x1b[0m]")
         push!(test_results, TestResult(test_function, r))
-        warn("test failed: $(r.expr)")
-        warn("partially evaluated expression: $(r.resultexpr)")
+        println()
+        println("Test failed: $(r.expr)")
+        #warn("partially evaluated expression: $(r.resultexpr)")
     end 
 
     function test_handler(r::Base.Test.Error)
+        allok = false
+        println(" [\x1b[31mERROR\x1b[0m]")
         push!(test_results, TestResult(test_function, r))
-        warn("Error when testing: $(r.expr)")
+        println("Error when testing: $(r.expr)")
     end 
 
     Base.Test.with_handler(test_handler) do
-        info("$test_function():")
+        print("TEST: $test_function() ")
         # TODO: print docstring of test function if defined.
         #@doc($test_function)
         try
             test_function()
         catch error
-            warn("testing $test_function() stopped for critical error $error")
+            allok = false
+            println("[\x1b[31mCRITICAL\x1b[0m]")
+            println("Testing $test_function() stopped for critical error:\n$error")
             Base.showerror(Base.STDOUT, error)
-            print("\n")
-            warn("cannot continue to test function $test_function")
+            println()
+            println("Cannot continue to test function $test_function()")
             push!(test_results, TestResult("$test_function", error))
         end
-        info("$test_function(): done.")
+
+        if allok
+            println(" [\x1b[32mPASS\x1b[0m]")
+        else
+            filename, linenum = Base.functionloc(test_function)
+            println("Test $test_function() failed: file $filename, line $linenum.")
+            println()
+        end
     end
 
 end

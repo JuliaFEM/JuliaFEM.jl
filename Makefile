@@ -64,8 +64,13 @@ test:
 test_file:
 	julia -e 'using JuliaFEM.Test; run_test("$(FILE)"); print_test_statistics()'
 
+# usage: make test_function FILE=test/test_fields.jl FUNCTION=test_increment
+# or even: watch ...
 test_function:
 	julia -e 'using JuliaFEM.Test; run_test("$(FILE)", :$(FUNCTION)); print_test_statistics()'
+
+pillu:
+	julia -e 'println("\x1b[31m\"red\"\x1b[0m")'
 
 #coverage_report:
 #	julia -e 'Pkg.test("JuliaFEM"; coverage=true); cd(Pkg.dir("JuliaFEM")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'

@@ -10,12 +10,27 @@ module JuliaFEM
 #@Logging.configure(level=DEBUG)
 #using Lexicon
 
+"""
+A very simple debugging macro. It prints debug message if environment variable
+JULIAFEM_DEBUG is found.
+
+Usage: instead of starting session `julia file.jl` do `JULIAFEM_DEBUG=1 julia file.jl`.
+Or set `export JULIAFEM_DEBUG=1` for your `.bashrc`.
+"""
 macro debug(msg)
-    if !haskey(ENV, "JuliaFEM_LOG_LEVEL")
-        return :()
+    if !haskey(ENV, "JULIAFEM_DEBUG")
+        return
     end
     return :( println("DEBUG: ", $msg) )
 end
+function set_debug_on!()
+    ENV["JULIAFEM_DEBUG"] = 1;
+end
+function set_debug_off!()
+    pop!(ENV, "JULIAFEM_DEBUG");
+end
+
+export @debug, set_debug_on!, set_debug_off!
 
 using ForwardDiff
 autodiffcache = ForwardDiffCache()
