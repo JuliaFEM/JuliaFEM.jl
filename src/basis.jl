@@ -205,7 +205,7 @@ function Base.call(field::DiscreteField, time::Number,
         t2 = field[j]
         J = abs(t2.time - t1.time)
         t = (time-t1.time)/J
-        result = 1/J*((1-t)*t1[end] + t*t2[end])
+        result = 1/J*(-1*t1[end] + 1*t2[end])
         return Increment(result)
     end
 
