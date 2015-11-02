@@ -7,6 +7,7 @@ using JuliaFEM.Test
 
 using JuliaFEM
 using JuliaFEM: Basis, ElementGradientBasis, ElementFieldGradientBasis, Field
+using JuliaFEM: Increment, TimeStep
 
 function get_basis()
 
@@ -53,6 +54,9 @@ function test_linear_time_extrapolation_of_field()
     T(X,t) = t*(1 + X[1] + 3*X[2] - 2*X[1]*X[2])
     @test b([0.0, 0.0], -1.0) == T([0.5, 0.5], -1.0)
     @test b([0.0, 0.0],  3.0) == T([0.5, 0.5],  3.0)
+    # when going to \pm infinity, return the last one.
+    @test b([0.0, 0.0], -Inf) == T([0.5, 0.5],  0.0)
+    @test b([0.0, 0.0], +Inf) == T([0.5, 0.5],  1.0)
 end
 
 function test_constant_time_extrapolation_of_field()
@@ -144,14 +148,14 @@ function test_time_derivative_gradient_interpolation_of_field()
         (0.0, Vector[[0.0, 0.0], [0.0, 0.0], [0.00, 0.0], [0.0, 0.0]]),
         (1.0, Vector[[0.0, 0.0], [0.0, 0.5], [0.25, 1.0], [0.0, 0.0]]))
 
-    basis, dbasis = get_basis()
-    N = Basis(basis, dbasis)
     # wanted
-    #u = Basis(basis, dbasis, displacement)
+    #u = get_basis(element, "displacement")
     #L = grad(diff(u))
     #D = 1/2*(L + L')
-    #@text isapprox(D([0.0, 0.0], 1.0), ...)
+    #@test isapprox(D([0.0, 0.0], 1.0), ...)
 
+    basis, dbasis = get_basis()
+    N = Basis(basis, dbasis)
     xi = [0.0, 0.0]
     time = 1.0
     grad = ElementGradientBasis(N, geometry)(xi, time)
@@ -199,47 +203,74 @@ end
 =#
 
 function test_interpolation_in_temporal_basis()
-    i1 = Increment([0.0])
-    i2 = Increment([1.0])
-    i3 = Increment([2.0])
+    i1 = Increment(0.0)
+    i2 = Increment(1.0)
+    i3 = Increment(2.0)
     t1 = TimeStep(0.0, Increment[i1])
     t2 = TimeStep(2.0, Increment[i2])
     t3 = TimeStep(4.0, Increment[i3])
     field = Field(TimeStep[t1, t2, t3])
-    @test call(field, temporalbasis, -Inf) == [0.0]
-    @test call(field, temporalbasis,  0.0) == [0.0]
-    @test call(field, temporalbasis,  1.0) == [0.5]
-    @test call(field, temporalbasis,  2.0) == [1.0]
-    @test call(field, temporalbasis,  3.0) == [1.5]
-    @test call(field, temporalbasis,  4.0) == [2.0]
-    @test call(field, temporalbasis, +Inf) == [2.0]
-    @test call(field, temporalbasis, +Inf, Val{:derivative}) == [0.5]
-    @test call(field, temporalbasis, -Inf, Val{:derivative}) == [0.5]
-    @test call(field, temporalbasis,  0.0, Val{:derivative}) == [0.5]
-    @test call(field, temporalbasis,  0.5, Val{:derivative}) == [0.5]
-    @test call(field, temporalbasis,  1.0, Val{:derivative}) == [0.5]
-    @test call(field, temporalbasis,  1.5, Val{:derivative}) == [0.5]
-    @test call(field, temporalbasis,  2.0, Val{:derivative}) == [0.5]
-    fs = FieldSet()
 
-    t = collect(linspace(0, 2, 5))
+    info("field(1.0) = $(field(1.0))")
+
+    @test field(-Inf) == [0.0]
+    @test field( 0.0) == [0.0]
+    @test field( 1.0) == [0.5]
+    @test field( 2.0) == [1.0]
+    @test field( 3.0) == [1.5]
+    @test field( 4.0) == [2.0]
+    @test field(+Inf) == [2.0]
+end
+
+function test_derivative_interpolation_in_temporal_basis_in_constant_velocity()
+    i1 = Increment(0.0)
+    i2 = Increment(1.0)
+    i3 = Increment(2.0)
+    t1 = TimeStep(0.0, Increment[i1])
+    t2 = TimeStep(2.0, Increment[i2])
+    t3 = TimeStep(4.0, Increment[i3])
+    field = Field(TimeStep[t1, t2, t3])
+    @test field(+Inf, Val{:derivative}) == [0.5]
+    @test field(-Inf, Val{:derivative}) == [0.5]
+    @test field( 0.0, Val{:derivative}) == [0.5]
+    @test field( 0.5, Val{:derivative}) == [0.5]
+    @test field( 1.0, Val{:derivative}) == [0.5]
+    @test field( 1.5, Val{:derivative}) == [0.5]
+    @test field( 2.0, Val{:derivative}) == [0.5]
+end
+
+function test_derivative_interpolation_in_temporal_basis_in_variable_velocity()
+    t = linspace(0, 2, 5)
     x = 1/2*t.^2
-    x2 = tuple(collect(zip(t, x))...)
+    timesteps = TimeStep[]
+    for (ti, xi) in zip(t, x)
+        increment = Increment(xi)
+        push!(timesteps, TimeStep(ti, increment))
+    end
     # => ((0.0,0.0),(0.5,0.125),(1.0,0.5),(1.5,1.125),(2.0,2.0))
-    fs["particle"] = x2
-    position = call(fs["particle"], temporalbasis, 1.0)[1]
-    @test isapprox(position, 0.50)
-    velocity = call(fs["particle"], temporalbasis, 2.0, Val{:derivative})[1]
-    @test isapprox(velocity, (2.0-1.125)/0.5) # = 1.75
-    velocity = call(fs["particle"], temporalbasis, 1.0, Val{:derivative})[1]
+    pos = Field(timesteps)
+
+    velocity = pos(1.0, Val{:derivative})[1]
     v1 = (0.500 - 0.125)/0.5
     v2 = (1.125 - 0.500)/0.5
-    info("v1 = $v1, v2 = $v2")
-    info(mean([v1, v2]))
     @test isapprox(velocity, mean([v1, v2])) # = 1.00
 
-    # FIXME, returns wrong type.
-    @test isa(position, Increment) == true
+    velocity = pos(2.0, Val{:derivative})[1]
+    @test isapprox(velocity, (2.0-1.125)/0.5) # = 1.75
+end
+
+function test_derivative_interpolation_in_temporal_basis_in_variable_velocity_check_type()
+    t = linspace(0, 2, 5)
+    x = 1/2*t.^2
+    timesteps = TimeStep[]
+    for (ti, xi) in zip(t, x)
+        increment = Increment(xi)
+        push!(timesteps, TimeStep(ti, increment))
+    end
+    # => ((0.0,0.0),(0.5,0.125),(1.0,0.5),(1.5,1.125),(2.0,2.0))
+    pos = Field(timesteps)
+    velocity = pos(1.0, Val{:derivative})
+    # after interpolation, we are expecting to have same type where we started
     @test isa(velocity, Increment) == true
 end
 
