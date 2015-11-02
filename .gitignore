@@ -4,3 +4,9 @@
 docs/build/html
 *.swp
 *.lnk
+*.mess
+*.log
+*.aux
+*.out
+*.tex
+*.export

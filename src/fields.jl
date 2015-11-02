@@ -131,7 +131,7 @@ end
 # FIXME: having some serious problems here to get tuple form working.
 
 # 3. DefaultDiscreteField
-type DefaultDiscreteField <: DiscreteField
+immutable DefaultDiscreteField <: DiscreteField
     timesteps :: Vector{TimeStep}
 #=
     function DefaultDiscreteField(data::Array)
@@ -170,16 +170,32 @@ function Base.size(field::DefaultDiscreteField)
     return size(field.timesteps)
 end
 
+function Base.length(field::DefaultDiscreteField)
+    return length(field.timesteps)
+end
+
+function Base.start(::DefaultDiscreteField)
+    return 1
+end
+
+function Base.next(field::DefaultDiscreteField, state)
+    return (field[state+1], state+1)
+end
+
+function Base.done(field::DefaultDiscreteField, state)
+    return state > length(field)
+end
+
+function eltype(::Type{DefaultDiscreteField})
+    return TimeStep
+end
+
 function Base.linearindexing(::Type{DefaultDiscreteField})
     return LinearFast()
 end
 
 function Base.getindex(field::DefaultDiscreteField, i::Int)
     return field.timesteps[i]
-end
-
-function Base.length(field::DefaultDiscreteField)
-    return length(field.timesteps)
 end
 
 function Base.endof(field::DefaultDiscreteField)

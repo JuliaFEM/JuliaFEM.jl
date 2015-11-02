@@ -5,9 +5,163 @@ module BasisTests
 
 using JuliaFEM.Test
 
-using JuliaFEM: get_basis, grad, FieldSet, Field, Quad4
+using JuliaFEM
+using JuliaFEM: Basis, ElementGradientBasis, ElementFieldGradientBasis, Field
+
+function get_basis()
+
+    basis(xi) = 1/4*[
+        (1-xi[1])*(1-xi[2])
+        (1+xi[1])*(1-xi[2])
+        (1+xi[1])*(1+xi[2])
+        (1-xi[1])*(1+xi[2])]'
+    
+    dbasis(xi) = 1/4*[
+        -(1-xi[2])    (1-xi[2])   (1+xi[2])  -(1+xi[2])
+        -(1-xi[1])   -(1+xi[1])   (1+xi[1])   (1-xi[1])]
+
+    return basis, dbasis
+end
 
 
+function test_basic_interpolation()
+    basis, dbasis = get_basis()
+    b = Basis(basis, dbasis)
+    @test b([0.0, 0.0]) == 1/4*[1 1 1 1]
+    @test b([0.0, 0.0], 1.0) == 1/4*[1 1 1 1]
+end
+
+function test_basic_interpolation_of_field()
+    # in unit square: T(X,t) = t*(1 + X[1] + 3*X[2] - 2*X[1]*X[2])
+    temperature = Field(
+        (0.0, [0.0, 0.0, 0.0, 0.0]),
+        (1.0, [1.0, 2.0, 3.0, 4.0]))
+    basis, dbasis = get_basis()
+    b = Basis(basis, dbasis, temperature)
+    T(X,t) = t*(1 + X[1] + 3*X[2] - 2*X[1]*X[2])
+    @test b([0.0, 0.0], 0.0) == T([0.5, 0.5], 0.0)
+    @test b([0.0, 0.0], 0.6) == T([0.5, 0.5], 0.6)
+    @test b([0.0, 0.0], 1.0) == T([0.5, 0.5], 1.0) 
+end
+
+function test_linear_time_extrapolation_of_field()
+    temperature = Field(
+        (0.0, [0.0, 0.0, 0.0, 0.0]),
+        (1.0, [1.0, 2.0, 3.0, 4.0]))
+    basis, dbasis = get_basis()
+    b = Basis(basis, dbasis, temperature, :linear)
+    T(X,t) = t*(1 + X[1] + 3*X[2] - 2*X[1]*X[2])
+    @test b([0.0, 0.0], -1.0) == T([0.5, 0.5], -1.0)
+    @test b([0.0, 0.0],  3.0) == T([0.5, 0.5],  3.0)
+end
+
+function test_constant_time_extrapolation_of_field()
+    temperature = Field(
+        (0.0, [0.0, 0.0, 0.0, 0.0]),
+        (1.0, [1.0, 2.0, 3.0, 4.0]))
+    basis, dbasis = get_basis()
+    b = Basis(basis, dbasis, temperature, :constant)
+    T(X,t) = t*(1 + X[1] + 3*X[2] - 2*X[1]*X[2])
+    @test b([0.0, 0.0], -1.0) == T([0.5, 0.5], 0.0)
+    @test b([0.0, 0.0],  3.0) == T([0.5, 0.5], 1.0)
+end
+
+function test_time_extrapolation_of_field_with_single_timestep()
+    temperature = Field([1.0, 2.0, 3.0, 4.0])
+    basis, dbasis = get_basis()
+    b = Basis(basis, dbasis, temperature)
+    @test b([0.0, 0.0], 1.0) == mean([1.0, 2.0, 3.0, 4.0])
+end
+
+function test_gradient_interpolation_empty_gradient()
+    X = [0.0 0.0; 1.0 0.0; 1.0 1.0; 0.0 1.0]'
+    geometry = Field(X)
+#   P(X) = [1.0, X[1], X[2], X[1]*X[2]]
+#   basis2, dbasis2 = JuliaFEM.calculate_lagrange_basis(P, X)
+    basis, dbasis = get_basis()
+    N = Basis(basis, dbasis)
+    dN = ElementGradientBasis(N, geometry)
+    @test dN([0.0, 0.0]) == 1/2*[-1 1 1 -1; -1 -1 1 1]
+#   @test dN([0.0, 0.0]) == dbasis2([0.5, 0.5])
+end
+
+function test_gradient_interpolation_of_scalar_field()
+    # in unit square: grad(T)(X) = [1-2X[2], 3-2*X[1]]
+    geometry = Field([0.0 0.0; 1.0 0.0; 1.0 1.0; 0.0 1.0]')
+
+    temperature = Field([1, 2, 3, 4])
+    basis, dbasis = get_basis()
+    N = Basis(basis, dbasis)
+
+    dN = ElementGradientBasis(N, geometry)
+    dT = ElementFieldGradientBasis(dN, temperature)
+    dT_expected(X) = [1-2*X[2] 3-2*X[1]]
+ 
+    @test dT([0.0, 0.0]) == dT_expected([0.5, 0.5])
+end
+
+function test_interpolation_of_vector_field()
+    # in unit square, u(X,t) = [1/4*t*X[1]*X[2], 0, 0]
+    geometry = Field([0.0 0.0; 1.0 0.0; 1.0 1.0; 0.0 1.0]')
+    displacement = Field(
+        (0.0, Vector[[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]),
+        (1.0, Vector[[0.0, 0.0], [0.0, 0.0], [1/4, 0.0], [0.0, 0.0]]))
+
+    basis, dbasis = get_basis()
+    X = Basis(basis, dbasis, geometry)
+    u = Basis(basis, dbasis, displacement)
+    u_expected(X,t) = [1/4*t*X[1]*X[2], 0]
+    # x = X + u
+    x = X([0.0, 0.0], 1.0) + u([0.0, 0.0], 1.0)
+    @test isapprox(x, [9/16, 1/2])
+    @test isapprox(u([0.0, 0.0], 1.0), u_expected([0.5, 0.5], 1.0))
+end
+
+function test_interpolation_of_gradient_of_vector_field()
+    # in unit square, u(X) = t*[X[1]*X[2]/4, X[1]*(X[1]+X[2])/2]
+    # => u_i,j = t*[X[2]/4 X[1]/4; X[1]/2+(X[1]+X[2])/2 X[1]/2]
+    geometry = Field([0.0 0.0; 1.0 0.0; 1.0 1.0; 0.0 1.0]')
+    displacement = Field(
+        (0.0, Vector[[0.0, 0.0], [0.0, 0.0], [0.00, 0.0], [0.0, 0.0]]),
+        (1.0, Vector[[0.0, 0.0], [0.0, 0.5], [0.25, 1.0], [0.0, 0.0]]))
+
+    basis, dbasis = get_basis()
+    N = Basis(basis, dbasis)
+    dN = ElementGradientBasis(N, geometry)
+    dU = ElementFieldGradientBasis(dN, displacement)
+    dU_expected(X, t) = t*[X[2]/4 X[1]/4; X[1]/2+(X[1]+X[2])/2 X[1]/2]
+
+    @test isapprox(dU([0.0, 0.0], 1.0), dU_expected([0.5, 0.5], 1.0))
+end
+
+# TODO: how on earth make this work without some serious spaghetti code
+function test_time_derivative_gradient_interpolation_of_field()
+    # in unit square, u(X) = t*[X[1]*X[2]/4, X[1]*(X[1]+X[2])/2]
+    # => u_i,j = t*[X[2]/4 X[1]/4; X[1]/2+(X[1]+X[2])/2 X[1]/2]
+    # => d(u_i,j)/dt = [X[2]/4 X[1]/4; X[1]/2+(X[1]+X[2])/2 X[1]/2]
+    geometry = Field([0.0 0.0; 1.0 0.0; 1.0 1.0; 0.0 1.0]')
+    displacement = Field(
+        (0.0, Vector[[0.0, 0.0], [0.0, 0.0], [0.00, 0.0], [0.0, 0.0]]),
+        (1.0, Vector[[0.0, 0.0], [0.0, 0.5], [0.25, 1.0], [0.0, 0.0]]))
+
+    basis, dbasis = get_basis()
+    N = Basis(basis, dbasis)
+    # wanted
+    #u = Basis(basis, dbasis, displacement)
+    #L = grad(diff(u))
+    #D = 1/2*(L + L')
+    #@text isapprox(D([0.0, 0.0], 1.0), ...)
+
+    xi = [0.0, 0.0]
+    time = 1.0
+    grad = ElementGradientBasis(N, geometry)(xi, time)
+    increment = displacement(time, Val{:derivative}, :linear, :linear)
+    diffgradu = sum([grad[:,i]*increment[i]' for i=1:length(increment)])'
+    diffgradu_expected(X, t) = [X[2]/4 X[1]/4; X[1]/2+(X[1]+X[2])/2 X[1]/2]
+    @test diffgradu == diffgradu_expected([0.5, 0.5], 1.0)
+end
+
+#=
 """basic continuum interpolations"""
 function test_basic_interpolations()
 
@@ -42,10 +196,9 @@ function test_basic_interpolations()
     @test isapprox(U, [1.24235 0.13804; 0.13804 1.02149])
 end
 
+=#
+
 function test_interpolation_in_temporal_basis()
-    info("testing interpolation on temporal basis")
-    temporalbasis = TemporalBasis((t) -> [1-t, t], (t) -> [-1, 1])
-    @test temporalbasis(0.2) == [0.8, 0.2]
     i1 = Increment([0.0])
     i2 = Increment([1.0])
     i3 = Increment([2.0])
@@ -88,33 +241,6 @@ function test_interpolation_in_temporal_basis()
     # FIXME, returns wrong type.
     @test isa(position, Increment) == true
     @test isa(velocity, Increment) == true
-end
-
-function test_interpolation_in_spatial_basis()
-    info("testing interpolation on spatial basis")
-    basis(xi) = 1/4*[
-        (1-xi[1])*(1-xi[2])
-        (1+xi[1])*(1-xi[2])
-        (1+xi[1])*(1+xi[2])
-        (1-xi[1])*(1+xi[2])]'
-    dbasis(xi) = 1/4*[
-        -(1-xi[2])    (1-xi[2])   (1+xi[2])  -(1+xi[2])
-        -(1-xi[1])   -(1+xi[1])   (1+xi[1])   (1-xi[1])]
-    spatialbasis = SpatialBasis(basis, dbasis)
-    @test spatialbasis.basis([0.0, 0.0]) == 1/4*[1 1 1 1]
-
-    fs = FieldSet()
-    fs["geometry"] = Vector{Float64}[[0.0,0.0], [1.0,0.0], [1.0,1.0], [0.0,1.0]]
-    fs["displacement"] = (0.0, zeros(2, 4)), (1.0, Vector[[0.0, 0.0], [0.0, 0.0], [0.25, 0.0], [0.0, 0.0]])
-
-    X = call(last(fs["geometry"]), spatialbasis, [0.0, 0.0])
-    u = call(last(fs["displacement"]), spatialbasis, [0.0, 0.0])
-    x = X+u
-    @test X ≈ 1/2*[1, 1]
-    @test x ≈ [9/16, 1/2]
-
-    gradu = call(last(fs["displacement"]), spatialbasis, [0.0, 0.0], last(fs["geometry"]), Val{:gradient})
-    @test gradu ≈ [0.125 0.125; 0.0 0.0]
 end
 
 end
