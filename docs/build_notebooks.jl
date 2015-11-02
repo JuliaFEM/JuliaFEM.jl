@@ -70,7 +70,7 @@ function run_notebooks()
                 Base.showerror(Base.STDOUT, error)
             end
             try
-                run(`ipython nbconvert tutorials/$ipynb --to pdf --output=$bn`)
+                run(`ipython nbconvert tutorials/$ipynb --to latex --output=$bn`)
             catch error
                 warn("unable to convert notebook to tex format")
                 Base.showerror(Base.STDOUT, error)
