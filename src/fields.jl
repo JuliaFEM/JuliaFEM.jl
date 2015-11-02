@@ -16,15 +16,15 @@ type Increment{T} <: AbstractVector{T}
 end
 
 function Base.size(increment::Increment)
-    size(increment.data)
+    return size(increment.data)
 end
 
 function Base.linearindexing(::Type{Increment})
-    LinearFast()
+    return LinearFast()
 end
 
 function Base.getindex(increment::Increment, i::Int)
-    increment.data[i]
+    return increment.data[i]
 end
 
 function Base.setindex!(increment::Increment, v, i::Int)
@@ -32,39 +32,49 @@ function Base.setindex!(increment::Increment, v, i::Int)
 end
 
 function Base.dot(k::Number, increment::Increment)
-    k*increment
+    return k*increment
 end
 
 function Base.convert(::Type{Increment}, data::Number)
-    Increment([data])
+    return Increment([data])
 end
 
 function Base.convert{T}(::Type{Increment}, data::Array{T, 2})
-    Increment([data[:,i] for i=1:size(data, 2)])
+    return Increment([data[:,i] for i=1:size(data, 2)])
 end
 
 function Base.convert{T}(::Type{Increment}, data::Array{T, 3})
-    Increment([data[:,:,i] for i=1:size(data, 3)])
+    return Increment([data[:,:,i] for i=1:size(data, 3)])
 end
 
 function Base.convert{T}(::Type{Increment}, data::Array{T, 4})
-    Increment([data[:,:,:,i] for i=1:size(data, 4)])
+    return Increment([data[:,:,:,i] for i=1:size(data, 4)])
 end
 
 function Base.convert{T}(::Type{Increment}, data::Array{T, 5})
-    Increment([data[:,:,:,:,i] for i=1:size(data, 5)])
+    return Increment([data[:,:,:,:,i] for i=1:size(data, 5)])
 end
 
-function Base.zeros(::Type{Increment}, dims...)
-    Increment(zeros(dims...))
+function Base.zeros(::Type{Increment}, T, dims...)
+    return Increment(zeros(T, dims...))
 end
 
+""" Flatten increment to Vector.
+
+Examples
+--------
+
+>>> inc = ones(Increment, 2, 4)
+>>> vec(inc)
+[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+"""
 function Base.vec(increment::Increment)
-    [increment...;]
+    return [increment...;]
 end
 
 function Base.similar{T}(increment::Increment, data::Vector{T})
-    Increment(reshape(data, round(Int, length(data)/length(increment)), length(increment)))
+    return Increment(reshape(data, round(Int, length(data)/length(increment)), length(increment)))
 end
 
 function Base.convert{T}(::Type{Vector{T}}, increment::Increment)
@@ -91,7 +101,7 @@ function Base.length(timestep::TimeStep)
 end
 
 function Base.linearindexing(::Type{TimeStep})
-    Base.LinearFast()
+    return Base.LinearFast()
 end
 
 function Base.getindex(timestep::TimeStep, i::Int)
@@ -103,7 +113,7 @@ end
 #end
 
 function TimeStep()
-    TimeStep(0.0, [])
+    return TimeStep(0.0, [])
 end
 
 function TimeStep{T}(data::T...)
@@ -117,6 +127,8 @@ end
 function Base.push!(timestep::TimeStep, increment::Increment)
     push!(timestep.increments, increment)
 end
+
+# FIXME: having some serious problems here to get tuple form working.
 
 # 3. DefaultDiscreteField
 type DefaultDiscreteField <: DiscreteField
@@ -163,15 +175,15 @@ function Base.linearindexing(::Type{DefaultDiscreteField})
 end
 
 function Base.getindex(field::DefaultDiscreteField, i::Int)
-    field.timesteps[i]
+    return field.timesteps[i]
 end
 
 function Base.length(field::DefaultDiscreteField)
-    length(field.timesteps)
+    return length(field.timesteps)
 end
 
 function Base.endof(field::DefaultDiscreteField)
-    endof(field.timesteps)
+    return endof(field.timesteps)
 end
 
 function Base.first(field::DefaultDiscreteField)
@@ -199,7 +211,7 @@ function Base.convert(::Type{DefaultDiscreteField}, data...)
     timesteps = TimeStep[]
     for (i, d) in enumerate(data)
         if isa(d, Tuple)
-#           @debug("is tuple, has time, d = $d")
+            @debug("is tuple, has time, d = $d")
             # contains time vector
             increments = Increment[Increment(d[2])]
             push!(timesteps, TimeStep(d[1], increments))
@@ -246,7 +258,7 @@ function Base.convert(::Type{Field}, data::Union{Number, Array, Tuple}...)
 end
 
 function Base.convert(::Type{DiscreteField}, data::Union{Number, Array, Tuple}...)
-    convert(DefaultDiscreteField, data...)
+    return convert(DefaultDiscreteField, data...)
 end
 
 # 2. given function -> continuous field
@@ -256,6 +268,6 @@ function Base.convert(::Type{Field}, data::Function)
 end
 
 function Base.convert(::Type{ContinuousField}, data::Function)
-    convert(DefaultContinuousField, data)
+    return convert(DefaultContinuousField, data)
 end
 
