@@ -58,7 +58,7 @@ function run_notebooks()
                 run(`timeout 180 runipy -o tutorials/$ipynb --kernel=julia-0.4`)
                 status = 0
             catch error
-                warning("running notebook failed")
+                warn("running notebook failed")
                 Base.showerror(Base.STDOUT, error)
             end
             runtime = toc()
