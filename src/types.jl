@@ -23,6 +23,6 @@ function IntegrationPoint(xi, weight)
     IntegrationPoint(xi, weight, Dict())
 end
 
-call(N::ElementBasis, ip::IntegrationPoint) = N(ip.xi)
+call(N::Basis, ip::IntegrationPoint) = N(ip.xi)
 
 
