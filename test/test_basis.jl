@@ -37,7 +37,7 @@ function test_basis_gradient_interpolation()
 #   P(X) = [1.0, X[1], X[2], X[1]*X[2]]
 #   basis2, dbasis2 = JuliaFEM.calculate_lagrange_basis(P, X)
     N = get_basis()
-    gradN = N(X, [0.0, 0.0], Val{:gradient})
+    gradN = N(X, [0.0, 0.0], Val{:grad})
     @test gradN == 1/2*[-1 1 1 -1; -1 -1 1 1]
 #   @test dN([0.0, 0.0]) == dbasis2([0.5, 0.5])
 end
@@ -56,7 +56,7 @@ function test_interpolation_of_gradient_of_scalar_increment_in_spatial_domain()
     X = Increment([0.0 0.0; 1.0 0.0; 1.0 1.0; 0.0 1.0]')
     T = Increment([1.0, 2.0, 3.0, 4.0])
     N = get_basis()
-    gradT = N(X, T, [0.0, 0.0], Val{:gradient})
+    gradT = N(X, T, [0.0, 0.0], Val{:grad})
     gradT_expected(X) = [1-2*X[2] 3-2*X[1]]
     @test gradT == gradT_expected([0.5, 0.5])
 end
@@ -86,7 +86,7 @@ function test_interpolation_of_gradient_of_vector_field()
     u = Increment([0.0 0.0; 1.0 -1.0; 2.0 3.0; 0.0 0.0]')
 
     N = get_basis()
-    gradu(xi) = N(X, u, xi, Val{:gradient})
+    gradu(xi) = N(X, u, xi, Val{:grad})
     gradu_expected(X) = [X[2]+1 X[1]; 4*X[2]-1 4*X[1]]
     @test isapprox(gradu([0.0, 0.0]), gradu_expected([0.5, 0.5]))
 end
@@ -144,13 +144,13 @@ function test_derivative_interpolation_in_temporal_basis_in_constant_velocity()
     t2 = TimeStep(2.0, Increment[i2])
     t3 = TimeStep(4.0, Increment[i3])
     field = Field(TimeStep[t1, t2, t3])
-    @test field(+Inf, Val{:derivative}) == [0.5]
-    @test field(-Inf, Val{:derivative}) == [0.5]
-    @test field( 0.0, Val{:derivative}) == [0.5]
-    @test field( 0.5, Val{:derivative}) == [0.5]
-    @test field( 1.0, Val{:derivative}) == [0.5]
-    @test field( 1.5, Val{:derivative}) == [0.5]
-    @test field( 2.0, Val{:derivative}) == [0.5]
+    @test field(+Inf, Val{:diff}) == [0.5]
+    @test field(-Inf, Val{:diff}) == [0.5]
+    @test field( 0.0, Val{:diff}) == [0.5]
+    @test field( 0.5, Val{:diff}) == [0.5]
+    @test field( 1.0, Val{:diff}) == [0.5]
+    @test field( 1.5, Val{:diff}) == [0.5]
+    @test field( 2.0, Val{:diff}) == [0.5]
 end
 
 function test_derivative_interpolation_in_temporal_basis_in_variable_velocity()
@@ -164,12 +164,12 @@ function test_derivative_interpolation_in_temporal_basis_in_variable_velocity()
     # => ((0.0,0.0),(0.5,0.125),(1.0,0.5),(1.5,1.125),(2.0,2.0))
     pos = Field(timesteps)
 
-    velocity = pos(1.0, Val{:derivative})[1]
+    velocity = pos(1.0, Val{:diff})[1]
     v1 = (0.500 - 0.125)/0.5
     v2 = (1.125 - 0.500)/0.5
     @test isapprox(velocity, mean([v1, v2])) # = 1.00
 
-    velocity = pos(2.0, Val{:derivative})[1]
+    velocity = pos(2.0, Val{:diff})[1]
     @test isapprox(velocity, (2.0-1.125)/0.5) # = 1.75
 end
 
@@ -183,7 +183,7 @@ function test_derivative_interpolation_in_temporal_basis_in_variable_velocity_ch
     end
     # => ((0.0,0.0),(0.5,0.125),(1.0,0.5),(1.5,1.125),(2.0,2.0))
     pos = Field(timesteps)
-    velocity = pos(1.0, Val{:derivative})
+    velocity = pos(1.0, Val{:diff})
     # after interpolation, we are expecting to have same type where we started
     @test isa(velocity, Increment) == true
 end
