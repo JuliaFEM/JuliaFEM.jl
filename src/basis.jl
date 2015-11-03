@@ -13,7 +13,7 @@ end
 
 """ Evaluate gradient of basis. This need geometry information to calculate Jacobian. """
 function Base.call(basis::Basis, geometry::Increment, xi::Vector,
-                   ::Type{Val{:gradient}})
+                   ::Type{Val{:grad}})
     dbasis = basis.dbasisdxi(xi)
     J = sum([dbasis[:,i]*geometry[i]' for i=1:length(geometry)])
     grad = inv(J)*dbasis
@@ -30,8 +30,8 @@ end
 
 """ Return gradient of increment in spatial domain using Basis.. """
 function Base.call(basis::Basis, geometry::Increment, field::Increment,
-                   xi::Vector, ::Type{Val{:gradient}})
-    grad = basis(geometry, xi, Val{:gradient})
+                   xi::Vector, ::Type{Val{:grad}})
+    grad = basis(geometry, xi, Val{:grad})
     gradf = sum([grad[:,i]*field[i]' for i=1:length(field)])'
     return gradf
 end
@@ -140,10 +140,10 @@ field
 time
     Time to interpolate.
 derivative
-    set Val{:derivative} to activate this function
+    set Val{:diff} to activate this function
 
 """
-function Base.call(field::DiscreteField, time::Number, ::Type{Val{:derivative}})
+function Base.call(field::DiscreteField, time::Number, ::Type{Val{:diff}})
 
     # FieldSet -> Field -> TimeStep -> Increment -> data
 
