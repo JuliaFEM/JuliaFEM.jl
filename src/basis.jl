@@ -1,53 +1,44 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-abstract Basis <: ContinuousField
-
-### ELEMENT BASIS
-
-""" This is the normal "user defined" basis functions familiar from school books. """
-type ElementBasis <: Basis
+type Basis <: ContinuousField
     basis :: Function
     dbasisdxi :: Function
 end
 
-function Basis(basis::Function, dbasisdxi::Function)
-    return ElementBasis(basis, dbasisdxi)
-end
-
-function Base.call(basis::ElementBasis, xi::Vector, time::Number=0.0)
+""" Evaluate basis. """
+function Base.call(basis::Basis, xi::Vector, time::Number=0.0)
     basis.basis(xi)  # passing time does not make much sense actually for this...
 end
 
-""" Interpolate increment in spatial domain using ElementBasis. """
-function Base.call(basis::ElementBasis, increment::Increment, xi::Vector)
+""" Evaluate gradient of basis. This need geometry information to calculate Jacobian. """
+function Base.call(basis::Basis, geometry::Increment, xi::Vector,
+                   ::Type{Val{:gradient}})
+    dbasis = basis.dbasisdxi(xi)
+    J = sum([dbasis[:,i]*geometry[i]' for i=1:length(geometry)])
+    grad = inv(J)*dbasis
+    return grad
+end
+
+### INTERPOLATION IN SPATIAL DOMAIN ###
+
+""" Interpolate increment in spatial domain using Basis. """
+function Base.call(basis::Basis, increment::Increment, xi::Vector)
     basis = basis.basis(xi)
     sum([basis[i]*increment[i] for i=1:length(increment)])
 end
 
-### ELEMENT FIELD BASIS = ELEMENT BASIS + FIELD
-
-""" Here we add field we are wanting to interpolate with ElementBasis. """
-type ElementFieldBasis <: Basis
-    element_basis :: ElementBasis
-    field :: DiscreteField
-    time_extrapolation :: Symbol
-    time_interpolation :: Symbol
+""" Return gradient of increment in spatial domain using Basis.. """
+function Base.call(basis::Basis, geometry::Increment, field::Increment,
+                   xi::Vector, ::Type{Val{:gradient}})
+    grad = basis(geometry, xi, Val{:gradient})
+    gradf = sum([grad[:,i]*field[i]' for i=1:length(field)])'
+    return gradf
 end
 
-function Basis(basis::Function, dbasisdxi::Function, field::DiscreteField,
-               time_extrapolation=:linear, time_interpolation=:linear)
-    element_basis = ElementBasis(basis, dbasisdxi)
-    return ElementFieldBasis(element_basis, field, time_extrapolation,
-                             time_interpolation)
-end
+### INTERPOLATION IN TIME DOMAIN ###
 
-function Base.call(basis::ElementFieldBasis, xi::Vector, time::Number)
-    increment = basis.field(time, basis.time_extrapolation, basis.time_interpolation)
-    return basis.element_basis(increment, xi)
-end
-
-""" Interpolate discrete field in time domain. """
+""" Interpolate discrete field in time domain. Return Increment. """
 function Base.call(field::DiscreteField, time::Number,
                    time_extrapolation::Symbol=:linear,
                    time_interpolation::Symbol=:linear)
@@ -139,61 +130,22 @@ function Base.call(field::DiscreteField, time::Number,
 
 end
 
-### ELEMENT GRADIENT BASIS = ELEMENT BASIS + GEOMETRY
+""" Interpolate time derivative of field in some time t. This assumes linear
+interpolation in time which is then differentiated.
 
-""" Gradient of ElementBasis, needs geometry information. """
-type ElementGradientBasis <: Basis
-    element_basis :: ElementBasis
-    geometry :: DiscreteField
-    time_extrapolation :: Symbol
-    time_interpolation :: Symbol
-end
+Parameters
+----------
+field
+    Discrete field to interpolate. Must have timesteps and increments defined
+time
+    Time to interpolate.
+derivative
+    set Val{:derivative} to activate this function
 
-function ElementGradientBasis(element_basis::ElementBasis, geometry::DiscreteField)
-    return ElementGradientBasis(element_basis, geometry, :linear, :linear)
-end
-
-function Base.call(basis::ElementGradientBasis, xi::Vector, time::Number=0.0)
-    dbasis = basis.element_basis.dbasisdxi(xi)
-    geometry = basis.geometry(time, basis.time_extrapolation, basis.time_interpolation)
-    J = sum([dbasis[:,i]*geometry[i]' for i=1:length(geometry)])
-    grad = inv(J)*dbasis
-    return grad
-end
-
-### ELEMENT FIELD GRADIENT BASIS = ELEMENT GRADIENT BASIS + FIELD
-
-""" Gradient of ElementFieldBasis, needs field to interpolate. """
-type ElementFieldGradientBasis <: Basis
-    element_gradient_basis :: ElementGradientBasis
-    field :: DiscreteField
-    time_extrapolation :: Symbol
-    time_interpolation :: Symbol
-end
-
-function ElementFieldGradientBasis(element_gradient_basis::ElementGradientBasis,
-                                   field::DiscreteField)
-    return ElementFieldGradientBasis(element_gradient_basis, field, :linear, :linear)
-end
-
-function Base.call(basis::ElementFieldGradientBasis, xi::Vector, time::Number=0.0)
-    grad = basis.element_gradient_basis(xi, time)
-    increment = basis.field(time, basis.time_extrapolation, basis.time_interpolation)
-    gradf = sum([grad[:,i]*increment[i]' for i=1:length(increment)])'
-    return gradf
-end
-
-### INTERPOLATION IN TIME DOMAIN ###
-
-function Base.call(field::DiscreteField, time::Number,
-                   derivative::Type{Val{:derivative}},
-                   time_extrapolation::Symbol=:linear,
-                   time_interpolation::Symbol=:linear)
+"""
+function Base.call(field::DiscreteField, time::Number, ::Type{Val{:derivative}})
 
     # FieldSet -> Field -> TimeStep -> Increment -> data
-
-    time_extrapolation == :linear || error("$time_extrapolation not implemented")
-    time_interpolation == :linear || error("$time_interpolation not implemented")
 
     if length(field) == 1
         # just one timestep, time derivative cannot be evaluated.
@@ -236,4 +188,77 @@ function Base.call(field::DiscreteField, time::Number,
     return eval_field(i, i+1)
 
 end
+
+
+
+### ELEMENT FIELD BASIS = ELEMENT BASIS + FIELD
+#=
+""" Here we add field we are wanting to interpolate with ElementBasis. """
+type ElementFieldBasis <: Basis
+    element_basis :: ElementBasis
+    field :: DiscreteField
+    time_extrapolation :: Symbol
+    time_interpolation :: Symbol
+end
+
+function Basis(basis::Function, dbasisdxi::Function, field::DiscreteField,
+               time_extrapolation=:linear, time_interpolation=:linear)
+    element_basis = ElementBasis(basis, dbasisdxi)
+    return ElementFieldBasis(element_basis, field, time_extrapolation,
+                             time_interpolation)
+end
+
+function Base.call(basis::ElementFieldBasis, xi::Vector, time::Number)
+    increment = basis.field(time, basis.time_extrapolation, basis.time_interpolation)
+    return basis.element_basis(increment, xi)
+end
+=#
+
+
+### ELEMENT GRADIENT BASIS = ELEMENT BASIS + GEOMETRY
+#=
+""" Gradient of ElementBasis, needs geometry information. """
+type ElementGradientBasis <: Basis
+    element_basis :: ElementBasis
+    geometry :: DiscreteField
+    time_extrapolation :: Symbol
+    time_interpolation :: Symbol
+end
+
+function grad(N::ElementBasis, f::ElementFieldBasis, X::ElementFieldBasis)
+    f.time_extrapolation == X.time_extrapolation || error("interpolation mismatch")
+    f.time_interpolation == X.time_interpolation || error("interpolation mismatch")
+    dN = ElementGradientBasis(N, X.field, f.time_extrapolation, f.time_interpolation)
+    dfdX = ElementFieldGradientBasis(dN, f.field, f.time_extrapolation, f.time_interpolation)
+    return dfdX
+end
+
+function grad(N::ElementBasis, f::DiscreteField, X::DiscreteField)
+    dN = ElementGradientBasis(N, X)
+    dfdX = ElementFieldGradientBasis(dN, f)
+end
+
+function ElementGradientBasis(element_basis::ElementBasis, geometry::DiscreteField)
+    return ElementGradientBasis(element_basis, geometry, :linear, :linear)
+end
+=#
+
+### ELEMENT FIELD GRADIENT BASIS = ELEMENT GRADIENT BASIS + FIELD
+#=
+""" Gradient of ElementFieldBasis, needs field to interpolate. """
+type ElementFieldGradientBasis <: Basis
+    element_gradient_basis :: ElementGradientBasis
+    field :: DiscreteField
+    time_extrapolation :: Symbol
+    time_interpolation :: Symbol
+end
+
+function ElementFieldGradientBasis(element_gradient_basis::ElementGradientBasis,
+                                   field::DiscreteField)
+    return ElementFieldGradientBasis(element_gradient_basis, field, :linear, :linear)
+end
+=#
+
+### INTERPOLATION IN TIME DOMAIN ###
+
 
