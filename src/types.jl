@@ -1,28 +1,33 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-### INTEGRATIONPOINT ###
+function ForwardDiff.derivative{T}(f::Function, S::Matrix{T}, args...)
+    shape = size(S)
+    wrapper(S::Vector) = f(reshape(S, shape))
+    deriv = ForwardDiff.gradient(wrapper, vec(S), args...)
+    return reshape(deriv, shape)
+end
 
 """
 Integration point
 
-xi :: Array{Float64, 1}
+xi
     (dimensionless) coordinates of integration point
-weight :: Float64
-    Integration weight
-attributes :: Dict{Any, Any}
-    This is used to save internal variables of IP needed e.g. for incremental
-    material models.
+weight
+    integration weight
+fields
+    FieldSet what can be used to store internal variables, stress, strain, ...
 """
 type IntegrationPoint
     xi :: Vector
     weight :: Float64
-    fields :: Dict{ASCIIString, FieldSet}
+    fields :: FieldSet
 end
+
 function IntegrationPoint(xi, weight)
     IntegrationPoint(xi, weight, Dict())
 end
 
-call(N::Basis, ip::IntegrationPoint) = N(ip.xi)
-
-
+function Base.convert(::Type{Number}, ip::IntegrationPoint)
+    return ip.xi
+end
