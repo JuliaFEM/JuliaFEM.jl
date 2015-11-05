@@ -78,6 +78,16 @@ Testing is made easy by using our `Makefile`. From there one founds convenient
 functions `make test`, `make test_file` and `make test_function` to make testing
 more rapid.
 
+Git issues
+----------
+
+Have done local changes, want to get latest updates and get "Cannot pull with
+rebase: You have unstaged changes. Please commit or stash them."
+
+http://stackoverflow.com/questions/23517464/error-cannot-pull-with-rebase-you-have-unstaged-changes
+
+Solution: git stash + git pull + git pop
+
 Use of UTF-8 characters in program code
 ---------------------------------------
 We have decided not to use them. See issue
