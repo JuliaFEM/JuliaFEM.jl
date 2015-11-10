@@ -214,6 +214,15 @@ function Base.push!(field::DefaultDiscreteField, timestep::TimeStep)
     push!(field.timesteps, timestep)
 end
 
+function Base.push!(field::DefaultDiscreteField, data::Union{Vector, Matrix})
+    push!(field[end], Increment(data))
+end
+
+function Base.push!(field::DefaultDiscreteField, data::Pair)
+    ts = TimeStep(data[1], Increment(data[2]))
+    push!(field, ts)
+end
+
 """Quickly create fields.
 
 Examples
@@ -285,5 +294,9 @@ end
 
 function Base.convert(::Type{ContinuousField}, data::Function)
     return convert(DefaultContinuousField, data)
+end
+
+function Base.length(::Field)
+    return 1
 end
 

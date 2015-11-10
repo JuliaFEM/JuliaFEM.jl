@@ -31,3 +31,19 @@ end
 function Base.convert(::Type{Number}, ip::IntegrationPoint)
     return ip.xi
 end
+
+function Base.call(basis::Basis, ip::IntegrationPoint)
+    return basis(ip.xi)
+end
+
+function Base.call(basis::Basis, increment::Increment, ip::IntegrationPoint)
+    return call(basis, increment, ip.xi)
+end
+
+function Base.call(basis::Basis, increment::Increment, ip::IntegrationPoint, ::Type{Val{:grad}})
+    return call(basis, increment, ip.xi, Val{:grad})
+end
+
+function Base.call(basis::Basis, geometry::Increment, field::Increment, ip::IntegrationPoint, ::Type{Val{:grad}})
+    return call(basis, geometry, field, ip.xi, Val{:grad})
+end

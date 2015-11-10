@@ -1,0 +1,74 @@
+# Nonlinear radiation term on free boundary
+# B1 = boundary element
+
+DEBUT()
+
+MAIL = LIRE_MAILLAGE()
+
+MO = AFFE_MODELE(
+    MAILLAGE=MAIL,
+    AFFE = _F(MAILLE=('B1','E1'), PHENOMENE='THERMIQUE', MODELISATION='PLAN'))
+
+CONDUC = DEFI_FONCTION(
+    NOM_PARA='TEMP',
+    NOM_RESU='LAMBDA',
+    VALE=(0.0, 6.0,
+          1.0, 6.0),
+    PROL_DROITE='LINEAIRE',
+    PROL_GAUCHE='LINEAIRE')
+
+ENTHAL = DEFI_FONCTION(
+    NOM_PARA='TEMP',
+    NOM_RESU='CP',
+    VALE= (0.0, 0.0,
+           1.0, 0.0),
+    PROL_DROITE='LINEAIRE',
+    PROL_GAUCHE='LINEAIRE')
+
+MAT = DEFI_MATERIAU(
+    THER_NL=_F(
+        LAMBDA=CONDUC,
+        BETA=ENTHAL))
+
+#MAT = DEFI_MATERIAU(
+#    THER_NL = _F(LAMBDA=6.0))
+
+CHMAT = AFFE_MATERIAU(
+    MAILLAGE = MAIL,
+    AFFE = _F(MAILLE = ('E1','B1'), MATER = MAT))
+
+BC = AFFE_CHAR_THER( # Dirichlet boundary condition on 0 <= X <= 1, Y = 1
+    MODELE = MO,
+    TEMP_IMPO = (_F(NOEUD = ('N3','N4'), TEMP=0.0)))
+
+# Heat flux on free boundary, radiation term.
+LO = AFFE_CHAR_THER(
+    MODELE = MO,
+    RAYONNEMENT = _F(
+        MAILLE="B1",
+        SIGMA=5.7e-8,
+        EPSILON=0.5,
+        TEMP_EXT=10.0))
+
+LIST = DEFI_LIST_REEL(
+    DEBUT = 0,
+    INTERVALLE = _F(JUSQU_A=1.0, NOMBRE=1))
+
+RESU = THER_NON_LINE(
+    MODELE=MO,
+    CHAM_MATER=CHMAT,
+    EXCIT=(
+        _F(CHARGE=BC),
+        _F(CHARGE=LO)),
+#   ETAT_INIT=_F(STATIONNAIRE='OUI'),
+    NEWTON=_F(REAC_ITER=1),
+#   INCREMENT=_F(LIST_INST=LIST),
+#   CONVERGENCE=_F(RESI_GLOB_RELA=1.0E-12)
+)
+
+IMPR_RESU(
+    MODELE = MO,
+    FORMAT = 'RESULTAT',
+    RESU = _F(RESULTAT = RESU))
+
+FIN()

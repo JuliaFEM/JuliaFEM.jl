@@ -45,12 +45,14 @@ function Base.call(field::DiscreteField, time::Number,
 
     # special cases, only 1 timestep defined or time = -Inf -> return first ts
     if (length(field) == 1) || (time == -Inf)
-        return field[1][end]
+        #return field[1][end]
+        return first(field)
     end
 
     # special case, time = +Inf -> return last ts
     if time == +Inf
-        return field[end][end]
+        #return field[end][end]
+        return last(field)
     end
 
     # very likely we are always near some defined timestep, usually field

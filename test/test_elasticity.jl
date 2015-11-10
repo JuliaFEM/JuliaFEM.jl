@@ -4,7 +4,9 @@
 module ElasticityTests
 
 using JuliaFEM.Test
-using JuliaFEM: Quad4, Field, FieldSet, CPS4, get_basis, solve!, PlaneStressElasticityProblem
+using JuliaFEM: Quad4, Field, FieldSet, CPS4,
+                get_basis, solve!,
+                PlaneStressElasticityProblem
 
 
 function test_elasticity_one_element()
@@ -21,7 +23,7 @@ function test_elasticity_one_element()
     disp = get_basis(element)("displacement", [1.0, 1.0])[2]
     info("displacement at tip: $disp")
     # verified using Code Aster.
-    @test disp ≈ -8.77303119819776
+    @test isapprox(disp, -8.77303119819776)
 end
 
 

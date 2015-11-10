@@ -35,7 +35,7 @@ function DBC2D2(element::Seg2)
         IntegrationPoint([-sqrt(1/3)], 1.0),
         IntegrationPoint([+sqrt(1/3)], 1.0)]
     if !haskey(element, "reaction force")
-        element["reaction force"] = FieldSet()
+        element["reaction force"] = zeros(1, 2)
     end
     DBC2D2(element, integration_points)
 end

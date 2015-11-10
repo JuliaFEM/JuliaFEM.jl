@@ -10,10 +10,10 @@ Solve field equations for single element with some dofs fixed. This can be used
 to test nonlinear element formulations.
 """
 function solve!(equation::Equation, unknown_field_name::ASCIIString,
-                 free_dofs::Array{Int, 1}, time::Number=Inf; 
+                 free_dofs::Array{Int, 1}, time::Number=0.0; 
                  max_iterations::Int=10, tolerance::Float64=1.0e-12, dump_matrices::Bool=false)
     element = get_element(equation)
-    x0 = element[unknown_field_name](-Inf)
+    x0 = element[unknown_field_name](0.0)
     x = zeros(prod(size(equation)))
     dx = fill!(similar(x), 0.0)
     la = initialize_local_assembly()
@@ -27,15 +27,10 @@ function solve!(equation::Equation, unknown_field_name::ASCIIString,
         end
         dx[free_dofs] = A \ b
         x += dx
-        new_field = similar(x0, x)
-        new_field.time = time
-        new_field.increment = i
-        push!(element[unknown_field_name], new_field)
-        if norm(dx) < tolerance
-            return
-        end
+        push!(element[unknown_field_name], reshape(x, size(equation)))
+        norm(dx) < tolerance && return
     end
-    Logging.err("Did not converge in $max_iterations iterations")
+    error("Did not converge in $max_iterations iterations")
 end
 
 """
@@ -44,15 +39,18 @@ to test nonlinear element formulations. Dirichlet boundary is assumed to be homo
 and degrees of freedom are eliminated. So if boundary condition is known in nodal
 points and everything is zero this should be quite good.
 """
-function solve!(problem::Problem, free_dofs::Array{Int, 1}, time::Number=Inf;
+function solve!(problem::Problem, free_dofs::Array{Int, 1}, time::Number=1.0;
                 max_iterations::Int=10, tolerance::Float64=1.0e-12, dump_matrices::Bool=false)
+    info("start solver")
     ga = initialize_global_assembly(problem)
     x = zeros(ga.ndofs)
     dx = fill!(similar(x), 0.0)
     field_name = get_unknown_field_name(problem)
     dim = get_unknown_field_dimension(problem)
     for i=1:max_iterations
+        info("calculate global assembly")
         calculate_global_assembly!(ga, problem)
+        info("done")
         A = ga.stiffness_matrix[free_dofs, free_dofs]
         b = ga.force_vector[free_dofs]
         if dump_matrices
@@ -60,20 +58,17 @@ function solve!(problem::Problem, free_dofs::Array{Int, 1}, time::Number=Inf;
             dump(full(b)')
         end
         dx[free_dofs] = lufact(A) \ full(b)
+        info("Difference in solution norm: $(norm(dx))")
         x += dx
         for equation in get_equations(problem)
             element = get_element(equation)
-            conn = get_connectivity(element)
-            gdofs = vec(vcat([dim*conn'-i for i=dim-1:-1:0]...))
-            old_field = element[field_name](Inf)
-            new_field = similar(old_field, full(x[gdofs]))
-            push!(element[field_name][end], new_field)
+            gdofs = get_gdofs(problem, equation)
+            data = reshape(full(x[gdofs]), size(equation))
+            push!(element[field_name], data)
         end
-        if norm(dx) < tolerance
-            return
-        end
+        norm(dx) < tolerance && return
     end
-    Logging.err("Did not converge in $max_iterations iterations")
+    error("Did not converge in $max_iterations iterations")
 end
 
 """ Add new problem to solver. """
