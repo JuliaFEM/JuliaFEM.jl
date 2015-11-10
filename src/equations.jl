@@ -57,10 +57,10 @@ function initialize_local_assembly!(assembly::LocalAssembly, equation::Equation)
 end
 
 has_mass_matrix(equation::Equation) = false
-function get_mass_matrix(equation::Equation, ip, time=Inf, problem=nothing)
+function get_mass_matrix(equation::Equation, ip, time=0.0, problem=nothing)
     get_mass_matrix(equation, ip, time)
 end
-function get_mass_matrix(equation::Equation, ip, time=Inf)
+function get_mass_matrix(equation::Equation, ip, time=0.0)
     get_mass_matrix(equation, ip)
 end
 function get_mass_matrix(equation::Equation, ip)
@@ -68,10 +68,10 @@ function get_mass_matrix(equation::Equation, ip)
 end
 
 has_stiffness_matrix(equation::Equation) = false
-function get_stiffness_matrix(equation::Equation, ip, time=Inf, problem=nothing)
+function get_stiffness_matrix(equation::Equation, ip, time=0.0, problem=nothing)
     get_stiffness_matrix(equation, ip, time)
 end
-function get_stiffness_matrix(equation::Equation, ip, time=Inf)
+function get_stiffness_matrix(equation::Equation, ip, time=0.0)
     get_stiffness_matrix(equation, ip)
 end
 function get_stiffness_matrix(equation::Equation, ip)
@@ -79,10 +79,10 @@ function get_stiffness_matrix(equation::Equation, ip)
 end
 
 has_force_vector(equation::Equation) = false
-function get_force_vector(equation::Equation, ip, time=Inf, problem=nothing)
+function get_force_vector(equation::Equation, ip, time=0.0, problem=nothing)
     get_force_vector(equation, ip, time)
 end
-function get_force_vector(equation::Equation, ip, time=Inf)
+function get_force_vector(equation::Equation, ip, time=0.0)
     get_force_vector(equation, ip)
 end
 function get_force_vector(equation::Equation, ip)
@@ -90,10 +90,10 @@ function get_force_vector(equation::Equation, ip)
 end
 
 has_residual_vector(equation::Equation) = false
-function get_residual_vector(equation::Equation, ip, time=Inf, problem=nothing)
+function get_residual_vector(equation::Equation, ip, time=0.0, problem=nothing)
     get_residual_vector(equation, ip, time)
 end
-function get_residual_vector(equation::Equation, ip, time=Inf)
+function get_residual_vector(equation::Equation, ip, time=0.0)
     get_residual_vector(equation, ip)
 end
 function get_residual_vector(equation::Equation, ip)
@@ -101,10 +101,10 @@ function get_residual_vector(equation::Equation, ip)
 end
 
 has_potential_energy(equation::Equation) = false
-function get_potential_energy(equation::Equation, ip, time=Inf, problem=nothing)
+function get_potential_energy(equation::Equation, ip, time=0.0, problem=nothing)
     get_potential_energy(equation, ip, time)
 end
-function get_potential_energy(equation::Equation, ip, time=Inf)
+function get_potential_energy(equation::Equation, ip, time=0.0)
     get_potential_energy(equation, ip)
 end
 function get_potential_energy(equation::Equation, ip)
@@ -117,7 +117,7 @@ get_integration_points(equation::Equation) = equation.integration_points
 
 """ Return a local assembly for element. """
 function calculate_local_assembly!(assembly::LocalAssembly, equation::Equation,
-                                   unknown_field_name::ASCIIString, time::Number=Inf,
+                                   unknown_field_name::ASCIIString, time::Number=0.0,
                                    problem=nothing)
 
     initialize_local_assembly!(assembly, equation) # zero all
@@ -174,6 +174,7 @@ function calculate_local_assembly!(assembly::LocalAssembly, equation::Equation,
         assembly.stiffness_matrix += hessian
         assembly.force_vector -= ForwardDiff.gradient(allresults)  # <--- minus explained in tutorial
         assembly.potential_energy = ForwardDiff.value(allresults)
+        #info("potential energy of system: $(assembly.potential_energy)")
     end
 
     # 3. virtual work form - user has defined residual vector δW_int(u,δu) + δW_ext(u,δu) = 0 ∀ v

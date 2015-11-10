@@ -19,7 +19,11 @@ end
 
 function MockElement(connectivity)
 
-    h(xi) = 1/4*[(1-xi[1])*(1-xi[2])   (1+xi[1])*(1-xi[2])   (1+xi[1])*(1+xi[2])   (1-xi[1])*(1+xi[2])]
+    h(xi) = 1/4*[
+        (1-xi[1])*(1-xi[2])
+        (1+xi[1])*(1-xi[2])
+        (1+xi[1])*(1+xi[2])
+        (1-xi[1])*(1+xi[2])]'
 
     dh(xi) = 1/4*[
         -(1-xi[2])    (1-xi[2])   (1+xi[2])  -(1+xi[2])
@@ -39,9 +43,47 @@ end
 """ test adding fieldsets and fields to element"""
 function test_add_fields_to_element()
     el = MockElement([1, 2, 3, 4])
-    el["geometry"] = [0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]
+    #geometry = Field([0.0, 0.0, 0.0, 0.0])
+    el["geometry"] = Field([0.0, 0.0, 0.0, 0.0])
+    @test el["geometry"][1].time == 0.0
+    @test last(el["geometry"]) == [0.0, 0.0, 0.0, 0.0]
+    el["geometry"] = Field(Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
+    @test last(el["geometry"])[3] == [1.0, 1.0]
+    el["geometry"] = Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+    @test last(el["geometry"])[3] == [1.0, 1.0]
+    el["geometry"] = [0.0 0.0; 1.0 0.0; 1.0 1.0; 0.0 1.0]'
+    @test last(el["geometry"])[3] == [1.0, 1.0]
+    el["geometry"] = (0.0, [0.0, 0.0, 0.0, 0.0]), (1.0, [1.0, 1.0, 1.0, 1.0])
     field = el["geometry"]
     @test length(field) == 2  # two time steps
+    el["boundary flux"] = (0.0, 0.0), (1.0, 6.0)
+end
+
+function test_add_fields_to_element_2()
+    el = MockElement([1, 2, 3, 4])
+    el["data"] = (0.0 => [1, 2], 1.0 => [2, 3])
+    @test length(el["data"]) == 2
+    @test el["data"][1].time == 0.0
+    @test el["data"][2].time == 1.0
+    @test last(el["data"][1]) == [1, 2]
+    @test last(el["data"][2]) == [2, 3]
+end
+
+function test_add_data_to_element_using_push()
+    el = MockElement([1, 2, 3, 4])
+    el["data"] = [0, 0, 0, 0]
+   
+    push!(el["data"], [1, 2, 3, 4])
+    @test length(el["data"]) == 1
+    @test length(el["data"][1]) == 2
+    @test el["data"][1].time == 0.0
+
+    push!(el["data"], 1.0 => [2, 3, 4, 5])  # creates new timestep at t=1.0
+    push!(el["data"], [3, 4, 5, 6])  # adds new increment data to last timestep
+    @test length(el["data"]) == 2
+    @test length(el["data"][2]) == 2
+    @test el["data"][2].time == 1.0
+    
 end
 
 #=
