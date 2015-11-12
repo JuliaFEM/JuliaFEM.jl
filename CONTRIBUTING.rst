@@ -78,15 +78,40 @@ Testing is made easy by using our `Makefile`. From there one founds convenient
 functions `make test`, `make test_file` and `make test_function` to make testing
 more rapid.
 
-Git issues
-----------
+One possible workflow: See
+`this post <http://superuser.com/questions/181517/how-to-execute-a-command-whenever-a-file-changes>_`:
+
+.. code:: bash
+
+   while sleep_until_modified.sh src/equations.jl; do clear; make test_file FILE=test/test_equations.jl; done
+
+or something similar. Every time file `src/equations.jl` is changed, tests from
+file `test/test_equations.jl` are run.
+
+Git spesific things
+-------------------
 
 Have done local changes, want to get latest updates and get "Cannot pull with
 rebase: You have unstaged changes. Please commit or stash them."
 
 http://stackoverflow.com/questions/23517464/error-cannot-pull-with-rebase-you-have-unstaged-changes
 
-Solution: git stash + git pull + git pop
+.. code-block:: bash
+
+   git stash
+   git pull
+   git stash pop
+
+Local modifictions done, want to get clean file from repo
+
+.. code-block:: bash
+
+   git checkout -- <filename>
+
+Having untracked files not wanting to commit at all? Put them to `.gitignore` if
+they are somehow generally unnecessary things. Or if they are "personal" (have
+made e.g. notebooks not wanting to commit), add them to your private ignore rules
+`.git/info/exclude` so that they don't show as untracked for you.
 
 Use of UTF-8 characters in program code
 ---------------------------------------
@@ -140,5 +165,6 @@ Documentation
 -------------
 We use restructured text to document this project. Information how to write rst
 format is described `here <http://sphinx-doc.org/rest.html>`_. See issue
-`#49 <https://github.com/JuliaFEM/JuliaFEM.jl/issues/49>`_.
+`#49 <https://github.com/JuliaFEM/JuliaFEM.jl/issues/49>`_. Keep line width max
+80 characters.
 
