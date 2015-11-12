@@ -9,18 +9,19 @@ abstract Solver
 Solve field equations for single element with some dofs fixed. This can be used
 to test nonlinear element formulations.
 """
-function solve!(equation::Equation, unknown_field_name::ASCIIString,
-                 free_dofs::Array{Int, 1}, time::Number=0.0; 
+function solve!(equation::Equation, free_dofs::Vector{Int}, time::Number=0.0; 
                  max_iterations::Int=10, tolerance::Float64=1.0e-12, dump_matrices::Bool=false)
+    unknown_field_name = get_unknown_field_name(equation)
     element = get_element(equation)
     x0 = element[unknown_field_name](0.0)
     x = zeros(prod(size(equation)))
     dx = fill!(similar(x), 0.0)
-    la = initialize_local_assembly()
+    ass = Assembly()
     for i=1:max_iterations
-        calculate_local_assembly!(la, equation, unknown_field_name)
-        A = la.stiffness_matrix[free_dofs, free_dofs]
-        b = la.force_vector[free_dofs]
+        empty!(ass)
+        assemble!(ass, equation)
+        A = full(ass.stiffness_matrix)[free_dofs, free_dofs]
+        b = full(ass.force_vector)[free_dofs]
         if dump_matrices
             dump(full(A))
             dump(full(b)')
@@ -39,30 +40,34 @@ to test nonlinear element formulations. Dirichlet boundary is assumed to be homo
 and degrees of freedom are eliminated. So if boundary condition is known in nodal
 points and everything is zero this should be quite good.
 """
-function solve!(problem::Problem, free_dofs::Array{Int, 1}, time::Number=1.0;
-                max_iterations::Int=10, tolerance::Float64=1.0e-12, dump_matrices::Bool=false)
+function solve!(problem::Problem, free_dofs::Vector{Int}, time::Number=1.0; max_iterations::Int=10, tolerance::Float64=1.0e-12, dump_matrices::Bool=false)
     info("start solver")
-    ga = initialize_global_assembly(problem)
-    x = zeros(ga.ndofs)
-    dx = fill!(similar(x), 0.0)
+    assembly = Assembly()
+#   x = zeros(ga.ndofs)
+#   dx = fill!(similar(x), 0.0)
+#   FIXME: better.
+    x = nothing
+    dx = nothing
     field_name = get_unknown_field_name(problem)
     dim = get_unknown_field_dimension(problem)
     for i=1:max_iterations
-        info("calculate global assembly")
-        calculate_global_assembly!(ga, problem)
-        info("done")
-        A = ga.stiffness_matrix[free_dofs, free_dofs]
-        b = ga.force_vector[free_dofs]
+        assemble!(assembly, problem, time)
+        A = sparse(assembly.stiffness_matrix)
+        b = sparse(assembly.force_vector)
         if dump_matrices
             dump(full(A))
             dump(full(b)')
         end
-        dx[free_dofs] = lufact(A) \ full(b)
+        if isa(dx, Void)
+            x = zeros(length(b))
+            dx = zeros(length(b))
+        end
+        dx[free_dofs] = lufact(A[free_dofs,free_dofs]) \ full(b)[free_dofs]
         info("Difference in solution norm: $(norm(dx))")
         x += dx
         for equation in get_equations(problem)
             element = get_element(equation)
-            gdofs = get_gdofs(problem, equation)
+            gdofs = get_gdofs(equation)
             data = reshape(full(x[gdofs]), size(equation))
             push!(element[field_name], data)
         end

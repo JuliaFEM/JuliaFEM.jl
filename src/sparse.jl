@@ -14,6 +14,10 @@ function SparseMatrixIJV()
     SparseMatrixIJV([], [], [])
 end
 
+function Base.sparse(A::SparseMatrixIJV)
+    return sparse(A.I, A.J, A.V)
+end
+
 function Base.push!(A::SparseMatrixIJV, I::Int, J::Int, V::Float64)
     push!(A.I, I)
     push!(A.J, J)
@@ -60,6 +64,13 @@ function add!(A::SparseMatrixIJV, dofs1::Vector{Int}, dofs2::Vector{Int}, data::
     n, m = size(data)
     append!(A.I, repeat(dofs1, outer=[m]))
     append!(A.J, repeat(dofs2, inner=[n]))
+    append!(A.V, vec(data))
+end
+
+""" Sparse vector version. """
+function add!(A::SparseMatrixIJV, dofs::Vector{Int}, data::Array{Float64})
+    append!(A.I, dofs)
+    append!(A.J, ones(Int, length(dofs)))
     append!(A.V, vec(data))
 end
 
