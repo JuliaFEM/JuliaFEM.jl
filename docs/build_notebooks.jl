@@ -63,24 +63,34 @@ function run_notebooks()
             end
             runtime = toc()
             bn = "tutorials/$(ipynb[1:end-6])"
+            #try
+            #    run(`ipython nbconvert tutorials/$ipynb --to rst --output=$bn`)
+            #catch error
+            #    warn("unable to convert notebook to rst format")
+            #    Base.showerror(Base.STDOUT, error)
+            #end
+
             try
-                run(`ipython nbconvert tutorials/$ipynb --to rst --output=$bn`)
+                run(`ipython nbconvert tutorials/$ipynb --to html --output=$bn`)
             catch error
-                warn("unable to convert notebook to rst format")
+                warn("unable to convert notebook to html format")
                 Base.showerror(Base.STDOUT, error)
             end
+
             try
                 run(`ipython nbconvert tutorials/$ipynb --to latex --output=$bn`)
             catch error
                 warn("unable to convert notebook to tex format")
                 Base.showerror(Base.STDOUT, error)
             end
+
             try
-                run(`lualatex $bn.tex`)
+                run(`lualatex --output-directory=tutorials $bn.tex`)
             catch error
                 warn("unable to convert notebook from tex to pdf")
                 Base.showerror(Base.STDOUT, error)
             end
+
             data = Dict("author" => "unknown", "status" => status, "runtime" => runtime,
                         "filename" => ipynb, "last_run" => time(), "description"=>"")
             res = parse_rst("$bn.rst")

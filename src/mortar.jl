@@ -1,101 +1,80 @@
-"""
-calculate "local" normals in elements, in a way that
-n = Nᵢnᵢ gives some reasonable results for ξ ∈ [-1, 1]
-"""
-function calculate_normals!(el::Element, t, field_name=symbol("normals"))
-    new_field!(el, field_name, Vector)
-    for xi in Vector[[-1.0], [1.0]]
-        t = dinterpolate(el, :Geometry, xi)
-        n = [0 -1; 1 0]*t
-        n /= norm(n)
-        push_field!(el, field_name, n)
-    end
-end
+# This file is a part of JuliaFEM.
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+
+# Mortar projection integration
+
+abstract MortarEquation <: Equation
 
 """
-Alter normal field such that normals of adjacent elements are averaged.
+Parameters
+----------
+node_csys
+    coordinate system in node, normal + tangent + "binormal"
+element_pairs
+    m x s matrix of boolean values, indicating elements sharing
+    common surface. s is number of slave elements and m is number
+    of master elements.
 """
-function average_normals!(elements, normal_field=symbol("normals"))
-    d = Dict()
-    for el in elements
-        c = get_connectivity(el)
-        n = get_field(el, normal_field)
-        for (ci, ni) in zip(c, n)
-            d[ci] = haskey(d, ci) ? d[ci] + ni : ni
+type MortarProblem <: BoundaryProblem
+    unknown_field_name :: ASCIIString
+    unknown_field_dimension :: Int
+    equations :: Vector{MortarEquation}
+    element_mapping :: Dict{Element, MortarEquation}
+    master_elements :: Vector{Element}  # mortar surface
+    node_csys :: Dict{Int, Matrix{Float64}}
+    element_pairs :: Matrix{Bool}
+end
+
+function MortarProblem(dimension::Int=1, equations=[], master_elements=[])
+    element_mapping = Dict(
+        Seg2 => MBC2D2,
+    )
+    MortarProblem("reaction force", dimension, equations, element_mapping, master_elements, Dict(), zeros(0,0))
+end
+
+""" Mortar boundary condition element for 2-dimensional problem, 2 node line segment. """
+type MBC2D2 <: MortarEquation
+    element :: Seg2  # == non-mortar surface element
+    integration_points :: Vector{IntegrationPoint}
+end
+function MBC2D2(element::Seg2)
+    integration_points = default_integration_points(element)
+    if !haskey(element, "reaction force")
+        element["reaction force"] = zeros(1, 2)
+    end
+    MBC2D2(element, integration_points)
+end
+Base.size(equation::MBC2D2) = (1, 2)
+
+function find_master_elements(slave_element, problem)
+    # find slave element "position" in element pairs matrix
+    all_elements = map((equation) -> get_element(equation), problem.equations)
+    seid = findfirst(slave_element, all_elements)
+    info("slave element id = $seid")
+    # find master element "positions" in element pairs matrix
+    meids = find(problem.element_pairs[:, seid])
+    info("master element ids = $meids")
+    # master elements
+    master_elements = problem.master_elements[meids]
+    return master_elements
+end
+
+function calculate_local_assembly!(assembly::LocalAssembly, equation::MortarEquation, unknown_field_name::ASCIIString, time::Number=0.0, problem=nothing)
+    # slave element = non-mortar element where integration happens
+    # master element = mortar element projected to non-mortar side
+    isa(problem, Void) && error("Cannot create projection without problem")
+    initialize_local_assembly!(assembly, equation)
+    slave_element = get_element(equation)
+    basis = get_basis(slave_element)
+    detJ = det(basis)
+    master_elements = find_master_elements(equation, problem)
+    for master_element in master_elements
+        for ip in get_integration_points(slave_element)
+            mortar_basis = 0 # ...
+            assembly.stiffness_matrix += w*basis'*basis
+            assembly.force_vector += w*N'*gn
         end
     end
-    for (ci, ni) in d
-        d[ci] /= norm(d[ci])
-    end
-    for el in elements
-        c = get_connectivity(el)
-        new_normals = [d[ci] for ci in c]
-        set_field(el, normal_field, new_normals)
-    end
 end
 
-
-""" Find projection from slave nodes to master element. """
-function calc_projection_slave_nodes_to_master_element(sel, mel)
-    X1 = get_field(sel, :Geometry)
-    N1 = get_field(sel, :Normals)
-    X2(xi) = interpolate(mel, :Geometry, xi)
-    dX2(xi) = dinterpolate(mel, :Geometry, xi)
-    R(xi, k) = det([X2(xi) - X1[k] N1[k]]')
-    dR(xi, k) = det([dX2(xi) N1[k]]')
-    xi2 = Vector[[0.0], [0.0]]
-    for k=1:2
-        xi = xi2[k]
-        for i=1:3
-            dxi = -R(xi, k)/dR(xi, k)
-            xi += dxi
-            if abs(dxi) < 1.0e-9
-                break
-            end
-        end
-        xi2[k] = xi
-    end
-    clamp!(xi2, -1, 1)
-    return xi2
-end
-
-""" Find projection from master nodes to slave element. """
-function calc_projection_master_nodes_to_slave_element(sel, mel)
-    X1(xi) = interpolate(sel, :Geometry, xi)
-    dX1(xi) = dinterpolate(sel, :Geometry, xi)
-    N1(xi) = interpolate(sel, :Normals, xi)
-    dN1(xi) = dinterpolate(sel, :Normals, xi)
-    X2 = get_field(mel, :Geometry)
-    R(xi, k) = det([X1(xi) - X2[k] N1(xi)]')
-    dR(xi, k) = det([dX1(xi) N1(xi)]') + det([X1(xi) - X2[k] dN1(xi)]')
-    xi1 = Vector[[0.0], [0.0]]
-    for k=1:2
-        xi = xi1[k]
-        for i=1:3
-            dxi = -R(xi, k)/dR(xi, k)
-            xi += dxi
-            if abs(dxi) < 1.0e-9
-                break
-            end
-        end
-        xi1[k] = xi
-    end
-    clamp!(xi1, -1, 1)
-    return xi1
-end
-
-function has_projection(sel, mel)
-    xi1 = calc_projection_master_nodes_to_slave_element(sel, mel)
-    l = abs(xi1[2]-xi1[1])[1]
-    return l > 1.0e-9
-end
-
-"""
-Calculate projection between 1d boundary elements
-"""
-function calc_projection(sel, mel)
-    xi1 = calc_projection_master_nodes_to_slave_element(sel, mel)
-    xi2 = calc_projection_slave_nodes_to_master_element(sel, mel)
-    return xi1, xi2
-end
 
