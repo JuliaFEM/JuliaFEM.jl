@@ -5,30 +5,32 @@ module TestAutoDiffWeakForm
 
 using JuliaFEM.Test
 using JuliaFEM
-using JuliaFEM: Quad4, Equation, IntegrationPoint,
+using JuliaFEM: Quad4, Equation, IntegrationPoint, assemble!,
+                Assembly,
                 solve!, get_field, get_element, get_basis,
-                grad
+                grad, get_default_integration_points
 
 """ Plane stress formulation for 4-node bilinear element. """
 type CPS4 <: Equation
     element :: Quad4
-    integration_points :: Array{IntegrationPoint, 1}
+    integration_points :: Vector{IntegrationPoint}
+end
+
+function JuliaFEM.get_unknown_field_name(equation::CPS4)
+    return "displacement"
 end
 
 function CPS4(element::Quad4)
-    integration_points = [
-        IntegrationPoint(1.0/sqrt(3.0)*[-1, -1], 1.0),
-        IntegrationPoint(1.0/sqrt(3.0)*[ 1, -1], 1.0),
-        IntegrationPoint(1.0/sqrt(3.0)*[ 1,  1], 1.0),
-        IntegrationPoint(1.0/sqrt(3.0)*[-1,  1], 1.0)]
+    integration_points = get_default_integration_points(element)
     if !haskey(element, "displacement")
-        # initial field must be defined if using autodiff
         element["displacement"] = zeros(2, 4)
     end
     CPS4(element, integration_points)
 end
 
-JuliaFEM.size(eq::CPS4) = (2, 4)
+function Base.size(eq::CPS4)
+    return (2, 4)
+end
 
 function JuliaFEM.get_residual_vector(equation::CPS4, ip, time; variation=nothing)
     element = get_element(equation)
@@ -58,8 +60,6 @@ function JuliaFEM.get_residual_vector(equation::CPS4, ip, time; variation=nothin
     return vec(r)
 end
 
-JuliaFEM.has_residual_vector(equation::CPS4) = true
-
 function test_residual_form()
     # create model -- start
     element = Quad4([1, 2, 3, 4])
@@ -71,7 +71,7 @@ function test_residual_form()
     # create model -- end
 
     free_dofs = [3, 4, 5, 6]
-    solve!(equation, "displacement", free_dofs)  # launch a newton solver for single element
+    solve!(equation, free_dofs)  # launch a newton solver for single element
     disp = get_basis(element)("displacement", [1.0, 1.0])[2]
     println("displacement at tip: $disp")
     # verified using Code Aster.

@@ -6,6 +6,10 @@
 abstract HeatProblem <: Problem
 abstract HeatEquation <: Equation
 
+function get_unknown_field_name(equation::HeatEquation)
+    return "temperature"
+end
+
 ### Formulation ###
 
 """ Heat equations.
@@ -32,55 +36,36 @@ References
 https://en.wikipedia.org/wiki/Heat_equation
 
 """
-function calculate_local_assembly!(assembly::LocalAssembly, equation::HeatEquation,
-                                            unknown_field_name::ASCIIString, time::Number=Inf,
-                                            problem=nothing)
-
-    initialize_local_assembly!(assembly, equation)
+function assemble!(assembly::Assembly, equation::HeatEquation, time::Number=0.0, problem=nothing)
 
     element = get_element(equation)
+    gdofs = get_gdofs(equation)
     basis = get_basis(element)
     dbasis = grad(basis)
     detJ = det(basis)
     for ip in get_integration_points(equation)
-        w = ip.weight * detJ(ip)
+        w = ip.weight*detJ(ip)
         N = basis(ip, time)
         if haskey(element, "density")
             rho = basis("density", ip, time)
-            assembly.mass_matrix += w * rho*N'*N
+            add!(assembly.mass_matrix, gdofs, gdofs, w*rho*N'*N)
         end
         if haskey(element, "temperature thermal conductivity")
             dN = dbasis(ip, time)
             k = basis("temperature thermal conductivity", ip, time)
-            assembly.stiffness_matrix += w * k*dN'*dN
+            add!(assembly.stiffness_matrix, gdofs, gdofs, w*k*dN'*dN)
         end
         if haskey(element, "temperature load")
             f = basis("temperature load", ip, time)
-            assembly.force_vector += w * N'*f
+            add!(assembly.force_vector, gdofs, w*N'*f)
         end
         if haskey(element, "temperature flux")
             g = basis("temperature flux", ip, time)
-            assembly.force_vector += w * N'*g
+            add!(assembly.force_vector, gdofs, w*N'*g)
         end
     end
 end
 
-### Problems ###
-
-type PlaneHeatProblem <: HeatProblem
-    unknown_field_name :: ASCIIString
-    unknown_field_dimension :: Int
-    equations :: Array{HeatEquation, 1}
-    element_mapping :: Dict{DataType, DataType}
-end
-
-""" Default constructor for problem takes no arguments. """
-function PlaneHeatProblem()
-    element_mapping = Dict(
-        Quad4 => DC2D4,
-        Seg2 => DC2D2)
-    return PlaneHeatProblem("temperature", 1, [], element_mapping)
-end
 
 ### Equations ###
 
@@ -101,7 +86,7 @@ Base.size(equation::DC2D4) = (1, 4)
 """ Diffusive heat transfer for 2-node linear segment. """
 type DC2D2 <: HeatEquation
     element :: Seg2
-    integration_points :: Array{IntegrationPoint, 1}
+    integration_points :: Vector{IntegrationPoint}
 end
 function DC2D2(element::Seg2)
     integration_points = get_default_integration_points(element)
@@ -112,3 +97,21 @@ function DC2D2(element::Seg2)
 end
 Base.size(equation::DC2D2) = (1, 2)
 
+### Problems ###
+
+type PlaneHeatProblem <: HeatProblem
+    unknown_field_name :: ASCIIString
+    unknown_field_dimension :: Int
+    equations :: Vector{Equation}
+    #element_mapping :: Dict{Element, Equation}
+    # FIXME: Why is not working ^
+    element_mapping :: Dict{Any, Any}
+end
+
+""" Default constructor for problem takes no arguments. """
+function PlaneHeatProblem()
+    element_mapping = Dict(
+        Quad4 => DC2D4,
+        Seg2 => DC2D2)
+    return PlaneHeatProblem("temperature", 1, [], element_mapping)
+end

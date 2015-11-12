@@ -5,6 +5,10 @@
 
 abstract DirichletEquation <: Equation
 
+function get_unknown_field_name(equation::DirichletEquation)
+    return "reaction force"
+end
+
 ### Dirichlet problem + equations
 
 type DirichletProblem <: BoundaryProblem
@@ -56,19 +60,19 @@ function DBC2D2(element::Seg2)
 end
 Base.size(equation::DBC2D2) = (1, 2)
 
-function calculate_local_assembly!(assembly::LocalAssembly, equation::DirichletEquation, unknown_field_name::ASCIIString, time::Number=0.0, problem=nothing)
-    initialize_local_assembly!(assembly, equation)
+function assemble!(assembly::Assembly, equation::DirichletEquation, time::Number=0.0, problem=nothing)
+    gdofs = get_gdofs(equation)
     element = get_element(equation)
     basis = get_basis(element)
     detJ = det(basis)
     for ip in get_integration_points(equation)
         w = ip.weight * detJ(ip)
         N = basis(ip, time)
-        assembly.stiffness_matrix += w * N'*N
+        add!(assembly.stiffness_matrix, gdofs, gdofs, w*N'*N)
         if !isa(problem, Void)
             X = basis("geometry", ip, time)
             u = problem.field_value(X)
-            assembly.force_vector += w * N'*u
+            add!(assembly.force_vector, gdofs, w*N'*u)
         end
     end
 end

@@ -6,6 +6,10 @@
 abstract ElasticityProblem <: Problem
 abstract ElasticityEquation <: Equation
 
+function get_unknown_field_name(equation::ElasticityEquation)
+    return "displacement"
+end
+
 ### Formulation ###
 
 """ Calculate internal energy for elasticity equation.

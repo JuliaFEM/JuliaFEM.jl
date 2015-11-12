@@ -63,6 +63,7 @@ include("lagrange.jl") # Lagrange elements
 
 ### EQUATIONS ###
 include("integrate.jl")  # default integration points for elements
+include("sparse.jl")
 include("equations.jl")
 include("problems.jl")
 
