@@ -111,25 +111,26 @@ common situation, i.e., some main field problem and it's Dirichlet boundary.
     Cu       = g
 
 """
-function call(solver::SimpleSolver, time::Number=Inf)
-    p1, p2 = get_problems(solver)
+function call(solver::SimpleSolver, time::Number=0.0)
+    problem1, problem2 = get_problems(solver)
 
-    ga1 = initialize_global_assembly(p1)
-    calculate_global_assembly!(ga1, p1)
-    ga2 = initialize_global_assembly(p2)
-    calculate_global_assembly!(ga2, p2)
+    assembly1 = Assembly()
+    assemble!(assembly1, problem1, time)
+    assembly2 = Assembly()
+    assemble!(assembly2, problem2, time)
 
-    A1 = ga1.stiffness_matrix
-    b1 = ga1.force_vector
-    A2 = ga2.stiffness_matrix
-    b2 = ga2.force_vector
+#   info("Creating sparse matrices")
+    A1 = sparse(assembly1.stiffness_matrix)
+    b1 = sparse(assembly1.force_vector, size(A1, 1), 1)
+    A2 = sparse(assembly2.stiffness_matrix)
+    b2 = sparse(assembly2.force_vector, size(A2, 1), 1)
     
     # create a saddle point problem
     A = [A1 A2; A2' zeros(A2)]
     b = [b1; b2]
 
     # solve problem
-    nz = unique(rowvals(A))  # here we remove any zero rows
+    nz = unique(rowvals(A))  # take only non-zero rows
     x = zeros(b)
     x[nz] = lufact(A[nz,nz]) \ full(b[nz])
 
@@ -138,23 +139,23 @@ function call(solver::SimpleSolver, time::Number=Inf)
     x2 = x[length(b1)+1:end]
 
     # update field for elements in problem 1
-    for equation in get_equations(p1)
+    for equation in get_equations(problem1)
         element = get_element(equation)
-        field_name = get_unknown_field_name(p1)
-        gdofs = get_gdofs(p1, equation)
+        field_name = get_unknown_field_name(problem1)
+        gdofs = get_gdofs(problem1, equation)
         element_solution = full(x1[gdofs])
-        field = Field(time, element_solution)
-        push!(element[field_name], field)
+        field = Increment(element_solution)
+        push!(element[field_name], TimeStep(time, field))
     end
 
     # update field for elements in problem 2 (Dirichlet boundary)
-    for equation in get_equations(p2)
+    for equation in get_equations(problem2)
         element = get_element(equation)
-        field_name = get_unknown_field_name(p2)
-        gdofs = get_gdofs(p2, equation)
+        field_name = get_unknown_field_name(problem2)
+        gdofs = get_gdofs(problem2, equation)
         element_solution = full(x2[gdofs])
-        field = Field(time, element_solution)
-        push!(element[field_name], field)
+        field = Increment(element_solution)
+        push!(element[field_name], TimeStep(time, field))
     end
 end
 

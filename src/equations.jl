@@ -97,6 +97,12 @@ function get_gdofs(equation::Equation)
     return gdofs
 end
 
+function get_gdofs(element::Element, dim::Int)
+    conn = get_connectivity(element)
+    gdofs = vec(vcat([dim*conn'-i for i=dim-1:-1:0]...))
+    return gdofs
+end
+
 """ Assemble element. """
 function assemble!(assembly::Assembly, equation::Equation, time::Number=0.0, problem=nothing)
 

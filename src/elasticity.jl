@@ -19,8 +19,7 @@ Saint Venant-Kirchhoff material model, which is simply
 
     S(E) = λtr(E) + 2μE
 """
-function get_internal_energy(equation::Equation, ip::IntegrationPoint,
-                             time::Number, F::Matrix)
+function get_internal_energy(equation::ElasticityEquation, ip::IntegrationPoint, time::Number, F::Matrix)
     element = get_element(equation)
     basis = get_basis(element)
     dbasis = grad(basis)
@@ -72,8 +71,7 @@ https://en.wikipedia.org/wiki/Plane_stress
 https://en.wikipedia.org/wiki/Hooke's_law
 
 """
-function get_residual_vector(equation::ElasticityEquation, ip::IntegrationPoint,
-                             time::Number; variation=nothing)
+function get_residual_vector(equation::ElasticityEquation, ip::IntegrationPoint, time::Number; variation=nothing)
 
     element = get_element(equation)
     basis = get_basis(element)
@@ -82,9 +80,10 @@ function get_residual_vector(equation::ElasticityEquation, ip::IntegrationPoint,
     u = basis("displacement", ip, time, variation)
     gradu = dbasis("displacement", ip, time, variation)
     F = I + gradu # deformation gradient
-
+    #info("Deformation gradient: $F")
     # residual vector - internal energy
     r = get_internal_energy(equation, ip, time, F)
+    #info("boundary element")
 
     # external forces - volume load
     if haskey(element, "displacement load")
@@ -94,40 +93,71 @@ function get_residual_vector(equation::ElasticityEquation, ip::IntegrationPoint,
 
     return vec(r)
 end
-has_residual_vector(equation::ElasticityEquation) = true
 
-### Problem 1 - plane elasticity ###
+### Plane stress elasticity ###
 
 abstract PlaneElasticityProblem <: ElasticityProblem
+abstract PlaneStressElasticityEquation <: ElasticityEquation
 
 type PlaneStressElasticityProblem <: PlaneElasticityProblem
     unknown_field_name :: ASCIIString
     unknown_field_dimension :: Int
-    equations :: Array{ElasticityEquation, 1}
-    element_mapping :: Dict{DataType, DataType}
+    equations :: Vector{PlaneStressElasticityEquation}
 end
 
 function PlaneStressElasticityProblem(equations=[])
-    element_mapping = Dict(
-        Quad4 => CPS4)
-    return PlaneStressElasticityProblem("displacement", 2, equations, element_mapping)
+    return PlaneStressElasticityProblem("displacement", 2, equations)
 end
 
 ### Equations ###
 
-abstract PlaneElasticityEquation <: ElasticityEquation
-abstract PlaneStressElasticityEquation <: PlaneElasticityEquation
-
+""" 4-node plane stress element. """
 type CPS4 <: PlaneStressElasticityEquation
     element :: Quad4
     integration_points :: Array{IntegrationPoint, 1}
 end
-function CPS4(element::Quad4)
+
+function Base.size(equation::CPS4)
+    return (2, 4)
+end
+
+function Base.convert(::Type{PlaneStressElasticityEquation}, element::Quad4)
     integration_points = get_default_integration_points(element)
-    if !haskey(element, "displacement")
-        element["displacement"] = zeros(2, 4)
-    end
+    haskey(element, "displacement") || (element["displacement"] = zeros(2, 4))
     CPS4(element, integration_points)
 end
-Base.size(equation::CPS4) = (2, 4)
+
+""" Boundary element for plane stress problem for surface loads. """
+type CPS2 <: PlaneStressElasticityEquation
+    element :: Seg2
+    integration_points :: Vector{IntegrationPoint}
+end
+
+function Base.size(equation::CPS2)
+    return (2, 2)
+end
+
+function Base.convert(::Type{PlaneStressElasticityEquation}, element::Seg2)
+    integration_points = get_default_integration_points(element)
+    haskey(element, "displacement") || (element["displacement"] = zeros(2, 2))
+    CPS2(element, integration_points)
+end
+
+function get_residual_vector(equation::CPS2, ip::IntegrationPoint, time::Number; variation=nothing)
+
+    element = get_element(equation)
+    basis = get_basis(element)
+
+    u = basis("displacement", ip, time, variation)
+    r = zeros(size(equation))
+
+    if haskey(element, "displacement traction force")
+        T = basis("displacement traction force", ip, time)
+#       info("traction force = $T")
+#       info("basis = $(basis(ip, time))")
+        r -= T*basis(ip, time)
+    end
+
+    return vec(r)
+end
 

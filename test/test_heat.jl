@@ -6,6 +6,8 @@
 module HeatTests  # always wrap tests to module ending with "Tests"
 
 using JuliaFEM.Test  # always use JuliaFEM.Test, not Base.Test
+
+using JuliaFEM: HeatEquation
 using JuliaFEM: Seg2, Quad4, DC2D4, DC2D2, Assembly, assemble!
 
 function test_one_element()  # always start test function with name test_
@@ -25,7 +27,7 @@ function test_one_element()  # always start test function with name test_
 
     # Set constant source f=12 with k=6. Accurate solution is
     # T=1 on free boundary, u(x,y) = -1/6*(1/2*f*x^2 - f*x)
-    equation = DC2D4(element)
+    equation = convert(HeatEquation, element)
     #la = initialize_local_assembly()
     #calculate_local_assembly!(la, equation, "temperature")
     assembly = Assembly()
@@ -37,7 +39,7 @@ function test_one_element()  # always start test function with name test_
 
     # Set constant flux g=6 on boundary. Accurate solution is
     # u(x,y) = x which equals T=1 on boundary.
-    boundary_equation = DC2D2(boundary_element)
+    boundary_equation = convert(HeatEquation, boundary_element)
     empty!(assembly)
 
     time = 1.0

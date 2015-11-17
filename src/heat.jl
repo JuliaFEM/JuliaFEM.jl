@@ -72,46 +72,46 @@ end
 """ Diffusive heat transfer for 4-node bilinear element. """
 type DC2D4 <: HeatEquation
     element :: Quad4
-    integration_points :: Array{IntegrationPoint, 1}
+    integration_points :: Vector{IntegrationPoint}
 end
-function DC2D4(element::Quad4)
-    integration_points = get_default_integration_points(element)
-    if !haskey(element, "temperature")
-        element["temperature"] = zeros(4)
-    end
-    DC2D4(element, integration_points)
+
+function Base.size(equation::DC2D4)
+    return (1, 4)
 end
-Base.size(equation::DC2D4) = (1, 4)
 
 """ Diffusive heat transfer for 2-node linear segment. """
 type DC2D2 <: HeatEquation
     element :: Seg2
     integration_points :: Vector{IntegrationPoint}
 end
-function DC2D2(element::Seg2)
+
+function Base.size(equation::DC2D2)
+    return (1, 2)
+end
+
+# Conversions element -> equation
+
+function Base.convert(::Type{HeatEquation}, element::Quad4)
     integration_points = get_default_integration_points(element)
-    if !haskey(element, "temperature")
-        element["temperature"] = zeros(2)
-    end
+    haskey(element, "temperature") || (element["temperature"] = zeros(4))
+    DC2D4(element, integration_points)
+end
+
+function Base.convert(::Type{HeatEquation}, element::Seg2)
+    integration_points = get_default_integration_points(element)
+    haskey(element, "temperature") || (element["temperature"] = zeros(2))
     DC2D2(element, integration_points)
 end
-Base.size(equation::DC2D2) = (1, 2)
 
 ### Problems ###
 
 type PlaneHeatProblem <: HeatProblem
     unknown_field_name :: ASCIIString
     unknown_field_dimension :: Int
-    equations :: Vector{Equation}
-    #element_mapping :: Dict{Element, Equation}
-    # FIXME: Why is not working ^
-    element_mapping :: Dict{Any, Any}
+    equations :: Vector{HeatEquation}
 end
 
 """ Default constructor for problem takes no arguments. """
-function PlaneHeatProblem()
-    element_mapping = Dict(
-        Quad4 => DC2D4,
-        Seg2 => DC2D2)
-    return PlaneHeatProblem("temperature", 1, [], element_mapping)
+function PlaneHeatProblem(equations=[])
+    return PlaneHeatProblem("temperature", 1, equations)
 end
