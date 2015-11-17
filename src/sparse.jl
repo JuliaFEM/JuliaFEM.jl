@@ -14,8 +14,8 @@ function SparseMatrixIJV()
     SparseMatrixIJV([], [], [])
 end
 
-function Base.sparse(A::SparseMatrixIJV)
-    return sparse(A.I, A.J, A.V)
+function Base.sparse(A::SparseMatrixIJV, args...)
+    return sparse(A.I, A.J, A.V, args...)
 end
 
 function Base.push!(A::SparseMatrixIJV, I::Int, J::Int, V::Float64)
@@ -37,7 +37,7 @@ function Base.append!(A::SparseMatrixIJV, I::Vector{Int}, J::Vector{Int}, V::Vec
 end
 
 function Base.full(A::SparseMatrixIJV, args...)
-    return full(sparse(A.I, A.J, A.V), args...)
+    return full(sparse(A.I, A.J, A.V, args...))
 end
 
 """ Add local element matrix to sparse matrix. This basically does:

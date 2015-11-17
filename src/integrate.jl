@@ -11,9 +11,17 @@ function get_default_integration_points(element::Quad4)
     ]
 end
 
-function get_default_integration_points(element::Seg2)
+
+function line1()
     [
         IntegrationPoint([0.0], 2.0)
+    ]
+end
+
+function line2()
+    [
+        IntegrationPoint([-sqrt(1/3)], 1)
+        IntegrationPoint([+sqrt(1/3)], 1)
     ]
 end
 
@@ -22,6 +30,15 @@ function line3()
         IntegrationPoint([0.0], 8/9),
         IntegrationPoint([-sqrt(3/5)], 5/9),
         IntegrationPoint([+sqrt(3/5)], 5/9)
+    ]
+end
+
+function line4()
+    [
+        IntegrationPoint([+sqrt(3/7 - 2/7*sqrt(6/5))], (18+sqrt(30))/36)
+        IntegrationPoint([-sqrt(3/7 - 2/7*sqrt(6/5))], (18+sqrt(30))/36)
+        IntegrationPoint([+sqrt(3/7 + 2/7*sqrt(6/5))], (18-sqrt(30))/36)
+        IntegrationPoint([-sqrt(3/7 + 2/7*sqrt(6/5))], (18-sqrt(30))/36)
     ]
 end
 
@@ -35,29 +52,10 @@ function line5()
     ]
 end
 
-    #integration_points = [
-    #    IntegrationPoint([ 0.0000000000000000], 0.5688888888888889),
-    #    IntegrationPoint([-0.5384693101056831], 0.4786286704993665),
-    #    IntegrationPoint([ 0.5384693101056831], 0.4786286704993665),
-    #    IntegrationPoint([-0.9061798459386640], 0.2369268850561891),
-    #    IntegrationPoint([ 0.9061798459386640], 0.2369268850561891)
-    #]
-    #integration_points = [
-    #    IntegrationPoint([+sqrt(3/7 - 2/7*sqrt(6/5))], (18+sqrt(30))/36)
-    #    IntegrationPoint([-sqrt(3/7 - 2/7*sqrt(6/5))], (18+sqrt(30))/36)
-    #    IntegrationPoint([+sqrt(3/7 + 2/7*sqrt(6/5))], (18-sqrt(30))/36)
-    #    IntegrationPoint([-sqrt(3/7 + 2/7*sqrt(6/5))], (18-sqrt(30))/36)
-    #]
-    #integration_points = [
-    #    IntegrationPoint([0.0], 8/9),
-    #    IntegrationPoint([-sqrt(3/5)], 5/9),
-    #    IntegrationPoint([+sqrt(3/5)], 5/9)
-    #]
-    #integration_points = [
-    #    IntegrationPoint([-sqrt(1/3)], 1)
-    #    IntegrationPoint([+sqrt(1/3)], 1)
-    #]
-    #integration_points = [
-    #    IntegrationPoint([0.0], 2)
-    #]
+function get_default_integration_points(element::Seg2)
+    return line1()
+end
 
+function get_default_integration_points(element::MSeg2)
+    return line3()
+end

@@ -33,10 +33,11 @@ Notes
 Equation is automatically created during process based on problem
 element -> equation mapping and element type.
 """
-function Base.push!(problem::Problem, element::Element)
-    element_type = typeof(element)
-    equation_type = problem.element_mapping[element_type]
-    push!(problem.equations, equation_type(element))
+function Base.push!(problem::Problem, element::Element, args...)
+#    element_type = typeof(element)
+#    equation_type = problem.element_mapping[element_type]
+#    push!(problem.equations, equation_type(element, args...))
+    push!(problem.equations, element)
 end
 
 """

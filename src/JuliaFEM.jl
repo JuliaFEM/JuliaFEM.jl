@@ -34,6 +34,7 @@ export @debug, set_debug_on!, set_debug_off!
 
 using ForwardDiff
 autodiffcache = ForwardDiffCache()
+export derivative, jacobian, hessian
 
 """ Simple linspace extension to arrays.
 
@@ -60,6 +61,7 @@ include("types.jl")  # type definitions
 include("elements.jl")
 include("lagrange.jl") # Lagrange elements
 #include("hierarchical.jl") # P-elements
+include("mortar_elements.jl") # Mortar elements
 
 ### EQUATIONS ###
 include("integrate.jl")  # default integration points for elements
@@ -69,6 +71,7 @@ include("problems.jl")
 
 ### FORMULATIION ###
 include("dirichlet.jl")
+include("mortar.jl")  # mortar projection
 include("heat.jl")
 include("elasticity.jl")
 
