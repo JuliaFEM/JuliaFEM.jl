@@ -93,12 +93,12 @@ end
 ## SimpleSolver -- tiny direct demo solver
 """ Simple solver for educational purposes. """
 type SimpleSolver <: Solver
-    problems
+    problems :: Vector{Problem}
 end
 
 """ Default initializer. """
 function SimpleSolver()
-    SimpleSolver(Problem[])
+    SimpleSolver([])
 end
 
 """
@@ -143,9 +143,8 @@ function call(solver::SimpleSolver, time::Number=0.0)
         element = get_element(equation)
         field_name = get_unknown_field_name(problem1)
         gdofs = get_gdofs(problem1, equation)
-        element_solution = full(x1[gdofs])
-        field = Increment(element_solution)
-        push!(element[field_name], TimeStep(time, field))
+        local_sol = vec(full(x1[gdofs]))
+        push!(element[field_name], time => local_sol)
     end
 
     # update field for elements in problem 2 (Dirichlet boundary)
@@ -153,9 +152,8 @@ function call(solver::SimpleSolver, time::Number=0.0)
         element = get_element(equation)
         field_name = get_unknown_field_name(problem2)
         gdofs = get_gdofs(problem2, equation)
-        element_solution = full(x2[gdofs])
-        field = Increment(element_solution)
-        push!(element[field_name], TimeStep(time, field))
+        local_sol = vec(full(x1[gdofs]))
+        push!(element[field_name], time => local_sol)
     end
 end
 
