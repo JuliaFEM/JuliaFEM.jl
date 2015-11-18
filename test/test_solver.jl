@@ -64,7 +64,7 @@ function test_simplesolver()
     X = basis("geometry", xi, 1.0)
     T = basis("temperature", xi, 1.0)
     info("Temperature at point X = $X is T = $T")
-    @test isapprox(mean(T), 100.0)
+    @test isapprox(T, 100.0)
 end
 
 end
