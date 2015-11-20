@@ -4,6 +4,7 @@
 # https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/notebooks/2015-06-14-data-structures.ipynb
 
 abstract Field
+
 abstract DiscreteField <: Field
 abstract ContinuousField <: Field
 
