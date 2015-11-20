@@ -86,8 +86,8 @@ function Base.push!(solver::Solver, problem::Problem)
 end
 
 """ Get all problems assigned to solver. """
-function get_problems(s::Solver)
-    return s.problems
+function get_problems(solver::Solver)
+    return solver.problems
 end
 
 ## SimpleSolver -- tiny direct demo solver

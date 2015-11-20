@@ -8,7 +8,6 @@ using JuliaFEM: Seg2, Quad4, Field, FieldSet, CPS4,
                 get_basis, solve!,
                 PlaneStressElasticityProblem
 
-
 function test_elasticity_volume_load()
     element = Quad4([1, 2, 3, 4])
     element["geometry"] = Vector[[0.0, 0.0], [10.0, 0.0], [10.0, 1.0], [0.0, 1.0]]
@@ -19,10 +18,10 @@ function test_elasticity_volume_load()
     problem = PlaneStressElasticityProblem()
     push!(problem, element)
     solve!(problem, free_dofs; max_iterations=10)
-    disp = get_basis(element)("displacement", [1.0, 1.0])[2]
+    disp = get_basis(element)("displacement", [1.0, 1.0])
     info("displacement at tip: $disp")
     # verified using Code Aster.
-    @test isapprox(disp, -8.77303119819776)
+    @test isapprox(disp[2], -8.77303119819776)
 end
 
 function test_elasticity_surface_load()
