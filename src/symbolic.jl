@@ -3,7 +3,7 @@
 
 # https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/notebooks/2015-06-14-data-structures.ipynb
 
-immutable SymbolicField <: Field
+immutable SymbolicField <: AbstractField
     name :: ASCIIString
 end
 

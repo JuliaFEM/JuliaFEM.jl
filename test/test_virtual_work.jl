@@ -5,8 +5,7 @@ module TestAutoDiffWeakForm
 
 using JuliaFEM.Test
 using JuliaFEM
-using JuliaFEM: Quad4, Equation, IntegrationPoint, assemble!,
-                Assembly,
+using JuliaFEM: Quad4, Equation, IntegrationPoint, assemble!, Assembly,
                 solve!, get_field, get_element, get_basis,
                 grad, get_default_integration_points
 
@@ -23,7 +22,7 @@ end
 function CPS4(element::Quad4)
     integration_points = get_default_integration_points(element)
     if !haskey(element, "displacement")
-        element["displacement"] = zeros(2, 4)
+        element["displacement"] = 0.0 => Vector{Float64}[[0.0,0.0], [0.0,0.0], [0.0,0.0], [0.0,0.0]]
     end
     CPS4(element, integration_points)
 end
@@ -71,8 +70,8 @@ function test_residual_form()
     # create model -- end
 
     free_dofs = [3, 4, 5, 6]
-    solve!(equation, free_dofs)  # launch a newton solver for single element
-    disp = get_basis(element)("displacement", [1.0, 1.0])[2]
+    solve!(equation, free_dofs, 0.0)  # launch a newton solver for single element
+    disp = get_basis(element)("displacement", [1.0, 1.0], 0.0)[2]
     println("displacement at tip: $disp")
     # verified using Code Aster.
     @test isapprox(disp, -8.77303119819776E+00)

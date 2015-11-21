@@ -75,18 +75,21 @@ Examples
 >>> element["temperature"] = (0.0, [0, 0, 0, 0]), (1.0, [1, 2, 3, 4])
 >>> element["temperature"] = (0.0 => [0, 0, 0, 0], 1.0 => [1, 2, 3, 4])
 """
-function Base.setindex!(element::Element, field_data, field_name)
-    setindex!(element.fields, field_data, field_name)
+function Base.setindex!(element::Element, data, name::ASCIIString)
+    element.fields[name] = Field(data)
+end
+function Base.setindex!(element::Element, data::Tuple, name::ASCIIString)
+    element.fields[name] = Field(data...)
 end
 
-function Base.setindex!(element::Element, field_data::Tuple, field_name)
-    field = Field()
-    for (time, data) in field_data
-        ts = TimeStep(time, Increment[Increment(data)])
-        push!(field, ts)
-    end
-    element[field_name] = field
-end
+#function Base.setindex!(element::Element, field_data::Tuple, field_name)
+#    field = Field()
+#    for (time, data) in field_data
+#        ts = TimeStep(time, Increment[Increment(data)])
+#        push!(field, ts)
+#    end
+#    element[field_name] = field
+#end
 
 function get_connectivity(el::Element)
     return el.connectivity
@@ -95,12 +98,12 @@ end
 abstract AbstractFunctionSpace
 
 type FunctionSpace <: AbstractFunctionSpace
-    basis :: Basis
+    basis :: CVTI
     fields :: FieldSet
 end
 
 type GradientFunctionSpace <: AbstractFunctionSpace
-    basis :: Basis
+    basis :: CVTI
     fields :: FieldSet
 end
 
@@ -130,9 +133,6 @@ end
 """ Evaluate field on element function space. """
 function call(u::FunctionSpace, field_name, xi::Union{Vector, IntegrationPoint}, t::Number=0.0, variation=nothing)
     field = !isa(variation, Void) ? variation : u.fields[field_name](t)
-    if length(field) == 1
-        return field.data[1]
-    end
     u.basis(field, xi)
 end
 
@@ -171,7 +171,7 @@ end
 """ Get a determinant of element in point ξ. """
 function LinAlg.det(u::FunctionSpace, xi::Vector, time::Number=0.0)
     X = u.fields["geometry"](time)
-    dN = u.basis.dbasisdxi(xi)
+    dN = u.basis(xi, Val{:grad})
     J = sum([dN[:,i]*X[i]' for i=1:length(X)])
     m, n = size(J)
     return m == n ? det(J) : norm(J)
