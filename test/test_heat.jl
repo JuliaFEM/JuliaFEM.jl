@@ -14,6 +14,7 @@ function test_one_element()  # always start test function with name test_
 
     # volume element
     element = Quad4([1, 2, 3, 4])
+
     element["geometry"] = Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
     element["temperature thermal conductivity"] = 6.0
     element["temperature load"] = [12.0, 12.0, 12.0, 12.0]
@@ -22,14 +23,12 @@ function test_one_element()  # always start test function with name test_
     # boundary element 
     boundary_element = Seg2([1, 2])
     boundary_element["geometry"] = Vector[[0.0, 0.0], [1.0, 0.0]]
-    # linear ramp from 1 to 6 in time 0 to 1
-    boundary_element["temperature flux"] = (0.0, 0.0), (1.0, 6.0)
+    # linear ramp from 0 to 6 in time 0 to 1
+    boundary_element["temperature flux"] = (0.0 => 0.0, 1.0 => 6.0)
 
     # Set constant source f=12 with k=6. Accurate solution is
     # T=1 on free boundary, u(x,y) = -1/6*(1/2*f*x^2 - f*x)
     equation = convert(HeatEquation, element)
-    #la = initialize_local_assembly()
-    #calculate_local_assembly!(la, equation, "temperature")
     assembly = Assembly()
     assemble!(assembly, equation)
     fdofs = [1, 2]
@@ -44,13 +43,7 @@ function test_one_element()  # always start test function with name test_
 
     time = 1.0
     assemble!(assembly, equation, time)
-    info("after first element: $(length(assembly.force_vector.V))")
-    info(full(assembly.force_vector)')
     assemble!(assembly, boundary_equation, time)
-    info("after second element: $(length(assembly.force_vector.V))")
-    info(full(assembly.force_vector)')
-    #calculate_local_assembly!(la, boundary_equation, "temperature")
-    #b = la.force_vector
     A = full(assembly.stiffness_matrix)
     b = full(assembly.force_vector)
     T = A[fdofs, fdofs] \ b[fdofs]

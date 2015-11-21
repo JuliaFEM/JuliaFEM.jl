@@ -17,8 +17,8 @@ function test_elasticity_volume_load()
     free_dofs = [3, 4, 5, 6]
     problem = PlaneStressElasticityProblem()
     push!(problem, element)
-    solve!(problem, free_dofs; max_iterations=10)
-    disp = get_basis(element)("displacement", [1.0, 1.0])
+    solve!(problem, free_dofs, 0.0; max_iterations=10)
+    disp = get_basis(element)("displacement", [1.0, 1.0], 0.0)
     info("displacement at tip: $disp")
     # verified using Code Aster.
     @test isapprox(disp[2], -8.77303119819776)
@@ -39,11 +39,13 @@ function test_elasticity_surface_load()
     problem = PlaneStressElasticityProblem()
     push!(problem, element1)
     push!(problem, element2)
-    solve!(problem, free_dofs; max_iterations=10)
-    disp = get_basis(element1)("displacement", [1.0, 1.0])[2]
+    solve!(problem, free_dofs, 1.0; max_iterations=10)
+    disp = get_basis(element1)("displacement", [1.0, 1.0], 1.0)[2]
     info("displacement at tip: $disp")
     # verified using Code Aster.
     @test isapprox(disp, -9.33106637611714)
 end
+
+#test_elasticity_volume_load()
 
 end

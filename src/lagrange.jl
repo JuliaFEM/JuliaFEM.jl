@@ -36,11 +36,11 @@ macro create_lagrange_element(element_name, element_description, X, P)
         basis, dbasisdxi = calculate_lagrange_basis($P, $X)
         type $eltype <: CG
             connectivity :: Array{Int, 1}
-            basis :: Basis
+            basis :: CVTI
             fields :: FieldSet
         end
         function $eltype(connectivity, args...)
-            $eltype(connectivity, Basis(basis, dbasisdxi), FieldSet())
+            $eltype(connectivity, CVTI(basis, dbasisdxi), FieldSet())
         end
         get_element_description(el::Type{$eltype}) = $element_description
         Base.size(element::Type{$eltype}) = Base.size($X)

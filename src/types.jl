@@ -25,25 +25,45 @@ type IntegrationPoint
 end
 
 function IntegrationPoint(xi, weight)
-    IntegrationPoint(xi, weight, Dict())
+    return IntegrationPoint(xi, weight, FieldSet())
 end
 
 function Base.convert(::Type{Number}, ip::IntegrationPoint)
     return ip.xi
 end
 
-function Base.call(basis::Basis, ip::IntegrationPoint)
-    return basis(ip.xi)
+function Base.call(field::CVTI, ip::IntegrationPoint)
+    return call(field, ip.xi)
 end
 
-function Base.call(basis::Basis, increment::Increment, ip::IntegrationPoint)
-    return call(basis, increment, ip.xi)
+function Base.call(basis::CVTI, field::DCTI, ip::IntegrationPoint)
+    call(basis, field, ip.xi)
 end
 
-function Base.call(basis::Basis, increment::Increment, ip::IntegrationPoint, ::Type{Val{:grad}})
-    return call(basis, increment, ip.xi, Val{:grad})
+function Base.call(basis::CVTI, field::DVTI, ip::IntegrationPoint, ::Type{Val{:grad}})
+    call(basis, field, ip.xi, Val{:grad})
 end
 
-function Base.call(basis::Basis, geometry::Increment, field::Increment, ip::IntegrationPoint, ::Type{Val{:grad}})
-    return call(basis, geometry, field, ip.xi, Val{:grad})
+function Base.call(basis::CVTI, field::DVTI, ip::IntegrationPoint)
+    call(basis, field, ip.xi)
 end
+
+function Base.call(basis::CVTI, geometry::DVTI, field::DVTI, ip::IntegrationPoint, ::Type{Val{:grad}})
+    call(basis, geometry, field, ip.xi, Val{:grad})
+end
+
+#function Base.call(basis::Basis, increment::Increment, ip::IntegrationPoint)
+#    return call(basis, increment, ip.xi)
+#end
+#function Base.call(basis::Basis, increment::Increment, ip::IntegrationPoint, ::Type{Val{:grad}})
+#    return call(basis, increment, ip.xi, Val{:grad})
+#end
+#function Base.call(basis::Basis, field::Field, ip::IntegrationPoint, ::Type{Val{:grad}})
+#    return call(basis, field, ip.xi, Val{:grad})
+#end
+#function Base.call(basis::Basis, geometry::Increment, field::Increment, ip::IntegrationPoint, ::Type{Val{:grad}})
+#    return call(basis, geometry, field, ip.xi, Val{:grad})
+#end
+#function Base.call(basis::Basis, field::Field, ip::IntegrationPoint)
+#    return call(basis, field, ip.xi)
+#end

@@ -23,14 +23,6 @@ type DC2D4NL <: MyEquation
     integration_points :: Vector{IntegrationPoint}
 end
 
-function DC2D4NL(element::Quad4)
-    integration_points = get_default_integration_points(element)
-    if !haskey(element, "temperature")
-        element["temperature"] = zeros(4)
-    end
-    DC2D4NL(element, integration_points)
-end
-
 function Base.size(equation::DC2D4NL)
     return (1, 4)
 end
@@ -41,17 +33,22 @@ type DC2D2NL <: MyEquation
     integration_points :: Vector{IntegrationPoint}
 end
 
-function DC2D2NL(element::Seg2)
-    integration_points = JuliaFEM.line5()
-    if !haskey(element, "temperature")
-        element["temperature"] = zeros(2)
-    end
-    DC2D2NL(element, integration_points)
-end
-
 function Base.size(equation::DC2D2NL)
     return (1, 2)
 end
+
+function Base.convert(::Type{MyEquation}, element::Quad4)
+    integration_points = get_default_integration_points(element)
+    haskey(element, "temperature") || (element["temperature"] = 0.0 => zeros(4))
+    DC2D4NL(element, integration_points)
+end
+
+function Base.convert(::Type{MyEquation}, element::Seg2)
+    integration_points = JuliaFEM.line5()
+    haskey(element, "temperature") || (element["temperature"] = 0.0 => zeros(2))
+    DC2D2NL(element, integration_points)
+end
+
 
 """ Calculate a potential Π = Wint - Wext of system. """
 function JuliaFEM.get_potential_energy(equation::DC2D4NL, ip, time; variation=nothing)
@@ -89,27 +86,13 @@ function test_potential_energy_method()
     element["temperature load"] = [0.0, 0.0, 0.0, 0.0]
     element["temperature nodal load"] = [3.0, 3.0, 0.0, 0.0]
     element["temperature nonlinearity coefficient"] = 6.0
-    equation = DC2D4NL(element)
+    equation = convert(MyEquation, element)
     # create model -- end
 
-    ass = Assembly()
-    info("unknown field name: $(get_unknown_field_name(equation))")
-
-    T = zeros(4) # create workspace for solution vector
-    dT = zeros(4) # 
-    fd = [1, 2] # free dofs
-    # start loops, in principle solve ∂r(u)/∂uΔu = -r(u) and update.
-    for i=1:10
-        empty!(ass)
-        assemble!(ass, equation)  # calculate local matrices
-        dT[fd] = full(ass.stiffness_matrix)[fd,fd] \ full(ass.force_vector)[fd]
-        T += dT
-        push!(element["temperature"], T) # add new increment to model
-        @printf("increment %2d, |du| = %8.5f\n", i, norm(dT))
-        err = last(element["temperature"])[1] - 2/3
-        isapprox(err, 0.0) && break
-    end
-    err = last(element["temperature"])[1] - 2/3
+    solve!(equation, [1, 2], 0.0)
+    basis = get_basis(element)
+    temp = basis("temperature", [0.0, -1.0], 0.0)
+    err = temp - 2/3
     info("error: $err")
     @test isapprox(err, 0.0)
 end
@@ -118,15 +101,11 @@ end
 type TestProblem <: Problem
     unknown_field_name :: ASCIIString
     unknown_field_dimension :: Int
-    equations :: Vector{Equation}
-    element_mapping :: Dict{DataType, DataType}
+    equations :: Vector{MyEquation}
 end
 
 function TestProblem(equations=[])
-    element_mapping = Dict(
-        Quad4 => DC2D4NL,
-        Seg2 => DC2D2NL)
-    TestProblem("temperature", 1, equations, element_mapping)
+    TestProblem("temperature", 1, equations)
 end
 
 function test_potential_energy_method_2()
@@ -138,41 +117,23 @@ function test_potential_energy_method_2()
     element1["temperature thermal conductivity"] = 6.0
     element1["temperature load"] = [0.0, 0.0, 0.0, 0.0]
     element1["temperature nonlinearity coefficient"] = [0.0, 0.0, 0.0, 0.0]
-    element1["temperature"] = ones(4)
 
     element2 = Seg2([1, 2])
     element2["geometry"] = Vector[N[1], N[2]]
     element2["temperature coefficient"] = 3.0e-8 # ~ 5.7e-8 * 0.5
     element2["temperature external"] = 100.0
-    element2["temperature"] = ones(2)
     # create model -- end
-    
-    equation1 = DC2D4NL(element1)
-    equation2 = DC2D2NL(element2)
- 
-    ass = Assembly()
-    info("unknown field name: $(get_unknown_field_name(equation1))")
 
-    T = zeros(4) # create workspace for solution vector
-    dT = zeros(4) # 
-    fd = [1, 2] # free dofs
-    # start loops, in principle solve ∂r(u)/∂uΔu = -r(u) and update.
-    for i=1:10
-        empty!(ass)
-        assemble!(ass, equation1)
-        assemble!(ass, equation2)
-        dT[fd] = full(ass.stiffness_matrix)[fd,fd] \ full(ass.force_vector)[fd]
-        T += dT
-        push!(element1["temperature"], T)
-        push!(element2["temperature"], T[fd])
-        @printf("increment %2d, |du| = %8.5f\n", i, norm(dT))
-        err = last(element1["temperature"])[1] - 0.5
-        isapprox(err, 0.0) && break
-    end
+    problem = TestProblem()
+    push!(problem, element1)
+    push!(problem, element2)
+    solve!(problem, [1, 2], 0.0)
 
-    err = last(element1["temperature"])[1] - 0.5
+    basis = get_basis(element1)
+    temp = basis("temperature", [0.0, -1.0], 0.0)
+    err = temp - 0.5
     info("error: $err")
-    @test isapprox(err, 0.0)
+    @test isapprox(err, 0.0, atol=1.0e-6)
     
     # @test isapprox(temp, 2.93509690572300E+00)  # tested using Code Aster
 end

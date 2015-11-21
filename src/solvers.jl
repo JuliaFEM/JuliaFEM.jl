@@ -9,8 +9,7 @@ abstract Solver
 Solve field equations for single element with some dofs fixed. This can be used
 to test nonlinear element formulations.
 """
-function solve!(equation::Equation, free_dofs::Vector{Int}, time::Number=0.0; 
-                 max_iterations::Int=10, tolerance::Float64=1.0e-12, dump_matrices::Bool=false)
+function solve!(equation::Equation, free_dofs::Vector{Int}, time::Number; max_iterations::Int=10, tolerance::Float64=1.0e-12, dump_matrices::Bool=false)
     unknown_field_name = get_unknown_field_name(equation)
     element = get_element(equation)
     x0 = element[unknown_field_name](0.0)
@@ -28,7 +27,9 @@ function solve!(equation::Equation, free_dofs::Vector{Int}, time::Number=0.0;
         end
         dx[free_dofs] = A \ b
         x += dx
-        push!(element[unknown_field_name], reshape(x, size(equation)))
+        eqsize = size(equation)
+        data = eqsize[1] != 1 ? reshape(x, eqsize) : x
+        push!(element[unknown_field_name], time => data)
         norm(dx) < tolerance && return
     end
     error("Did not converge in $max_iterations iterations")
@@ -40,7 +41,7 @@ to test nonlinear element formulations. Dirichlet boundary is assumed to be homo
 and degrees of freedom are eliminated. So if boundary condition is known in nodal
 points and everything is zero this should be quite good.
 """
-function solve!(problem::Problem, free_dofs::Vector{Int}, time::Number=1.0; max_iterations::Int=10, tolerance::Float64=1.0e-12, dump_matrices::Bool=false)
+function solve!(problem::Problem, free_dofs::Vector{Int}, time::Float64; max_iterations::Int=10, tolerance::Float64=1.0e-12, dump_matrices::Bool=false)
     info("start solver")
     assembly = Assembly()
 #   x = zeros(ga.ndofs)
@@ -68,8 +69,12 @@ function solve!(problem::Problem, free_dofs::Vector{Int}, time::Number=1.0; max_
         for equation in get_equations(problem)
             element = get_element(equation)
             gdofs = get_gdofs(equation)
-            data = reshape(full(x[gdofs]), size(equation))
-            push!(element[field_name], data)
+            data = full(x[gdofs])
+            eqsize = size(equation)
+            if eqsize[1] != 1
+                data = reshape(data, eqsize)
+            end
+            push!(element[field_name], time => data)
         end
         norm(dx) < tolerance && return
     end

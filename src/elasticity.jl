@@ -114,7 +114,7 @@ end
 """ 4-node plane stress element. """
 type CPS4 <: PlaneStressElasticityEquation
     element :: Quad4
-    integration_points :: Array{IntegrationPoint, 1}
+    integration_points :: Vector{IntegrationPoint}
 end
 
 function Base.size(equation::CPS4)
@@ -123,7 +123,9 @@ end
 
 function Base.convert(::Type{PlaneStressElasticityEquation}, element::Quad4)
     integration_points = get_default_integration_points(element)
-    haskey(element, "displacement") || (element["displacement"] = zeros(2, 4))
+    if !haskey(element, "displacement")
+        element["displacement"] = 0.0 => [zeros(2) for i=1:4]
+    end
     CPS4(element, integration_points)
 end
 
@@ -139,7 +141,9 @@ end
 
 function Base.convert(::Type{PlaneStressElasticityEquation}, element::Seg2)
     integration_points = get_default_integration_points(element)
-    haskey(element, "displacement") || (element["displacement"] = zeros(2, 2))
+    if !haskey(element, "displacement")
+        element["displacement"] = 0.0 => [zeros(2) for i=1:2]
+    end
     CPS2(element, integration_points)
 end
 

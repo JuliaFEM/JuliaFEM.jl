@@ -161,7 +161,8 @@ function assemble!(assembly::Assembly, equation::Equation, time::Number=0.0, pro
 
     # 3. virtual work -- user has defined some residual r = p - f = 0
     if has_residual_vector(equation)
-        field = element[unknown_field_name](time)
+
+        field = DVTI(last(element[unknown_field_name]).data)
 
         """ Wrapper for virtual work for ForwardDiff. """
         function calc_R(data::Vector)
@@ -177,9 +178,12 @@ function assemble!(assembly::Assembly, equation::Equation, time::Number=0.0, pro
             if haskey(element, "$unknown_field_name nodal load")
                 R -= vec(element["$unknown_field_name nodal load"](time))
             end
+            #info("return = $R")
             return R
         end
-       
+
+        #info("field = $field")
+        #info("vec(field) = $(vec(field))")
         jacobian, allresults = ForwardDiff.jacobian(calc_R, vec(field), AllResults, cache=autodiffcache)
         add!(assembly.stiffness_matrix, gdofs, gdofs, jacobian)
         add!(assembly.force_vector, gdofs, -ForwardDiff.value(allresults))

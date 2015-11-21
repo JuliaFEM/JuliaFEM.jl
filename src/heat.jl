@@ -60,6 +60,7 @@ function assemble!(assembly::Assembly, equation::HeatEquation, time::Number=0.0,
             add!(assembly.force_vector, gdofs, w*N'*f)
         end
         if haskey(element, "temperature flux")
+            info("assemble boundary flux")
             g = basis("temperature flux", ip, time)
             add!(assembly.force_vector, gdofs, w*N'*g)
         end
@@ -93,13 +94,13 @@ end
 
 function Base.convert(::Type{HeatEquation}, element::Quad4)
     integration_points = get_default_integration_points(element)
-    haskey(element, "temperature") || (element["temperature"] = zeros(4))
+    haskey(element, "temperature") || (element["temperature"] = 0.0 => zeros(4))
     DC2D4(element, integration_points)
 end
 
 function Base.convert(::Type{HeatEquation}, element::Seg2)
     integration_points = get_default_integration_points(element)
-    haskey(element, "temperature") || (element["temperature"] = zeros(2))
+    haskey(element, "temperature") || (element["temperature"] = 0.0 => zeros(2))
     DC2D2(element, integration_points)
 end
 

@@ -52,8 +52,8 @@ function Base.linspace{T<:Array}(X1::T, X2::T, n)
 end
 
 # fields, see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/notebooks/2015-06-14-data-structures.ipynb
-include("fields.jl")
-include("basis.jl")  # interpolation of discrete fields
+include("fields2.jl")
+#include("basis.jl")  # interpolation of discrete fields
 include("symbolic.jl") # a thin symbolic layer for fields
 include("types.jl")  # type definitions
 
