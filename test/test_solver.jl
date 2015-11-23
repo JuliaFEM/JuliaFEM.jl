@@ -6,7 +6,7 @@ module SolverTests
 using JuliaFEM.Test
 using JuliaFEM
 
-using JuliaFEM: DirichletProblem, Seg2, PlaneHeatProblem, Quad4, SimpleSolver, get_element, get_basis, MortarElement, MortarProblem, DirectSolver, PlaneStressElasticityProblem
+using JuliaFEM: DirichletProblem, Seg2, PlaneHeatProblem, Quad4, SimpleSolver, get_element, get_basis, MortarElement, MortarProblem, PlaneStressElasticityProblem, solve!, DirectSolver
 
 """ Define Problem 1:
 
@@ -38,7 +38,8 @@ end
 function get_boundaryproblem()
     el3 = Seg2([3, 4])
     el3["geometry"] = Vector[[1.0, 1.0], [0.0, 1.0]]
-    problem2 = DirichletProblem(1)
+    el3["temperature"] = 0.0
+    problem2 = DirichletProblem("temperature", 1)
     push!(problem2, el3)
     return problem2
 end
@@ -67,7 +68,7 @@ function test_simplesolver()
     @test isapprox(T, 100.0)
 end
 
-function test_direct_solver()
+function atest_direct_solver()
 
     N = Dict{Int, Vector}(
         1 => [0.0, 0.0],
@@ -87,7 +88,7 @@ function test_direct_solver()
 
    # volume elements
    e1 = Quad4([1, 2, 5, 4])
-   e1["geometry"] = Vector[N[1], N[2], N[3], N[4]]
+   e1["geometry"] = Vector[N[1], N[2], N[5], N[4]]
    e2 = Quad4([2, 3, 6, 5])
    e2["geometry"] = Vector[N[2], N[3], N[6], N[5]]
    e3 = Quad4([7, 8, 12, 11])
@@ -177,5 +178,57 @@ function test_direct_solver()
    call(solver)
 
 end
+
+function test_solver_multiple_dirichlet_bc()
+    N = Vector[[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
+
+    e1 = Quad4([1, 2, 4, 3])
+    e1["geometry"] = Vector[N[1], N[2], N[4], N[3]]
+    e1["youngs modulus"] = 900.0
+    e1["poissons ratio"] = 0.25
+    b1 = Seg2([3, 4])
+    b1["geometry"] = Vector[N[3], N[4]]
+    b1["displacement traction force"] = Vector[[0.0, -100.0], [0.0, -100.0]]
+
+    #free_dofs = [3, 5, 6, 8]
+    free_dofs = [3, 6, 7, 8]
+    problem = PlaneStressElasticityProblem()
+    push!(problem, e1)
+    push!(problem, b1)
+
+    # manually solve problem 1
+    #solve!(problem, free_dofs, 0.0; max_iterations=10)
+    #disp = e1("displacement", [1.0, 1.0], 0.0)
+    #info("displacement at tip: $disp")
+    #@test isapprox(disp, [3.17431158889468E-02, -1.38591518927826E-01])
+
+    # boundary elements for dirichlet dx=0
+    dx = Seg2([1, 3])
+    dx["geometry"] = Vector[N[1], N[3]]
+    dx["displacement 1"] = 0.0
+
+    # boundary elements for dirichlet dy=0
+    dy = Seg2([1, 2])
+    dy["geometry"] = Vector[N[1], N[2]]
+    dy["displacement 2"] = 0.0
+  
+    problem2 = DirichletProblem("displacement", 2)
+    push!(problem2, dx)
+    push!(problem2, dy)
+
+    solver = DirectSolver()
+    push!(solver, problem)
+    push!(solver, problem2)
+
+    # launch solver
+    norm = solver(0.0)
+
+    disp = e1("displacement", [1.0, 1.0], 0.0)
+    info("displacement at tip: $disp")
+    @test isapprox(disp, [3.17431158889468E-02, -1.38591518927826E-01])
+
+end
+
+# test_solver_multiple_dirichlet_bc()
 
 end

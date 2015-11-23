@@ -67,6 +67,10 @@ function Base.getindex(element::Element, field_name)
     return element.fields[field_name]
 end
 
+function get_integration_points(element)
+    return get_default_integration_points(element)
+end
+
 """Add new Field to element.
 
 Examples
@@ -77,6 +81,9 @@ Examples
 """
 function Base.setindex!(element::Element, data, name::ASCIIString)
     element.fields[name] = Field(data)
+end
+function Base.setindex!(element::Element, field::Field, name::ASCIIString)
+    element.fields[name] = field
 end
 function Base.setindex!(element::Element, data::Tuple, name::ASCIIString)
     element.fields[name] = Field(data...)
@@ -143,6 +150,39 @@ function call(gradu::GradientFunctionSpace, field_name, xi::Union{Vector, Integr
     gradu.basis(geometry, field, xi, Val{:grad})
 end
 
+typealias VecOrIP Union{Vector, IntegrationPoint}
+
+function Base.call(element::Element, field_name::ASCIIString, xi::VecOrIP, time::Number)
+    return element.basis(element[field_name](time), xi)
+end
+
+function Base.call(element::Element, field_name::ASCIIString, xi::VecOrIP, time::Number, ::Type{Val{:grad}})
+    return element.basis(element["geometry"](time), element[field_name](time), xi, Val{:grad})
+end
+
+function Base.call(element::Element, field_name::ASCIIString, xi::VecOrIP)
+    return element.basis(element[field_name], xi)
+end
+
+function Base.call(element::Element, field_name::ASCIIString, xi::VecOrIP, ::Type{Val{:grad}})
+    return element.basis(element["geometry"], element[field_name], xi, Val{:grad})
+end
+
+function Base.call(element::Element, field_name::ASCIIString, time::Number)
+    return element[field_name](time)
+end
+
+function Base.call(element::Element, xi::VecOrIP)
+    element.basis(xi)
+end
+
+function Base.call(element::Element, xi::VecOrIP, ::Type{Val{:grad}})
+    element.basis(element["geometry"], xi, Val{:grad})
+end
+
+function Base.call(element::Element, field_name::ASCIIString)
+    return element[field_name]
+end
 
 # on-line functions to get api more easy to use, ip -> xi.ip
 #call(u::FunctionSpace, ip::IntegrationPoint, t::Number=Inf) = call(u, ip.xi, t)
@@ -176,12 +216,19 @@ function LinAlg.det(u::FunctionSpace, xi::Vector, time::Number=0.0)
     m, n = size(J)
     return m == n ? det(J) : norm(J)
 end
+
 function LinAlg.det(u::FunctionSpace, ip::IntegrationPoint, time::Number=0.0)
     LinAlg.det(u, ip.xi, time)
 end
+
 function LinAlg.det(u::FunctionSpace)
     return (args...) -> det(u, args...)
 end
+
+function LinAlg.det(element::Element)
+    return det(get_basis(element))
+end
+
 #Base.(:+)(u::FunctionSpace, v::FunctionSpace) = (args...) -> u(args...) + v(args...)
 #Base.(:-)(u::FunctionSpace, v::FunctionSpace) = (args...) -> u(args...) - v(args...)
 #Base.(:+)(u::GradientFunctionSpace, v::GradientFunctionSpace) = (args...) -> u(args...) + v(args...)

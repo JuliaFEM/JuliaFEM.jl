@@ -3,7 +3,7 @@
 
 # Elasticity problems
 
-abstract ElasticityProblem <: Problem
+abstract ElasticityProblem <: FieldProblem
 abstract ElasticityEquation <: Equation
 
 function get_unknown_field_name(equation::ElasticityEquation)

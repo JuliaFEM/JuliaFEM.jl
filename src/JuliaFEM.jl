@@ -10,6 +10,10 @@ module JuliaFEM
 #@Logging.configure(level=DEBUG)
 #using Lexicon
 
+import Base: +, -, /, *, push!, convert, getindex, length, similar, call, vec, endof
+
+#importall Base
+
 """
 A very simple debugging macro. It prints debug message if environment variable
 JULIAFEM_DEBUG is found.
@@ -78,6 +82,7 @@ include("elasticity.jl")
 ### ASSEMBLY + SOLVE ###
 include("assembly.jl")
 include("solvers.jl")
+include("directsolver.jl") # parallel sparse direct solver for non-lniear problems
 
 # PRE AND POSTPROCESS
 include("xdmf.jl")

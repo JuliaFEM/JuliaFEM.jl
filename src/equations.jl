@@ -4,6 +4,8 @@
 # Functions to handle element level things -- integration, assembly, ...
 
 abstract Equation
+abstract FieldEquation <: Equation
+abstract BoundaryEquation <: Equation
 
 type Assembly
     mass_matrix :: SparseMatrixIJV
