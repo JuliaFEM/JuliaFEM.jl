@@ -12,6 +12,7 @@ abstract Variable <: AbstractField
 abstract TimeVariant <: AbstractField
 abstract TimeInvariant <: AbstractField
 
+
 type Field{A<:Union{Discrete,Continuous}, B<:Union{Constant,Variable}, C<:Union{TimeVariant,TimeInvariant}}
     data
 end
@@ -81,6 +82,10 @@ typealias TimeVariantField   Union{DCTV, DVTV, CCTV, CVTV}
 
 ### Convenient functions to create fields
 
+#function Base.convert(::Type{Field}, data)
+#    return Field(data)
+#end
+
 function Field(data)
     return DCTI(data)
 end
@@ -99,6 +104,20 @@ end
 
 function Base.convert{T}(::Type{DCTV}, data::Pair{Float64, Vector{T}}...)
     return DCTV([Increment{Vector{T}}(d[1], d[2]) for d in data])
+end
+
+function Field(func::Function)
+    if method_exists(func, Tuple{})
+        return CCTI(func)
+    elseif method_exists(func, Tuple{Float64})
+        return CCTV(func)
+    elseif method_exists(func, Tuple{Vector})
+        return CVTI(func)
+    elseif method_exists(func, Tuple{Vector, Number})
+        return CVTV(func)
+    else
+        error("no proper definition found for function: check methods.")
+    end
 end
 
 function CVTI(basis::Function, dbasis::Function)
@@ -203,28 +222,55 @@ function Base.convert(::Type{Basis}, field::CVTI)
     return field.data
 end
 
+function Base.call(field::CCTV, time::Number)
+    return field.data(time)
+end
+
 ### Interpolation 
 
+""" Interpolate time-invariant field in time direction. """
 function Base.call(field::DVTI, time::Float64)
-    # interpolating time-invariant field in time direction -> no effect
     return field
 end
-
 function Base.call(field::DCTI, time::Float64)
-    # interpolating time-invariant field in time direction -> no effect
     return field
 end
+function Base.call(field::CVTI, time::Float64)
+    return field.data()
+end
+function Base.call(field::CCTI, time::Float64)
+    return field.data()
+end
 
+""" Interpolate time-variant field in time direction. """
+function Base.call(field::DCTV, time::Float64)
+    for i=reverse(1:length(field))
+        if isapprox(field[i].time, time)
+            return DCTI(field[i].data)
+        end
+    end
+    info(field.data)
+    info(time)
+    error("interpolate DCTV: not implemented yet")
+end
+
+function Base.call(field::DVTV, time::Float64, time_extrapolation::Symbol=:linear)
+    for i=reverse(1:length(field))
+        if isapprox(field[i].time, time)
+            return DVTI(field[i].data)
+        end
+    end
+    info(field.data)
+    info(time)
+    error("interpolate DVTV: not implemented yet")
+end
+
+""" Interpolate constant field in spatial dimension. """
 function Base.call(basis::CVTI, field::DCTI, xi::Vector)
-    # try to interpolate constant value -> no effect
-    return field
+    return field.data
 end
 
-#function Base.call(basis::Basis, field::DCTI, xi::Vector)
-    # calling constant field with basis -> no effect
-#    return field
-#end
-
+""" Interpolate variable field in spatial dimension. """
 function Base.call(basis::CVTI, values::DVTI, xi::Vector)
     N = basis(xi)
     return sum([N[i]*values[i] for i=1:length(N)])
@@ -244,27 +290,8 @@ function Base.call(basis::CVTI, geometry::DVTI, values::DVTI, xi::Vector, ::Type
     return length(gradf) == 1 ? gradf[1] : gradf
 end
 
-function Base.call(field::DCTV, time::Float64)
-    for i in length(field)
-        if isapprox(field[i].time, time)
-            return DCTI(field[i].data)
-        end
-    end
-    error("interpolate DCTV: not implemented yet")
-end
-
-function Base.call(field::DVTV, time::Float64, time_extrapolation::Symbol=:linear)
-#    info("length of field DVTV: $(length(field))")
-    for i=reverse(1:length(field))
-        res = isapprox(field[i].time, time)
-        #info("isapprox $(field[i].time) to $time ? $res")
-        if isapprox(field[i].time, time)
-            return DVTI(field[i].data)
-        end
-    end
-    info(field.data)
-    info(time)
-    error("interpolate DVTV: not implemented yet")
+function Base.call(basis::CVTI, xi::Vector, time::Number)
+    call(basis, xi)
 end
 
 ### FIELDSET ###

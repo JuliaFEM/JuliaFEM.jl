@@ -9,7 +9,7 @@ abstract Solver
 Solve field equations for single element with some dofs fixed. This can be used
 to test nonlinear element formulations.
 """
-function solve!(equation::Equation, free_dofs::Vector{Int}, time::Number; max_iterations::Int=10, tolerance::Float64=1.0e-12, dump_matrices::Bool=false)
+function solve!(equation::Equation, free_dofs::Vector{Int}, time::Number; max_iterations::Int=10, tolerance::Float64=1.0e-12, dump_matrices::Bool=false, callback=nothing)
     unknown_field_name = get_unknown_field_name(equation)
     element = get_element(equation)
     x0 = element[unknown_field_name](0.0)
@@ -31,6 +31,9 @@ function solve!(equation::Equation, free_dofs::Vector{Int}, time::Number; max_it
         data = eqsize[1] != 1 ? reshape(x, eqsize) : x
         push!(element[unknown_field_name], time => data)
         norm(dx) < tolerance && return
+        if !isa(callback, Void)
+            callback(x)
+        end
     end
     error("Did not converge in $max_iterations iterations")
 end
@@ -41,7 +44,7 @@ to test nonlinear element formulations. Dirichlet boundary is assumed to be homo
 and degrees of freedom are eliminated. So if boundary condition is known in nodal
 points and everything is zero this should be quite good.
 """
-function solve!(problem::Problem, free_dofs::Vector{Int}, time::Float64; max_iterations::Int=10, tolerance::Float64=1.0e-12, dump_matrices::Bool=false)
+function solve!(problem::Problem, free_dofs::Vector{Int}, time::Float64; max_iterations::Int=10, tolerance::Float64=1.0e-12, dump_matrices::Bool=false, callback=nothing)
     info("start solver")
     assembly = Assembly()
 #   x = zeros(ga.ndofs)
@@ -66,6 +69,9 @@ function solve!(problem::Problem, free_dofs::Vector{Int}, time::Float64; max_ite
         dx[free_dofs] = lufact(A[free_dofs,free_dofs]) \ full(b)[free_dofs]
         info("Difference in solution norm: $(norm(dx))")
         x += dx
+        if !(isa(callback, Void))
+            callback(x)
+        end
         for equation in get_equations(problem)
             element = get_element(equation)
             gdofs = get_gdofs(equation)
@@ -79,11 +85,6 @@ function solve!(problem::Problem, free_dofs::Vector{Int}, time::Float64; max_ite
         norm(dx) < tolerance && return
     end
     error("Did not converge in $max_iterations iterations")
-end
-
-""" Add new problem to solver. """
-function add_problem!(solver::Solver, problem::Problem)
-    push!(solver.problems, problem)
 end
 
 function Base.push!(solver::Solver, problem::Problem)
@@ -126,9 +127,10 @@ function call(solver::SimpleSolver, time::Number=0.0)
 
 #   info("Creating sparse matrices")
     A1 = sparse(assembly1.stiffness_matrix)
-    b1 = sparse(assembly1.force_vector, size(A1, 1), 1)
-    A2 = sparse(assembly2.stiffness_matrix)
-    b2 = sparse(assembly2.force_vector, size(A2, 1), 1)
+    dims = size(A1)
+    b1 = sparse(assembly1.force_vector, dims[1], 1)
+    A2 = sparse(assembly2.stiffness_matrix, dims[1], dims[2])
+    b2 = sparse(assembly2.force_vector, dims[1], 1)
     
     # create a saddle point problem
     A = [A1 A2; A2' zeros(A2)]
@@ -149,16 +151,28 @@ function call(solver::SimpleSolver, time::Number=0.0)
         field_name = get_unknown_field_name(problem1)
         gdofs = get_gdofs(problem1, equation)
         local_sol = vec(full(x1[gdofs]))
+        eqsize = size(equation)
+        if eqsize[1] != 1
+            local_sol = reshape(local_sol, eqsize)
+        end
+        #info("problem1: pushing to $field_name")
         push!(element[field_name], time => local_sol)
     end
 
     # update field for elements in problem 2 (Dirichlet boundary)
     for equation in get_equations(problem2)
         element = get_element(equation)
-        field_name = get_unknown_field_name(problem2)
+        field_name = "reaction force" #get_unknown_field_name(problem2)
         gdofs = get_gdofs(problem2, equation)
         local_sol = vec(full(x1[gdofs]))
+        eqsize = size(equation)
+        if eqsize[1] != 1
+            local_sol = reshape(local_sol, eqsize)
+        end
+        #info("problem2: pushing to $field_name")
         push!(element[field_name], time => local_sol)
     end
+
+    return norm(x1)
 end
 
