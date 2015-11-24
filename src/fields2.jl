@@ -208,6 +208,18 @@ function Base.similar{T}(field::DVTI, data::Vector{T})
     return typeof(field)(newdata)
 end
 
+function Base.start(::DVTI)
+    return 1
+end
+
+function Base.next(f::DVTI, state)
+    return f.data[state], state+1
+end
+
+function Base.done(f::DVTI, s)
+    return s > length(f.data)
+end
+
 ### Accessing continuous fields
 
 function Base.call(field::CVTI, xi::Vector)

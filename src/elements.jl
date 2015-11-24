@@ -67,9 +67,9 @@ function Base.getindex(element::Element, field_name)
     return element.fields[field_name]
 end
 
-function get_integration_points(element)
-    return get_default_integration_points(element)
-end
+#function get_integration_points(element)
+#    return get_default_integration_points(element)
+#end
 
 """Add new Field to element.
 

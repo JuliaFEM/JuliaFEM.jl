@@ -11,14 +11,10 @@ type Assembly
     mass_matrix :: SparseMatrixIJV
     stiffness_matrix :: SparseMatrixIJV
     force_vector :: SparseMatrixIJV
-    lhs :: SparseMatrixIJV
-    rhs :: SparseMatrixIJV
 end
 
 function Assembly()
     return Assembly(
-        SparseMatrixIJV(),
-        SparseMatrixIJV(),
         SparseMatrixIJV(),
         SparseMatrixIJV(),
         SparseMatrixIJV())
@@ -28,8 +24,6 @@ function Base.empty!(assembly::Assembly)
     empty!(assembly.mass_matrix)
     empty!(assembly.stiffness_matrix)
     empty!(assembly.force_vector)
-    empty!(assembly.lhs)
-    empty!(assembly.rhs)
 end
 
 function get_mass_matrix
@@ -184,8 +178,6 @@ function assemble!(assembly::Assembly, equation::Equation, time::Number=0.0, pro
             return R
         end
 
-        #info("field = $field")
-        #info("vec(field) = $(vec(field))")
         jacobian, allresults = ForwardDiff.jacobian(calc_R, vec(field), AllResults, cache=autodiffcache)
         add!(assembly.stiffness_matrix, gdofs, gdofs, jacobian)
         add!(assembly.force_vector, gdofs, -ForwardDiff.value(allresults))

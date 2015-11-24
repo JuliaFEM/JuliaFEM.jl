@@ -122,7 +122,7 @@ function Base.size(equation::CPS4)
 end
 
 function Base.convert(::Type{PlaneStressElasticityEquation}, element::Quad4)
-    integration_points = get_default_integration_points(element)
+    integration_points = get_integration_points(element)
     if !haskey(element, "displacement")
         element["displacement"] = 0.0 => [zeros(2) for i=1:4]
     end
@@ -140,7 +140,7 @@ function Base.size(equation::CPS2)
 end
 
 function Base.convert(::Type{PlaneStressElasticityEquation}, element::Seg2)
-    integration_points = get_default_integration_points(element)
+    integration_points = get_integration_points(element)
     if !haskey(element, "displacement")
         element["displacement"] = 0.0 => [zeros(2) for i=1:2]
     end

@@ -93,13 +93,13 @@ end
 # Conversions element -> equation
 
 function Base.convert(::Type{HeatEquation}, element::Quad4)
-    integration_points = get_default_integration_points(element)
+    integration_points = get_integration_points(element)
     haskey(element, "temperature") || (element["temperature"] = 0.0 => zeros(4))
     DC2D4(element, integration_points)
 end
 
 function Base.convert(::Type{HeatEquation}, element::Seg2)
-    integration_points = get_default_integration_points(element)
+    integration_points = get_integration_points(element)
     haskey(element, "temperature") || (element["temperature"] = 0.0 => zeros(2))
     DC2D2(element, integration_points)
 end
