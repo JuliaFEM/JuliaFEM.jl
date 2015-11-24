@@ -39,8 +39,10 @@ function Base.size(equation::DBC2D2)
 end
 
 function Base.convert(::Type{DirichletEquation}, element::Seg2)
-    integration_points = line3()
-    haskey(element, "reaction force") || (element["reaction force"] = 0.0 => zeros(2))
+    integration_points = get_integration_points(element, Val{3})
+    if !haskey(element, "reaction force")
+        element["reaction force"] = (0.0 => Vector{Float64}[])
+    end
     DBC2D2(element, integration_points)
 end
 

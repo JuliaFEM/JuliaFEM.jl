@@ -36,6 +36,21 @@ function Base.append!(A::SparseMatrixIJV, I::Vector{Int}, J::Vector{Int}, V::Vec
     append!(A.V, V)
 end
 
+function Base.isempty(A::SparseMatrixIJV)
+    return isempty(A.I) && isempty(A.J) && isempty(A.V)
+end
+
+function Base.(:+)(A::SparseMatrixIJV, B::SparseMatrixIJV)
+    if isempty(A)
+        return B
+    end
+    if isempty(B)
+        return A
+    end
+    C = SparseMatrixIJV([A.I;B.I], [A.J;B.J], [A.V;B.V])
+    return C
+end
+
 function Base.full(A::SparseMatrixIJV, args...)
     return full(sparse(A.I, A.J, A.V, args...))
 end

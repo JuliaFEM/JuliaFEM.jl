@@ -170,7 +170,7 @@ function call(solver::SimpleSolver, time::Number=0.0)
             local_sol = reshape(local_sol, eqsize)
         end
         #info("problem2: pushing to $field_name")
-        push!(element[field_name], time => local_sol)
+        #push!(element[field_name], time => local_sol)
     end
 
     return norm(x1)
