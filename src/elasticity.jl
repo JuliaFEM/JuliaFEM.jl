@@ -94,6 +94,10 @@ function get_residual_vector(equation::ElasticityEquation, ip::IntegrationPoint,
     return vec(r)
 end
 
+
+
+
+
 ### Plane stress elasticity ###
 
 abstract PlaneElasticityProblem <: ElasticityProblem
@@ -157,11 +161,79 @@ function get_residual_vector(equation::CPS2, ip::IntegrationPoint, time::Number;
 
     if haskey(element, "displacement traction force")
         T = basis("displacement traction force", ip, time)
-#       info("traction force = $T")
-#       info("basis = $(basis(ip, time))")
         r -= T*basis(ip, time)
     end
 
     return vec(r)
 end
 
+
+#=
+
+### 3d continuum elasticity ###
+
+type ContinuumElasticityProblem <: ElasticityProblem
+    unknown_field_name :: ASCIIString
+    unknown_field_dimension :: Int
+    equations :: Vector{ElasticityEquation}
+end
+
+function ContinuumElasticityProblem(equations=[])
+    return PlaneStressElasticityProblem("displacement", 3, equations)
+end
+
+### Equations ###
+
+""" 4-node plane stress element. """
+type C3D10 <: ContinuumElasticityEquation
+    element :: Quad4
+    integration_points :: Vector{IntegrationPoint}
+end
+
+function Base.size(equation::CPS4)
+    return (2, 4)
+end
+
+function Base.convert(::Type{PlaneStressElasticityEquation}, element::Quad4)
+    integration_points = get_integration_points(element)
+    if !haskey(element, "displacement")
+        element["displacement"] = 0.0 => [zeros(2) for i=1:4]
+    end
+    CPS4(element, integration_points)
+end
+
+""" Boundary element for plane stress problem for surface loads. """
+type CPS2 <: PlaneStressElasticityEquation
+    element :: Seg2
+    integration_points :: Vector{IntegrationPoint}
+end
+
+function Base.size(equation::CPS2)
+    return (2, 2)
+end
+
+function Base.convert(::Type{PlaneStressElasticityEquation}, element::Seg2)
+    integration_points = get_integration_points(element)
+    if !haskey(element, "displacement")
+        element["displacement"] = 0.0 => [zeros(2) for i=1:2]
+    end
+    CPS2(element, integration_points)
+end
+
+function get_residual_vector(equation::CPS2, ip::IntegrationPoint, time::Number; variation=nothing)
+
+    element = get_element(equation)
+    basis = get_basis(element)
+
+    u = basis("displacement", ip, time, variation)
+    r = zeros(size(equation))
+
+    if haskey(element, "displacement traction force")
+        T = basis("displacement traction force", ip, time)
+        r -= T*basis(ip, time)
+    end
+
+    return vec(r)
+end
+
+=#

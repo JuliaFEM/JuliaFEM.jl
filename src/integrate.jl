@@ -62,3 +62,20 @@ function get_integration_points(element::Seg3)
     return get_integration_points(element, Val{2})
 end
 
+### 3D elements
+
+function get_integration_points(element::Tet10, ::Type{Val{4}})
+    a = .585410196624969
+    b = .138196601125011
+    w = .041666666666667
+    integration_points = [
+        IntegrationPoint([a, b, b], w),
+        IntegrationPoint([b, a, b], w),
+        IntegrationPoint([b, b, a], w),
+        IntegrationPoint([b, b, b], w)]
+end
+
+function get_integration_points(element::Tet10)
+    return get_integration_points(element, Val{4})
+end
+
