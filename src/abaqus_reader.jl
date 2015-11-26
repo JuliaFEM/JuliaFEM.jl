@@ -39,7 +39,6 @@ function parse_node_section(model, header, data)
     end
 end
 
-
 function parse_element_section(model, header, data)
     info("Parsing elements")
     eldims = Dict(
@@ -71,7 +70,6 @@ function parse_element_section(model, header, data)
     end
 end
 
-
 function parse_nodeset_section(model, header, data)
     nset_name = header["options"]["NSET"]
     info("Creating node set $nset_name")
@@ -83,7 +81,6 @@ function parse_nodeset_section(model, header, data)
         push!(nsets[nset_name], j)
     end
 end
-
 
 function parse_abaqus(fid::IOStream)
     model = Dict()
