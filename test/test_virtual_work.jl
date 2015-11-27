@@ -5,57 +5,48 @@ module TestAutoDiffWeakForm
 
 using JuliaFEM.Test
 using JuliaFEM
-using JuliaFEM: Quad4, Equation, IntegrationPoint, assemble!, Assembly,
-                solve!, get_field, get_element, get_basis,
-                grad, get_default_integration_points
 
-""" Plane stress formulation for 4-node bilinear element. """
-type CPS4 <: Equation
-    element :: Quad4
-    integration_points :: Vector{IntegrationPoint}
+using JuliaFEM: Problem, AbstractProblem, CG, Element, IntegrationPoint, Quad4, solve!
+
+abstract PlaneStressElasticityProblem <: AbstractProblem
+
+function PlaneStressElasticityProblem(dim::Int=2, elements=[])
+    return Problem{PlaneStressElasticityProblem}(dim, elements)
 end
 
-function JuliaFEM.get_unknown_field_name(equation::CPS4)
+function JuliaFEM.get_unknown_field_name{P<:PlaneStressElasticityProblem}(::Type{P})
     return "displacement"
 end
 
-function CPS4(element::Quad4)
-    integration_points = get_default_integration_points(element)
-    if !haskey(element, "displacement")
-        element["displacement"] = 0.0 => Vector{Float64}[[0.0,0.0], [0.0,0.0], [0.0,0.0], [0.0,0.0]]
-    end
-    CPS4(element, integration_points)
+function JuliaFEM.get_unknown_field_type{P<:PlaneStressElasticityProblem}(::Type{P})
+    return Vector{Float64}
 end
 
-function Base.size(eq::CPS4)
-    return (2, 4)
-end
+function JuliaFEM.get_residual_vector{EL<:CG}(problem::Problem{PlaneStressElasticityProblem}, element::Element{EL}, ip::IntegrationPoint, time::Number; variation=nothing)
 
-function JuliaFEM.get_residual_vector(equation::CPS4, ip, time; variation=nothing)
-    element = get_element(equation)
-    basis = get_basis(element)
-    dbasis = grad(basis)
+
+    basis = element(ip, time)
+    dbasis = element(ip, time, Val{:grad})
 
     # material parameters
-    E = basis("youngs modulus", ip, time)
-    nu = basis("poissons ratio", ip, time)
+    E = element("youngs modulus", ip, time)
+    nu = element("poissons ratio", ip, time)
     mu = E/(2*(1+nu))
     la = E*nu/((1+nu)*(1-2*nu))
     la = 2*la*mu/(la + 2*mu)  # <- correction for 2d
 
     # elasticity formulation
-    u = basis("displacement", ip, time, variation)
-    gradu = dbasis("displacement", ip, time, variation)
+    u = element("displacement", ip, time, variation)
+    gradu = element("displacement", ip, time, Val{:grad}, variation)
     F = I + gradu
-    b = basis("displacement volume load", ip, time)
+
     E = 1/2*(F'*F - I)
     S = la*trace(E)*I + 2*mu*E
-    P = F*S
+    r = F*S*dbasis
 
-    # residual vector
-    r_int = P*dbasis(ip,time)
-    r_ext = b*basis(ip,time)
-    r = r_int - r_ext
+    b = element("displacement volume load", ip, time)
+    r -= b*basis
+
     return vec(r)
 end
 
@@ -66,15 +57,18 @@ function test_residual_form()
     element["youngs modulus"] = 500.0
     element["poissons ratio"] = 0.3
     element["displacement volume load"] = Vector[[0.0,-10.0], [0.0,-10.0], [0.0,-10.0], [0.0,-10.0]]
-    equation = CPS4(element)
+    element["displacement"] = (0.0 => Vector{Float64}[zeros(2) for i=1:length(element)])
+    problem = PlaneStressElasticityProblem()
+    push!(problem, element)
     # create model -- end
 
     free_dofs = [3, 4, 5, 6]
-    solve!(equation, free_dofs, 0.0)  # launch a newton solver for single element
-    disp = get_basis(element)("displacement", [1.0, 1.0], 0.0)[2]
-    println("displacement at tip: $disp")
+    solve!(problem, free_dofs, 0.0)  # launch a newton solver for single element
+    disp = element("displacement", [1.0, 1.0], 0.0)
+    info("displacement at tip: $disp")
+
     # verified using Code Aster.
-    @test isapprox(disp, -8.77303119819776E+00)
+    @test isapprox(disp[2], -8.77303119819776E+00)
 end
 
 end

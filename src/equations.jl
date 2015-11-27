@@ -3,10 +3,6 @@
 
 # Functions to handle element level things -- integration, assembly, ...
 
-abstract Equation
-abstract FieldEquation <: Equation
-abstract BoundaryEquation <: Equation
-
 type Assembly
     mass_matrix :: SparseMatrixIJV
     stiffness_matrix :: SparseMatrixIJV
@@ -41,56 +37,29 @@ end
 function get_residual_vector
 end
 
-function has_mass_matrix(equation::Equation)
-    default_args = Tuple{typeof(equation), IntegrationPoint, Float64}
+function has_mass_matrix(problem::Problem, element::Element)
+    default_args = Tuple{typeof(problem), typeof(element), IntegrationPoint, Float64}
     return method_exists(get_mass_matrix, default_args)
 end
 
-function has_stiffness_matrix(equation::Equation)
-    default_args = Tuple{typeof(equation), IntegrationPoint, Float64}
+function has_stiffness_matrix(problem::Problem, element::Element)
+    default_args = Tuple{typeof(problem), typeof(element), IntegrationPoint, Float64}
     return method_exists(get_stiffness_matrix, default_args)
 end
 
-function has_force_vector(equation::Equation)
-    default_args = Tuple{typeof(equation), IntegrationPoint, Float64}
+function has_force_vector(problem::Problem, element::Element)
+    default_args = Tuple{typeof(problem), typeof(element), IntegrationPoint, Float64}
     return method_exists(get_force_vector, default_args)
 end
 
-function has_potential_energy(equation::Equation)
-    default_args = Tuple{typeof(equation), IntegrationPoint, Float64}
+function has_potential_energy(problem::Problem, element::Element)
+    default_args = Tuple{typeof(problem), typeof(element), IntegrationPoint, Float64}
     return method_exists(get_potential_energy, default_args)
 end
 
-function has_residual_vector(equation::Equation)
-    default_args = Tuple{typeof(equation), IntegrationPoint, Float64}
+function has_residual_vector(problem::Problem, element::Element)
+    default_args = Tuple{typeof(problem), typeof(element), IntegrationPoint, Float64}
     return method_exists(get_residual_vector, default_args)
-end
-
-function get_element(equation::Equation)
-    return equation.element
-end
-
-function get_integration_points(equation::Equation)
-    return equation.integration_points
-end
-
-function Base.size(equation::Equation, i::Int)
-    return size(equation)[i]
-end
-
-""" Return global degrees of freedom of element in matrix level.
-
-Notes
------
-This is calculated from connectivity and equation dimension.
-"""
-
-function get_gdofs(equation::Equation)
-    element = get_element(equation)
-    conn = get_connectivity(element)
-    dim = size(equation, 1)
-    gdofs = vec(vcat([dim*conn'-i for i=dim-1:-1:0]...))
-    return gdofs
 end
 
 function get_gdofs(element::Element, dim::Int)
@@ -100,26 +69,23 @@ function get_gdofs(element::Element, dim::Int)
 end
 
 """ Assemble element. """
-function assemble!(assembly::Assembly, equation::Equation, time::Number=0.0, problem=nothing)
+function assemble!(assembly::Assembly, problem::Problem, element::Element, time::Number)
 
-    element = get_element(equation)
-    gdofs = get_gdofs(equation)
-    basis = get_basis(element)
-    detJ = det(basis)
-    unknown_field_name = get_unknown_field_name(equation)
+    gdofs = get_gdofs(element, problem.dim)
+    unknown_field_name = get_unknown_field_name(problem)
 
     # 1. if equations are defined we just integrate them, without caring how they are done
-    if has_mass_matrix(equation) || has_stiffness_matrix(equation) || has_force_vector(equation)
-        for ip in get_integration_points(equation)
-            s = ip.weight*detJ(ip)
-            if has_mass_matrix(equation)
-                add!(assembly.mass_matrix, gdofs, gdofs, s*get_mass_matrix(equation, ip, time))
+    if has_mass_matrix(problem, element) || has_stiffness_matrix(problem, element) || has_force_vector(problem, element)
+        for ip in get_integration_points(element)
+            s = ip.weight*det(element, ip, time)
+            if has_mass_matrix(element)
+                add!(assembly.mass_matrix, gdofs, gdofs, s*get_mass_matrix(problem, element, ip, time))
             end
-            if has_stiffness_matrix(equation)
-                add!(assembly.stiffness_matrix, gdofs, gdofs, s*get_stiffness_matrix(equation, ip, time))
+            if has_stiffness_matrix(element)
+                add!(assembly.stiffness_matrix, gdofs, gdofs, s*get_stiffness_matrix(problem, element, ip, time))
             end
-            if has_force_vector(equation)
-                add!(assembly.force_vector, gdofs, s*get_force_vector(equation, ip, time))
+            if has_force_vector(element)
+                add!(assembly.force_vector, gdofs, s*get_force_vector(problem, element, ip, time))
             end
         end
         # external loads -- if any nodal loads is defined add to force vector
@@ -129,7 +95,7 @@ function assemble!(assembly::Assembly, equation::Equation, time::Number=0.0, pro
     end
 
     # 2. energy form -- user has defined potential energy W -> min!
-    if has_potential_energy(equation)
+    if has_potential_energy(problem, element)
         field = element[unknown_field_name](time)
 
         """ Wrapper for potential energy for ForwardDiff. """
@@ -137,9 +103,9 @@ function assemble!(assembly::Assembly, equation::Equation, time::Number=0.0, pro
             W = 0.0
             df = similar(field, data)
             # integrate potential energy
-            for ip in get_integration_points(equation)
-                s = ip.weight*detJ(ip)
-                dw = get_potential_energy(equation, ip, time; variation=df)
+            for ip in get_integration_points(element)
+                s = ip.weight*det(element, ip, time)
+                dw = get_potential_energy(problem, element, ip, time; variation=df)
                 W += s*dw
             end
             # external energy -- if any nodal loads is defined, decrease from potential energy
@@ -156,7 +122,7 @@ function assemble!(assembly::Assembly, equation::Equation, time::Number=0.0, pro
     end
 
     # 3. virtual work -- user has defined some residual r = p - f = 0
-    if has_residual_vector(equation)
+    if has_residual_vector(problem, element)
 
         field = DVTI(last(element[unknown_field_name]).data)
 
@@ -165,9 +131,9 @@ function assemble!(assembly::Assembly, equation::Equation, time::Number=0.0, pro
             R = zeros(length(data))
             df = similar(field, data)
             # integrate residual vector
-            for ip in get_integration_points(equation)
-                s = ip.weight*detJ(ip)
-                dr = get_residual_vector(equation, ip, time; variation=df)
+            for ip in get_integration_points(element)
+                s = ip.weight*det(element, ip, time)
+                dr = get_residual_vector(problem, element, ip, time; variation=df)
                 R += s*dr
             end
             # external loads -- if any nodal loads is defined, decrease from residual
@@ -183,3 +149,4 @@ function assemble!(assembly::Assembly, equation::Equation, time::Number=0.0, pro
         add!(assembly.force_vector, gdofs, -ForwardDiff.value(allresults))
     end
 end
+

@@ -1,67 +1,26 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-# Dirichlet boundary conditions in weak form
+abstract DirichletProblem <: AbstractProblem
 
-abstract DirichletEquation <: BoundaryEquation
-
-### Dirichlet problem + equations
-
-type DirichletProblem <: BoundaryProblem
-    unknown_field_name :: ASCIIString
-    unknown_field_dimension :: Int
-    equations :: Vector{DirichletEquation}
+function DirichletProblem(parent_field_name, parent_field_dim, dim=1, elements=[])
+    return BoundaryProblem{DirichletProblem}(parent_field_name, parent_field_dim, dim, elements)
 end
 
-""" Initialize new Dirichlet boundary condition.
+function assemble!{E}(assembly::Assembly, problem::BoundaryProblem{DirichletProblem}, element::Element{E}, time::Number)
 
-Parameters
-----------
-dimension
-    dimension of unknown field (scalar, vector, ...)
+    # get dimension and name of PARENT field
+    field_dim = problem.parent_field_dim
+    field_name = problem.parent_field_name
 
-Examples
---------
-
-"""
-function DirichletProblem(unknown_field_name::ASCIIString, dimension::Int=1)
-    DirichletProblem(unknown_field_name, dimension, [])
-end
-
-""" Dirichlet boundary condition element for 2 node line segment """
-type DBC2D2 <: DirichletEquation
-    element :: Seg2
-    integration_points :: Vector{IntegrationPoint}
-end
-
-function Base.size(equation::DBC2D2)
-    return (1, 2)
-end
-
-function Base.convert(::Type{DirichletEquation}, element::Seg2)
-    integration_points = get_integration_points(element, Val{3})
-    if !haskey(element, "reaction force")
-        element["reaction force"] = (0.0 => Vector{Float64}[])
-    end
-    DBC2D2(element, integration_points)
-end
-
-
-function assemble!(assembly::Assembly, equation::DirichletEquation, time::Number=0.0, problem=nothing)
-    isa(problem, Void) && error("Dicihlet boundary condition needs problem defined")
-    field_dim = problem.unknown_field_dimension
-    field_name = problem.unknown_field_name
-    element = get_element(equation)
     gdofs = get_gdofs(element, field_dim)
-    basis = get_basis(element)
-    detJ = det(basis)
-    for ip in get_integration_points(equation)
-        w = ip.weight * detJ(ip)
-        N = basis(ip, time)
+    for ip in get_integration_points(element)
+        w = ip.weight * det(element, ip, time)
+        N = element(ip, time)
         A = w*N'*N
 
         if haskey(element, field_name)
-            # add all dimensions at once
+            # add all dimensions at once if defined element["blaa"] = 0.0
             for i=1:field_dim
                 g = element(field_name, ip, time)
                 ldofs = gdofs[i:field_dim:end]
@@ -71,8 +30,8 @@ function assemble!(assembly::Assembly, equation::DirichletEquation, time::Number
         end
   
         for i=1:field_dim
+            # add per dof if defined element["blaa 1"] = 1.0, element["blaa 2"] = 0.0 etc.
             if haskey(element, field_name*" $i")
-                # add single component
                 g = element(field_name*" $i", ip, time)
                 ldofs = gdofs[i:field_dim:end]
                 add!(assembly.stiffness_matrix, ldofs, ldofs, A)

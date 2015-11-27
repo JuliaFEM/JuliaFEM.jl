@@ -6,39 +6,6 @@
 abstract Solver
 
 """
-Solve field equations for single element with some dofs fixed. This can be used
-to test nonlinear element formulations.
-"""
-function solve!(equation::Equation, free_dofs::Vector{Int}, time::Number; max_iterations::Int=10, tolerance::Float64=1.0e-12, dump_matrices::Bool=false, callback=nothing)
-    unknown_field_name = get_unknown_field_name(equation)
-    element = get_element(equation)
-    x0 = element[unknown_field_name](0.0)
-    x = zeros(prod(size(equation)))
-    dx = fill!(similar(x), 0.0)
-    ass = Assembly()
-    for i=1:max_iterations
-        empty!(ass)
-        assemble!(ass, equation)
-        A = full(ass.stiffness_matrix)[free_dofs, free_dofs]
-        b = full(ass.force_vector)[free_dofs]
-        if dump_matrices
-            dump(full(A))
-            dump(full(b)')
-        end
-        dx[free_dofs] = A \ b
-        x += dx
-        eqsize = size(equation)
-        data = eqsize[1] != 1 ? reshape(x, eqsize) : x
-        push!(element[unknown_field_name], time => data)
-        norm(dx) < tolerance && return
-        if !isa(callback, Void)
-            callback(x)
-        end
-    end
-    error("Did not converge in $max_iterations iterations")
-end
-
-"""
 Solve field equations for a single problem with some dofs fixed. This can be used
 to test nonlinear element formulations. Dirichlet boundary is assumed to be homogeneous
 and degrees of freedom are eliminated. So if boundary condition is known in nodal
@@ -72,13 +39,12 @@ function solve!(problem::Problem, free_dofs::Vector{Int}, time::Float64; max_ite
         if !(isa(callback, Void))
             callback(x)
         end
-        for equation in get_equations(problem)
-            element = get_element(equation)
-            gdofs = get_gdofs(equation)
+        for element in get_elements(problem)
+            gdofs = get_gdofs(element, problem.dim)
             data = full(x[gdofs])
-            eqsize = size(equation)
-            if eqsize[1] != 1
-                data = reshape(data, eqsize)
+            if length(data) != length(element)
+                data = reshape(data, problem.dim, length(element))
+                data = [data[:,i] for i=1:size(data,2)]
             end
             push!(element[field_name], time => data)
         end
@@ -87,24 +53,11 @@ function solve!(problem::Problem, free_dofs::Vector{Int}, time::Float64; max_ite
     error("Did not converge in $max_iterations iterations")
 end
 
-function Base.push!(solver::Solver, problem::Problem)
-    push!(solver.problems, problem)
-end
 
-""" Get all problems assigned to solver. """
-function get_problems(solver::Solver)
-    return solver.problems
-end
-
-## SimpleSolver -- tiny direct demo solver
-""" Simple solver for educational purposes. """
-type SimpleSolver <: Solver
-    problems :: Vector{Problem}
-end
-
-""" Default initializer. """
-function SimpleSolver()
-    SimpleSolver([])
+""" Simple linear solver for educational purposes. """
+type LinearSolver <: Solver
+    field_problem :: Problem
+    boundary_problem :: BoundaryProblem
 end
 
 """
@@ -113,28 +66,30 @@ Call solver to solve a set of problems.
 This is a simple direct solver for demonstration purposes. It handles the
 common situation, i.e., some main field problem and it's Dirichlet boundary.
 
-    Au + C'λ = f
+    Ku + C'λ = f
     Cu       = g
 
 """
-function call(solver::SimpleSolver, time::Number=0.0)
-    problem1, problem2 = get_problems(solver)
+function call(solver::LinearSolver, time::Float64)
 
-    assembly1 = Assembly()
-    assemble!(assembly1, problem1, time)
-    assembly2 = Assembly()
-    assemble!(assembly2, problem2, time)
+    field_name = get_unknown_field_name(solver.field_problem)
+    field_dim = get_unknown_field_dimension(solver.field_problem)
+    info("solving $field_name problem, $field_dim dofs / nodes")
 
-#   info("Creating sparse matrices")
-    A1 = sparse(assembly1.stiffness_matrix)
-    dims = size(A1)
-    b1 = sparse(assembly1.force_vector, dims[1], 1)
-    A2 = sparse(assembly2.stiffness_matrix, dims[1], dims[2])
-    b2 = sparse(assembly2.force_vector, dims[1], 1)
-    
+    field_assembly = assemble(solver.field_problem, time)
+    boundary_assembly = assemble(solver.boundary_problem, time)
+
+    info("Creating sparse matrices")
+    K = sparse(field_assembly.stiffness_matrix)
+    dim = size(K, 1)
+    f = sparse(field_assembly.force_vector, dim, 1)
+
+    C = sparse(boundary_assembly.stiffness_matrix, dim, dim)
+    g = sparse(boundary_assembly.force_vector, dim, 1)
+
     # create a saddle point problem
-    A = [A1 A2; A2' zeros(A2)]
-    b = [b1; b2]
+    A = [K C'; C' zeros(C)]
+    b = [f; g]
 
     # solve problem
     nz = unique(rowvals(A))  # take only non-zero rows
@@ -142,37 +97,26 @@ function call(solver::SimpleSolver, time::Number=0.0)
     x[nz] = lufact(A[nz,nz]) \ full(b[nz])
 
     # get "problem-wise" solution vectors
-    x1 = x[1:length(b1)]
-    x2 = x[length(b1)+1:end]
+    u = x[1:dim]
+    la = x[dim+1:end]
 
     # update field for elements in problem 1
-    for equation in get_equations(problem1)
-        element = get_element(equation)
-        field_name = get_unknown_field_name(problem1)
-        gdofs = get_gdofs(problem1, equation)
-        local_sol = vec(full(x1[gdofs]))
-        eqsize = size(equation)
-        if eqsize[1] != 1
-            local_sol = reshape(local_sol, eqsize)
+    for element in get_elements(solver.field_problem)
+        gdofs = get_gdofs(element, field_dim)
+        local_sol = vec(full(u[gdofs]))
+        # if solving vector field, modify local solution vector
+        # to array of vectors
+        if field_dim != 1
+            local_sol = reshape(local_sol, field_dim, length(element))
+            local_sol = [local_sol[:,i] for i=1:size(local_sol,2)]
         end
-        #info("problem1: pushing to $field_name")
-        push!(element[field_name], time => local_sol)
+        if haskey(element, field_name)
+            push!(element[field_name], time => local_sol)
+        else
+            element[field_name] = (time => local_sol)
+        end
     end
 
-    # update field for elements in problem 2 (Dirichlet boundary)
-    for equation in get_equations(problem2)
-        element = get_element(equation)
-        field_name = "reaction force" #get_unknown_field_name(problem2)
-        gdofs = get_gdofs(problem2, equation)
-        local_sol = vec(full(x1[gdofs]))
-        eqsize = size(equation)
-        if eqsize[1] != 1
-            local_sol = reshape(local_sol, eqsize)
-        end
-        #info("problem2: pushing to $field_name")
-        #push!(element[field_name], time => local_sol)
-    end
-
-    return norm(x1)
+    return norm(u)
 end
 

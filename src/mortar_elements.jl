@@ -6,7 +6,7 @@
 # slave element = non-mortar element where integration happens
 # master element = mortar element projected to non-mortar side
 
-abstract MortarElement <: Element
+abstract MortarElement <: AbstractElement
 
 type MSeg2 <: MortarElement
     connectivity :: Vector{Int}

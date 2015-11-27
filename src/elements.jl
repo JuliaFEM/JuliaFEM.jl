@@ -1,10 +1,23 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using FactCheck
-using ForwardDiff
+abstract AbstractElement
 
-abstract Element
+type Element{E<:AbstractElement}
+    connectivity :: Vector{Int}
+#   integration_points :: Vector{IntegrationPoint}
+    fields :: Dict{ASCIIString, Field}
+end
+
+function convert{E}(::Type{Element{E}}, connectivity::Vector{Int})
+#   return Element{E}(connectivity, get_integration_points(E), Dict())
+    return Element{E}(connectivity, Dict())
+end
+
+function get_integration_points{E}(element::Element{E})
+#   return element.integration_points
+    return get_integration_points(E)
+end
 
 """
 Test routine for element. If this passes, element interface is properly
@@ -67,9 +80,9 @@ function Base.getindex(element::Element, field_name)
     return element.fields[field_name]
 end
 
-#function get_integration_points(element)
-#    return get_default_integration_points(element)
-#end
+function Base.length{E}(element::Element{E})
+    size(E)[2]
+end
 
 """Add new Field to element.
 
@@ -89,150 +102,68 @@ function Base.setindex!(element::Element, data::Tuple, name::ASCIIString)
     element.fields[name] = Field(data...)
 end
 
-#function Base.setindex!(element::Element, field_data::Tuple, field_name)
-#    field = Field()
-#    for (time, data) in field_data
-#        ts = TimeStep(time, Increment[Increment(data)])
-#        push!(field, ts)
-#    end
-#    element[field_name] = field
-#end
-
 function get_connectivity(el::Element)
     return el.connectivity
 end
 
-abstract AbstractFunctionSpace
-
-type FunctionSpace <: AbstractFunctionSpace
-    basis :: CVTI
-    fields :: FieldSet
-end
-
-type GradientFunctionSpace <: AbstractFunctionSpace
-    basis :: CVTI
-    fields :: FieldSet
-end
-
-function get_basis(element::Element)
-    return FunctionSpace(element.basis, element.fields)
-end
-
-function get_dbasis(element::Element)
-    return GradientFunctionSpace(element.basis, element.fields)
-end
-
-function grad(u::FunctionSpace)
-    return GradientFunctionSpace(u.basis, u.fields)
-end
-
-""" If basis is called without a field, return basis functions evaluated at that point. """
-function call(u::FunctionSpace, xi::Union{Vector, IntegrationPoint}, t::Number=0.0)
-    return u.basis(xi)
-end
-
-""" If gradient of basis is called without a field, return "empty" gradient evaluated at that point. """
-function call(gradu::GradientFunctionSpace, xi::Union{Vector, IntegrationPoint}, t::Number=0.0)
-    geometry = gradu.fields["geometry"](t)
-    gradu.basis(geometry, xi, Val{:grad})
-end
-
-""" Evaluate field on element function space. """
-function call(u::FunctionSpace, field_name, xi::Union{Vector, IntegrationPoint}, t::Number=0.0, variation=nothing)
-    field = !isa(variation, Void) ? variation : u.fields[field_name](t)
-    u.basis(field, xi)
-end
-
-""" Evaluate gradient of field on element function space. """
-function call(gradu::GradientFunctionSpace, field_name, xi::Union{Vector, IntegrationPoint}, t::Number=0.0, variation=nothing)
-    field = !isa(variation, Void) ? variation : gradu.fields[field_name](t)
-    geometry = gradu.fields["geometry"](t)
-    gradu.basis(geometry, field, xi, Val{:grad})
-end
-
 typealias VecOrIP Union{Vector, IntegrationPoint}
 
-function Base.call(element::Element, field_name::ASCIIString, xi::VecOrIP, time::Number)
-    return element.basis(element[field_name](time), xi)
+function call(element::Element, field_name::ASCIIString, xi::VecOrIP, time::Number, variation=nothing)
+    field = isa(variation, Void) ? element[field_name](time) : variation
+    basis = get_basis(element)
+    return basis(field, xi)
 end
 
-function Base.call(element::Element, field_name::ASCIIString, xi::VecOrIP, time::Number, ::Type{Val{:grad}})
-    return element.basis(element["geometry"](time), element[field_name](time), xi, Val{:grad})
+function call(element::Element, field_name::ASCIIString, xi::VecOrIP, time::Number, ::Type{Val{:grad}}, variation=nothing)
+    field = isa(variation, Void) ? element[field_name](time) : variation
+    basis = get_basis(element)
+    geom = element["geometry"](time)
+    return basis(geom, field, xi, Val{:grad})
 end
 
-function Base.call(element::Element, field_name::ASCIIString, xi::VecOrIP)
+function call(element::Element, field_name::ASCIIString, xi::VecOrIP)
     return element.basis(element[field_name], xi)
 end
 
-function Base.call(element::Element, field_name::ASCIIString, xi::VecOrIP, ::Type{Val{:grad}})
+function call(element::Element, field_name::ASCIIString, xi::VecOrIP, ::Type{Val{:grad}})
     return element.basis(element["geometry"], element[field_name], xi, Val{:grad})
 end
 
-function Base.call(element::Element, field_name::ASCIIString, time::Number)
+function call(element::Element, field_name::ASCIIString, time::Number)
     return element[field_name](time)
 end
 
-function Base.call(element::Element, xi::VecOrIP)
-    element.basis(xi)
+function get_basis{E}(element::Element{E}, ip::IntegrationPoint)
+    return get_basis(E, ip.xi)
 end
 
-function Base.call(element::Element, xi::VecOrIP, ::Type{Val{:grad}})
-    element.basis(element["geometry"], xi, Val{:grad})
+function call{E}(element::Element{E}, xi::VecOrIP, time::Float64=0)
+    return get_basis(element, xi)
 end
 
-function Base.call(element::Element, field_name::ASCIIString)
+function get_basis{E}(element::Element{E})
+    basis = CVTI(
+        (xi::Vector) -> get_basis(E, xi),
+        (xi::Vector) -> get_dbasis(E, xi))
+    return basis
+end
+
+function call{E}(element::Element{E}, xi::VecOrIP, time::Float64, ::Type{Val{:grad}})
+    basis = get_basis(element)
+    return basis(element["geometry"], xi, Val{:grad})
+end
+
+function call(element::Element, field_name::ASCIIString)
     return element[field_name]
 end
 
-# on-line functions to get api more easy to use, ip -> xi.ip
-#call(u::FunctionSpace, ip::IntegrationPoint, t::Number=Inf) = call(u, ip.xi, t)
-#call(u::GradientFunctionSpace, ip::IntegrationPoint, t::Number=Inf) = call(u, ip.xi, t)
-# i think these will be the most called functions.
-#call(u::FunctionSpace, field_name, ip::IntegrationPoint, t::Number=0.0, variation=nothing) = call(u, field_name, ip.xi, t, variation)
-#call(u::GradientFunctionSpace, field_name, ip::IntegrationPoint, t::Number=0.0, variation=nothing) = call(u, field_name, ip.xi, t, variation)
-#call(u::FunctionSpace, field_name) = (args...) -> call(u, field_name, args...)
-#call(u::GradientFunctionSpace, field_name) = (args...) -> call(u, field_name, args...)
-
-""" Return a field from function space. """
-function get_field(u::FunctionSpace, field_name, time::Number=0.0)
-    return u.fields[field_name](time)
-end
-
-""" Return a field from function space. """
-function get_field(u::FunctionSpace, field_name, time::Number=0.0, variation=nothing)
-    return !isa(variation, Void) ? variation : u.fields[field_name](time)
-end
-
-""" Return a field from function space. """
-function get_fieldset(u::FunctionSpace, field_name)
-    return u.fields[field_name]
-end
-
-""" Get a determinant of element in point ξ. """
-function LinAlg.det(u::FunctionSpace, xi::Vector, time::Number=0.0)
-    X = u.fields["geometry"](time)
-    dN = u.basis(xi, Val{:grad})
+function LinAlg.det{E<:AbstractElement}(element::Element{E}, ip::IntegrationPoint, time::Number=0.0)
+    X = element("geometry", time)
+    dN = get_dbasis(E, ip.xi)
     J = sum([dN[:,i]*X[i]' for i=1:length(X)])
     m, n = size(J)
     return m == n ? det(J) : norm(J)
 end
-
-function LinAlg.det(u::FunctionSpace, ip::IntegrationPoint, time::Number=0.0)
-    LinAlg.det(u, ip.xi, time)
-end
-
-function LinAlg.det(u::FunctionSpace)
-    return (args...) -> det(u, args...)
-end
-
-function LinAlg.det(element::Element)
-    return det(get_basis(element))
-end
-
-#Base.(:+)(u::FunctionSpace, v::FunctionSpace) = (args...) -> u(args...) + v(args...)
-#Base.(:-)(u::FunctionSpace, v::FunctionSpace) = (args...) -> u(args...) - v(args...)
-#Base.(:+)(u::GradientFunctionSpace, v::GradientFunctionSpace) = (args...) -> u(args...) + v(args...)
-#Base.(:-)(u::GradientFunctionSpace, v::GradientFunctionSpace) = (args...) -> u(args...) - v(args...)
 
 """ Check does field exist. """
 function Base.haskey(element::Element, what)
