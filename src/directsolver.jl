@@ -4,7 +4,7 @@
 ## Direct solver
 
 type DirectSolver <: Solver
-    field_problems :: Vector{FieldProblem}
+    field_problems :: Vector{Problem}
     boundary_problems :: Vector{BoundaryProblem}
     parallel :: Bool
     nonlinear_problem :: Bool
@@ -12,7 +12,7 @@ type DirectSolver <: Solver
     tol :: Float64
 end
 
-function push!(solver::DirectSolver, problem::FieldProblem)
+function push!(solver::DirectSolver, problem::Problem)
     push!(solver.field_problems, problem)
 end
 
@@ -45,24 +45,30 @@ function call(solver::DirectSolver, time::Number=0.0)
     # for this increment
 
     for field_problem in solver.field_problems
-        for equation in get_equations(field_problem)
-            element = get_element(equation)
-            gdofs = get_gdofs(field_problem, equation)
-            if !isapprox(last(element[field_name]).time, time)
-                last_data = copy(last(element[field_name]).data)
-                push!(element[field_name], time => last_data)
+        for element in get_elements(field_problem)
+            gdofs = get_gdofs(element, field_dim)
+            if haskey(element, field_name)
+                if !isapprox(last(element[field_name]).time, time)
+                    last_data = copy(last(element[field_name]).data)
+                    push!(element[field_name], time => last_data)
+                end
+            else
+                data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
+                element[field_name] = (time => data)
             end
         end
     end
 
     for boundary_problem in solver.boundary_problems
-        for equation in get_equations(boundary_problem)
-            element = get_element(equation)
-            gdofs = get_gdofs(boundary_problem, equation)
-            eqdim = size(equation)[2]
-            data = Vector{Float64}[zeros(field_dim) for i in 1:eqdim]
-            if !isapprox(last(element["reaction force"]).time, time)
-                push!(element["reaction force"], time => data)
+        for element in get_elements(boundary_problem)
+            gdofs = get_gdofs(element, field_dim)
+            data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
+            if haskey(element, "reaction force")
+                if !isapprox(last(element["reaction force"]).time, time)
+                    push!(element["reaction force"], time => data)
+                end
+            else
+                element["reaction force"] = (time => data)
             end
         end
     end
@@ -105,32 +111,27 @@ function call(solver::DirectSolver, time::Number=0.0)
 
         # update elements in field problems
         for field_problem in solver.field_problems
-            for equation in get_equations(field_problem)
-                element = get_element(equation)
-                gdofs = get_gdofs(field_problem, equation)
-                eqsize = size(equation)
+            for element in get_elements(field_problem)
+                gdofs = get_gdofs(element, field_dim)
                 local_sol = vec(full(sol[gdofs]))  # incremental data for element
-                local_sol = reshape(local_sol, eqsize)
-                local_sol = Vector{Float64}[local_sol[:,i] for i=1:size(local_sol,2)]
+                local_sol = reshape(local_sol, field_dim, length(element))
+                local_sol = Vector{Float64}[local_sol[:,i] for i=1:length(element)]
                 last(element[field_name]).data += local_sol  # <-- added
             end
         end
 
         # update elements in boundary problems
         for boundary_problem in solver.boundary_problems
-            for equation in get_equations(boundary_problem)
-                element = get_element(equation)
-                gdofs = get_gdofs(boundary_problem, equation) + dim
-                eqsize = size(equation)
+            for element in get_elements(boundary_problem)
+                gdofs = get_gdofs(element, field_dim) + dim
                 local_sol = vec(full(sol[gdofs]))
-                #info("local sol = $local_sol")
-                local_sol = reshape(local_sol, field_dim, eqsize[2])
-                local_sol = Vector{Float64}[local_sol[:,i] for i=1:size(local_sol,2)]
+                local_sol = reshape(local_sol, field_dim, length(element))
+                local_sol = Vector{Float64}[local_sol[:,i] for i=1:length(element)]
                 last(element["reaction force"]).data = local_sol  # <-- replaced
             end
         end
 
-        info("Iteration took $(toq()) seconds")
+        info("Non-linear iteration took $(toq()) seconds")
 
         if norm(sol[1:dim]) < solver.tol
             return (iter, true)

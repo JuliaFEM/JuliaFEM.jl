@@ -3,19 +3,19 @@
 
 # Functions to handle global assembly of problem
 
-function assemble!(assembly::Assembly, problem::Problem, time::Number=0.0, empty_assembly::Bool=true)
+function assemble!(assembly::Assembly, problem::AllProblems, time::Float64, empty_assembly::Bool=true)
     if empty_assembly
         empty!(assembly)
     end
-    for equation in get_equations(problem)
-        assemble!(assembly, equation, time, problem)
+    for element in get_elements(problem)
+        assemble!(assembly, problem, element, time)
     end
 end
 
-function assemble(problem::Problem, time::Number=0.0)
+function assemble(problem::AllProblems, time::Float64)
     assembly = Assembly()
-    for equation in get_equations(problem)
-        assemble!(assembly, equation, time, problem)
+    for element in get_elements(problem)
+        assemble!(assembly, problem, element, time)
     end
     return assembly
 end

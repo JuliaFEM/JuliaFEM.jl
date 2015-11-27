@@ -7,8 +7,7 @@ module HeatTests  # always wrap tests to module ending with "Tests"
 
 using JuliaFEM.Test  # always use JuliaFEM.Test, not Base.Test
 
-using JuliaFEM: HeatEquation
-using JuliaFEM: Seg2, Quad4, DC2D4, DC2D2, Assembly, assemble!
+using JuliaFEM: Seg2, Quad4, HeatProblem, assemble
 
 function test_one_element()  # always start test function with name test_
 
@@ -26,11 +25,13 @@ function test_one_element()  # always start test function with name test_
     # linear ramp from 0 to 6 in time 0 to 1
     boundary_element["temperature flux"] = (0.0 => 0.0, 1.0 => 6.0)
 
+    problem = HeatProblem()
+    push!(problem, element)
+    push!(problem, boundary_element)
+
     # Set constant source f=12 with k=6. Accurate solution is
     # T=1 on free boundary, u(x,y) = -1/6*(1/2*f*x^2 - f*x)
-    equation = convert(HeatEquation, element)
-    assembly = Assembly()
-    assemble!(assembly, equation)
+    assembly = assemble(problem, 0.0)
     fdofs = [1, 2]
     A = full(assembly.stiffness_matrix)
     b = full(assembly.force_vector)
@@ -38,18 +39,15 @@ function test_one_element()  # always start test function with name test_
 
     # Set constant flux g=6 on boundary. Accurate solution is
     # u(x,y) = x which equals T=1 on boundary.
-    boundary_equation = convert(HeatEquation, boundary_element)
-    empty!(assembly)
-
-    time = 1.0
-    assemble!(assembly, equation, time)
-    assemble!(assembly, boundary_equation, time)
+    # at time t=1.0 all loads should be on.
+    assembly = assemble(problem, 1.0)
     A = full(assembly.stiffness_matrix)
     b = full(assembly.force_vector)
     T = A[fdofs, fdofs] \ b[fdofs]
     info("T = $T")
-    @test isapprox(T, [2.0, 2.0])  # always use @test to test things.
+    @test isapprox(T, [2.0, 2.0])
 
 end
 
 end
+

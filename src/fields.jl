@@ -3,301 +3,310 @@
 
 # https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/notebooks/2015-06-14-data-structures.ipynb
 
-abstract Field
+abstract AbstractField
 
-abstract DiscreteField <: Field
-abstract ContinuousField <: Field
+abstract Discrete <: AbstractField
+abstract Continuous <: AbstractField
+abstract Constant <: AbstractField
+abstract Variable <: AbstractField
+abstract TimeVariant <: AbstractField
+abstract TimeInvariant <: AbstractField
 
-### DEFAULT DISCRETE FIELD ###
 
-# 1. Increment
-
-type Increment{T} <: AbstractVector{T}
-    data :: Vector{T}
+type Field{A<:Union{Discrete,Continuous}, B<:Union{Constant,Variable}, C<:Union{TimeVariant,TimeInvariant}}
+    data
 end
 
-function Base.size(increment::Increment)
-    return size(increment.data)
+### Basic data structure for discrete field
+
+type Increment{T}
+    time :: Float64
+    data :: T
 end
 
-function Base.linearindexing(::Type{Increment})
-    return LinearFast()
+function Base.convert{T}(::Type{Increment{T}}, data::Pair{Float64,T})
+    return Increment{T}(data[1], data[2])
 end
 
-function Base.getindex(increment::Increment, i::Int)
+function Base.convert{T}(::Type{Increment{Vector{Vector{T}}}}, data::Pair{Float64, Matrix{T}})
+    time = data[1]
+    content = data[2]
+    return Increment(time, Vector{T}[content[:,i] for i=1:size(content,2)])
+end
+
+function Base.getindex{T}(increment::Increment{Vector{T}}, i::Int64)
     return increment.data[i]
 end
 
-function Base.setindex!(increment::Increment, v, i::Int)
-    increment.data[i] = v
+function Base.(:*)(d, increment::Increment)
+    return d*increment.data
 end
 
-function Base.dot(k::Number, increment::Increment)
-    return k*increment
+### Basic data structure for continuous field
+
+type Basis
+    basis :: Function
+    dbasis :: Function
 end
 
-function Base.convert(::Type{Increment}, data::Number)
-    return Increment([data])
+function Base.call(basis::Basis, xi::Vector)
+    basis.basis(xi)
 end
 
-function Base.convert{T}(::Type{Increment}, data::Array{T, 2})
-    return Increment([data[:,i] for i=1:size(data, 2)])
+function Base.call(basis::Basis, xi::Vector, ::Type{Val{:grad}})
+    basis.dbasis(xi)
 end
 
-function Base.convert{T}(::Type{Increment}, data::Array{T, 3})
-    return Increment([data[:,:,i] for i=1:size(data, 3)])
-end
+### Different field combinations and other typealiases
 
-function Base.convert{T}(::Type{Increment}, data::Array{T, 4})
-    return Increment([data[:,:,:,i] for i=1:size(data, 4)])
-end
+typealias DCTI Field{Discrete,   Constant, TimeInvariant}
+typealias DVTI Field{Discrete,   Variable, TimeInvariant}
+typealias DCTV Field{Discrete,   Constant, TimeVariant}
+typealias DVTV Field{Discrete,   Variable, TimeVariant}
+typealias CCTI Field{Continuous, Constant, TimeInvariant}
+typealias CVTI Field{Continuous, Variable, TimeInvariant} # can be used to interpolate in spatial dimension
+typealias CCTV Field{Continuous, Constant, TimeVariant} # can be used to interpolate in time
+typealias CVTV Field{Continuous, Variable, TimeVariant}
 
-function Base.convert{T}(::Type{Increment}, data::Array{T, 5})
-    return Increment([data[:,:,:,:,i] for i=1:size(data, 5)])
-end
+typealias ScalarIncrement{T} Increment{T}
+typealias VectorIncrement{T} Increment{Vector{T}}
+typealias TensorIncrement{T} Increment{Matrix{T}}
 
-function Base.zeros(::Type{Increment}, T, dims...)
-    return Increment(zeros(T, dims...))
-end
+typealias DiscreteField      Union{DCTI, DVTI, DCTV, DVTV}
+typealias ContinuousField    Union{CCTI, CVTI, CCTV, CVTV}
+typealias ConstantField      Union{DCTI, DCTV, CCTI, CCTV}
+typealias VariableField      Union{DVTI, DVTV, CVTI, CVTV}
+typealias TimeInvariantField Union{DCTI, DVTI, CCTI, CVTI}
+typealias TimeVariantField   Union{DCTV, DVTV, CCTV, CVTV}
 
-""" Flatten increment to Vector.
 
-Examples
---------
+### Convenient functions to create fields
 
->>> inc = ones(Increment, 2, 4)
->>> vec(inc)
-[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-
-"""
-function Base.vec(increment::Increment)
-    return [increment...;]
-end
-
-function Base.similar{T}(increment::Increment, data::Vector{T})
-    return Increment(reshape(data, round(Int, length(data)/length(increment)), length(increment)))
-end
-
-function Base.convert{T}(::Type{Vector{T}}, increment::Increment)
-    return Increment[increment]
-end
-
-# 2. TimeStep
-
-type TimeStep
-    time :: Float64
-    increments :: Vector{Increment}
-end
-
-function Base.size(timestep::TimeStep)
-    return size(timestep.increments)
-end
-
-function Base.endof(timestep::TimeStep)
-    return endof(timestep.increments)
-end
-
-function Base.length(timestep::TimeStep)
-    return length(timestep.increments)
-end
-
-function Base.linearindexing(::Type{TimeStep})
-    return Base.LinearFast()
-end
-
-function Base.getindex(timestep::TimeStep, i::Int)
-    return timestep.increments[i]
-end
-
-#function TimeStep(data::Union{Number, Array}...)
-#    return TimeStep(0.0, Increment[Increment(d) for d in data])
+#function Base.convert(::Type{Field}, data)
+#    return Field(data)
 #end
 
-function TimeStep()
-    return TimeStep(0.0, [])
+function Field(data)
+    return DCTI(data)
 end
 
-function TimeStep{T}(data::T...)
-    return TimeStep(0.0, Increment[Increment(d) for d in data])
+function Field(data::Vector)
+    return DVTI(data)
 end
 
-function Base.convert(::Type{TimeStep}, value::Number)
-    return TimeStep(0.0, Increment[Increment(value)])
+function Field{T}(data::Pair{Float64, T}...)
+    return DCTV([Increment{T}(d[1], d[2]) for d in data])
 end
 
-function Base.push!(timestep::TimeStep, increment::Increment)
-    push!(timestep.increments, increment)
+function Field{T}(data::Pair{Float64, Vector{T}}...)
+    return DVTV([Increment{Vector{T}}(d[1], d[2]) for d in data])
 end
 
-# FIXME: having some serious problems here to get tuple form working.
-
-# 3. DefaultDiscreteField
-immutable DefaultDiscreteField <: DiscreteField
-    timesteps :: Vector{TimeStep}
-#=
-    function DefaultDiscreteField(data::Array)
-        if (typeof(data) == Vector{Int64}) || (typeof(data) == Vector{Float64})
-            new(TimeStep[TimeStep(data)])
-        else
-            new(data)
-        end
-    end
-=#
+function Base.convert{T}(::Type{DCTV}, data::Pair{Float64, Vector{T}}...)
+    return DCTV([Increment{Vector{T}}(d[1], d[2]) for d in data])
 end
 
-#=
-type DefaultDiscreteField <: DiscreteField
-    timesteps :: Vector{TimeStep}
-    function DefaultDiscreteField(data...)
-        timesteps = TimeStep[]
-        for (i, d) in enumerate(data)
-            @debug("i = $i, d = $d")
-            if isa(d, Tuple)
-                # contains time vector
-                increments = Increment[Increment(d[2])]
-                push!(timesteps, TimeStep(d[1], increments))
-            else
-                increments = Increment[Increment(d)]
-                push!(timesteps, TimeStep(i-1.0, increments))
-            end
-        end
-        new(timesteps)
+function Field(func::Function)
+    if method_exists(func, Tuple{})
+        return CCTI(func)
+    elseif method_exists(func, Tuple{Float64})
+        return CCTV(func)
+    elseif method_exists(func, Tuple{Vector})
+        return CVTI(func)
+    elseif method_exists(func, Tuple{Vector, Number})
+        return CVTV(func)
+    else
+        error("no proper definition found for function: check methods.")
     end
 end
-=#
 
-
-function Base.size(field::DefaultDiscreteField)
-    return size(field.timesteps)
+function CVTI(basis::Function, dbasis::Function)
+    return CVTI(Basis(basis, dbasis))
 end
 
-function Base.length(field::DefaultDiscreteField)
-    return length(field.timesteps)
+function Field(basis::Function, dbasis::Function)
+    return CVTI(basis, dbasis)
 end
 
-function Base.start(::DefaultDiscreteField)
+### Accessing and manipulating discrete fields
+
+function Base.getindex(field::DVTV, i::Int64)
+    return field.data[i]
+end
+
+function Base.push!(field::DCTV, data::Pair)
+    push!(field.data, data)
+end
+
+function Base.push!(field::DVTV, data::Pair)
+#    info("field.data = \n$(field.data)")
+#    info("data = \n$data")
+    push!(field.data, data)
+end
+
+function Base.getindex(field::DVTV, i::Int64)
+    return field.data[i]
+end
+
+function Base.getindex(field::DVTI, i::Int64)
+    return field.data[i]
+end
+
+function Base.getindex(field::DCTV, i::Int64)
+    return field.data[i]
+end
+
+function Base.getindex(field::Field, i::Int64)
+    return field.data[i]
+end
+
+function Base.length(field::DVTI)
+    return length(field.data)
+end
+
+function Base.length(field::DCTI)
     return 1
 end
 
-function Base.next(field::DefaultDiscreteField, state)
-    return (field[state+1], state+1)
+function Base.length(field::DVTV)
+    return length(field.data)
 end
 
-function Base.done(field::DefaultDiscreteField, state)
-    return state > length(field)
+function Base.length(field::DCTV)
+    return length(field.data)
 end
 
-function eltype(::Type{DefaultDiscreteField})
-    return TimeStep
+for op = (:+, :*, :/, :-)
+    @eval ($op)(increment::Increment, field::DCTI) = ($op)(increment.data, field.data)
+    @eval ($op)(field::DCTI, increment::Increment) = ($op)(increment.data, field.data)
+    @eval ($op)(field1::DCTI, field2::DCTI) = ($op)(field1.data, field2.data)
+    @eval ($op)(field::DCTI, k) = ($op)(field.data, k)
+    @eval ($op)(k, field::DCTI) = ($op)(field.data, k)
 end
 
-function Base.linearindexing(::Type{DefaultDiscreteField})
-    return LinearFast()
+function Base.vec(field::DVTI)
+    return [field.data...;]
 end
 
-function Base.getindex(field::DefaultDiscreteField, i::Int)
-    return field.timesteps[i]
+function Base.vec(field::DCTV)
+    info("trying to vectorize $field")
+    error("does not make sense")
 end
 
-function Base.endof(field::DefaultDiscreteField)
-    return endof(field.timesteps)
+function Base.endof(field::Field)
+    return endof(field.data)
 end
 
-function Base.first(field::DefaultDiscreteField)
-    return field[1][end]
+#function Base.similar{T}(field::DVTI, data::Vector{T})
+#    return Increment(reshape(data, round(Int, length(data)/length(increment)), length(increment)))
+#end
+
+function Base.similar{T}(field::DVTI, data::Vector{T})
+    n = length(field.data)
+    data = reshape(data, round(Int, length(data)/n), n)
+    newdata = Vector[data[:,i] for i=1:n]
+    return typeof(field)(newdata)
 end
 
-function Base.last(field::DefaultDiscreteField)
-    return field[end][end]
+function Base.start(::DVTI)
+    return 1
 end
 
-function Base.push!(field::DefaultDiscreteField, timestep::TimeStep)
-    push!(field.timesteps, timestep)
+function Base.next(f::DVTI, state)
+    return f.data[state], state+1
 end
 
-function Base.push!(field::DefaultDiscreteField, data::Union{Vector, Matrix})
-    push!(field[end], Increment(data))
+function Base.done(f::DVTI, s)
+    return s > length(f.data)
 end
 
-function Base.push!(field::DefaultDiscreteField, data::Pair)
-    ts = TimeStep(data[1], Increment(data[2]))
-    push!(field, ts)
+### Accessing continuous fields
+
+function Base.call(field::CVTI, xi::Vector)
+    field.data(xi)
 end
 
-"""Quickly create fields.
+function Base.call(field::CVTI, xi::Vector, ::Type{Val{:grad}})
+    field.data(xi, Val{:grad})
+end
 
-Examples
---------
->>> Field([1, 2])  # creates field with one timestep and vector value [1, 2]
->>> Field(1, 2) # creates field with two timesteps, each having scalar value
->>> Field([1, 2], [3, 4]) # creates field with two timesteps, each having vector value
->>> Field( (0.0, [1, 2]), (0.5, [3, 4]) ) # like above, but give time also
-"""
-function Base.convert(::Type{DefaultDiscreteField}, data...)
-    timesteps = TimeStep[]
-    for (i, d) in enumerate(data)
-        if isa(d, Tuple)
-            @debug("is tuple, has time, d = $d")
-            # contains time vector
-            increments = Increment[Increment(d[2])]
-            push!(timesteps, TimeStep(d[1], increments))
-        else
-#           @debug("array without time, d = $d")
-#           @debug(typeof(d))
-            increments = Increment[Increment(d)]
-            push!(timesteps, TimeStep(i-1.0, increments))
+function Base.convert(::Type{Basis}, field::CVTI)
+    return field.data
+end
+
+function Base.call(field::CCTV, time::Number)
+    return field.data(time)
+end
+
+### Interpolation 
+
+""" Interpolate time-invariant field in time direction. """
+function Base.call(field::DVTI, time::Float64)
+    return field
+end
+function Base.call(field::DCTI, time::Float64)
+    return field
+end
+function Base.call(field::CVTI, time::Float64)
+    return field.data()
+end
+function Base.call(field::CCTI, time::Float64)
+    return field.data()
+end
+
+""" Interpolate time-variant field in time direction. """
+function Base.call(field::DCTV, time::Float64)
+    for i=reverse(1:length(field))
+        if isapprox(field[i].time, time)
+            return DCTI(field[i].data)
         end
     end
-    field = DefaultDiscreteField(timesteps)
-    return field
+    info(field.data)
+    info(time)
+    error("interpolate DCTV: not implemented yet")
 end
 
-function Base.convert(::Type{DefaultDiscreteField}, data::Vector{TimeStep})
-    field = DefaultDiscreteField(data)
-#    @debug(field)
-    return field
+function Base.call(field::DVTV, time::Float64, time_extrapolation::Symbol=:linear)
+    for i=reverse(1:length(field))
+        if isapprox(field[i].time, time)
+            return DVTI(field[i].data)
+        end
+    end
+    info(field.data)
+    info(time)
+    error("interpolate DVTV: not implemented yet")
 end
 
-### CONTINUOUS FIELDS ###
-
-type DefaultContinuousField <: ContinuousField
-    field :: Function
+""" Interpolate constant field in spatial dimension. """
+function Base.call(basis::CVTI, field::DCTI, xi::Vector)
+    return field.data
 end
 
-function Base.call(field::DefaultContinuousField, xi::Vector, time::Number)
-    return field.field(xi, time)
+""" Interpolate variable field in spatial dimension. """
+function Base.call(basis::CVTI, values::DVTI, xi::Vector)
+    N = basis(xi)
+    return sum([N[i]*values[i] for i=1:length(N)])
 end
 
-function Base.convert(::Type{DefaultContinuousField}, f::Function)
-    return DefaultContinuousField(f)
+function Base.call(basis::CVTI, geometry::DVTI, xi::Vector, ::Type{Val{:grad}})
+    dbasis = basis(xi, Val{:grad})
+    J = sum([dbasis[:,i]*geometry[i]' for i=1:length(geometry)])
+    invJ = isa(J, Vector) ? inv(J[1]) : inv(J)
+    grad = invJ * dbasis
+    return grad
 end
 
+function Base.call(basis::CVTI, geometry::DVTI, values::DVTI, xi::Vector, ::Type{Val{:grad}})
+    grad = call(basis, geometry, xi, Val{:grad})
+    gradf = sum([grad[:,i]*values[i]' for i=1:length(geometry)])'
+    return length(gradf) == 1 ? gradf[1] : gradf
+end
+
+function Base.call(basis::CVTI, xi::Vector, time::Number)
+    call(basis, xi)
+end
 
 ### FIELDSET ###
 
 typealias FieldSet Dict{ASCIIString, Field}
-
-# 1. given numbers, arrays or tuples -> discrete field
-
-function Base.convert(::Type{Field}, data::Union{Number, Array, Tuple}...)
-    return DiscreteField(data...)
-end
-
-function Base.convert(::Type{DiscreteField}, data::Union{Number, Array, Tuple}...)
-    return convert(DefaultDiscreteField, data...)
-end
-
-# 2. given function -> continuous field
-
-function Base.convert(::Type{Field}, data::Function)
-    return ContinuousField(data)
-end
-
-function Base.convert(::Type{ContinuousField}, data::Function)
-    return convert(DefaultContinuousField, data)
-end
-
-function Base.length(::Field)
-    return 1
-end
 

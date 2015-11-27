@@ -3,7 +3,7 @@
 
 # Lagrange (Continous Galerkin) finite elements
 
-abstract CG <: Element
+abstract CG <: AbstractElement
 
 """
 Given polynomial P and coordinates of reference element, calculate
@@ -29,28 +29,25 @@ Examples
 >>> @create_lagrange_element(Seg2, "2 node linear segment", X, P)
 """
 macro create_lagrange_element(element_name, element_description, X, P)
-#   Logging.debug("Creating element ", element_name, ": ", element_description, "\n")
     eltype = esc(element_name)
     quote
-        global get_element_description
-        basis, dbasisdxi = calculate_lagrange_basis($P, $X)
-        type $eltype <: CG
-            connectivity :: Array{Int, 1}
-            basis :: CVTI
-            fields :: FieldSet
+        global get_basis, get_dbasis
+        basis, dbasis = calculate_lagrange_basis($P, $X)
+        abstract $eltype <: CG
+        function get_basis(::Type{$eltype}, xi::Vector{Float64})
+            return basis(xi)
         end
-        function $eltype(connectivity, args...)
-            $eltype(connectivity, CVTI(basis, dbasisdxi), FieldSet())
+        function get_dbasis(::Type{$eltype}, xi::Vector{Float64})
+            return dbasis(xi)
         end
-        get_element_description(el::Type{$eltype}) = $element_description
-        Base.size(element::Type{$eltype}) = Base.size($X)
-        Base.size(element::$eltype) = Base.size($X)
+        function $eltype(args...)
+            return Element{$eltype}(args...)
+        end
+        function Base.size(::Type{$eltype})
+            return Base.size($X)
+        end
     end
 end
-
-# 0d Lagrange element
-
-#@create_element(Point1, CG, "1 node point element")
 
 # 1d Lagrange elements
 

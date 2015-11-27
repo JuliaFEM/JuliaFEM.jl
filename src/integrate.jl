@@ -3,7 +3,7 @@
 
 # Let's drop here all integration schemes and some defaults for different element types
 
-function get_integration_points(Quad4::Element)
+function get_integration_points(::Type{Quad4})
     [
         IntegrationPoint(1.0/sqrt(3.0)*[-1, -1], 1.0),
         IntegrationPoint(1.0/sqrt(3.0)*[ 1, -1], 1.0),
@@ -14,13 +14,13 @@ end
 
 typealias LineElement Union{Seg2, Seg3}
 
-function get_integration_points(element::LineElement, ::Type{Val{1}})
+function get_integration_points(::Type{Seg2}, ::Type{Val{1}})
     [
         IntegrationPoint([0.0], 2.0)
     ]
 end
 
-function get_integration_points(element::LineElement, ::Type{Val{2}})
+function get_integration_points(::Type{Seg2}, ::Type{Val{2}})
     [
         IntegrationPoint([-sqrt(1/3)], 1)
         IntegrationPoint([+sqrt(1/3)], 1)
@@ -54,12 +54,12 @@ function get_integration_points(element::LineElement, ::Type{Val{5}})
     ]
 end
 
-function get_integration_points(element::Seg2)
-    return get_integration_points(element, Val{1})
+function get_integration_points(::Type{Seg2})
+    return get_integration_points(Seg2, Val{2})
 end
 
 function get_integration_points(element::Seg3)
-    return get_integration_points(element, Val{2})
+    return get_integration_points(element, Val{3})
 end
 
 ### 3D elements

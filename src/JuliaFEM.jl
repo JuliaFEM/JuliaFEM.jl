@@ -56,7 +56,7 @@ function Base.linspace{T<:Array}(X1::T, X2::T, n)
 end
 
 # fields, see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/notebooks/2015-06-14-data-structures.ipynb
-include("fields2.jl")
+include("fields.jl")
 #include("basis.jl")  # interpolation of discrete fields
 include("symbolic.jl") # a thin symbolic layer for fields
 include("types.jl")  # type definitions
@@ -65,24 +65,26 @@ include("types.jl")  # type definitions
 include("elements.jl")
 include("lagrange.jl") # Lagrange elements
 #include("hierarchical.jl") # P-elements
-include("mortar_elements.jl") # Mortar elements
+#include("mortar_elements.jl") # Mortar elements
 
 ### EQUATIONS ###
 include("integrate.jl")  # default integration points for elements
 include("sparse.jl")
-include("equations.jl")
 include("problems.jl")
+include("equations.jl")
 
 ### FORMULATIION ###
 include("dirichlet.jl")
-include("mortar.jl")  # mortar projection
 include("heat.jl")
 include("elasticity.jl")
 
 ### ASSEMBLY + SOLVE ###
 include("assembly.jl")
 include("solvers.jl")
-include("directsolver.jl") # parallel sparse direct solver for non-lniear problems
+include("directsolver.jl") # parallel sparse direct solver for non-linear problems
+
+### MORTAR STUFF ###
+#include("mortar.jl")  # mortar projection
 
 # PRE AND POSTPROCESS
 include("xdmf.jl")
