@@ -6,7 +6,7 @@
 """ Find projection from slave nodes to master element, i.e. find xi2 from
 master element corresponding to the xi1.
 """
-function project_from_slave_to_master(slave::Element, master::Element, xi1::Vector, time::Float64=0.0; max_iterations=5, tol=1.0e-9)
+function project_from_slave_to_master{S,M}(slave::Element{S}, master::Element{M}, xi1::Vector, time::Float64=0.0; max_iterations=5, tol=1.0e-9)
 #   slave_basis = get_basis(slave)
 
     # slave side geometry and normal direction at xi1
@@ -14,17 +14,19 @@ function project_from_slave_to_master(slave::Element, master::Element, xi1::Vect
     N1 = slave("nodal ntsys", xi1, time)[:,1]
 
     # master side geometry at xi2
-    master_basis = master.basis.data.basis
-    master_dbasis = master.basis.data.dbasis
+    #master_basis = master.basis.data.basis
+    #master_dbasis = master.basis.data.dbasis
+    master_basis(xi) = get_basis(M, [xi])
+    master_dbasis(xi) = get_dbasis(M, [xi])
     master_geometry = master("geometry")(time)
 
     function X2(xi2)
-        N = master_basis([xi2])
+        N = master_basis(xi2)
         return sum([N[i]*master_geometry[i] for i=1:length(N)])
     end
 
     function dX2(xi2)
-        dN = master_dbasis([xi2])
+        dN = master_dbasis(xi2)
         return sum([dN[i]*master_geometry[i] for i=1:length(dN)])
     end
 
@@ -51,33 +53,35 @@ end
 
 """ Find projection from master surface to slave point, i.e. find xi1 from slave
 element corresponding to the xi2. """
-function project_from_master_to_slave(slave::Element, master::Element, xi2::Vector, time::Float64=0.0; max_iterations=5, tol=1.0e-9)
+function project_from_master_to_slave{S,M}(slave::Element{S}, master::Element{M}, xi2::Vector, time::Float64=0.0; max_iterations=5, tol=1.0e-9)
 #   slave_basis = get_basis(slave)
 
     # slave side geometry and normal direction at xi1
 
     slave_geometry = slave("geometry")(time)
     slave_normals = slave("nodal ntsys")(time)
-    slave_basis = slave.basis.data.basis
-    slave_dbasis = slave.basis.data.dbasis
+    #slave_basis = slave.basis.data.basis
+    #slave_dbasis = slave.basis.data.dbasis
+    slave_basis(xi) = get_basis(S, [xi])
+    slave_dbasis(xi) = get_dbasis(S, [xi])
 
     function X1(xi1)
-        N = slave_basis([xi1])
+        N = slave_basis(xi1)
         return sum([N[i]*slave_geometry[i] for i=1:length(N)])
     end
 
     function dX1(xi1)
-        dN = slave_dbasis([xi1])
+        dN = slave_dbasis(xi1)
         return sum([dN[i]*slave_geometry[i] for i=1:length(dN)])
     end
 
     function N1(xi1)
-        N = slave_basis([xi1])
+        N = slave_basis(xi1)
         return sum([N[i]*slave_normals[i] for i=1:length(N)])[:,1]
     end
 
     function dN1(xi1)
-        dN = slave_dbasis([xi1])
+        dN = slave_dbasis(xi1)
         return sum([dN[i]*slave_normals[i] for i=1:length(dN)])[:,1]
     end
 
@@ -112,36 +116,13 @@ function project_from_master_to_slave(slave::Element, master::Element, xi2::Vect
     for i=1:max_iterations
         dxi1 = -R(xi1) / dR(xi1)
         xi1 += dxi1
+        #info("dxi1 = $dxi1, xi1 = $xi1, norm(dxi1) = $(norm(dxi1))")
         if norm(dxi1) < tol
             return Float64[xi1]
         end
     end
     error("find projection from master to slave: did not converge")
 end
-
-
-### Mortar equations
-
-abstract MortarEquation <: Equation
-
-""" Mortar boundary condition element for 2-dimensional problem, 2 node line segment. """
-type MBC2D2 <: MortarEquation
-    element :: Seg2
-    integration_points :: Vector{IntegrationPoint}
-end
-
-function Base.size(equation::MBC2D2)
-    return (1, 2)
-end
-
-function Base.convert(::Type{MortarEquation}, element::Seg2)
-    integration_points = get_integration_points(element, Val{3})
-    if !haskey(element, "reaction force")
-        element["reaction force"] = (0.0 => Vector{Float64}[])
-    end
-    MBC2D2(element, integration_points)
-end
-
 
 ### Mortar problem
 
@@ -152,30 +133,23 @@ node_csys
     coordinate system in node, normal + tangent + "binormal"
     in 3d 3x3 matrix, in 2d 2x2 matrix, respectively
 """
-type MortarProblem <: BoundaryProblem
-    unknown_field_name :: ASCIIString
-    unknown_field_dimension :: Int
-    equations :: Vector{MortarEquation}
-end
+abstract MortarProblem <: AbstractProblem
 
-function MortarProblem(unknown_field_name, unknown_field_dimension::Int=1)
-    MortarProblem(unknown_field_name, unknown_field_dimension, [])
+function MortarProblem(parent_field_name, parent_field_dim, dim=1, elements=[])
+    return BoundaryProblem{MortarProblem}(parent_field_name, parent_field_dim, dim, elements)
 end
 
 # Mortar assembly
 
-function assemble!(assembly::Assembly, equation::MortarEquation, time::Number=0.0, problem=nothing)
-    isa(problem, Void) && error("Mortar boundary problem needs problem to be defined")
-    field_dim = problem.unknown_field_dimension
-    field_name = problem.unknown_field_name
+function assemble!(assembly::Assembly, problem::BoundaryProblem{MortarProblem}, slave_element::Element, time::Number)
+    
+    # get dimension and name of PARENT field
+    field_dim = problem.parent_field_dim
+    field_name = problem.parent_field_name
 
-    slave_element = get_element(equation)
     slave_dofs = get_gdofs(slave_element, field_dim)
-    slave_basis = get_basis(slave_element)
-    detJ = det(slave_basis)
 
     for master_element in slave_element["master elements"]
-        master_dofs = get_gdofs(master_element, field_dim)
         xi1a = project_from_master_to_slave(slave_element, master_element, [-1.0])
         xi1b = project_from_master_to_slave(slave_element, master_element, [ 1.0])
         xi1 = clamp([xi1a xi1b], -1.0, 1.0)
@@ -184,9 +158,9 @@ function assemble!(assembly::Assembly, equation::MortarEquation, time::Number=0.
             warn("No contribution")
             continue # no contribution
         end
-        master_basis = get_basis(master_element)
-        for ip in get_integration_points(equation)
-            w = ip.weight*detJ(ip)*l
+        master_dofs = get_gdofs(master_element, field_dim)
+        for ip in get_integration_points(slave_element)
+            w = ip.weight*det(slave_element, ip, time)*l
 
             # integration point on slave side segment
             xi_gauss = 1/2*(1-ip.xi)*xi1[1] + 1/2*(1+ip.xi)*xi1[2]
@@ -194,8 +168,8 @@ function assemble!(assembly::Assembly, equation::MortarEquation, time::Number=0.
             xi_projected = project_from_slave_to_master(slave_element, master_element, xi_gauss)
 
             # add contribution to left hand side 
-            N1 = slave_basis(xi_gauss, time)
-            N2 = master_basis(xi_projected, time)
+            N1 = slave_element(xi_gauss, time)
+            N2 = master_element(xi_projected, time)
             S = w*N1'*N1
             M = w*N1'*N2
             for i=1:field_dim
@@ -208,5 +182,4 @@ function assemble!(assembly::Assembly, equation::MortarEquation, time::Number=0.
         end
     end
 end
-
 

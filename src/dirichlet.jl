@@ -7,7 +7,7 @@ function DirichletProblem(parent_field_name, parent_field_dim, dim=1, elements=[
     return BoundaryProblem{DirichletProblem}(parent_field_name, parent_field_dim, dim, elements)
 end
 
-function assemble!{E}(assembly::Assembly, problem::BoundaryProblem{DirichletProblem}, element::Element{E}, time::Number)
+function assemble!(assembly::Assembly, problem::BoundaryProblem{DirichletProblem}, element::Element, time::Number)
 
     # get dimension and name of PARENT field
     field_dim = problem.parent_field_dim

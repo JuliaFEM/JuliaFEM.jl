@@ -6,9 +6,9 @@ module MortarTests
 using JuliaFEM
 using JuliaFEM.Test
 
-using JuliaFEM: Seg2, MortarProblem, MortarEquation, MortarElement, Assembly, assemble!, Element
-using JuliaFEM: get_basis, grad, project_from_slave_to_master, project_from_master_to_slave, Quad4
+using JuliaFEM: Element, Seg2, Quad4, MortarProblem, Assembly, assemble!
 using JuliaFEM: PlaneStressElasticityProblem, DirichletProblem, DirectSolver
+using JuliaFEM: project_from_slave_to_master, project_from_master_to_slave
 
 function get_test_2d_model()
     # this is hand calculated and given as an example in my thesis
@@ -40,7 +40,7 @@ function get_test_2d_model()
 end
 
 
-function test_calc_flat_2d_projection()
+function test_calc_flat_2d_projection_slave_to_master()
     slaves, masters = get_test_2d_model()
     slave1, slave2 = slaves
     master1, master2 = masters
@@ -50,15 +50,21 @@ function test_calc_flat_2d_projection()
 
     xi2b = project_from_slave_to_master(slave1, master1, [1.0])
     @test xi2b == [ 0.2]
-    X2 = get_basis(master1)("geometry", xi2b)
+    X2 = master1("geometry", xi2b, 0.0)
     @test X2 == [3/4, 1.0]
+end
 
+function test_calc_flat_2d_projection_master_to_slave()
+    slaves, masters = get_test_2d_model()
+    slave1, slave2 = slaves
+    master1, master2 = masters
     xi1a = project_from_master_to_slave(slave1, master1, [-1.0])
     @test xi1a == [-1.0]
     xi1b = project_from_master_to_slave(slave1, master1, [1.0])
-    X1 = get_basis(slave1)("geometry", xi1b)
+    X1 = slave1("geometry", xi1b, 0.0)
     @test X1 == [5/4, 1.0]
 end
+#test_calc_flat_2d_projection_master_to_slave()
 
 function test_calc_flat_2d_projection_rotated()
     master1 = Seg2([3, 4])
@@ -79,7 +85,6 @@ function test_calc_flat_2d_projection_rotated()
     xi = project_from_slave_to_master(slave1, master1, [1.0])
     info("xi = $xi")
     @test xi == [-1.0]
-
 
 end
 
@@ -102,7 +107,7 @@ function test_create_flat_2d_assembly()
 
     info("creating assembly")
     assembly = Assembly()
-    assemble!(assembly, problem.equations[1], 0.0, problem)
+    assemble!(assembly, problem, slave1, 0.0)
     B = round(full(assembly.stiffness_matrix, 12, 12), 6)
     info("size of B = $(size(B))")
     info("B matrix in first slave element = \n$(B[10:11,:])")
@@ -120,7 +125,7 @@ function test_create_flat_2d_assembly()
     M3 = [8, 9]
     B_expected[S3,S3] += [9/100 27/200; 27/200 39/100]
     B_expected[S3,M3] -= [3/20 3/40; 9/40 3/10]
-    assemble!(assembly, problem.equations[2], 0.0, problem)
+    assemble!(assembly, problem, slave2, 0.0)
     B = full(assembly.stiffness_matrix)
     info("size of B = $(size(B))")
     info("B matrix in second slave element = \n$(B[11:12,:])")
@@ -128,6 +133,7 @@ function test_create_flat_2d_assembly()
 
     @test isapprox(B, B_expected)
 end
+#test_create_flat_2d_assembly()
 
 function test_2d_mortar_multiple_bodies_multiple_dirichlet_bc()
     N = Vector[
@@ -205,6 +211,7 @@ function test_2d_mortar_multiple_bodies_multiple_dirichlet_bc()
     # code aster verification, two_elements.comm
     @test isapprox(disp, [3.17431158889468E-02, -2.77183037855653E-01])
 end
+test_2d_mortar_multiple_bodies_multiple_dirichlet_bc()
 
 
 function test_2d_mortar_three_bodies_shared_nodes()
@@ -324,7 +331,5 @@ function test_2d_mortar_three_bodies_shared_nodes()
     @test isapprox(disp, [3.17431158889468E-02, -2.77183037855653E-01])
 
 end
-
-
 
 end

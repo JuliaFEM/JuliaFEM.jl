@@ -137,7 +137,11 @@ function get_basis{E}(element::Element{E}, ip::IntegrationPoint)
     return get_basis(E, ip.xi)
 end
 
-function call{E}(element::Element{E}, xi::VecOrIP, time::Float64=0)
+function get_basis{E}(element::Element{E}, xi::Vector{Float64})
+    return get_basis(E, xi)
+end
+
+function call{E}(element::Element{E}, xi::VecOrIP, time::Float64=0.0)
     return get_basis(element, xi)
 end
 

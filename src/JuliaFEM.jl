@@ -84,7 +84,7 @@ include("solvers.jl")
 include("directsolver.jl") # parallel sparse direct solver for non-linear problems
 
 ### MORTAR STUFF ###
-#include("mortar.jl")  # mortar projection
+include("mortar.jl")  # mortar projection
 
 # PRE AND POSTPROCESS
 include("xdmf.jl")
