@@ -25,12 +25,28 @@ function DirectSolver()
     DirectSolver([], [], false, true, 10, 1.0e-6)
 end
 
+function tic(timing, what::ASCIIString)
+    timing[what * " start"] = time()
+end
+
+function toc(timing, what::ASCIIString)
+    timing[what * " finish"] = time()
+end
+
+function time_elapsed(timing, what::ASCIIString)
+    return timing[what * " finish"] - timing[what * " start"]
+end
+
 """ Call solver to solve a set of problems. """
 function call(solver::DirectSolver, time::Number=0.0)
     #@assert length(solver.field_problems) == 1
     info("# of field problems: $(length(solver.field_problems))")
     info("# of boundary problems: $(length(solver.boundary_problems))")
     @assert solver.nonlinear_problem == true
+    
+    timing = Dict{ASCIIString, Float64}()
+    tic(timing, "solver")
+    tic(timing, "initialization")
 
     # check that all problems are "same kind"
     field_name = get_unknown_field_name(solver.field_problems[1])
@@ -73,26 +89,33 @@ function call(solver::DirectSolver, time::Number=0.0)
         end
     end
 
+    toc(timing, "initialization")
+
     dim = 0
 
     for iter=1:solver.max_iterations
-        tic()
         info("Starting iteration $iter")
+        tic(timing, "non-linear iteration")
 
         mapper = solver.parallel ? pmap : map
 
         # assemble boundary problems
+        tic(timing, "boundary assembly")
         boundary_assembly = sum(mapper((p)->assemble(p, time), solver.boundary_problems))
         boundary_dofs = unique(boundary_assembly.stiffness_matrix.I)
+        toc(timing, "boundary assembly")
 
         # assemble field problems
         # in principle if we want to static condensation we need to pass boundary dofs
         # to field problems in order to know which dofs are interior dofs and can be
         # condensated.
+        tic(timing, "field assembly")
         field_assembly = sum(mapper((p)->assemble(p, time), solver.field_problems))
         field_dofs = unique(field_assembly.stiffness_matrix.I)
         info("# of dofs: $(length(field_dofs)), # of interface dofs: $(length(boundary_dofs))")
+        toc(timing, "field assembly")
 
+        tic(timing, "create sparse matrices")
         # create sparse matrices and saddle point problem
         K = sparse(field_assembly.stiffness_matrix)
         dim = size(K, 1)
@@ -101,14 +124,18 @@ function call(solver::DirectSolver, time::Number=0.0)
         g = sparse(boundary_assembly.force_vector, dim, 1)
         A = [K C'; C spzeros(dim, dim)]
         b = [r; g]
+        toc(timing, "create sparse matrices")
 
+        tic(timing, "solution of system")
         # solve increment for linearized problem
         nz = unique(rowvals(A))  # take only non-zero rows
         sol = zeros(b)
         sol[nz] = lufact(A[nz,nz]) \ full(b[nz])
         info("solved. length of solution vector = $(length(sol))")
+        toc(timing, "solution of system")
         #info(full(sol[nz]))
 
+        tic(timing, "update element data")
         # update elements in field problems
         for field_problem in solver.field_problems
             for element in get_elements(field_problem)
@@ -130,10 +157,22 @@ function call(solver::DirectSolver, time::Number=0.0)
                 last(element["reaction force"]).data = local_sol  # <-- replaced
             end
         end
+        toc(timing, "update element data")
+        toc(timing, "non-linear iteration")
 
-        info("Non-linear iteration took $(toq()) seconds")
+        if true
+            info("timing info for non-linear iteration:")
+            info("boundary assembly      : ", time_elapsed(timing, "boundary assembly"))
+            info("field assembly         : ", time_elapsed(timing, "field assembly"))
+            info("create sparse matrices : ", time_elapsed(timing, "create sparse matrices"))
+            info("solution of system     : ", time_elapsed(timing, "solution of system"))
+            info("update element data    : ", time_elapsed(timing, "update element data"))
+            info("non-linear iteration   : ", time_elapsed(timing, "non-linear iteration"))
+        end
 
         if norm(sol[1:dim]) < solver.tol
+            toc(timing, "solver")
+            info("solver finished in ", time_elapsed(timing, "solver"), " seconds.")
             return (iter, true)
         end
 
