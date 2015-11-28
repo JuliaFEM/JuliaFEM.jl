@@ -83,6 +83,9 @@ include("assembly.jl")
 include("solvers.jl")
 include("directsolver.jl") # parallel sparse direct solver for non-linear problems
 
+### API ###
+include("api.jl")
+
 ### MORTAR STUFF ###
 include("mortar.jl")  # mortar projection
 
