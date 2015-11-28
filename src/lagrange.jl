@@ -64,12 +64,23 @@ end
      0.0 0.0 1.0],
     (xi) -> [1.0, xi[1], xi[2]])
 
+@create_lagrange_element(Tri6, "6 node quadratic triangle element",
+    [0.0 1.0 0.0 0.5 0.5 0.0
+     0.0 0.0 1.0 0.0 0.5 0.5],
+    (xi) -> [1.0, xi[1], xi[2], xi[1]^2, xi[2]^2, xi[1]*xi[2]])
+
 @create_lagrange_element(Quad4, "4 node bilinear quadrangle element",
     [-1.0  1.0 1.0 -1.0
      -1.0 -1.0 1.0  1.0],
     (xi) -> [1.0, xi[1], xi[2], xi[1]*xi[2]])
 
 # 3d Lagrange elements
+
+@create_lagrange_element(Tet4, "4 node tetrahedron",
+    [0.0 1.0 0.0 0.0
+     0.0 0.0 1.0 0.0
+     0.0 0.0 0.0 1.0],
+    (xi) -> [1.0, xi[1], xi[2], xi[3]])
 
 @create_lagrange_element(Tet10, "10 node quadratic tetrahedron",
     [0.0 1.0 0.0 0.0 0.5 0.5 0.0 0.0 0.5 0.0
