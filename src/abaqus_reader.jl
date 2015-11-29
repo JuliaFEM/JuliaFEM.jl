@@ -1,29 +1,24 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-global ABQ_ELTYPE_HAS_NODES = Dict(
-    :C3D4 => 4,
-    :C3D10 => 10,
-    :C3D20 => 20,
-    :C3D20E => 20,
-    :S3 => 3,
-)
-
+element_has_nodes(::Type{Val{:C3D4}}) = 4
+element_has_type( ::Type{Val{:C3D4}}) = Tet4
+element_has_nodes(::Type{Val{:C3D10}}) = 10
+element_has_nodes(::Type{Val{:C3D20}}) = 20
+element_has_nodes(::Type{Val{:C3D20E}}) = 20
+element_has_nodes(::Type{Val{:S3}}) = 3
+element_has_type( ::Type{Val{:S3}}) = Seg3
 
 """
 """
 function empty_or_comment_line(line)
-    val_bool = false
-    if startswith(line, "**") || length(line) == 0
-        val_bool = true
-    end
-    val_bool
+    startswith(line, "**") || (length(line) == 0)
 end
 
 """
 Function for parsing nodes from the file
 """
-function parse_nodes(model, lines, key, idx_start, idx_end)
+function parse_section(model, lines, key, idx_start, idx_end, ::Type{Val{:NODE}})
     info("Parsing nodes")
     definition = lines[idx_start]
     for line in lines[idx_start + 1: idx_end]
@@ -31,8 +26,8 @@ function parse_nodes(model, lines, key, idx_start, idx_end)
             m = matchall(r"[-0-9.]+", line)
             node_id = parse(Int, m[1])
             coords = float(m[2:end])
-            node = jNode(node_id, coords)
-            push!(model.nodes, node)
+            node = Node(node_id, coords)
+            add_node!(model, node)
         end
     end
 end
@@ -57,11 +52,12 @@ end
 
 """
 """
-function parse_elements(model, lines, key, idx_start, idx_end)
+function parse_section(model, lines, key, idx_start, idx_end, ::Type{Val{:ELEMENT}})
     definition = uppercase(lines[idx_start])
     element_type = regex_match(r"TYPE=([\w\-\_]+)", definition, 1)
     eltype_sym = symbol(element_type)
-    eltype_nodes = ABQ_ELTYPE_HAS_NODES[eltype_sym]
+    eltype_nodes = element_has_nodes(Val{eltype_sym})
+    element_type = element_has_type(Val{eltype_sym})
     info("Parsing elements. Type: $(element_type)")
     list_iterator = consumeList(lines, idx_start+1, idx_end)
     line = consume(list_iterator)
@@ -71,23 +67,21 @@ function parse_elements(model, lines, key, idx_start, idx_end)
         if !(empty_or_comment_line(line))
             id = numbers[1]
             connectivity = numbers[2:end]
-            element = jElement(id, connectivity, element_type)
-            while length(element.connectivity) != eltype_nodes
-                @assert length(element.connectivity) < eltype_nodes
+            while length(connectivity) != eltype_nodes
+                @assert length(connectivity) < eltype_nodes
                 line = consume(list_iterator)
                 arr_num_as_str = matchall(r"[0-9]+", line)
                 numbers = map(x-> parse(Int, x), arr_num_as_str)
-                map(x->push!(element.connectivity, x), numbers)
+                map(x->push!(connectivity, x), numbers)
             end
-            push!(model.elements, element)
+            element = Element{element_type}(connectivity)
+            add_element!(model, element)
         end
         line = consume(list_iterator)
     end
 end
 
-"""
-"""
-function parse_set(model, lines, key, idx_start, idx_end)
+function parse_section(model, lines, key, idx_start, idx_end, ::Union{Type{Val{:NSET}}, Type{Val{:ELSET}}})
     set_regex_string = Dict(:NSET  => r"NSET=([\w\-\_]+)",
                             :ELSET => r"ELSET=([\w\-\_]+)" )
     definition = uppercase(lines[idx_start])
@@ -110,16 +104,11 @@ function parse_set(model, lines, key, idx_start, idx_end)
             end
         end
     end
-    selected_set = key == :NSET ? jNodeSet : jElementSet
+    selected_set = key == :NSET ? NodeSet : ElementSet
     set_alloc = selected_set(set_name, data)
-    model.sets[set_name] = set_alloc
+    add_set(model, set_alloc)
 end
 
-# 
-parse_section = Dict(:NODE => parse_nodes,
-                     :ELEMENT => parse_elements,
-                     :NSET => parse_set,
-                     :ELSET => parse_set)
 
 """
 Find lines, which contain keywords, for example "*NODE"
@@ -138,9 +127,9 @@ end
 """
 """
 function parse_abaqus(fid::IOStream)
-    model = jModel()
+    model = Model()
     lines = readlines(fid)
-    info("Registered handlers: $(keys(parse_section))")
+    # info("Registered handlers: $(keys(parse_section))")
     keyword_indexes = find_keywords(lines)
     idx_start = keyword_indexes[1]
     keyword_sym::Symbol = :none
@@ -148,15 +137,13 @@ function parse_abaqus(fid::IOStream)
     for idx_end in keyword_indexes[2:end]
         keyword_line = uppercase(lines[idx_start])
         keyword = regex_match(r"\s*(\w+)", keyword_line, 1)
-        keyword_sym = symbol(keyword)
-        try
-            parser = parse_section[keyword_sym]
-        catch
-            warn("Keyword not implemented: ", keyword_sym)
-            idx_start = idx_end
-            continue
+        k_sym = symbol(keyword)
+        if method_exists(parse_section, Tuple{Model, Array{Integer, 1}, Symbol,
+            Integer, Integer, Type{Val{k_sym}}})
+            parse_section(model, lines, k_sym, idx_start, idx_end-1, Val{k_sym})
+        else
+            warn("Unknown section: $(keyword)")
         end
-        parser(model, lines, keyword_sym, idx_start, idx_end-1)
         idx_start = idx_end
     end
     return model
