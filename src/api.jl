@@ -39,7 +39,6 @@ end
 """
 """
 type Node{T<:Real}
-    id::Integer
     coords::Array{T, 1}
 end
 
@@ -64,13 +63,14 @@ end
 
 """
 """
-type ElementSet
+type ElementSet{E<:AbstractElement}
     name :: AbstractString
-    element_ids :: Array{Integer, 1}
     material :: Material
+    elements :: Vector{E} 
 end
 
-ElementSet(name, el_ids) = ElementSet(name, el_ids, Material())
+ElementSet{E<:AbstractElement}(name::ASCIIString, elements::E...) =
+ElementSet(name,Material(), E[elements...])
 
 type LoadCase{ P <: Problem }
     problem :: P
@@ -86,19 +86,25 @@ LoadCase(a, Vector{Union{NeumannBC,DirichletBC}}(b))
 """
 """
 type Model
-    nodes :: Vector{Node}
-    elements :: Vector{Element}
+    name :: ASCIIString
+    nodes :: Dict{Union{Int64, ASCIIString}, Node}
+    elements :: Dict{Union{Int64, ASCIIString}, Element}
     sets :: Dict{AbstractString, Union{NodeSet, ElementSet}}
     load_cases :: Vector{LoadCase}
  #   settings :: Dict{AbstractString, Real}
 end
 
-Model() = Model(Node[],
-                Element[],
-                Dict{AbstractString, 
-                    Union{NodeSet, ElementSet}}(),
-                LoadCase[],
+Model(name::ASCIIString) = Model(name,
+                                 Dict{Union{Int64, ASCIIString}, Node}(),
+                                 Dict{Union{Int64, ASCIIString}, Element}(),
+                                 Dict{AbstractString, 
+                                    Union{NodeSet, ElementSet}}(),
+                                 LoadCase[],
 )
+
+function Base.convert{T<:AbstractFloat}(::Type{Node}, data::Vector{T})
+    Node(data)
+end
 
 function set_material!{S <: AbstractString}(model::Model, material::Material, set_name::S)
     model.sets[set_name].material = material
@@ -166,7 +172,7 @@ end
 
 """
 """
-function push!(model::Model, element::Element...)
+function push!(model::Model, element::Element)
     push!(model.elements, element...)
 end
 
@@ -178,8 +184,8 @@ end
 
 """
 """
-function push!(model::Model, node::Node...)
-    push!(model.nodes, node...)
+function push!(model::Model, node::Node)
+    push!(model.nodes, node)
 end
 
 function push!(model::Model, nodes::Vector{Node})
@@ -203,3 +209,4 @@ function add_set!{S <: AbstractString}(model::Model, ::Type{Val{:ELSET}},
     new_set = ElementSet(name, ids)
     add_set!(model, new_set)
 end
+
