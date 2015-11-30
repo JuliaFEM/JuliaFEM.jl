@@ -76,6 +76,12 @@ function get_residual_vector{P<:ElasticityProblem}(problem::Problem{P}, element:
         end
         E = 1/2*(F'*F - I)  # strain
         S = lambda*trace(E)*I + 2*mu*E
+
+        J = det(element, ip, time)
+        T = J^-1*F*S*F'
+        #ip["cauchy stress"] = T
+        ip["gl strain"] = E
+
         r += F*S*dbasis
     end
 

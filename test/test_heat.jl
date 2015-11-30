@@ -35,6 +35,14 @@ function test_one_element()  # always start test function with name test_
     fdofs = [1, 2]
     A = full(assembly.stiffness_matrix)
     b = full(assembly.force_vector)
+
+    @test isapprox(A, [
+         4.0 -1.0 -2.0 -1.0
+        -1.0  4.0 -1.0 -2.0
+        -2.0 -1.0  4.0 -1.0
+        -1.0 -2.0 -1.0  4.0
+    ])
+
     @test isapprox(A[fdofs, fdofs] \ b[fdofs], [1.0, 1.0])
 
     # Set constant flux g=6 on boundary. Accurate solution is

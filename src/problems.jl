@@ -15,6 +15,8 @@ type BoundaryProblem{T<:AbstractProblem}
     elements :: Vector{Element}
 end
 
+typealias FieldProblem Problem
+
 typealias AllProblems Union{Problem, BoundaryProblem}
 
 function get_elements(problem::AllProblems)

@@ -62,6 +62,7 @@ function test_solver_multiple_dirichlet_bc()
     @test isapprox(disp, [3.17431158889468E-02, -1.38591518927826E-01])
 
 end
+#test_solver_multiple_dirichlet_bc()
 
 function test_solver_multiple_bodies_multiple_dirichlet_bc()
     N = Vector[
