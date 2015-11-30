@@ -148,6 +148,11 @@ function call(element::Element, field_name::ASCIIString, time::Number)
     return element[field_name](time)
 end
 
+function get_dbasis{E<:AbstractElement}(::Type{E}, xi::Vector)
+    basis(xi) = vec(get_basis(E, xi))
+    return ForwardDiff.jacobian(basis, xi, cache=autodiffcache)'
+end
+
 function get_basis{E}(element::Element{E}, ip::IntegrationPoint)
     return get_basis(E, ip.xi)
 end

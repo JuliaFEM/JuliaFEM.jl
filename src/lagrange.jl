@@ -9,16 +9,22 @@ abstract CG <: AbstractElement
 Given polynomial P and coordinates of reference element, calculate
 Lagrange basis functions
 """
-function calculate_lagrange_basis(P, X)
+function calculate_lagrange_basis_coefficients(P, X)
     dim, nbasis = size(X)
     A = zeros(nbasis, nbasis)
     for i=1:nbasis
         A[i,:] = P(X[:, i])
     end
-    invA = inv(A)'
-    basis(xi) = (invA*P(xi))'
-    dbasisdxi(xi) = (ForwardDiff.jacobian((xi) -> invA*P(xi), xi, cache=autodiffcache))'
-    basis, dbasisdxi
+#   invA = inv(A)'
+#   basis(xi) = (invA*P(xi))'
+#   dbasisdxi(xi) = (ForwardDiff.jacobian((xi) -> invA*P(xi), xi, cache=autodiffcache))'
+#   basis, dbasisdxi
+#   info(inv(A))
+#   info(P([0.0, 0.0]))
+#   invA = inv(A)'
+#   basis(xi) = invA*P(xi)
+#   return basis
+    return inv(A)'
 end
 
 """
@@ -32,20 +38,31 @@ macro create_lagrange_element(element_name, element_description, X, P)
     eltype = esc(element_name)
     quote
         global get_basis, get_dbasis
-        basis, dbasis = calculate_lagrange_basis($P, $X)
+        #basis, dbasis = calculate_lagrange_basis($P, $X)
+        C = calculate_lagrange_basis_coefficients($P, $X)
+        basis(xi) = C*$P(xi)
+#       dbasis = ForwardDiff.jacobian(basis)
+
         abstract $eltype <: CG
-        function get_basis(::Type{$eltype}, xi::Vector{Float64})
-            return basis(xi)
+
+        function get_basis(::Type{$eltype}, xi::Vector)
+            return basis(xi)'
         end
+
+#=
         function get_dbasis(::Type{$eltype}, xi::Vector{Float64})
-            return dbasis(xi)
+            return dbasis(xi)'
         end
+=#
+
         function $eltype(args...)
             return Element{$eltype}(args...)
         end
+
         function Base.size(::Type{$eltype})
             return Base.size($X)
         end
+
     end
 end
 
