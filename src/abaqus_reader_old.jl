@@ -44,7 +44,8 @@ function parse_element_section(model, header, data)
     eldims = Dict(
         "C3D10" => 10,
         "C3D4" => 4,
-        "S3" => 3)
+        "S3" => 3,
+        "STRI65" => 6)
     eltype = header["options"]["TYPE"]
     if !(eltype in keys(eldims))
         throw("Element $eltype dimension information missing")

@@ -1,22 +1,15 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM: Basis, Field, FieldSet, interpolate
-using FactCheck
+module TypesTests
 
-facts("test fields") do
-    # multiple field with some constant
-    u1 = Field(0.0, [0.0, 1.0])
-    u2 = 3.0*u1
-    @fact u1.time --> 0.0
-    @fact u2.time --> 0.0
-    @fact u2.values --> [0.0, 3.0]
+using JuliaFEM
+using JuliaFEM.Test
 
-    # addition of fields together
-    u1 = Field(0.0, [0.0, 1.0])
-    u2 = Field(0.0, [1.0, 2.0])
-    u3 = u1 + u2
-    @fact u3.values --> [1.0, 3.0]
+using JuliaFEM: Field, FieldSet
+
+function test_foo()
+    @test 1+1 == 2
 end
 
 #= to be fixed
@@ -85,3 +78,4 @@ end
 
 =#
 
+end

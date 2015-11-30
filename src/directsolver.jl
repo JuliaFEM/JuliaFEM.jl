@@ -99,48 +99,93 @@ function call(solver::DirectSolver, time::Number=0.0)
 
         mapper = solver.parallel ? pmap : map
 
+        info("Assembling problems.")
         # assemble boundary problems
         tic(timing, "boundary assembly")
         boundary_assembly = sum(mapper((p)->assemble(p, time), solver.boundary_problems))
         boundary_dofs = unique(boundary_assembly.stiffness_matrix.I)
+#       boundary_dofs = collect(range(1, 12))
+        info("# of interface dofs: $(length(boundary_dofs))")
+        #info("dofs = $boundary_dofs")
         toc(timing, "boundary assembly")
 
-        # assemble field problems
-        # in principle if we want to static condensation we need to pass boundary dofs
-        # to field problems in order to know which dofs are interior dofs and can be
-        # condensated.
-        tic(timing, "field assembly")
-        field_assembly = sum(mapper((p)->assemble(p, time), solver.field_problems))
-        field_dofs = unique(field_assembly.stiffness_matrix.I)
-        info("# of dofs: $(length(field_dofs)), # of interface dofs: $(length(boundary_dofs))")
-        toc(timing, "field assembly")
+        #static_condensation = false
 
+        # assemble field problems
+        dim = 0
+        assemblies = []
+        for (i, problem) in enumerate(solver.field_problems)
+            tic(timing, "field assembly")
+            field_assembly = assemble(problem, time)
+            #info("full assembly body $i")
+            #info(round(full(field_assembly.stiffness_matrix), 3))
+            toc(timing, "field assembly")
+            field_dofs = unique(field_assembly.stiffness_matrix.I)
+            #info("# of dofs in problem $i: $(length(field_dofs))")
+            dim = maximum([dim, maximum(field_dofs)])
+            #tic(timing, "condensate")
+            #cfield_assembly = condensate(field_assembly, boundary_dofs)
+            #toc(timing, "condensate")
+            #push!(assemblies, cfield_assembly)
+            push!(assemblies, field_assembly)
+        end
+
+        #info("dim = $dim")
+
+        #info("assembly done")
         tic(timing, "create sparse matrices")
         # create sparse matrices and saddle point problem
-        K = sparse(field_assembly.stiffness_matrix)
-        dim = size(K, 1)
-        r = sparse(field_assembly.force_vector, dim, 1)
+        #K = sparse(field_assembly.stiffness_matrix)
+        #dim = size(K, 1)
+        #r = sparse(field_assembly.force_vector, dim, 1)
+
+        K = spzeros(dim, dim)
+        r = spzeros(dim, 1)
+
+        for (i, assembly) in enumerate(assemblies)
+            #info("body $i")
+            #info(round(full(assembly.Kc), 3))
+            #resize!(assembly.stiffness_matrix, dim, dim)
+            #resize!(assembly.force_vector, dim, 1)
+            K += sparse(assembly.stiffness_matrix, dim, dim)
+            r += sparse(assembly.force_vector, dim, 1)
+        end
+        #info(round(full(K), 3))
+
         C = sparse(boundary_assembly.stiffness_matrix, dim, dim)
         g = sparse(boundary_assembly.force_vector, dim, 1)
         A = [K C'; C spzeros(dim, dim)]
         b = [r; g]
         toc(timing, "create sparse matrices")
+        #info("problem size = ", size(A))
 
+        info("Solving system")
         tic(timing, "solution of system")
         # solve increment for linearized problem
         nz = unique(rowvals(A))  # take only non-zero rows
         sol = zeros(b)
-        sol[nz] = lufact(A[nz,nz]) \ full(b[nz])
-        info("solved. length of solution vector = $(length(sol))")
-        toc(timing, "solution of system")
-        #info(full(sol[nz]))
+        sol[nz] = A[nz,nz] \ full(b[nz])
+        #info("solution vector before reconstruction")
+        #info(full(sol)')
+        la = sol[dim+1:end]
+        #for assembly in assemblies
+        #    reconstruct!(assembly, sol)
+        #end
+        la = vec(full(la))
+        sol = vec(full(sol))
+        #info("la = ", la')
+        #info("sol = ", sol')
 
+        info("solved. solution norm: $(norm(sol[1:dim]))")
+        toc(timing, "solution of system")
+
+        info("Updating element data")
         tic(timing, "update element data")
         # update elements in field problems
         for field_problem in solver.field_problems
             for element in get_elements(field_problem)
                 gdofs = get_gdofs(element, field_dim)
-                local_sol = vec(full(sol[gdofs]))  # incremental data for element
+                local_sol = sol[gdofs]  # incremental data for element
                 local_sol = reshape(local_sol, field_dim, length(element))
                 local_sol = Vector{Float64}[local_sol[:,i] for i=1:length(element)]
                 last(element[field_name]).data += local_sol  # <-- added
@@ -150,8 +195,8 @@ function call(solver::DirectSolver, time::Number=0.0)
         # update elements in boundary problems
         for boundary_problem in solver.boundary_problems
             for element in get_elements(boundary_problem)
-                gdofs = get_gdofs(element, field_dim) + dim
-                local_sol = vec(full(sol[gdofs]))
+                gdofs = get_gdofs(element, field_dim)
+                local_sol = la[gdofs]
                 local_sol = reshape(local_sol, field_dim, length(element))
                 local_sol = Vector{Float64}[local_sol[:,i] for i=1:length(element)]
                 last(element["reaction force"]).data = local_sol  # <-- replaced
@@ -164,6 +209,7 @@ function call(solver::DirectSolver, time::Number=0.0)
             info("timing info for non-linear iteration:")
             info("boundary assembly      : ", time_elapsed(timing, "boundary assembly"))
             info("field assembly         : ", time_elapsed(timing, "field assembly"))
+#           info("condensate             : ", time_elapsed(timing, "condensate"))
             info("create sparse matrices : ", time_elapsed(timing, "create sparse matrices"))
             info("solution of system     : ", time_elapsed(timing, "solution of system"))
             info("update element data    : ", time_elapsed(timing, "update element data"))

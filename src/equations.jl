@@ -95,7 +95,7 @@ function assemble!(assembly::Assembly, problem::Problem, element::Element, time:
     end
 
     # 2. energy form -- user has defined potential energy W -> min!
-    if has_potential_energy(problem, element)
+    if has_potential_energy(problem, element) && haskey(element, unknown_field_name)
         field = element[unknown_field_name](time)
 
         """ Wrapper for potential energy for ForwardDiff. """
@@ -122,7 +122,7 @@ function assemble!(assembly::Assembly, problem::Problem, element::Element, time:
     end
 
     # 3. virtual work -- user has defined some residual r = p - f = 0
-    if has_residual_vector(problem, element)
+    if has_residual_vector(problem, element) && haskey(element, unknown_field_name)
 
         field = DVTI(last(element[unknown_field_name]).data)
 
@@ -130,17 +130,24 @@ function assemble!(assembly::Assembly, problem::Problem, element::Element, time:
         function calc_R(data::Vector)
             R = zeros(length(data))
             df = similar(field, data)
+            gauss_fields = IntegrationPoint[]
             # integrate residual vector
             for ip in get_integration_points(element)
                 s = ip.weight*det(element, ip, time)
                 dr = get_residual_vector(problem, element, ip, time; variation=df)
                 R += s*dr
+                if ip.changed
+                    push!(gauss_fields, ip)
+                end
             end
             # external loads -- if any nodal loads is defined, decrease from residual
             if haskey(element, "$unknown_field_name nodal load")
                 R -= vec(element["$unknown_field_name nodal load"](time))
             end
             #info("return = $R")
+            if length(gauss_fields) != 0
+                update_gauss_fields!(element, gauss_fields, time)
+            end
             return R
         end
 
