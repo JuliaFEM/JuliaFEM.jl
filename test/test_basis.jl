@@ -4,11 +4,8 @@
 module BasisTests
 
 using JuliaFEM.Test
-
-using JuliaFEM
-using JuliaFEM: AbstractElement, Element
-
-import JuliaFEM: get_basis, get_dbasis
+using JuliaFEM.Core: AbstractElement, Element
+import JuliaFEM.Core: get_basis, get_dbasis
 
 abstract TestElement <: AbstractElement
 

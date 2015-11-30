@@ -3,12 +3,11 @@
 
 module MortarTests
 
-using JuliaFEM
 using JuliaFEM.Test
 
-using JuliaFEM: Element, Seg2, Quad4, MortarProblem, Assembly, assemble!
-using JuliaFEM: PlaneStressElasticityProblem, DirichletProblem, DirectSolver
-using JuliaFEM: project_from_slave_to_master, project_from_master_to_slave
+using JuliaFEM.Core: Element, Seg2, Quad4, MortarProblem, Assembly, assemble!
+using JuliaFEM.Core: PlaneStressElasticityProblem, DirichletProblem, DirectSolver
+using JuliaFEM.Core: project_from_slave_to_master, project_from_master_to_slave
 
 function get_test_2d_model()
     # this is hand calculated and given as an example in my thesis

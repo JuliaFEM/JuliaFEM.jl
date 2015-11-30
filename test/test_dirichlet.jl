@@ -4,8 +4,7 @@
 module TestDirichletBoundaryCondition
 
 using JuliaFEM.Test
-using JuliaFEM
-using JuliaFEM: Seg2, DirichletProblem, Assembly, assemble
+using JuliaFEM.Core: Seg2, DirichletProblem, Assembly, assemble
 
 function test_dirichlet_problem_1_dim()
     element = Seg2([1, 2])

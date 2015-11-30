@@ -1,9 +1,6 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-""" JuliaFEM testing routines. """
-module Test
-
 using Base.Test
 
 abstract TestResult
@@ -159,4 +156,3 @@ end
 
 export @test, run_test, print_test_statistics
 
-end

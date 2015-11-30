@@ -6,13 +6,30 @@ This is JuliaFEM -- Finite Element Package
 """
 module JuliaFEM
 
-#using Logging
-#@Logging.configure(level=DEBUG)
-#using Lexicon
+module API
+include("api.jl")
+
+# export ....
+
+end
+
+module Preprocess
+# include("abaqus_reader.jl") <-- ERROR: LoadError: LoadError: UndefVarError: Model not defined
+include("aster_reader.jl")
+end
+
+module Postprocess
+include("xdmf.jl")
+end
+
+""" JuliaFEM testing routines. """
+module Test
+include("test.jl")
+end
+
+module Core
 
 import Base: +, -, /, *, push!, convert, getindex, setindex!, length, similar, call, vec, endof
-
-#importall Base
 
 """
 A very simple debugging macro. It prints debug message if environment variable
@@ -27,9 +44,11 @@ macro debug(msg)
     end
     return :( println("DEBUG: ", $msg) )
 end
+
 function set_debug_on!()
     ENV["JULIAFEM_DEBUG"] = 1;
 end
+
 function set_debug_off!()
     pop!(ENV, "JULIAFEM_DEBUG");
 end
@@ -38,7 +57,7 @@ export @debug, set_debug_on!, set_debug_off!
 
 using ForwardDiff
 autodiffcache = ForwardDiffCache()
-export derivative, jacobian, hessian
+# export derivative, jacobian, hessian
 
 """ Simple linspace extension to arrays.
 
@@ -63,6 +82,7 @@ function Base.resize!(A::SparseMatrixCSC, m::Int64, n::Int64)
     A.n = n
     A.m = m
 end
+
 
 # fields, see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/notebooks/2015-06-14-data-structures.ipynb
 include("fields.jl")
@@ -92,19 +112,12 @@ include("assembly.jl")
 include("solvers.jl")
 include("directsolver.jl") # parallel sparse direct solver for non-linear problems
 
-### API ###
-include("api.jl")
-
 ### MORTAR STUFF ###
 include("mortar.jl")  # mortar projection
+end
 
-# PRE AND POSTPROCESS
-include("xdmf.jl")
-include("abaqus_reader.jl")
-
-include("test.jl")
+module Interfaces
+include("interfaces.jl")
+end
 
 end # module
-
-FEM = JuliaFEM
-

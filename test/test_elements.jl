@@ -5,8 +5,8 @@ module ElementTests
 
 using JuliaFEM.Test
 
-using JuliaFEM: AbstractElement, Element, Field, FieldSet, test_element
-import JuliaFEM: get_basis, get_dbasis
+using JuliaFEM.Core: AbstractElement, Element, Field, FieldSet, test_element
+import JuliaFEM.Core: get_basis, get_dbasis
 import Base: size
 
 """ Prototype element

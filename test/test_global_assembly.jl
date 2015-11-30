@@ -4,8 +4,8 @@
 module AssemblyTests
 
 using JuliaFEM.Test
-using JuliaFEM: Quad4, Seg2, FieldSet, Field, HeatProblem
-using JuliaFEM: Assembly, assemble!
+using JuliaFEM.Core: Quad4, Seg2, FieldSet, Field, HeatProblem
+using JuliaFEM.Core: Assembly, assemble!
 
 """assemble a simple two element problem and solve"""
 function test_assembly()
