@@ -11,6 +11,7 @@ using JuliaFEM: PlaneStressElasticityProblem, DirichletProblem
 using JuliaFEM: DirectSolver
 
 function test_solver_multiple_dirichlet_bc()
+
     N = Vector[[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
 
     e1 = Quad4([1, 2, 4, 3])
@@ -19,7 +20,9 @@ function test_solver_multiple_dirichlet_bc()
     e1["poissons ratio"] = 0.25
     b1 = Seg2([3, 4])
     b1["geometry"] = Vector[N[3], N[4]]
-    b1["displacement traction force"] = Vector[[0.0, -100.0], [0.0, -100.0]]
+    b1["displacement traction force"] = (
+        0.0 => Vector[[0.0,    0.0], [0.0,    0.0]],
+        1.0 => Vector[[0.0, -100.0], [0.0, -100.0]])
 
     problem = PlaneStressElasticityProblem()
     push!(problem, e1)
@@ -56,13 +59,59 @@ function test_solver_multiple_dirichlet_bc()
 
     # launch solver
     norm = solver(0.0)
-
-    disp = e1("displacement", [1.0, 1.0], 0.0)
+    norm = solver(1.0)
+    disp = e1("displacement", [1.0, 1.0], 1.0)
     info("displacement at tip: $disp")
     @test isapprox(disp, [3.17431158889468E-02, -1.38591518927826E-01])
 
 end
 #test_solver_multiple_dirichlet_bc()
+
+
+function test_solver_no_convergence()
+
+    N = Vector[[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
+
+    e1 = Quad4([1, 2, 4, 3])
+    e1["geometry"] = Vector[N[1], N[2], N[4], N[3]]
+    e1["youngs modulus"] = 900.0
+    e1["poissons ratio"] = 0.25
+    b1 = Seg2([3, 4])
+    b1["geometry"] = Vector[N[3], N[4]]
+    b1["displacement traction force"] = Vector[[100.0, 100.0], [100.0, 100.0]]
+
+    problem = PlaneStressElasticityProblem()
+    push!(problem, e1)
+    push!(problem, b1)
+
+    # boundary elements for dirichlet dx=0
+    dx = Seg2([1, 3])
+    dx["geometry"] = Vector[N[1], N[3]]
+    dx["displacement 1"] = 0.0
+
+    # boundary elements for dirichlet dy=0
+    dy = Seg2([1, 2])
+    dy["geometry"] = Vector[N[1], N[2]]
+    dy["displacement 2"] = 0.0
+  
+    problem2 = DirichletProblem("displacement", 2)
+    push!(problem2, dx)
+
+    problem3 = DirichletProblem("displacement", 2)
+    push!(problem3, dy)
+
+    solver = DirectSolver()
+    solver.max_iterations = 1
+    push!(solver, problem)
+    push!(solver, problem2)
+    push!(solver, problem3)
+
+    # launch solver
+    iterations, status = solver(0.0)
+
+    @test status == false
+
+end
 
 function test_solver_multiple_bodies_multiple_dirichlet_bc()
     N = Vector[
@@ -128,6 +177,5 @@ function test_solver_multiple_bodies_multiple_dirichlet_bc()
 end
 
 # test_solver_multiple_bodies_multiple_dirichlet_bc()
-
 
 end

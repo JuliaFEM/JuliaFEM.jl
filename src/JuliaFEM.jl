@@ -10,7 +10,7 @@ module JuliaFEM
 #@Logging.configure(level=DEBUG)
 #using Lexicon
 
-import Base: +, -, /, *, push!, convert, getindex, length, similar, call, vec, endof
+import Base: +, -, /, *, push!, convert, getindex, setindex!, length, similar, call, vec, endof
 
 #importall Base
 
@@ -53,6 +53,15 @@ Examples
 """
 function Base.linspace{T<:Array}(X1::T, X2::T, n)
     [1/2*(1-ti)*X1 + 1/2*(1+ti)*X2 for ti in linspace(-1, 1, n)]
+end
+
+function Base.resize!(A::SparseMatrixCSC, m::Int64, n::Int64)
+    (n == A.n) && (m == A.m) && return
+    @assert n >= A.n
+    @assert m >= A.m
+    append!(A.colptr, A.colptr[end]*ones(Int, m-A.m))
+    A.n = n
+    A.m = m
 end
 
 # fields, see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/notebooks/2015-06-14-data-structures.ipynb
