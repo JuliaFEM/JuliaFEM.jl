@@ -67,7 +67,6 @@ end
 Parse elements from input.
 """
 function parse_section(model::Model, lines, key, idx_start, idx_end, ::Type{Val{:ELEMENT}})
-    # LISÄÄ TOIMINTO, ETTÄ VOI LUKEA SUORAAN ELSETIT
     definition = uppercase(lines[idx_start])
     element_type = regex_match(r"TYPE=([\w\-\_]+)", definition, 1)
     eltype_sym = symbol(element_type)
