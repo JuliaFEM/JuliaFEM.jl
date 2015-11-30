@@ -56,15 +56,10 @@ Set of nodes. Holds name and the ids
 """
 type NodeSet
     name :: AbstractString
-    node_ids :: Array{Integer, 1} 
+    node_ids :: Array{Integer, 1}
 end
 
-#julia> type myn
-#       arr :: Array{Integer, 1}
-#       finder :: Dict{Integer, Integer}
-#       end
-#
-#julia> myn(arr::Array{Int64, 1}) = myn(arr, Dict(zip(arr, collect(1:length(arr)))))
+# NodeSet(arr::Array{Int64, 1}) = myn(arr, Dict(zip(arr, collect(1:length(arr)))))
 
 
 """
@@ -171,14 +166,24 @@ end
 
 """
 """
-function add_element!(model::Model, element::Element)
-    push!(model.elements, element)
+function push!(model::Model, element::Element...)
+    push!(model.elements, element...)
 end
 
 """
 """
-function add_node!(model::Model, node::Node)
-    push!(model.nodes, node)
+function push!(model::Model, elements::Vector{Element})
+    push!(model.element, elements...)
+end
+
+"""
+"""
+function push!(model::Model, node::Node...)
+    push!(model.nodes, node...)
+end
+
+function push!(model::Model, nodes::Vector{Node})
+    push!(mode, nodes...)
 end
 
 """
