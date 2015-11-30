@@ -3,12 +3,13 @@
 
 module ElementTests
 
-using JuliaFEM
 using JuliaFEM.Test
 
-using JuliaFEM: AbstractProblem, Problem
-using JuliaFEM: Element, Seg2, Quad4
-using JuliaFEM: IntegrationPoint, solve!
+using JuliaFEM.Core: AbstractProblem, Problem
+using JuliaFEM.Core: Element, Seg2, Quad4
+using JuliaFEM.Core: IntegrationPoint, solve!
+
+import JuliaFEM.Core: get_unknown_field_name, get_unknown_field_type, get_potential_energy
 
 abstract HeatProblem <: AbstractProblem
 
@@ -16,16 +17,16 @@ function HeatProblem(dim::Int=1, elements=[])
     return Problem{HeatProblem}(dim, elements)
 end
 
-function JuliaFEM.get_unknown_field_name{P<:HeatProblem}(::Type{P})
+function get_unknown_field_name{P<:HeatProblem}(::Type{P})
     return "temperature"
 end
 
-function JuliaFEM.get_unknown_field_type{P<:HeatProblem}(::Type{P})
+function get_unknown_field_type{P<:HeatProblem}(::Type{P})
     return Float64
 end
 
 """ Calculate a potential Π = Wint - Wext of system. """
-function JuliaFEM.get_potential_energy(problem::Problem{HeatProblem}, element::Element{Quad4}, ip::IntegrationPoint, time::Number; variation=nothing)
+function get_potential_energy(problem::Problem{HeatProblem}, element::Element{Quad4}, ip::IntegrationPoint, time::Number; variation=nothing)
     k = element("temperature thermal conductivity", ip, time)
     f = element("temperature load", ip, time)
     T = element("temperature", ip, time, variation)
@@ -36,7 +37,7 @@ function JuliaFEM.get_potential_energy(problem::Problem{HeatProblem}, element::E
     return Wint - Wext
 end
 
-function JuliaFEM.get_potential_energy(problem::Problem{HeatProblem}, element::Element{Seg2}, ip::IntegrationPoint, time::Number; variation=nothing)
+function get_potential_energy(problem::Problem{HeatProblem}, element::Element{Seg2}, ip::IntegrationPoint, time::Number; variation=nothing)
     T = element("temperature", ip, time, variation)[1]
     T_ext = element("temperature external", ip, time)[1]
     coeff = element("temperature coefficient", ip, time)[1]

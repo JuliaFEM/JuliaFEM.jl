@@ -4,11 +4,10 @@
 module SolverTests
 
 using JuliaFEM.Test
-using JuliaFEM
 
-using JuliaFEM: Seg2, Quad4
-using JuliaFEM: DirichletProblem, HeatProblem
-using JuliaFEM: LinearSolver
+using JuliaFEM.Core: Seg2, Quad4
+using JuliaFEM.Core: DirichletProblem, HeatProblem
+using JuliaFEM.Core: LinearSolver
 
 function test_linearsolver()
     el1 = Quad4([1, 2, 3, 4])

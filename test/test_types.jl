@@ -3,10 +3,9 @@
 
 module TypesTests
 
-using JuliaFEM
 using JuliaFEM.Test
 
-using JuliaFEM: Field, FieldSet
+using JuliaFEM.Core: Field, FieldSet
 
 function test_foo()
     @test 1+1 == 2

@@ -4,7 +4,7 @@
 module ElasticityTests
 
 using JuliaFEM.Test
-using JuliaFEM: Seg2, Quad4, PlaneStressElasticityProblem, solve!
+using JuliaFEM.Core: Seg2, Quad4, PlaneStressElasticityProblem, solve!
 
 function test_elasticity_volume_load()
     element = Quad4([1, 2, 3, 4])

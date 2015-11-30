@@ -1,6 +1,10 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+# define these
+abstract Problem
+abstract Element
+
 abstract BoundaryCondition
 
 type NeumannBC{ S <: AbstractString} <: BoundaryCondition
