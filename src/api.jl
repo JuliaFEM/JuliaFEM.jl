@@ -3,12 +3,16 @@
 
 abstract BoundaryCondition
 
-type NeumannBC <: BoundaryCondition
-    value
+type NeumannBC{ S <: AbstractString} <: BoundaryCondition
+    definition :: S
+    value :: Any
+    set_name :: S
 end
 
-type DirichletBC <: BoundaryCondition
-
+type DirichletBC{ S <: AbstractString } <: BoundaryCondition
+    definition :: S
+    value :: Any
+    set_name :: S
 end
 
 typealias DisplacementBC DirichletBC
@@ -73,10 +77,15 @@ end
 
 ElementSet(name, el_ids) = ElementSet(name, el_ids, Material())
 
-type LoadCase{ T <: AbstractProblem }
-    problem :: T
-    boundary_conditions :: Vector{BoundaryProblem}
+type LoadCase{ P <: Problem }
+    problem :: P
+    boundary_conditions :: Vector{Union{NeumannBC, DirichletBC}}
 end
+
+LoadCase{P <: Problem}(a :: P) = LoadCase(a, Vector{Union{NeumannBC,DirichletBC}}())
+LoadCase{P <: Problem, B <: BoundaryCondition}(a :: P, b :: B) = LoadCase(a, Vector{Union{NeumannBC,DirichletBC}}([b]))
+LoadCase{P <: Problem, B <: BoundaryCondition}(a :: P, b :: Vector{B}) =
+LoadCase(a, Vector{Union{NeumannBC,DirichletBC}}(b))
 
 
 """
@@ -91,7 +100,8 @@ end
 
 Model() = Model(Node[],
                 Element[],
-                Dict{AbstractString, Union{NodeSet, ElementSet}}(),
+                Dict{AbstractString, 
+                    Union{NodeSet, ElementSet}}(),
                 LoadCase[],
 )
 
@@ -99,6 +109,29 @@ function set_material!{S <: AbstractString}(model::Model, material::Material, se
     model.sets[set_name].material = material
 end
 
+
+function get_element_set(model::Model, set_name::ASCIIString)
+    get_set = model.sets[set_name]
+    isa(get_set, ElementSet) ? get_set : err("Found set $(set_name)
+    but it is not a ElementSet. Check if you have used
+    dublicate set names.")
+end
+
+function add_boundary_condition!{B <: BoundaryCondition}(case::LoadCase, bc::B)
+    push!(case.boundary_conditions, bc)
+end
+
+function add_boundary_condition!{B <: BoundaryCondition}(case::LoadCase, bc::Vector{B})
+    map(x-> push!(case.boundary_conditions, x), bc)
+end
+
+function add_loadcase!(model::Model, case::LoadCase)
+    push!(model.load_cases, case)
+end
+
+function add_loadcase!{T<:LoadCase}(model::Model, case::Vector{T})
+    map(x-> push!(model.load_cases, x), case)
+end
 
 """
 """
