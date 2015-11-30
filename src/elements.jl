@@ -5,7 +5,6 @@ abstract AbstractElement
 
 type Element{E<:AbstractElement}
     connectivity :: Vector{Int}
-#   integration_points :: Vector{IntegrationPoint}
     fields :: Dict{ASCIIString, Field}
 end
 
@@ -15,8 +14,21 @@ function convert{E}(::Type{Element{E}}, connectivity::Vector{Int})
 end
 
 function get_integration_points{E}(element::Element{E})
-#   return element.integration_points
     return get_integration_points(E)
+end
+
+function update_gauss_fields!(element::Element, data::Vector{IntegrationPoint}, time::Real)
+    if haskey(element, "integration points")
+        # push or update
+        if !isapprox(last(element["integration points"]).time, time)
+            push!(element["integration points"], time => data)
+        else
+            last(element["integration points"]).data = data
+        end
+    else
+        # create
+        element["integration points"] = Field(time => data)
+    end
 end
 
 """
@@ -46,7 +58,7 @@ function test_element(element_type)
 
     info("Initializing element")
     try
-        element = element_type(collect(1:n))
+        element = Element{element_type}(collect(1:n))
     catch
         error("""
         Unable to create element with default constructor define function
@@ -55,22 +67,20 @@ function test_element(element_type)
     end
 
     # try to interpolate some scalar field
-    element["field1"] = Field(collect(1:n))
+    element["field1"] = range(1, n)
     # TODO: how to parametrize this?
-    element["geometry"] = Field(Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
+    element["geometry"] = Vector{Float64}[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
 
     # evaluate basis functions at middle point of element
-    basis = get_basis(element)
-    dbasis = grad(basis)
     mid = zeros(dim)
-    val1 = basis(mid, 0.0)
+    val1 = element(mid, 0.0)
     info("basis at $mid: $val1")
-    val2 = basis("field1", mid, 0.0)
+    val2 = element("field1", mid, 0.0)
     info("field val at $mid: $val2")
-    val3 = dbasis(mid, 0.0)
+    val3 = element(mid, 0.0, Val{:grad})
     info("derivative of basis at $mid:\n$val3")
-    val4 = dbasis("field1", mid, 0.0)
-    info("field val at $mid: $val4")
+    #val4 = element("field1", mid, Val{:grad})
+    #info("field val at $mid: $val4")
 
     info("Element $element_type passed tests.")
 end
@@ -122,11 +132,16 @@ function call(element::Element, field_name::ASCIIString, xi::VecOrIP, time::Numb
 end
 
 function call(element::Element, field_name::ASCIIString, xi::VecOrIP)
-    return element.basis(element[field_name], xi)
+    field = element[field_name]
+    basis = get_basis(element)
+    return basis(element[field_name], xi)
 end
 
 function call(element::Element, field_name::ASCIIString, xi::VecOrIP, ::Type{Val{:grad}})
-    return element.basis(element["geometry"], element[field_name], xi, Val{:grad})
+    field = element[field_name]
+    geom = element["geometry"]
+    basis = get_basis(element)
+    return basis(geom, field, xi, Val{:grad})
 end
 
 function call(element::Element, field_name::ASCIIString, time::Number)
@@ -135,6 +150,10 @@ end
 
 function get_basis{E}(element::Element{E}, ip::IntegrationPoint)
     return get_basis(E, ip.xi)
+end
+
+function get_basis{E}(::Type{Element{E}}, xi::Vector{Float64})
+    return get_basis(E, xi)
 end
 
 function get_basis{E}(element::Element{E}, xi::Vector{Float64})
@@ -152,9 +171,15 @@ function get_basis{E}(element::Element{E})
     return basis
 end
 
+function call{E}(element::Element{E}, xi::VecOrIP, ::Type{Val{:grad}})
+    basis = get_basis(element)
+    geom = element["geometry"]
+    return basis(geom, xi, Val{:grad})
+end
+
 function call{E}(element::Element{E}, xi::VecOrIP, time::Float64, ::Type{Val{:grad}})
     basis = get_basis(element)
-    return basis(element["geometry"], xi, Val{:grad})
+    return basis(element["geometry"](time), xi, Val{:grad})
 end
 
 function call(element::Element, field_name::ASCIIString)

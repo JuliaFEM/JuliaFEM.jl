@@ -4,7 +4,7 @@
 module AssemblyTests
 
 using JuliaFEM.Test
-using JuliaFEM: Quad4, Seg2, FieldSet, Field, PlaneHeatProblem
+using JuliaFEM: Quad4, Seg2, FieldSet, Field, HeatProblem
 using JuliaFEM: Assembly, assemble!
 
 """assemble a simple two element problem and solve"""
@@ -21,7 +21,7 @@ function test_assembly()
     el2["temperature flux"] = ((0.0 => 0.0), (1.0 => 600.0))
     info("element created")
 
-    problem = PlaneHeatProblem()
+    problem = HeatProblem()
     info("problem created. pushing elements")
     push!(problem, el1)
     push!(problem, el2)
