@@ -33,7 +33,7 @@ function solve!(model::Model, case_name::ASCIIString, time::Float64)
         model.elements[el_id].results = core_element
     end
         
-#    # Lisätään Neumann:nin reunaehdot ja listään field probleemaan
+    # Add Neumann boundary conditions to elements
     for each in neumann_bcs
         set_for_bc = each.set_name
         set_ids = model.elsets[set_for_bc]
@@ -44,10 +44,13 @@ function solve!(model::Model, case_name::ASCIIString, time::Float64)
         end
     end
     dirile_arr = Any[]
+    # Create Dirichlet boundary conditions
     for each in dirichlet_bcs
         set_name = each.set_name 
         value = each.value
-        problem = JuliaFEM.Core.DirichletProblem(value[1], 1)
+        problem = JuliaFEM.Core.DirichletProblem(
+           JuliaFEM.Core.get_unknown_field_name(field_problem),
+           JuliaFEM.Core.get_unknown_field_dimension(field_problem))
         set_for_bc = each.set_name
         set_ids = model.elsets[set_for_bc]
         bc = each.value
@@ -58,17 +61,18 @@ function solve!(model::Model, case_name::ASCIIString, time::Float64)
         end
         push!(dirile_arr, problem)
     end
+
+    # Push all the elements, where the field problem is solved into the field_problem
     element_set = case.sets
     el_ids = model.elsets[element_set].elements
     for each in el_ids
         push!(field_problem, core_elements[each])
     end
-    solver = JuliaFEM.Core.(case.solver)(field_problem, dirile_arr[1]) 
-    solver(1.0)
 
+    # Creating the solver
+    solver = JuliaFEM.Core.(case.solver)(field_problem, dirile_arr...) 
 
+    # Solving 
+    solver(time)
  end
 
-function foo()
-    return "bar"
-end
