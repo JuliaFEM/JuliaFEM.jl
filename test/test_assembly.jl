@@ -3,10 +3,9 @@
 
 module AssemblyTests
 
-using JuliaFEM
 using JuliaFEM.Test
-using JuliaFEM: Seg2, Quad4, HeatProblem, DirichletProblem, assemble
-using JuliaFEM: condensate, reconstruct!
+using JuliaFEM.Core: Seg2, Quad4, HeatProblem, DirichletProblem, assemble
+using JuliaFEM.Core: condensate, reconstruct!
 
 function test_static_condensation()
     nodes = Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]

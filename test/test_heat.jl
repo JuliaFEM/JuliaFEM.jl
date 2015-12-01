@@ -7,7 +7,7 @@ module HeatTests  # always wrap tests to module ending with "Tests"
 
 using JuliaFEM.Test  # always use JuliaFEM.Test, not Base.Test
 
-using JuliaFEM: Seg2, Quad4, HeatProblem, assemble
+using JuliaFEM.Core: Seg2, Quad4, HeatProblem, assemble
 
 function test_one_element()  # always start test function with name test_
 

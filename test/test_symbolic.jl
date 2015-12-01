@@ -5,10 +5,9 @@
 
 module SymbolicFieldTests
 
-using JuliaFEM
-using JuliaFEM: Basis, Field, FieldSet, Expression, diff, grad
-
 using JuliaFEM.Test
+using JuliaFEM.Core: Basis, Field, FieldSet, Expression, diff, grad
+
 
 function get_basis()
     basis(xi) = 1/4*[

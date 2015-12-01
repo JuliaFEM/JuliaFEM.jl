@@ -4,11 +4,9 @@
 module DirectSolverTests
 
 using JuliaFEM.Test
-using JuliaFEM
-
-using JuliaFEM: Seg2, Quad4
-using JuliaFEM: PlaneStressElasticityProblem, DirichletProblem
-using JuliaFEM: DirectSolver
+using JuliaFEM.Core: Seg2, Quad4
+using JuliaFEM.Core: PlaneStressElasticityProblem, DirichletProblem
+using JuliaFEM.Core: DirectSolver
 
 function test_solver_multiple_dirichlet_bc()
 

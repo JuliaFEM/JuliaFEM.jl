@@ -155,9 +155,7 @@ function xdmf_new_field(grid, name, source, data)
 
     typ = string(typeof(data))
     datatype = "unknown"
-    @debug("typeof: $typ")
     for j in ["Int", "Float"]
-        @debug(j)
         if contains(typ, j)
             datatype = j
         end

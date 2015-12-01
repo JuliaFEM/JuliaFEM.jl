@@ -4,10 +4,9 @@
 
 module FieldTests
 
-using JuliaFEM
 using JuliaFEM.Test
 
-using JuliaFEM: Field
+using JuliaFEM.Core: Field
 
 function test_create_field()
     f = Field(1.0)
