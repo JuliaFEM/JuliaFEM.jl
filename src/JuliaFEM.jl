@@ -12,14 +12,14 @@ include("core.jl")
 end
 
 module API
-include("api.jl")
+#include("api.jl")
 
 # export ....
 
 end
 
 module Preprocess
-# include("abaqus_reader.jl") <-- ERROR: LoadError: LoadError: UndefVarError: Model not defined
+include("abaqus_reader.jl") 
 include("aster_reader.jl")
 end
 
