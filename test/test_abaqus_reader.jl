@@ -80,6 +80,4 @@ function test_unknown_handler_warning_message()
 end
 
 
-test_read_abaqus_model()
-test_read_element_section()
 end
