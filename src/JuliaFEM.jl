@@ -12,7 +12,7 @@ include("core.jl")
 end
 
 module API
-#include("api.jl")
+include("api.jl")
 
 # export ....
 
