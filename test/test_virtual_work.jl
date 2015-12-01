@@ -4,9 +4,9 @@
 module TestAutoDiffWeakForm
 
 using JuliaFEM.Test
-using JuliaFEM
 
-using JuliaFEM: Problem, AbstractProblem, CG, Element, IntegrationPoint, Quad4, solve!
+using JuliaFEM.Core: Problem, AbstractProblem, CG, Element, IntegrationPoint, Quad4, solve!
+import JuliaFEM.Core: get_unknown_field_name, get_unknown_field_type, get_residual_vector
 
 abstract PlaneStressElasticityProblem <: AbstractProblem
 
@@ -14,15 +14,15 @@ function PlaneStressElasticityProblem(dim::Int=2, elements=[])
     return Problem{PlaneStressElasticityProblem}(dim, elements)
 end
 
-function JuliaFEM.get_unknown_field_name{P<:PlaneStressElasticityProblem}(::Type{P})
+function get_unknown_field_name{P<:PlaneStressElasticityProblem}(::Type{P})
     return "displacement"
 end
 
-function JuliaFEM.get_unknown_field_type{P<:PlaneStressElasticityProblem}(::Type{P})
+function get_unknown_field_type{P<:PlaneStressElasticityProblem}(::Type{P})
     return Vector{Float64}
 end
 
-function JuliaFEM.get_residual_vector{EL<:CG}(problem::Problem{PlaneStressElasticityProblem}, element::Element{EL}, ip::IntegrationPoint, time::Number; variation=nothing)
+function get_residual_vector{EL<:CG}(problem::Problem{PlaneStressElasticityProblem}, element::Element{EL}, ip::IntegrationPoint, time::Number; variation=nothing)
 
 
     basis = element(ip, time)
