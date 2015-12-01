@@ -6,10 +6,10 @@
 type CAssembly
     interior_dofs :: Vector{Int}
     boundary_dofs :: Vector{Int}
-    F :: Factorization
+    F :: Union{Factorization, Matrix}
     Kc :: SparseMatrixCSC
     fc :: SparseMatrixCSC
-    Ki :: SparseMatrixCSC
+    Kib :: SparseMatrixCSC
     fi :: SparseMatrixCSC
 end
 
@@ -24,77 +24,98 @@ end
 
 function assemble(problem::AllProblems, time::Float64)
     assembly = Assembly()
-    for element in get_elements(problem)
+    ne = length(get_elements(problem))
+    p = ne > 10 ? round(Int, ne/10) : ne
+    for (i, element) in enumerate(get_elements(problem))
+        mod(i, p) == 0 && info("Assemble: ", round(Int, i/ne*100), " % done")
         assemble!(assembly, problem, element, time)
     end
     return assembly
 end
 
-""" Return condensed system. """
-function assemble(problem::FieldProblem, time::Float64, boundary_dofs::Vector{Int})
-    assembly = Assembly()
-    for element in get_elements(problem)
-        assemble!(assembly, problem, element, time)
-    end
-    return condensate(assembly, boundary_dofs)
-end
-
-function condensate(assembly::Assembly, boundary_dofs_::Vector{Int})
-    K = sparse(assembly.stiffness_matrix)
+""" Calculate reduced stiffness matrix. """
+function reduce(assembly::Assembly, boundary_dofs_::Vector{Int})
     all_dofs = unique(assembly.stiffness_matrix.I)
     boundary_dofs = intersect(all_dofs, boundary_dofs_)
     interior_dofs = setdiff(all_dofs, boundary_dofs_)
+
+    K = sparse(assembly.stiffness_matrix)
+    f = sparse(assembly.force_vector)
+
     dim = size(K, 1)
-    f = sparse(assembly.force_vector, dim, 1)
+
+    # empty assembly to release memory for factorization
+    empty!(assembly.stiffness_matrix)
+    empty!(assembly.force_vector)
+
+    if dim < 100000
+        # no need to do any reduction of matrix size at all
+        return CAssembly([], all_dofs, Matrix{Float64}(), K, f, spzeros(0, 0), spzeros(0,1))
+    end
 
     # check that matrix is symmetric
-    asdf = maximum(abs(1/2*(K + K') - K))
-    if asdf > 1.0e-6
-        info(full(K))
-        error("asdf $asdf > 1.0e-6")
-    end
-    
+    s = maximum(abs(1/2*(K + K') - K))
+    @assert s < 1.0e-6
     K = 1/2*(K + K')
-    F::Factorization = cholfact(K[interior_dofs, interior_dofs])
 
-#   info("condensation: all dofs: ", all_dofs)
-#   info("condensation: interior dofs: ", interior_dofs)
-#   info("condensation: boundary dofs: ", boundary_dofs)
-#   info("manually condensated")
-#   Kman = K[boundary_dofs, boundary_dofs] - K[boundary_dofs,interior_dofs] * inv(full(K[interior_dofs, interior_dofs])) * K[interior_dofs, boundary_dofs]
-#   info("\n$(full(Kman))")
-    #info("K = \n$(full(K))")
-    #Ki = K[interior_dofs, boundary_dofs]
-    Ki = K[interior_dofs, boundary_dofs]
+    Kib = K[interior_dofs, boundary_dofs]
+    Kbb = K[boundary_dofs, boundary_dofs]
     fi = f[interior_dofs]
-#   info("condensated using factorization")
-#   LL = K[boundary_dofs, boundary_dofs] - K[boundary_dofs, interior_dofs] * (K[interior_dofs, interior_dofs] \ K[interior_dofs, boundary_dofs])
-#   info(LL)
+    fb = f[boundary_dofs]
 
-    Ks = F \ Ki
-    Fs = F \ fi
+    F = cholfact(K[interior_dofs, interior_dofs])
+    K = spzeros(0, 0)
 
-    dim = size(K, 1)
+#=
+    if dim < 100000
+        # for small problems we don't need to care about memory usage
+        Kd = Kib' * (F \ Kib)
+    else
+        # for larger problems calculate schur complement in pieces
+        nb = length(boundary_dofs)
+        p = nb > 10 ? round(Int, nb/10) : nb
+        Kd = zeros(nb, nb)
+        for bi in 1:nb
+            mod(bi, p) == 0 && info("Reduction: ", round(Int, bi/nb*100), " % done")
+            C = full(F \ Kib[:, bi])
+            for bj in 1:nb
+                d = Kib[:, bj]
+                Kd[bj,bi] = dot(C[rowvals(d)], nonzeros(d))
+            end
+        end
+    end
     Kc = spzeros(dim, dim)
+    Kc[boundary_dofs, boundary_dofs] = Kbb - Kd
+=#
+
+    chunks = round(Int, dim/3000)
+    info("Reduction is done in $chunks chunks.")
+    nb = length(boundary_dofs)
+    kk = round(Int, collect(linspace(0, nb, chunks+1)))
+    sl = [kk[j]+1:kk[j+1] for j=1:length(kk)-1]
+    Kc = spzeros(dim, dim)
+    for (k,sli) in enumerate(sl)
+        b1 = boundary_dofs[sli]
+        Sc = F \ Kib[:,sli]
+        for slj in sl
+            b2 = boundary_dofs[slj]
+            Kc[b2,b1] = Kbb[slj,sli] - Kib[:,slj]'*Sc
+        end
+        info("Reduction: ", round(k/chunks*100, 0), " % done")
+    end
+
     fc = spzeros(dim, 1)
-    Kc[boundary_dofs, boundary_dofs] = K[boundary_dofs, boundary_dofs] - Ki' * Ks
-    fc[boundary_dofs] = f[boundary_dofs] - Ki' * Fs
+    fc[boundary_dofs] = fb - Kib' * (F \ fi)
 
-
-    return CAssembly(interior_dofs, boundary_dofs, F, Kc, fc, Ki, fi)
+    return CAssembly(interior_dofs, boundary_dofs, F, Kc, fc, Kib, fi)
 end
 
 function reconstruct!(ca::CAssembly, x::SparseMatrixCSC)
-#   info("size of la = ", size(la))
-#   info("size of ca.Ki = ", size(ca.Ki))
-#   info("size of ca.fi = ", size(ca.fi))
-#   info("size of la[ca.interior_dofs] = ", size(la[ca.interior_dofs]))
-#   info("interior dofs: $(ca.interior_dofs)")
-#   info("boundary dofs: $(ca.boundary_dofs)")
-#   info("ca.fi = $(ca.fi')")
-#   info("sol1 = ", full(ca.F \ ca.fi)')
-#   info("sol2 = ", full(ca.F \ (ca.Ki*x[ca.boundary_dofs]))')
-    x[ca.interior_dofs] += ca.F \ (ca.fi - ca.Ki*x[ca.boundary_dofs])
+    if isa(ca.F, Factorization)
+        x[ca.interior_dofs] = ca.F \ (ca.fi - ca.Kib*x[ca.boundary_dofs])
+    else  # normal inverse of matrix
+        x[ca.interior_dofs] = ca.F * (ca.fi - ca.Kib*x[ca.boundary_dofs])
+    end
 end
 
 function Base.(:+)(ass1::Assembly, ass2::Assembly)

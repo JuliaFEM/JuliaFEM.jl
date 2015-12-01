@@ -56,7 +56,7 @@ function test_solver_multiple_dirichlet_bc()
     push!(solver, problem3)
 
     # launch solver
-    norm = solver(0.0)
+    #norm = solver(0.0)
     norm = solver(1.0)
     disp = e1("displacement", [1.0, 1.0], 1.0)
     info("displacement at tip: $disp")
@@ -174,6 +174,6 @@ function test_solver_multiple_bodies_multiple_dirichlet_bc()
 
 end
 
-# test_solver_multiple_bodies_multiple_dirichlet_bc()
+test_solver_multiple_bodies_multiple_dirichlet_bc()
 
 end
