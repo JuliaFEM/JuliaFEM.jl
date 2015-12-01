@@ -1,15 +1,28 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-function add_boundary_condition!{P<:APIProblem}(case::LoadCase{P}, bc)
-    push!(case.boundary_conditions, bc)
+function add_boundary_condition!(case::LoadCase, bc::NeumannBC)
+    push!(case.neumann_boundary_conditions, bc)
 end
 
-function add_solver!{P<:APIProblem, S<:APISolver}(case::LoadCase{P},
-    bc::Type{S})
-    case.solver = bc
+
+function add_boundary_condition!(case::LoadCase, bc::DirichletBC)
+    push!(case.dirichlet_boundary_conditions, bc)
 end
 
+function add_solver!(case::LoadCase, solver)
+    case.solver = solver
+end
+
+function add_material!(model::Model, set_name::ASCIIString, material::Material)
+    element_set = model.elsets[set_name]
+    set_ids = element_set.elements
+    for each in set_ids
+        element = model.elements[each]
+        element.material = material
+    end
+    element_set.material = material
+end
 #function Base.convert{T<:AbstractFloat}(::Type{Node}, data::Vector{T})
 #    Node(data)
 #end:q

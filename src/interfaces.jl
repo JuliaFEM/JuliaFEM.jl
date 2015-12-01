@@ -1,58 +1,73 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 using JuliaFEM
+using JuliaFEM.Core
 using JuliaFEM.API: Model
 
+"""
+This needs this a bit honing ... 
+"""
 function solve!(model::Model, case_name::ASCIIString, time::Float64)
     element_ids = keys(model.elements)
-    all_eles = model.elements
+    all_elements = model.elements
     case = model.load_cases[case_name]
-    bcs = case.boundary_conditions
+    neumann_bcs = case.neumann_boundary_conditions
+    dirichlet_bcs = case.dirichlet_boundary_conditions
     nodes = model.nodes
     field_problem = JuliaFEM.Core.(case.problem)()
+    core_elements = Dict()
+
     # luodaan core elementit
-    # for each in elements
-    # end
-
-    # Lisätään Neumann:nin reunaehdot ja listään field probleemaan
-    # for each in neumann
-    # end
-
-    # lisätään Dirichlet:in reunaehdot ja lisätään reunaehtoon
-    # for each in dirichlet
-    # end
-    #
-    # SOLVE !
-
-    # Adding elements to field problem
- #   for element in all_eles
- #       el_type = element.element_type
- #       el_id = element.id
- #       mat = element.material
- #       conn = element.connectivity
- #       core_element = JuliaFEM.Core.(el_type)(conn)
- #       core_element["geometry"] = map(x->nodes[x], conn)
- #       for each in keys(mat)
- #           core_element[each] = mat[each]
- #       end
- #       # TODO ! Lisätään Neumann:nin reunaehdot ennen kuin
- #       # lisätään probleemaan
- #       push!(field_problem, core_element)
- #       model.elements[el_id].fields = core_element.fields
- #   end
- #   # käydaan läpi Dirichlet:in reunaehdot  
- #   for bc in bcs
- #       elset_name = bc.set_name
- #       elset = model.elsets[elset_name]
- #       for element in elset.elements
- #           element_id = element.id
- #           el_type = element.element_type
- #           core_element = JuliaFEM.Core.(el_type)(element.connectivity)
- #           
- #           model.elements[element_id].fields = core_element.fields
- #       println(core_element)
+    for el_id in element_ids
+        element = all_elements[el_id]
+        el_type = element.element_type
+        el_id = element.id
+        mat = element.material
+        conn = element.connectivity
+        core_element = JuliaFEM.Core.(el_type)(conn)
+        core_element["geometry"] = map(x->nodes[x], conn)
+        for each in keys(mat.scalar_data)
+            core_element[each] = mat.scalar_data[each]
+        end
+        core_elements[el_id] = core_element
+        model.elements[el_id].results = core_element
     end
-end
+        
+#    # Lisätään Neumann:nin reunaehdot ja listään field probleemaan
+    for each in neumann_bcs
+        set_for_bc = each.set_name
+        set_ids = model.elsets[set_for_bc]
+        bc = each.value
+        for el_id in set_ids.elements
+            core_element = core_elements[el_id]
+            core_element[bc[1]] = bc[2]
+        end
+    end
+    dirile_arr = Any[]
+    for each in dirichlet_bcs
+        set_name = each.set_name 
+        value = each.value
+        problem = JuliaFEM.Core.DirichletProblem(value[1], 1)
+        set_for_bc = each.set_name
+        set_ids = model.elsets[set_for_bc]
+        bc = each.value
+        for el_id in set_ids.elements
+            core_element = core_elements[el_id]
+            core_element[bc[1]] = bc[2]
+            push!(problem, core_element)
+        end
+        push!(dirile_arr, problem)
+    end
+    element_set = case.sets
+    el_ids = model.elsets[element_set].elements
+    for each in el_ids
+        push!(field_problem, core_elements[each])
+    end
+    solver = JuliaFEM.Core.(case.solver)(field_problem, dirile_arr[1]) 
+    solver(1.0)
+
+
+ end
 
 function foo()
     return "bar"
