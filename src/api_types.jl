@@ -1,24 +1,6 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-#abstract APIType
-#
-#abstract Mesh <: APIType
-#abstract APIElement <: Mesh
-#abstract APINode <: Mesh
-#
-#abstract APIProblem <: APIType
-#abstract HeatProblem <: APIProblem
-#abstract ElasticityProblem <: APIProblem
-#
-#abstract APISolver <: APIType
-#abstract SolverLinear <: APISolver
-# define these
-#abstract Problem
-#abstract Element
-
-#abstract BoundaryCondition
-
 type NeumannBC
     set_name :: ASCIIString
     value :: Any
@@ -51,7 +33,7 @@ function Base.setindex!{T <: AbstractString }(material::Material, val::Real, nam
 end
 
 
-type Node{T<:Real} <: APINode
+type Node{T<:Real} 
     id :: Union{Integer, ASCIIString}
     coords :: Array{T, 1}
 end
@@ -60,29 +42,11 @@ type Element
     id :: Union{Integer, ASCIIString, Void}
     connectivity :: Vector{Int64}
     element_type :: Symbol
-    fields :: Any # Dict{}
+    results :: Any # Dict{}
+    material :: Any
 end
 
-#Element{I<:Integer}(eltype::Symbol, conn::Vector{I}) = Element(
-#    nothing,
-#    conn,
-#    eltype )
-#    
-#Element{I<:Integer}(conn::Vector{I}, eltype::ASCIIString) = Element(
-#    nothing,
-#    conn,
-#    eltype)
-
-#"""
-#Set of nodes. Holds name and the ids
-#"""
-#type NodeSet}
-#    name :: AbstractString
-#    node_ids :: Array{Integer, 1}
-#end
-
-# NodeSet(arr::Array{Int64, 1}) = myn(arr, Dict(zip(arr, collect(1:length(arr)))))
-
+Element(a, b, c) = Element(a, b, c, nothing, Material())
 
 """
 """
@@ -90,7 +54,7 @@ type ElementSet
     name :: ASCIIString
     elements :: Vector{Int64} 
     material :: Material
-end#
+end
 
 ElementSet(name::ASCIIString, elements::Vector{Element}) =
     ElementSet(name, map(x-> x.id, elements), Material())
@@ -98,17 +62,19 @@ ElementSet(name::ASCIIString, elements::Vector{Element}) =
 ElementSet(name::ASCIIString, ids::Vector{Int64}) =
     ElementSet(name, ids, Material())
 
-type LoadCase{ P <: APIProblem }
-    problem :: Type{P}
-    boundary_conditions #:: Vector{Union{NeumannBC, DirichletBC}}
+"""
+LoadCase
+"""
+type LoadCase
+    problem :: Symbol
+    neumann_boundary_conditions :: Vector{NeumannBC}
+    dirichlet_boundary_conditions :: Vector{DirichletBC}
     solver
+    sets
 end
 
-#LoadCase{P <: APIProblem}(a :: P) = LoadCase(a, Vector{Union{NeumannBC,DirichletBC}}())
-LoadCase(a) = LoadCase(a, [], nothing)
-#LoadCase{P <: Problem, B <: BoundaryCondition}(a :: P, b :: B) = LoadCase(a, Vector{Union{NeumannBC,DirichletBC}}([b]))
-#LoadCase{P <: Problem, B <: BoundaryCondition}(a :: P, b :: Vector{B}) =
-#LoadCase(a, Vector{Union{NeumannBC,DirichletBC}}(b))
+LoadCase(a) = LoadCase(a, NeumannBC[], DirichletBC[], nothing, nothing)
+
 
 """
 """
@@ -120,7 +86,6 @@ type Model
     nsets
     load_cases
     #settings :: Dict{AbstractString, Real}
-    #results
 end
 
 Model(name::ASCIIString, abq_input::Dict) = Model(
@@ -145,12 +110,3 @@ Model(name::ASCIIString) = Model(
 #    dicti[idx] = el
 #    return dicti
 #end
-
-#Model(name::ASCIIString) = Model(name,
-#                                 Dict{Union{Int64, ASCIIString}, Node}(),
-#                                 Dict{Union{Int64, ASCIIString}, Element}(),
-#                                 Dict{AbstractString, 
-#                                    Union{NodeSet, ElementSet}}(),
-#                                 LoadCase[],
-#)
-
