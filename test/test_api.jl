@@ -79,5 +79,5 @@ function test_piston_8789()
 
     model = Model("Piston Calculation", abaqus_input)
 end
-test_basic()
+
 end
