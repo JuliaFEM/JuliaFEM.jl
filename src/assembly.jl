@@ -47,9 +47,10 @@ function reduce(assembly::Assembly, boundary_dofs_::Vector{Int})
     # empty assembly to release memory for factorization
     empty!(assembly.stiffness_matrix)
     empty!(assembly.force_vector)
+    gc()
 
     if dim < 100000
-        # no need to do any reduction of matrix size at all
+        # no need to do any reduction of matrix size at all, just \ it.
         return CAssembly([], all_dofs, Matrix{Float64}(), K, f, spzeros(0, 0), spzeros(0,1))
     end
 
@@ -64,9 +65,10 @@ function reduce(assembly::Assembly, boundary_dofs_::Vector{Int})
     fb = f[boundary_dofs]
 
     F = cholfact(K[interior_dofs, interior_dofs])
-    K = spzeros(0, 0)
+    K = 0
+    gc()
 
-#=
+
     if dim < 100000
         # for small problems we don't need to care about memory usage
         Kd = Kib' * (F \ Kib)
@@ -78,31 +80,38 @@ function reduce(assembly::Assembly, boundary_dofs_::Vector{Int})
         for bi in 1:nb
             mod(bi, p) == 0 && info("Reduction: ", round(Int, bi/nb*100), " % done")
             C = full(F \ Kib[:, bi])
-            for bj in 1:nb
+            for bj in bi:nb
                 d = Kib[:, bj]
-                Kd[bj,bi] = dot(C[rowvals(d)], nonzeros(d))
+                @inbounds Kd[bj,bi] = dot(C[rowvals(d)], nonzeros(d))
             end
         end
+        Kd += tril(Kd, -1)'
     end
     Kc = spzeros(dim, dim)
     Kc[boundary_dofs, boundary_dofs] = Kbb - Kd
-=#
 
+#=  # this is slightly faster but uses more memory
     chunks = round(Int, dim/3000)
     info("Reduction is done in $chunks chunks.")
     nb = length(boundary_dofs)
     kk = round(Int, collect(linspace(0, nb, chunks+1)))
     sl = [kk[j]+1:kk[j+1] for j=1:length(kk)-1]
-    Kc = spzeros(dim, dim)
+    Kd = zeros(Float64, nb, nb)
+    #Kd = SharedArray(Float64, nb, nb)
     for (k,sli) in enumerate(sl)
         b1 = boundary_dofs[sli]
         Sc = F \ Kib[:,sli]
         for slj in sl
             b2 = boundary_dofs[slj]
-            Kc[b2,b1] = Kbb[slj,sli] - Kib[:,slj]'*Sc
+            #Kc[b2,b1] = Kbb[slj,sli] - Kib[:,slj]'*Sc
+            Kd[slj, sli] = Kib[:,slj]'*Sc
         end
         info("Reduction: ", round(k/chunks*100, 0), " % done")
     end
+    
+    Kc = spzeros(dim, dim)
+    Kc[boundary_dofs, boundary_dofs] = Kbb - Kd
+=#
 
     fc = spzeros(dim, 1)
     fc[boundary_dofs] = fb - Kib' * (F \ fi)
