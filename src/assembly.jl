@@ -13,6 +13,12 @@ type CAssembly
     fi :: SparseMatrixCSC
 end
 
+function optimize!(assembly::Assembly)
+    optimize!(assembly.mass_matrix)
+    optimize!(assembly.stiffness_matrix)
+    optimize!(assembly.force_vector)
+end
+
 function assemble!(assembly::Assembly, problem::AllProblems, time::Float64, empty_assembly::Bool=true)
     if empty_assembly
         empty!(assembly)
@@ -22,19 +28,28 @@ function assemble!(assembly::Assembly, problem::AllProblems, time::Float64, empt
     end
 end
 
-function assemble(problem::AllProblems, time::Float64)
+function assemble(problem::AllProblems, elrange::UnitRange{Int64}, time::Real)
+    elements = get_elements(problem)[elrange]
     assembly = Assembly()
-    ne = length(get_elements(problem))
+    ne = length(elrange)
     p = ne > 10 ? round(Int, ne/10) : ne
-    for (i, element) in enumerate(get_elements(problem))
+    for (i, element) in enumerate(elements)
         mod(i, p) == 0 && info("Assemble: ", round(Int, i/ne*100), " % done")
         assemble!(assembly, problem, element, time)
     end
+    optimize!(assembly)
     return assembly
 end
 
-""" Calculate reduced stiffness matrix. """
-function reduce(assembly::Assembly, boundary_dofs_::Vector{Int})
+function assemble(problem::AllProblems, time::Real)
+    ne = length(get_elements(problem))
+    assemble(problem, 1:ne, time)
+end
+
+""" Calculate reduced stiffness matrix.
+mindofs: if dofs < mindofs, do not reduce
+"""
+function reduce(assembly::Assembly, boundary_dofs_::Vector{Int}, mindofs=100000)
     all_dofs = unique(assembly.stiffness_matrix.I)
     boundary_dofs = intersect(all_dofs, boundary_dofs_)
     interior_dofs = setdiff(all_dofs, boundary_dofs_)
@@ -49,7 +64,7 @@ function reduce(assembly::Assembly, boundary_dofs_::Vector{Int})
     empty!(assembly.force_vector)
     gc()
 
-    if dim < 100000
+    if dim < mindofs
         # no need to do any reduction of matrix size at all, just \ it.
         return CAssembly([], all_dofs, Matrix{Float64}(), K, f, spzeros(0, 0), spzeros(0,1))
     end
@@ -108,7 +123,7 @@ function reduce(assembly::Assembly, boundary_dofs_::Vector{Int})
         end
         info("Reduction: ", round(k/chunks*100, 0), " % done")
     end
-    
+
     Kc = spzeros(dim, dim)
     Kc[boundary_dofs, boundary_dofs] = Kbb - Kd
 =#
