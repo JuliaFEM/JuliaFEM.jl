@@ -163,16 +163,16 @@ function call(solver::DirectSolver, ::Type{Val{:noreduce}}, time::Number=0.0)
         tic(timing, "solution of system")
         # solve increment for linearized problem
         nz = unique(rowvals(A))  # take only non-zero rows
-        sol = zeros(b)
-        sol[nz] = A[nz,nz] \ full(b[nz])
+        sol = zeros(length(b))
+        sol[nz] = full(A[nz,nz]) \ full(b[nz])
         #info("solution vector before reconstruction")
         #info(full(sol)')
         la = sol[dim+1:end]
         #for assembly in assemblies
         #    reconstruct!(assembly, sol)
         #end
-        la = vec(full(la))
-        sol = vec(full(sol))
+#       la = vec(full(la))
+#       sol = vec(full(sol))
         #info("la = ", la')
         #info("sol = ", sol')
 
