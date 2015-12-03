@@ -174,6 +174,6 @@ function test_solver_multiple_bodies_multiple_dirichlet_bc()
 
 end
 
-test_solver_multiple_bodies_multiple_dirichlet_bc()
+#test_solver_multiple_bodies_multiple_dirichlet_bc()
 
 end

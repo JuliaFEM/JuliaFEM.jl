@@ -16,6 +16,7 @@ type DirectSolver <: Solver
     tol :: Float64
     dump_matrices :: Bool
     reduce_stiffness_matrix :: Bool
+    method :: Symbol
 end
 
 """ Default initializer. """
@@ -28,7 +29,8 @@ function DirectSolver()
         10, # max nonlinear iterations
         1.0e-6, # convergence tolerance
         false, # dump matrices
-        true # reduce stiffness matrix
+        true, # reduce stiffness matrix
+        :LDLt # method: LDLt or LU ?
     )
 end
 
@@ -51,6 +53,85 @@ end
 function time_elapsed(timing, what::ASCIIString)
     return timing[what * " finish"] - timing[what * " start"]
 end
+
+
+"""
+Solve problem 
+
+    Ku + C'λ = f
+    Cu       = g
+
+"""
+function solve(K, f, C, g, ::Type{Val{:LDLt}})
+
+    t0 = time()
+
+    # make sure K is symmetric
+    s = maximum(abs(1/2*(K + K') - K))
+    @assert s < 1.0e-6
+    K = 1/2*(K + K')
+    dim = size(K, 1)
+
+    # make sure C is square
+    boundary_dofs = unique(rowvals(C))
+    boundary_dofs2 = unique(rowvals(C'))
+    @assert length(boundary_dofs) == length(boundary_dofs2)
+    @assert setdiff(Set(boundary_dofs), Set(boundary_dofs2)) == Set()
+
+    all_dofs = unique(rowvals(K))
+    interior_dofs = setdiff(all_dofs, boundary_dofs)
+    info("all dofs = $(length(all_dofs))")
+    info("interior dofs = $(length(interior_dofs))")
+    info("boundary dofs = $(length(boundary_dofs))")
+    info("preparation in ", time()-t0, " seconds")
+
+    # solve displacement on known boundary
+    t0 = time()
+    LUF = lufact(C[boundary_dofs, boundary_dofs])
+    u = zeros(dim)
+    u[boundary_dofs] = LUF \ full(g[boundary_dofs])
+    info("displacement on boundary solved.")
+    normub = norm(u[boundary_dofs])
+    info("norm[u_boundary_dofs] = ", normub)
+    if isapprox(normub, 0.0)
+        info("homogeneous dirichlet boundary")
+    end
+    info("solve boundary = ", time()-t0)
+
+    # factorize interior domain using cholmod
+    t0 = time()
+    CF = cholfact(K[interior_dofs, interior_dofs])
+    Kib = K[interior_dofs, boundary_dofs]
+    Kbb = K[boundary_dofs, boundary_dofs]
+    fi = f[interior_dofs]
+    info("factorizations done in ", time()-t0, " seconds")
+
+    # solve interior domain + lagrange multipliers
+    t0 = time()
+    u[interior_dofs] = CF \ (fi - Kib*u[boundary_dofs])
+    la = zeros(dim)
+    la[boundary_dofs] = LUF \ full(Kib'*u[interior_dofs] - Kbb*u[boundary_dofs])
+    info("solved interior in ", time()-t0, " seconds. norm = ", norm(u))
+    return u, la
+end
+
+function solve(K, f, C, g, ::Type{Val{:LU}})
+    dim = size(K, 1)
+    A = nothing
+    try
+        A = [K C'; C spzeros(dim, dim)]
+    catch
+        info("size(K) = ", size(K))
+        info("size(C) = ", size(C))
+        error("Failed to construct problem. dim = $dim")
+    end
+    b = [f; g]
+    nz = sort(unique(rowvals(A)))
+    u = zeros(length(b))
+    u[nz] = lufact(A[nz,nz]) \ full(b[nz])
+    return u[1:dim], u[dim+1:end]
+end
+
 
 """ Call solver to solve a set of problems. """
 function call(solver::DirectSolver, time::Number=0.0)
@@ -111,65 +192,37 @@ function call(solver::DirectSolver, time::Number=0.0)
         info("Starting iteration $iter")
         tic(timing, "non-linear iteration")
 
-        mapper = solver.parallel ? pmap : map
+        tic(timing, "field assembly")
+        info("Assembling field problems...")
+        field_assembly = Assembly()
+        for (i, problem) in enumerate(solver.field_problems)
+            info("Assembling body $i...")
+            append!(field_assembly, assemble(problem, time))
+        end
+        K = sparse(field_assembly.stiffness_matrix)
+        dim = size(K, 1)
+        f = sparse(field_assembly.force_vector, dim, 1)
+        field_assembly = nothing
+        gc()
+        toc(timing, "field assembly")
 
-        info("Assembling boundary problems...")
         tic(timing, "boundary assembly")
-        boundary_assembly = sum(mapper((p)->assemble(p, time), solver.boundary_problems))
-        boundary_dofs = unique(boundary_assembly.stiffness_matrix.I)
-        info("# of interface dofs: $(length(boundary_dofs))")
-        C = sparse(boundary_assembly.stiffness_matrix)
-        g = sparse(boundary_assembly.force_vector)
+        info("Assembling boundary problems...")
+        boundary_assembly = Assembly()
+        for (i, problem) in enumerate(solver.boundary_problems)
+            info("Assembling boundary $i...")
+            append!(boundary_assembly, assemble(problem, time))
+        end
+        C = sparse(boundary_assembly.stiffness_matrix, dim, dim)
+        g = sparse(boundary_assembly.force_vector, dim, 1)
         boundary_assembly = nothing
         gc()
         toc(timing, "boundary assembly")
 
-        info("Assembling field problems...")
-        dim = 0
-        assemblies = []
-        for (i, problem) in enumerate(solver.field_problems)
-            info("Assembling body $i...")
 
-            tic(timing, "field assembly")
-            nchunks = length(workers())
-            ne = length(get_elements(problem))
-            kk = round(Int, collect(linspace(0, ne, nchunks+1)))
-            slices = [kk[j]+1:kk[j+1] for j=1:length(kk)-1]
-            field_assembly = sum(pmap((s) -> assemble(problem, s, time), slices))
-
-            #field_assembly = assemble(problem, time)
-            toc(timing, "field assembly")
-
-            field_dofs = unique(field_assembly.stiffness_matrix.I)
-            info("# of dofs in problem $i: $(length(field_dofs))")
-            dim = maximum([dim, maximum(field_dofs)])
-            tic(timing, "reduce stiffness matrix")
-            cfield_assembly = nothing
-            if solver.reduce_stiffness_matrix && (nnz(boundary) != 0)
-                info("Eliminating interior dofs for body $i...")
-                cfield_assembly = reduce(field_assembly, boundary_dofs)
-            else
-                cfield_assembly = reduce(field_assembly, boundary_dofs, Inf)
-            end
-            toc(timing, "reduce stiffness matrix")
-            push!(assemblies, cfield_assembly)
-        end
-
-        tic(timing, "create sparse matrices")
-
-        K = spzeros(dim, dim)
-        f = spzeros(dim, 1)
-
-        for (i, assembly) in enumerate(assemblies)
-            resize!(assembly.Kc, dim, dim)
-            resize!(assembly.fc, dim, 1)
-            K += assembly.Kc
-            f += assembly.fc
-        end
-
-        resize!(C, dim, dim)
-        resize!(g, dim, 1)
-        toc(timing, "create sparse matrices")
+#       resize!(C, dim, dim)
+#       resize!(g, dim, 1)
+#       resize!(f, dim, 1)
 
         tic(timing, "dump matrices to disk")
         if solver.dump_matrices
@@ -179,39 +232,13 @@ function call(solver::DirectSolver, time::Number=0.0)
         end
         toc(timing, "dump matrices to disk")
 
-        all_dofs = sort(unique(rowvals(K)))
-        field_dofs = setdiff(all_dofs, boundary_dofs)
-
-        info("Solving system")
         tic(timing, "solution of system")
-        sol = zeros(2*dim)
-        if nnz(g) != 0
-            A = [K C'; C spzeros(dim, dim)]
-            b = [f; g]
-            K = 0
-            C = 0
-            gc()
-            nz = sort(unique(rowvals(A)))  # take only non-zero rows
-            sol[nz] = A[nz,nz] \ full(b[nz])
-        else
-            K = 1/2*(K + K')
-            sol[field_dofs] = cholfact(K[field_dofs, field_dofs]) \ f[field_dofs]
-        end
+        info("Solving system")
+        gc()
+#       whos()
+        sol, la = solve(K, f, C, g, Val{solver.method})
+        gc()
         toc(timing, "solution of system")
-
-        info("Solved, calculating interior dofs...")
-        tic(timing, "back substitute")
-        for assembly in assemblies
-            length(assembly.interior_dofs) != 0 || continue
-            reconstruct!(assembly, sol)
-        end
-        toc(timing, "back substitute")
-
-        la = sol[dim+1:end]
-        la = vec(full(la))
-        sol = vec(full(sol))
-
-        info("Problem solved. solution norm: $(norm(sol[1:dim]))")
 
         tic(timing, "update element data")
         # update elements in field problems
@@ -236,22 +263,20 @@ function call(solver::DirectSolver, time::Number=0.0)
             end
         end
         toc(timing, "update element data")
+
         toc(timing, "non-linear iteration")
 
         if true
             info("timing info for non-linear iteration:")
             info("boundary assembly       : ", time_elapsed(timing, "boundary assembly"))
             info("field assembly          : ", time_elapsed(timing, "field assembly"))
-            info("reduce stiffness matrix : ", time_elapsed(timing, "reduce stiffness matrix"))
-            info("create sparse matrices  : ", time_elapsed(timing, "create sparse matrices"))
             info("dump matrices to disk   : ", time_elapsed(timing, "dump matrices to disk"))
             info("solve problem           : ", time_elapsed(timing, "solution of system"))
-            info("back substitute         : ", time_elapsed(timing, "back substitute"))
             info("update element data     : ", time_elapsed(timing, "update element data"))
             info("non-linear iteration    : ", time_elapsed(timing, "non-linear iteration"))
         end
 
-        if norm(sol[1:dim]) < solver.tol
+        if norm(sol) < solver.tol
             toc(timing, "solver")
             info("solver finished in ", time_elapsed(timing, "solver"), " seconds.")
             return (iter, true)

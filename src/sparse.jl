@@ -38,6 +38,12 @@ function Base.append!(A::SparseMatrixIJV, I::Vector{Int}, J::Vector{Int}, V::Vec
     append!(A.V, V)
 end
 
+function Base.append!(A::SparseMatrixIJV, B::SparseMatrixIJV)
+    append!(A.I, B.I)
+    append!(A.J, B.J)
+    append!(A.V, B.V)
+end
+
 function Base.isempty(A::SparseMatrixIJV)
     return isempty(A.I) && isempty(A.J) && isempty(A.V)
 end
@@ -92,7 +98,9 @@ function add!(A::SparseMatrixIJV, dofs::Vector{Int}, data::Array{Float64})
 end
 
 function optimize!(A::SparseMatrixIJV)
+#   dim1 = length(A.I)
     I, J, V = findnz(sparse(A))
+#   dim2 = length(I)
     A = SparseMatrixCOO(I, J, V)
     gc()
 end

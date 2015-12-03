@@ -19,6 +19,12 @@ function optimize!(assembly::Assembly)
     optimize!(assembly.force_vector)
 end
 
+function append!(assembly::Assembly, sub_assembly::Assembly)
+    append!(assembly.mass_matrix, sub_assembly.mass_matrix)
+    append!(assembly.stiffness_matrix, sub_assembly.stiffness_matrix)
+    append!(assembly.force_vector, sub_assembly.force_vector)
+end
+
 function assemble!(assembly::Assembly, problem::AllProblems, time::Float64, empty_assembly::Bool=true)
     if empty_assembly
         empty!(assembly)
@@ -28,22 +34,39 @@ function assemble!(assembly::Assembly, problem::AllProblems, time::Float64, empt
     end
 end
 
-function assemble(problem::AllProblems, elrange::UnitRange{Int64}, time::Real)
+function assemble(problem::AllProblems, elrange::UnitRange{Int64}, time::Real, optimize=false)
     elements = get_elements(problem)[elrange]
     assembly = Assembly()
-    ne = length(elrange)
-    p = ne > 10 ? round(Int, ne/10) : ne
     for (i, element) in enumerate(elements)
-        mod(i, p) == 0 && info("Assemble: ", round(Int, i/ne*100), " % done")
         assemble!(assembly, problem, element, time)
     end
-    optimize!(assembly)
+    if optimize
+        dim1 = length(assembly.stiffness_matrix.I)
+        optimize!(assembly)
+        dim2 = length(assembly.stiffness_matrix.I)
+        info("combine: dim1 = $dim1, dim2 = $dim2")
+    end
     return assembly
 end
 
-function assemble(problem::AllProblems, time::Real)
+function assemble(problem::AllProblems, time::Real, nchunks=10)
     ne = length(get_elements(problem))
-    assemble(problem, 1:ne, time)
+    kk = round(Int, collect(linspace(0, ne, nchunks+1)))
+    slices = [kk[j]+1:kk[j+1] for j=1:nchunks]
+
+#   sub_assemblies = map( (elrange) -> assemble(problem, elrange, time), slices)
+#   assembly = sum(sub_assemblies)
+
+    assembly = Assembly()
+    for (j, elrange) in enumerate(slices)
+        sub_assembly = assemble(problem, elrange, time)
+        append!(assembly, sub_assembly)
+        info("Assembly: ", round(j/nchunks*100,1), " % done. ")
+    end
+#   optimize!(assembly)
+#   dim = length(assembly.stiffness_matrix.I)
+#   info("dim of COO: $dim")
+    return assembly
 end
 
 """ Calculate reduced stiffness matrix.
