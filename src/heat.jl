@@ -42,7 +42,7 @@ References
 https://en.wikipedia.org/wiki/Heat_equation
 
 """
-function assemble!{E<:CG}(assembly::Assembly, problem::Problem{HeatProblem}, element::Element{E}, time::Number)
+function assemble!(assembly::Assembly, problem::Problem{HeatProblem}, element::Element, time::Number)
 
     gdofs = get_gdofs(element, problem.dim)
     for ip in get_integration_points(element)
