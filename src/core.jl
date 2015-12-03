@@ -1,7 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-import Base: +, -, /, *, push!, convert, getindex, setindex!, length, similar, call, vec, endof
+import Base: +, -, /, *, push!, convert, getindex, setindex!, length, similar, call, vec, endof, append!
 
 """
 A very simple debugging macro. It prints debug message if environment variable
