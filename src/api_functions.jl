@@ -5,6 +5,12 @@ function add_boundary_condition!(case::LoadCase, bc::NeumannBC)
     push!(case.neumann_boundary_conditions, bc)
 end
 
+function add_node!(model::Model, index::Union{Int64, ASCIIString},
+    coords::Vector{Float64})
+    node = Node(index, coords)
+    model.nodes[index] = node
+end
+
 
 function add_boundary_condition!(case::LoadCase, bc::DirichletBC)
     push!(case.dirichlet_boundary_conditions, bc)
@@ -22,6 +28,37 @@ function add_material!(model::Model, set_name::ASCIIString, material::Material)
         element.material = material
     end
     element_set.material = material
+end
+
+function add_element!(model::Model, idx::Union{Int64, ASCIIString},
+    eltype::Symbol, node_ids::Vector{Int64})
+
+    element = Element(idx, node_ids, eltype)
+    model.elements[idx] = element
+end
+
+function add_element_set!(model::Model, elset::ElementSet)
+    name = elset.name
+    model.elsets[name] = elset
+end
+
+function add_element_set!(model::Model, name::ASCIIString, ids::Vector{Int64})
+    elset = ElementSet(name, ids)
+    model.elsets[name] = elset
+end
+
+function add_element_set!(model::Model, name::ASCIIString,
+    elements::Vector{Element})
+    elset = ElementSet(name, elements)
+model.elsets[name] = elset
+end
+
+function add_element_set!(case::LoadCase, name::ASCIIString)
+    push!(case.sets, name)
+end
+
+function add_load_case!(model::Model, name::ASCIIString, case::LoadCase)
+    model.load_cases[name] = case
 end
 #function Base.convert{T<:AbstractFloat}(::Type{Node}, data::Vector{T})
 #    Node(data)

@@ -33,9 +33,9 @@ function Base.setindex!{T <: AbstractString }(material::Material, val::Real, nam
 end
 
 
-type Node{T<:Real} 
+type Node 
     id :: Union{Integer, ASCIIString}
-    coords :: Array{T, 1}
+    coords :: Array{Float64, 1}
 end
 
 type Element
@@ -48,11 +48,16 @@ end
 
 Element(a, b, c) = Element(a, b, c, nothing, Material())
 
+type NodeSet
+    name :: ASCIIString
+    nodes :: Vector{Int64}
+end
+
 """
 """
 type ElementSet
     name :: ASCIIString
-    elements :: Vector{Int64} 
+    elements :: Vector{Union{Int64, ASCIIString}} 
     material :: Material
 end
 
@@ -70,21 +75,24 @@ type LoadCase
     neumann_boundary_conditions :: Vector{NeumannBC}
     dirichlet_boundary_conditions :: Vector{DirichletBC}
     solver
-    sets
+    sets :: Vector{ASCIIString}
 end
 
-LoadCase(a) = LoadCase(a, NeumannBC[], DirichletBC[], nothing, nothing)
+LoadCase(a) = LoadCase(a, NeumannBC[], DirichletBC[], nothing, ASCIIString[])
 
 
 """
+Model type
+
+Used for constructing the calculation model
 """
 type Model
-    name 
-    nodes 
+    name :: ASCIIString 
+    nodes :: Dict{Union{Int64, ASCIIString}}
     elements :: Dict{Union{ASCIIString, Int64}, Element} 
-    elsets
-    nsets
-    load_cases
+    elsets :: Dict{ASCIIString, ElementSet}
+    nsets :: Dict{ASCIIString, NodeSet}
+    load_cases :: Dict{ASCIIString, LoadCase}
     #settings :: Dict{AbstractString, Real}
 end
 
@@ -94,19 +102,19 @@ Model(name::ASCIIString, abq_input::Dict) = Model(
     abq_input["elements"],
     abq_input["elsets"],
     abq_input["nsets"],
-    Dict())
+    Dict{ASCIIString, LoadCase}())
 
 Model(name::ASCIIString) = Model(
     name,
-    Dict(),
-    Dict{Union{ASCIIString, Int64}, Element}(),
-    Dict(),
-    Dict(),
-    Dict(),
+    Dict{Union{Int64, ASCIIString}, Node}(),
+    Dict{Union{Int64, ASCIIString}, Element}(),
+    Dict{ASCIIString, NodeSet}(),
+    Dict{ASCIIString, ElementSet}(),
+    Dict{ASCIIString, LoadCase}(),
 )
 
-#function Base.setindex!(dicti::Dict{Union{ASCIIString, Int64}, Element}, el::Element, idx::Union{ASCIIString, Int64})
-#    el.id = idx
-#    dicti[idx] = el
-#    return dicti
-#end
+function Base.setindex!(dict::Dict{Union{ASCIIString, Int64}, Node},
+    vals::Vector{Float64}, idx::Union{ASCIIString, Int64})
+    dict[idx] = Node(idx, vals)
+end
+
