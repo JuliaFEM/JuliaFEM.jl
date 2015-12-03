@@ -82,6 +82,17 @@ function test_piston_8789()
     @test length(keys(model.elements)) == 37331
     @test length(keys(model.nodes)) == 8789
 end
-# test_basic()
-test_piston_8789()
+
+#function test_piston_107168()
+#    abaqus_input = open(parse_abaqus, "./geometry/piston/piston_107168_P2.inp")
+#
+#    model = Model("Piston Calculation", abaqus_input)
+#    @test length(keys(model.elsets)) == 3
+#    @test length(keys(model.nsets)) == 1
+#    @test length(keys(model.elements)) == 65948
+#    @test length(keys(model.nodes)) == 107168
+#end 
+
+#test_piston_107168()
+
 end
