@@ -202,15 +202,17 @@ function test_2d_mortar_multiple_bodies_multiple_dirichlet_bc()
     push!(solver, boundary2)
     push!(solver, boundary3)
 
+    solver.dump_matrices = true
+    solver.method = :LU
     # launch solver
-    norm = solver(0.0)
+    solver(0.0)
 
     disp = e2("displacement", [1.0, 1.0], 0.0)
     info("displacement at tip: $disp")
     # code aster verification, two_elements.comm
     @test isapprox(disp, [3.17431158889468E-02, -2.77183037855653E-01])
 end
-test_2d_mortar_multiple_bodies_multiple_dirichlet_bc()
+#test_2d_mortar_multiple_bodies_multiple_dirichlet_bc()
 
 
 function test_2d_mortar_three_bodies_shared_nodes()
@@ -322,7 +324,8 @@ function test_2d_mortar_three_bodies_shared_nodes()
     push!(solver, bc5)
 
     # launch solver
-    norm = solver(0.0)
+    solver.method = :LU
+    call(solver, 0.0)
 
     disp = e2("displacement", [1.0, 1.0], 0.0)
     info("displacement at tip: $disp")
@@ -330,5 +333,6 @@ function test_2d_mortar_three_bodies_shared_nodes()
     @test isapprox(disp, [3.17431158889468E-02, -2.77183037855653E-01])
 
 end
+#test_2d_mortar_three_bodies_shared_nodes()
 
 end
