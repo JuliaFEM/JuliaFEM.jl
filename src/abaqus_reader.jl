@@ -189,9 +189,9 @@ function parse_abaqus(fid::IOStream)
     keyword_sym::Symbol = :none
     parser::Function = x->()
     model = Dict{AbstractString, Any}()
-    model["nodes"] = Dict{Int, Vector{AbstractFloat}}()
-    model["nsets"] = Dict{AbstractString, Vector{Int}}()
-    model["elsets"] = Dict{AbstractString, Vector{Int}}()
+    model["nodes"] = Dict{Int64, Vector{Float64}}()
+    model["nsets"] = Dict{ASCIIString, Vector{Int64}}()
+    model["elsets"] = Dict{ASCIIString, Vector{Int64}}()
     model["elements"] = Dict{Integer, Any}()
     for idx_end in keyword_indexes[2:end]
         keyword_line = uppercase(lines[idx_start])
