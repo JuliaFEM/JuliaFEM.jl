@@ -25,7 +25,7 @@ function solve!(model::Model, case_name::ASCIIString, time::Float64)
         mat = element.material
         conn = element.connectivity
         core_element = JuliaFEM.Core.(el_type)(conn)
-        core_element["geometry"] = map(x->nodes[x], conn)
+        core_element["geometry"] = map(x->nodes[x].coords, conn)
         for each in keys(mat.scalar_data)
             core_element[each] = mat.scalar_data[each]
         end
@@ -63,10 +63,11 @@ function solve!(model::Model, case_name::ASCIIString, time::Float64)
     end
 
     # Push all the elements, where the field problem is solved into the field_problem
-    element_set = case.sets
-    el_ids = model.elsets[element_set].elements
-    for each in el_ids
-        push!(field_problem, core_elements[each])
+    for element_set in case.sets
+        el_ids = model.elsets[element_set].elements
+        for each in el_ids
+            push!(field_problem, core_elements[each])
+        end
     end
 
     # Creating the solver

@@ -7,7 +7,8 @@ using JuliaFEM.Test
 
 using JuliaFEM.Preprocess: parse_abaqus
 using JuliaFEM.API: Model, Element, ElementSet, Material, LoadCase,
-DirichletBC, NeumannBC, add_boundary_condition!, add_solver!, add_material!
+DirichletBC, NeumannBC, add_boundary_condition!, add_solver!, add_material!,
+add_node!, add_element!, add_element_set!, add_load_case!
 using JuliaFEM.Interfaces: solve!
 
 
@@ -15,9 +16,9 @@ function test_basic()
     # basic workflow, copied from test_solver.jl
     model = Model("Piston Calculation")
 
-    model.nodes[1] = [0.0, 0.0]
+    add_node!(model, 1, [0.0, 0.0]) 
     model.nodes[2] = [1.0, 0.0]
-    model.nodes[3] = [1.0, 1.0]
+    add_node!(model, 3, [1.0, 1.0])
     model.nodes[4] = [0.0, 1.0]
     
     # create elements
@@ -26,29 +27,26 @@ function test_basic()
     e3 = Element(3, [3, 4], :Seg2)
     model.elements[1] = e1  
     model.elements[2] = e2  
-    model.elements[3] = e3  
-
+    add_element!(model, 3, :Seg2, [3, 4])
 
     # element set
     elset = ElementSet("body", [e1, e2])
-    elset2 = ElementSet("heat_flux", [e2]) 
-    elset3 = ElementSet("constant_temp", [e3])
     elset4 = ElementSet("set_material", [e1]) 
 
     model.elsets["body"] = elset
-    model.elsets["heat_flux"] = elset2
-    model.elsets["constant_temp"] = elset3
-    model.elsets["set_material"] = elset4
+    add_element_set!(model, "heat_flux", [2])
+    add_element_set!(model, "constant_temp", [e3])
+    add_element_set!(model, elset4)
 
     # material properties
-    material = Material("MatMat")
+    material = Material("myMaterial")
     material["temperature thermal conductivity"] = 6.0
     material["density"] = 36.0
     add_material!(model, "set_material", material)
 
     # Create problem
     field_problem = LoadCase(:HeatProblem)
-    field_problem.sets = "body"
+    add_element_set!(field_problem, "body") # is this necessary?
 
     # boundary conditions
     bc = DirichletBC("constant_temp", "temperature" => 0.0)
@@ -63,7 +61,8 @@ function test_basic()
     add_solver!(field_problem, :LinearSolver)
 
     # add case
-    model.load_cases["Heat problem"] = field_problem
+    add_load_case!(model, "Heat problem", field_problem)
+    #model.load_cases["Heat problem"] = field_problem
 
     # Solve problem
     solve!(model, "Heat problem", 1.0)
@@ -79,5 +78,5 @@ function test_piston_8789()
 
     model = Model("Piston Calculation", abaqus_input)
 end
-test_basic()
+# test_basic()
 end
