@@ -7,7 +7,7 @@ using JuliaFEM.API: Model
 """
 This needs this a bit honing ... 
 """
-function solve!(model::Model, case_name::ASCIIString, time::Float64)
+function get_solver(model::Model, case_name::ASCIIString, time::Float64)
     element_ids = keys(model.elements)
     all_elements = model.elements
     case = model.load_cases[case_name]
@@ -71,9 +71,17 @@ function solve!(model::Model, case_name::ASCIIString, time::Float64)
     end
 
     # Creating the solver
-    solver = JuliaFEM.Core.(case.solver)(field_problem, dirile_arr...) 
+    #solver = JuliaFEM.Core.(case.solver)(field_problem, dirile_arr...) 
+	solver = JuliaFEM.Core.(case.solver)()
+	push!(solver, field_problem)
+	for d in dirile_arr
+		push!(solver, d)
+	end
+	return solver
+end
 
+function solve!(model::Model, case_name::ASCIIString, time::Float64)
+	solver = get_solver(model, case_name, time)
     # Solving 
     solver(time)
- end
-
+end
