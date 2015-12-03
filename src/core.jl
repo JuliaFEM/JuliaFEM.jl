@@ -31,6 +31,8 @@ using ForwardDiff
 autodiffcache = ForwardDiffCache()
 # export derivative, jacobian, hessian
 
+using JLD
+
 """ Simple linspace extension to arrays.
 
 Examples

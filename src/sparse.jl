@@ -10,6 +10,8 @@ type SparseMatrixIJV
     V :: Vector{Float64}
 end
 
+typealias SparseMatrixCOO SparseMatrixIJV
+
 function SparseMatrixIJV()
     SparseMatrixIJV([], [], [])
 end
@@ -89,3 +91,8 @@ function add!(A::SparseMatrixIJV, dofs::Vector{Int}, data::Array{Float64})
     append!(A.V, vec(data))
 end
 
+function optimize!(A::SparseMatrixIJV)
+    I, J, V = findnz(sparse(A))
+    A = SparseMatrixCOO(I, J, V)
+    gc()
+end
