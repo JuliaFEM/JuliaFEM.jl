@@ -17,6 +17,9 @@ element_has_nodes(::Type{Val{:C3D20E}}) = 20
 element_has_nodes(::Type{Val{:S3}}) = 3
 element_has_type( ::Type{Val{:S3}}) = :Seg3
 
+element_has_nodes(::Type{Val{:STRI65}}) = 6
+element_has_type(::Type{Val{:STRI65}}) = :Tri6
+
 """
 Checks for if line is a comment line or just empty
 """
