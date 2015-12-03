@@ -49,4 +49,6 @@ function test_linearsolver()
     @test isapprox(T, 100.0)
 end
 
+test_basic()
+
 end
