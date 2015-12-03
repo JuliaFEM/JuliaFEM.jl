@@ -96,13 +96,36 @@ type Model
     #settings :: Dict{AbstractString, Real}
 end
 
-Model(name::ASCIIString, abq_input::Dict) = Model(
-    name,
-    abq_input["nodes"],
-    abq_input["elements"],
-    abq_input["elsets"],
-    abq_input["nsets"],
-    Dict{ASCIIString, LoadCase}())
+function Model(name::ASCIIString, abq_input::Dict)
+    model  = Model(name)
+    nodes        = abq_input["nodes"]
+    elements     = abq_input["elements"]
+    element_sets = abq_input["elsets"]
+    node_sets    = abq_input["nsets"]
+    for id in keys(nodes)
+        coords = nodes[id]
+        add_node!(model, id, coords)
+    end
+
+    for id in keys(elements)
+        data = elements[id]
+        eltype = data["type"]
+        conn = data["connectivity"]
+#        println(eltype, " ", conn)
+        add_element!(model, id, eltype, conn)
+    end
+    
+    for name in keys(node_sets)
+        ids = node_sets[name]
+        add_node_set!(model, name, ids)
+    end
+
+    for name in keys(element_sets)
+        ids = element_sets[name]
+        add_element_set!(model, name, ids)
+    end
+    model
+end
 
 Model(name::ASCIIString) = Model(
     name,

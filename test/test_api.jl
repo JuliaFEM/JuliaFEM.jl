@@ -74,9 +74,14 @@ function test_basic()
 end
 
 function test_piston_8789()
-    abaqus_input = open(parse_abaqus, "../geometry/piston/piston_8789_P1.inp")
+    abaqus_input = open(parse_abaqus, "./geometry/piston/piston_8789_P1.inp")
 
     model = Model("Piston Calculation", abaqus_input)
+    @test length(keys(model.elsets)) == 4
+    @test length(keys(model.nsets)) == 1
+    @test length(keys(model.elements)) == 37331
+    @test length(keys(model.nodes)) == 8789
 end
 # test_basic()
+test_piston_8789()
 end

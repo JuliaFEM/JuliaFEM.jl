@@ -47,6 +47,11 @@ function add_element_set!(model::Model, name::ASCIIString, ids::Vector{Int64})
     model.elsets[name] = elset
 end
 
+function add_node_set!(model::Model, name::ASCIIString, ids::Vector{Int64})
+    nset = NodeSet(name, ids)
+    model.nsets[name] = nset
+end
+
 function add_element_set!(model::Model, name::ASCIIString,
     elements::Vector{Element})
     elset = ElementSet(name, elements)
