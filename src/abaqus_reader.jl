@@ -47,6 +47,7 @@ function parse_section(model, lines, key::Symbol, idx_start,
     has_set_def = match(r"NSET=([\w\_\-]+)", definition) 
     if has_set_def != nothing
       set_name = has_set_def[1]
+      info("Creating nset $set_name")
       model["nsets"][set_name] = ids
   end
 end
@@ -109,6 +110,7 @@ function parse_section(model, lines, key, idx_start, idx_end, ::Type{Val{:ELEMEN
     has_set_def = match(r"ELSET=([\w\_\-]+)", definition) 
     if has_set_def != nothing
       set_name = has_set_def[1]
+      info("Creating elset $set_name")
       model["elsets"][set_name] = ids
   end
 end

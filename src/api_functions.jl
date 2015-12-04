@@ -1,7 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-function add_boundary_condition!(case::LoadCase, bc::NeumannBC)
+function add_boundary_condition!(case::Simulation, bc::NeumannBC)
     push!(case.neumann_boundary_conditions, bc)
 end
 
@@ -12,11 +12,11 @@ function add_node!(model::Model, index::Union{Int64, ASCIIString},
 end
 
 
-function add_boundary_condition!(case::LoadCase, bc::DirichletBC)
+function add_boundary_condition!(case::Simulation, bc::DirichletBC)
     push!(case.dirichlet_boundary_conditions, bc)
 end
 
-function add_solver!(case::LoadCase, solver)
+function add_solver!(case::Simulation, solver)
     case.solver = solver
 end
 
@@ -58,11 +58,11 @@ function add_element_set!(model::Model, name::ASCIIString,
 model.elsets[name] = elset
 end
 
-function add_element_set!(case::LoadCase, name::ASCIIString)
+function add_element_set!(case::Simulation, name::ASCIIString)
     push!(case.sets, name)
 end
 
-function add_load_case!(model::Model, name::ASCIIString, case::LoadCase)
+function add_simulation!(model::Model, name::ASCIIString, case::Simulation)
     model.load_cases[name] = case
 end
 #function Base.convert{T<:AbstractFloat}(::Type{Node}, data::Vector{T})
@@ -82,19 +82,19 @@ end
 #    dublicate set names.")
 #end
 #
-#function add_boundary_condition!{B <: BoundaryCondition}(case::LoadCase, bc::B)
+#function add_boundary_condition!{B <: BoundaryCondition}(case::Simulation, bc::B)
 #    push!(case.boundary_conditions, bc)
 #end
 #
-#function add_boundary_condition!{B <: BoundaryCondition}(case::LoadCase, bc::Vector{B})
+#function add_boundary_condition!{B <: BoundaryCondition}(case::Simulation, bc::Vector{B})
 #    map(x-> push!(case.boundary_conditions, x), bc)
 #end
 #
-#function add_loadcase!(model::Model, case::LoadCase)
+#function add_loadcase!(model::Model, case::Simulation)
 #    push!(model.load_cases, case)
 #end
 #
-#function add_loadcase!{T<:LoadCase}(model::Model, case::Vector{T})
+#function add_loadcase!{T<:Simulation}(model::Model, case::Vector{T})
 #    map(x-> push!(model.load_cases, x), case)
 #end
 #
