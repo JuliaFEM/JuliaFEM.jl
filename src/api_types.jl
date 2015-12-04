@@ -68,9 +68,9 @@ ElementSet(name::ASCIIString, ids::Vector{Int64}) =
     ElementSet(name, ids, Material())
 
 """
-LoadCase
+Simulation
 """
-type LoadCase
+type Simulation
     problem :: Symbol
     neumann_boundary_conditions :: Vector{NeumannBC}
     dirichlet_boundary_conditions :: Vector{DirichletBC}
@@ -78,7 +78,7 @@ type LoadCase
     sets :: Vector{ASCIIString}
 end
 
-LoadCase(a) = LoadCase(a, NeumannBC[], DirichletBC[], nothing, ASCIIString[])
+Simulation(a) = Simulation(a, NeumannBC[], DirichletBC[], nothing, ASCIIString[])
 
 
 """
@@ -92,7 +92,7 @@ type Model
     elements :: Dict{Union{ASCIIString, Int64}, Element} 
     elsets :: Dict{ASCIIString, ElementSet}
     nsets :: Dict{ASCIIString, NodeSet}
-    load_cases :: Dict{ASCIIString, LoadCase}
+    load_cases :: Dict{ASCIIString, Simulation}
     #settings :: Dict{AbstractString, Real}
 end
 
@@ -133,7 +133,7 @@ Model(name::ASCIIString) = Model(
     Dict{Union{Int64, ASCIIString}, Element}(),
     Dict{ASCIIString, NodeSet}(),
     Dict{ASCIIString, ElementSet}(),
-    Dict{ASCIIString, LoadCase}(),
+    Dict{ASCIIString, Simulation}(),
 )
 
 function Base.setindex!(dict::Dict{Union{ASCIIString, Int64}, Node},

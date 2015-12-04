@@ -71,12 +71,15 @@ function get_solver(model::Model, case_name::ASCIIString, time::Float64)
     end
 
     # Creating the solver
-    #solver = JuliaFEM.Core.(case.solver)(field_problem, dirile_arr...) 
-	solver = JuliaFEM.Core.(case.solver)()
-	push!(solver, field_problem)
-	for d in dirile_arr
-		push!(solver, d)
-	end
+    if case.solver == :LinearSolver
+        solver = JuliaFEM.Core.(case.solver)(field_problem, dirile_arr...) 
+    else
+	    solver = JuliaFEM.Core.(case.solver)()
+	    push!(solver, field_problem)
+	    for d in dirile_arr
+		    push!(solver, d)
+	    end
+     end
 	return solver
 end
 

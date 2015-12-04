@@ -6,7 +6,7 @@ module APITests
 using JuliaFEM.Test
 
 using JuliaFEM.Preprocess: parse_abaqus
-using JuliaFEM.API: Model, Element, ElementSet, Material, LoadCase,
+using JuliaFEM.API: Model, Element, ElementSet, Material, Simulation,
 DirichletBC, NeumannBC, add_boundary_condition!, add_solver!, add_material!,
 add_node!, add_element!, add_element_set!, add_load_case!
 using JuliaFEM.Interfaces: solve!
@@ -45,7 +45,7 @@ function test_basic()
     add_material!(model, "set_material", material)
 
     # Create problem
-    field_problem = LoadCase(:HeatProblem)
+    field_problem = Simulation(:HeatProblem)
     add_element_set!(field_problem, "body") # is this necessary?
 
     # boundary conditions
@@ -93,6 +93,6 @@ end
 #    @test length(keys(model.nodes)) == 107168
 #end 
 
-#test_piston_107168()
+test_basic()
 
 end
