@@ -8,6 +8,7 @@ using JuliaFEM
 @everywhere assemble = JuliaFEM.Core.assemble
 
 type DirectSolver <: Solver
+    name :: ASCIIString
     field_problems :: Vector{Problem}
     boundary_problems :: Vector{BoundaryProblem}
     parallel :: Bool
@@ -20,8 +21,9 @@ type DirectSolver <: Solver
 end
 
 """ Default initializer. """
-function DirectSolver()
+function DirectSolver(name="DirectSolver")
     DirectSolver(
+        name,
         [], # field problems
         [], # boundary problems
         false, # parallel run?
@@ -67,12 +69,10 @@ function solve(K, f, C, g, ::Type{Val{:LDLt}})
     t0 = time()
 
     # make sure K is symmetric
-    K = Symmetric(K)
-#=
+#   K = Symmetric(K)
     s = maximum(abs(1/2*(K + K') - K))
     @assert s < 1.0e-6
     K = 1/2*(K + K')
-=#
 
     dim = size(K, 1)
 
@@ -230,8 +230,9 @@ function call(solver::DirectSolver, time::Number=0.0)
 
         tic(timing, "dump matrices to disk")
         if solver.dump_matrices
-            save("host_$(myid())_iteration_$(iter)_matrices.jld",
-                 "stiffness matrix", K, "force vector", f,
+            filename = "matrices_$(solver.name)_host_$(myid())_iteration_$(iter).jld"
+            info("dumping matrices to disk, file = $filename")
+            save(filename, "stiffness matrix", K, "force vector", f,
                  "constraint matrix lhs", C, "constraint matrix rhs", g)
         end
         toc(timing, "dump matrices to disk")
