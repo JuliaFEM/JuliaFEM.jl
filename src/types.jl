@@ -18,7 +18,7 @@ weight
 fields
     FieldSet what can be used to store internal variables, stress, strain, ...
 """
-type IntegrationPoint
+immutable IntegrationPoint
     xi :: Vector
     weight :: Float64
     fields :: Dict{ASCIIString, Field}

@@ -152,8 +152,9 @@ function assemble!(assembly::Assembly, problem::Problem, element::Element, time:
         end
 
         jacobian, allresults = ForwardDiff.jacobian(calc_R, vec(field), AllResults, cache=autodiffcache)
+        residual_vector = -ForwardDiff.value(allresults)
         add!(assembly.stiffness_matrix, gdofs, gdofs, jacobian)
-        add!(assembly.force_vector, gdofs, -ForwardDiff.value(allresults))
+        add!(assembly.force_vector, gdofs, residual_vector)
     end
 end
 
