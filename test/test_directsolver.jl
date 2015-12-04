@@ -65,6 +65,56 @@ function test_solver_multiple_dirichlet_bc()
 end
 #test_solver_multiple_dirichlet_bc()
 
+function test_direct_cholesky_with_non_homogeneous_dirichlet_conditions()
+
+    N = Vector[[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
+
+    e1 = Quad4([1, 2, 4, 3])
+    e1["geometry"] = Vector[N[1], N[2], N[4], N[3]]
+    e1["youngs modulus"] = 900.0
+    e1["poissons ratio"] = 0.25
+
+    problem = PlaneStressElasticityProblem()
+    push!(problem, e1)
+
+    # left boundary: dx=-0.1, dy=0.1
+    bc1 = Seg2([1, 3])
+    bc1["geometry"] = Vector[N[1], N[3]]
+    bc1["displacement 1"] = -0.1
+    bc1["displacement 2"] =  0.1
+
+    # right boundary: dx=0.2, dy=-0.2
+    bc2 = Seg2([2, 4])
+    bc2["geometry"] = Vector[N[2], N[4]]
+    bc2["displacement 1"] =  0.2
+    bc2["displacement 2"] = -0.2
+  
+    boundary = DirichletProblem("displacement", 2)
+    push!(boundary, bc1)
+    push!(boundary, bc2)
+
+    solver = DirectSolver("test_direct_cholesky_with_non_homogeneous_dirichlet_boundary_conditions")
+    push!(solver, problem)
+    push!(solver, boundary)
+
+    # launch solver
+#   solver.method = :LU
+#   solver.dump_matrices = true
+    solver.max_iterations = 1
+    solver(0.0)
+#   FIXME: solver gives no convergence warning when all dofs are fixed.
+    n1disp = e1("displacement", [-1.0, -1.0], 0.0)
+    n2disp = e1("displacement", [ 1.0, -1.0], 0.0)
+    n3disp = e1("displacement", [-1.0,  1.0], 0.0)
+    n4disp = e1("displacement", [ 1.0,  1.0], 0.0)
+    udisp = [n1disp n2disp n3disp n4disp]
+    info("nodal disp = ", udisp)
+    @test isapprox(n1disp, [-0.1,  0.1])
+    @test isapprox(n3disp, [-0.1,  0.1])
+    @test isapprox(n2disp, [ 0.2, -0.2])
+    @test isapprox(n4disp, [ 0.2, -0.2])
+end
+#test_direct_cholesky_with_non_homogeneous_dirichlet_conditions()
 
 function test_solver_no_convergence()
 
@@ -106,10 +156,9 @@ function test_solver_no_convergence()
 
     # launch solver
     iterations, status = solver(0.0)
-
     @test status == false
-
 end
+
 
 function test_solver_multiple_bodies_multiple_dirichlet_bc()
     N = Vector[
