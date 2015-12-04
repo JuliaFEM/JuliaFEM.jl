@@ -67,9 +67,13 @@ function solve(K, f, C, g, ::Type{Val{:LDLt}})
     t0 = time()
 
     # make sure K is symmetric
+    K = Symmetric(K)
+#=
     s = maximum(abs(1/2*(K + K') - K))
     @assert s < 1.0e-6
     K = 1/2*(K + K')
+=#
+
     dim = size(K, 1)
 
     # make sure C is square
