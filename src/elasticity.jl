@@ -55,16 +55,18 @@ https://en.wikipedia.org/wiki/Hooke's_law
 """
 function get_residual_vector{P<:ElasticityProblem}(problem::Problem{P}, element::Element, ip::IntegrationPoint, time::Number; variation=nothing)
 
-    basis = element(ip, time)
 
-    u = element("displacement", ip, time, variation)
+    # u = element("displacement", ip, time, variation)
 
     r = zeros(Float64, problem.dim, length(element))
 
     # internal forces
     if haskey(element, "youngs modulus") && haskey(element, "poissons ratio")
-        dbasis = element(ip, time, Val{:grad})
-        gradu = element("displacement", ip, time, Val{:grad}, variation)
+        u = element("displacement", time, variation)
+        grad = element(ip, time, Val{:grad})
+#        gradu = element("displacement", ip, time, Val{:grad}, variation)
+        gradu = grad*u
+
         F = I + gradu # deformation gradient
 
         young = element("youngs modulus", ip, time)
@@ -77,22 +79,24 @@ function get_residual_vector{P<:ElasticityProblem}(problem::Problem{P}, element:
         E = 1/2*(F'*F - I)  # strain
         S = lambda*trace(E)*I + 2*mu*E
 
-        J = det(element, ip, time)
-        T = J^-1*F*S*F'
+        #J = det(element, ip, time)
+        #T = J^-1*F*S*F'
         #ip["cauchy stress"] = T
         #ip["gl strain"] = E
 
-        r += F*S*dbasis
+        r += F*S*grad
     end
 
     # external forces - volume load
     if haskey(element, "displacement load")
+        basis = element(ip, time)
         b = element("displacement load", ip, time)
         r -= b*basis
     end
 
     # external forces - surface traction force
     if haskey(element, "displacement traction force")
+        basis = element(ip, time)
         T = element("displacement traction force", ip, time)
         r -= T*basis
     end

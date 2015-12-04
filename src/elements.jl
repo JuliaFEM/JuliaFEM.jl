@@ -118,14 +118,20 @@ end
 
 typealias VecOrIP Union{Vector, IntegrationPoint}
 
+function call(element::Element, field_name::ASCIIString, time::Real, variation=nothing)
+    return isa(variation, Void) ? element[field_name](time) : variation
+end
+
 function call(element::Element, field_name::ASCIIString, xi::VecOrIP, time::Number, variation=nothing)
-    field = isa(variation, Void) ? element[field_name](time) : variation
+    field = element(field_name, time, variation)
+#   field = isa(variation, Void) ? element[field_name](time) : variation
     basis = get_basis(element)
     return basis(field, xi)
 end
 
 function call(element::Element, field_name::ASCIIString, xi::VecOrIP, time::Number, ::Type{Val{:grad}}, variation=nothing)
-    field = isa(variation, Void) ? element[field_name](time) : variation
+#   field = isa(variation, Void) ? element[field_name](time) : variation
+    field = element(field_name, time, variation)
     basis = get_basis(element)
     geom = element["geometry"](time)
     return basis(geom, field, xi, Val{:grad})
@@ -194,7 +200,7 @@ end
 function LinAlg.det{E<:AbstractElement}(element::Element{E}, ip::IntegrationPoint, time::Number=0.0)
     X = element("geometry", time)
     dN = get_dbasis(E, ip.xi)
-    J = sum([dN[:,i]*X[i]' for i=1:length(X)])
+    J = sum([kron(dN[:,i], X[i]') for i=1:length(X)])
     m, n = size(J)
     return m == n ? det(J) : norm(J)
 end
