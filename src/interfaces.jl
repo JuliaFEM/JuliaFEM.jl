@@ -42,15 +42,15 @@ function create_solver(model, case, core_elements, dirichlet_arr)
 
     # Creating the solver and pushing problems and 
     # boundary conditions
-    if case.solver == :LinearSolver
-        solver = JuliaFEM.Core.(case.solver)(field_problem,
-                                             dirichlet_arr...) 
-    else
+#    if case.solver == :LinearSolver
+#        solver = JuliaFEM.Core.(case.solver)(field_problem,
+#                                             dirichlet_arr...) 
+#    else
 	    solver = JuliaFEM.Core.(case.solver)()
 	    push!(solver, field_problem)
 	    push!(solver, dirichlet_arr...)
-     end
-    solver
+#     end
+    return solver
 end
 
 """

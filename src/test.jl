@@ -33,6 +33,11 @@ end
 """ Return all functions from module with name starting test """
 function get_test_functions(mod::Module)
     test_function_names = filter((k) -> startswith(string(k), "test_"), names(mod, true))
+    if haskey(ENV, "JULIAFEM_TEST_SLOW")
+        info("JULIAFEM_TEST_SLOW set, testing also tests that are taking a long time")
+        slow_test_functions = filter((k) -> startswith(string(k), "slow_test_"), names(mod, true))
+        append!(test_function_names, slow_test_functions)
+    end
     test_function_expressions = map((k) -> :($mod.$k), test_function_names)
     test_functions = map(eval, test_function_expressions)
     return test_functions

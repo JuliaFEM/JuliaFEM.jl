@@ -56,8 +56,23 @@ end
 
 """ Simple linear solver for educational purposes. """
 type LinearSolver <: Solver
-    field_problem :: Problem
-    boundary_problem :: BoundaryProblem
+    name :: ASCIIString
+    field_problems :: Vector{Problem}
+    boundary_problems :: Vector{BoundaryProblem}
+end
+
+function LinearSolver(name="LinearSolver")
+    LinearSolver(name, [], [])
+end
+
+function push!(solver::LinearSolver, problem::Problem)
+    length(solver.field_problems) == 0 || error("Only one field problem allowed for LinearSolver")
+    push!(solver.field_problems, problem)
+end
+
+function push!(solver::LinearSolver, problem::BoundaryProblem)
+    length(solver.boundary_problems) == 0 || error("Only one boundary problem allowed for LinearSolver")
+    push!(solver.boundary_problems, problem)
 end
 
 """
@@ -72,12 +87,12 @@ common situation, i.e., some main field problem and it's Dirichlet boundary.
 """
 function call(solver::LinearSolver, time::Float64)
 
-    field_name = get_unknown_field_name(solver.field_problem)
-    field_dim = get_unknown_field_dimension(solver.field_problem)
+    field_name = get_unknown_field_name(solver.field_problems[1])
+    field_dim = get_unknown_field_dimension(solver.field_problems[1])
     info("solving $field_name problem, $field_dim dofs / nodes")
 
-    field_assembly = assemble(solver.field_problem, time)
-    boundary_assembly = assemble(solver.boundary_problem, time)
+    field_assembly = assemble(solver.field_problems[1], time)
+    boundary_assembly = assemble(solver.boundary_problems[1], time)
 
     info("Creating sparse matrices")
     K = sparse(field_assembly.stiffness_matrix)
@@ -101,7 +116,7 @@ function call(solver::LinearSolver, time::Float64)
     la = x[dim+1:end]
 
     # update field for elements in problem 1
-    for element in get_elements(solver.field_problem)
+    for element in get_elements(solver.field_problems[1])
         gdofs = get_gdofs(element, field_dim)
         local_sol = vec(full(u[gdofs]))
         # if solving vector field, modify local solution vector
