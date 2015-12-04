@@ -85,8 +85,14 @@ Example
 """
 function add!(A::SparseMatrixIJV, dofs1::Vector{Int}, dofs2::Vector{Int}, data::Matrix{Float64})
     n, m = size(data)
-    append!(A.I, repeat(dofs1, outer=[m]))
-    append!(A.J, repeat(dofs2, inner=[n]))
+    for i=1:n
+        for j=1:m
+            push!(A.I, dofs1[i])
+            push!(A.J, dofs2[j])
+        end
+    end
+#   append!(A.I, repeat(dofs1, outer=[m]))
+#   append!(A.J, repeat(dofs2, inner=[n]))
     append!(A.V, vec(data))
 end
 

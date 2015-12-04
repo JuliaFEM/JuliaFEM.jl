@@ -290,7 +290,8 @@ end
 
 function Base.call(basis::CVTI, geometry::DVTI, xi::Vector, ::Type{Val{:grad}})
     dbasis = basis(xi, Val{:grad})
-    J = sum([dbasis[:,i]*geometry[i]' for i=1:length(geometry)])
+#    J = sum([dbasis[:,i]*geometry[i]' for i=1:length(geometry)])
+    J = sum([kron(dbasis[:,i], geometry[i]') for i=1:length(geometry)])
     invJ = isa(J, Vector) ? inv(J[1]) : inv(J)
     grad = invJ * dbasis
     return grad
@@ -298,12 +299,17 @@ end
 
 function Base.call(basis::CVTI, geometry::DVTI, values::DVTI, xi::Vector, ::Type{Val{:grad}})
     grad = call(basis, geometry, xi, Val{:grad})
-    gradf = sum([grad[:,i]*values[i]' for i=1:length(geometry)])'
+#    gradf = sum([grad[:,i]*values[i]' for i=1:length(geometry)])'
+    gradf = sum([kron(grad[:,i], values[i]') for i=1:length(values)])'
     return length(gradf) == 1 ? gradf[1] : gradf
 end
 
 function Base.call(basis::CVTI, xi::Vector, time::Number)
     call(basis, xi)
+end
+
+function Base.(:*)(grad::Matrix{Float64}, field::DVTI)
+    return sum([kron(grad[:,i], field[i]') for i=1:length(field)])'
 end
 
 ### FIELDSET ###

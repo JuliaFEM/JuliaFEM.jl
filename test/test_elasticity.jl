@@ -19,11 +19,11 @@ function test_elasticity_volume_load()
     free_dofs = [3, 4, 5, 6]
     solve!(problem, free_dofs, 0.0; max_iterations=10)
     disp = element("displacement", [1.0, 1.0], 0.0)
-    ip1 = last(element["integration points"])[1]
-    ip2 = last(element["integration points"])[2]
-    strain = ip1["gl strain"]
+    #ip1 = last(element["integration points"])[1]
+    #ip2 = last(element["integration points"])[2]
+    #strain = ip1["gl strain"]
     info("displacement at tip: $disp")
-    info("strain in first ip: $strain. ip coord = $(ip1.xi) and weight = $(ip1.weight)")
+    #info("strain in first ip: $strain. ip coord = $(ip1.xi) and weight = $(ip1.weight)")
     # verified using Code Aster, verification/2015-10-22-plane-stress/cplan_grot_gdep_volume_force.resu
     @test isapprox(disp[2], -8.77303119819776)
 end
