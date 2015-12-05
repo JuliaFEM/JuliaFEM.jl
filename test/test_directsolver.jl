@@ -98,10 +98,10 @@ function test_direct_cholesky_with_non_homogeneous_dirichlet_conditions()
     push!(solver, boundary)
 
     # launch solver
-#   solver.method = :LU
-#   solver.dump_matrices = true
+    solver.method = :UMFPACK
+    solver.dump_matrices = true
     solver.max_iterations = 1
-    solver(0.0)
+    iters, status = solver(0.0)
 #   FIXME: solver gives no convergence warning when all dofs are fixed.
     n1disp = e1("displacement", [-1.0, -1.0], 0.0)
     n2disp = e1("displacement", [ 1.0, -1.0], 0.0)
@@ -113,6 +113,7 @@ function test_direct_cholesky_with_non_homogeneous_dirichlet_conditions()
     @test isapprox(n3disp, [-0.1,  0.1])
     @test isapprox(n2disp, [ 0.2, -0.2])
     @test isapprox(n4disp, [ 0.2, -0.2])
+    @test status == true
 end
 #test_direct_cholesky_with_non_homogeneous_dirichlet_conditions()
 

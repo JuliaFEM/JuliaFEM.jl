@@ -1,6 +1,12 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+#= Solution norms for piston model
+
+piston_19611_P2.inp     iter 1      2.048090408266966
+
+=#
+
 ## Direct solver
 
 using JuliaFEM
@@ -32,7 +38,7 @@ function DirectSolver(name="DirectSolver")
         1.0e-6, # convergence tolerance
         false, # dump matrices
         true, # reduce stiffness matrix
-        :LDLt # method: LDLt or LU ?
+        :CHOLMOD # method: CHOLMOD, UMFPACK, PETSc_GMRES
     )
 end
 
@@ -64,10 +70,9 @@ Solve problem
     Cu       = g
 
 """
-function solve(K, f, C, g, ::Type{Val{:LDLt}})
+function solve(K, f, C, g, ::Type{Val{:CHOLMOD}})
 
     t0 = time()
-
     # make sure K is symmetric
 #   K = Symmetric(K)
     s = maximum(abs(1/2*(K + K') - K))
@@ -84,55 +89,52 @@ function solve(K, f, C, g, ::Type{Val{:LDLt}})
 
     all_dofs = unique(rowvals(K))
     interior_dofs = setdiff(all_dofs, boundary_dofs)
-    info("all dofs = $(length(all_dofs))")
-    info("interior dofs = $(length(interior_dofs))")
-    info("boundary dofs = $(length(boundary_dofs))")
-    info("preparation in ", time()-t0, " seconds")
+    info("CHOLMOD: all dofs = $(length(all_dofs))")
+    info("CHOLMOD: interior dofs = $(length(interior_dofs))")
+    info("CHOLMOD: boundary dofs = $(length(boundary_dofs))")
 
     # solve displacement on known boundary
-    t0 = time()
     LUF = lufact(C[boundary_dofs, boundary_dofs])
     u = zeros(dim)
     u[boundary_dofs] = LUF \ full(g[boundary_dofs])
-    info("displacement on boundary solved.")
+    info("CHOLMOD: displacement on boundary solved.")
     normub = norm(u[boundary_dofs])
-    info("norm[u_boundary_dofs] = ", normub)
     if isapprox(normub, 0.0)
-        info("homogeneous dirichlet boundary")
+        info("CHOLMOD: homogeneous dirichlet boundary")
     end
-    info("solve boundary = ", time()-t0)
 
     # factorize interior domain using cholmod
-    t0 = time()
+    t = time()
     CF = cholfact(K[interior_dofs, interior_dofs])
     Kib = K[interior_dofs, boundary_dofs]
     Kbb = K[boundary_dofs, boundary_dofs]
     fi = f[interior_dofs]
-    info("factorizations done in ", time()-t0, " seconds")
+    info("CHOLMOD: LDLt factorization done in ", time()-t, " seconds")
 
     # solve interior domain + lagrange multipliers
-    t0 = time()
     u[interior_dofs] = CF \ (fi - Kib*u[boundary_dofs])
     la = zeros(dim)
     la[boundary_dofs] = LUF \ full(Kib'*u[interior_dofs] - Kbb*u[boundary_dofs])
-    info("solved interior in ", time()-t0, " seconds. norm = ", norm(u))
+    info("CHOLMOD: solved in ", time()-t0, " seconds. norm = ", norm(u))
     return u, la
 end
 
-function solve(K, f, C, g, ::Type{Val{:LU}})
+function solve(K, f, C, g, ::Type{Val{:UMFPACK}})
+    t0 = time()
     dim = size(K, 1)
     A = nothing
     try
         A = [K C'; C spzeros(dim, dim)]
     catch
-        info("size(K) = ", size(K))
-        info("size(C) = ", size(C))
-        error("Failed to construct problem. dim = $dim")
+        info("UMFPACK: size(K) = ", size(K))
+        info("UMFPACK: size(C) = ", size(C))
+        error("UMFPACK: Failed to construct problem. dim = $dim")
     end
     b = [f; g]
     nz = sort(unique(rowvals(A)))
     u = zeros(length(b))
     u[nz] = lufact(A[nz,nz]) \ full(b[nz])
+    info("UMFPACK: solved in ", time()-t0, " seconds. norm = ", norm(u[1:dim]))
     return u[1:dim], u[dim+1:end]
 end
 

@@ -13,8 +13,8 @@ function convert{E}(::Type{Element{E}}, connectivity::Vector{Int})
     return Element{E}(connectivity, Dict())
 end
 
-function get_integration_points{E}(element::Element{E})
-    return get_integration_points(E)
+function get_integration_points{E}(element::Element{E}, args...)
+    return get_integration_points(E, args...)
 end
 
 function update_gauss_fields!(element::Element, data::Vector{IntegrationPoint}, time::Real)
