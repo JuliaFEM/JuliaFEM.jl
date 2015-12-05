@@ -35,20 +35,12 @@ using LightXML
 # > #define XDMF_3DSMESH        0x1100
 # > #define XDMF_3DRECTMESH     0x1101
 # > #define XDMF_3DCORECTMESH   0x1102
-"""
-Build a new model for outout
 
-Parameters
-----------
+global eltypes = Dict{Symbol, Int}(
+    :Tet4  => 0x6,
+    :Quad4 => 0x5,
+    :Tet10 => 0x0026)
 
-Examples
--------
-
-```julia
-@assert 1+1 == 3
-```
-
-"""
 function xdmf_new_model(xdmf_version="2.1")
     xdoc = XMLDocument()
     xroot = create_root(xdoc, "Xdmf")
@@ -63,11 +55,11 @@ function xdmf_new_temporal_collection(model)
     set_attribute(temporal_collection, "CollectionType", "Temporal")
     set_attribute(temporal_collection, "GridType", "Collection")
     set_attribute(temporal_collection, "Name", "Collection")
-    geometry = new_child(temporal_collection, "Geometry")
-    set_attribute(geometry, "Type", "None")
-    topology = new_child(temporal_collection, "Topology")
-    set_attribute(topology, "Dimensions", "0")
-    set_attribute(topology, "Type", "NoTopology")
+#   geometry = new_child(temporal_collection, "Geometry")
+#   set_attribute(geometry, "Type", "None")
+#   topology = new_child(temporal_collection, "Topology")
+#   set_attribute(topology, "Dimensions", "0")
+#   set_attribute(topology, "Type", "NoTopology")
     return temporal_collection
 end
 
@@ -79,102 +71,51 @@ function xdmf_new_grid(temporal_collection; time=0)
     return grid
 end
 
-#function xdmf_new_mesh(grid, X, elmap)
-#    geometry = new_child(grid, "Geometry")
-#    set_attribute(geometry, "Type", "XYZ")
-#    dataitem = new_child(geometry, "DataItem")
-#    set_attribute(dataitem, "DataType", "Float")
-#    set_attribute(dataitem, "Dimensions", length(X))
-#    set_attribute(dataitem, "Format", "XML")
-#    set_attribute(dataitem, "Precision", "4")
-#    add_text(dataitem, join(X, " "))
-#    topology = new_child(grid, "Topology")
-#    set_attribute(topology, "Dimensions", "1")
-#    set_attribute(topology, "Type", "Mixed")
-#    dataitem = new_child(topology, "DataItem")
-#    set_attribute(dataitem, "DataType", "Int")
-#    set_attribute(dataitem, "Dimensions", length(elmap))
-#    set_attribute(dataitem, "Format", "XML")
-#    set_attribute(dataitem, "Precision", 4)
-#    elmap2 = copy(elmap)
-#    elmap2[2:end,:] -= 1
-#    add_text(dataitem, join(elmap2, " "))
-#end
+function xdmf_new_mesh!(grid, nodes, elements)
 
-function xdmf_new_mesh(grid, X, elmap)
-    dim, nnodes = size(X)
+    # 1. write nodes
     geometry = new_child(grid, "Geometry")
     set_attribute(geometry, "Type", "XYZ")
     dataitem = new_child(geometry, "DataItem")
     set_attribute(dataitem, "DataType", "Float")
-    set_attribute(dataitem, "Dimensions", "$nnodes $dim")
+    ndim = sum([length(node) for node in nodes])
+    info("XDFM: ndim = $ndim")
+    set_attribute(dataitem, "Dimensions", "$ndim")
     set_attribute(dataitem, "Format", "XML")
     set_attribute(dataitem, "Precision", 8)
-    #add_text(dataitem, join(X, " "))
-    s = "\n"
-    
-    for i=1:nnodes
-        s *= "\t\t" * join(X[:,i], " ") * "\n"
-    end
-    s *= "       "
-    add_text(dataitem, s)
+    s = join([join(node, " ") for node in round(nodes, 5)], "\n")
+    add_text(dataitem, "\n"*s*"\n")
 
-    elmap2 = copy(elmap)
-    elmap2[2:end,:] -= 1
-    dim, nelements = size(elmap2)
-
+    # 2. write elements
     topology = new_child(grid, "Topology")
-    #set_attribute(topology, "Dimensions", "1")
+    eldim = sum([length(element[2]) for element in elements]) + length(elements)
     set_attribute(topology, "TopologyType", "Mixed")
-    set_attribute(topology, "NumberOfElements", nelements)
+    set_attribute(topology, "NumberOfElements", length(elements))
     dataitem = new_child(topology, "DataItem")
-    set_attribute(dataitem, "DataType", "Int")
-    set_attribute(dataitem, "Dimensions", "$nelements $dim")
     set_attribute(dataitem, "Format", "XML")
-    set_attribute(dataitem, "Precision", 8)
-    s = "\n"
-    for i=1:nelements
-        s *= "\t\t" * join(elmap2[:,i], " ") * "\n"
-    end
-    add_text(dataitem, s)
-    #add_text(dataitem, join(elmap2, " "))    
+    set_attribute(dataitem, "DataType", "Int")
+    set_attribute(dataitem, "Dimensions", "$eldim")
+#   set_attribute(dataitem, "Precision", 8)
+    # note: id numbers start from 0 in Xdmf
+    s = join([join([eltypes[eltype]; connectivity-1], " ") for (eltype, connectivity) in elements], "\n")
+    add_text(dataitem, "\n"*s*"\n")
+
 end
 
-
-function xdmf_new_field(grid, name, source, data)
-    loc = Dict("elements" => "Cell",
-               "nodes" => "Node")
-
-    dim1, dim2 = size(data'')
-    if dim1 == 1
-        Type = "Scalar"
-    end
-    if dim1 == 3
-        Type = "Vector"
-    end
-
-    typ = string(typeof(data))
-    datatype = "unknown"
-    for j in ["Int", "Float"]
-        if contains(typ, j)
-            datatype = j
-        end
-    end
-    if datatype == "unknown"
-        throw("unknown data type ", typ)
-    end
-
-
+""" Write Vector field to nodes. """
+function xdmf_new_nodal_field!(grid, name, data)
     attribute = new_child(grid, "Attribute")
-    set_attribute(attribute, "Center", loc[source])
+    set_attribute(attribute, "Center", "Node")
     set_attribute(attribute, "Name", name)
-    set_attribute(attribute, "Type", Type)
+    set_attribute(attribute, "Type", "Vector")
     dataitem = new_child(attribute, "DataItem")
-    set_attribute(dataitem, "DataType", datatype)
-    set_attribute(dataitem, "Dimensions", length(data))
+    set_attribute(dataitem, "DataType", "Float")
+    ndim = sum([length(d) for d in data])
+    set_attribute(dataitem, "Dimensions", "$ndim")
     set_attribute(dataitem, "Format", "XML")
-    set_attribute(dataitem, "Precision", 4)
-    add_text(dataitem, join(data, " "))
+    set_attribute(dataitem, "Precision", 8)
+    s = join([join(d, " ") for d in round(data, 5)], "\n")
+    add_text(dataitem, "\n"*s*"\n")
 end
 
 function xdmf_save_model(xdoc, filename)
