@@ -159,7 +159,7 @@ function assemble!(assembly::Assembly, problem::BoundaryProblem{MortarProblem}, 
             continue # no contribution
         end
         master_dofs = get_gdofs(master_element, field_dim)
-        for ip in get_integration_points(slave_element)
+        for ip in get_integration_points(slave_element, Val{5})
             w = ip.weight*det(slave_element, ip, time)*l
 
             # integration point on slave side segment
@@ -171,7 +171,9 @@ function assemble!(assembly::Assembly, problem::BoundaryProblem{MortarProblem}, 
             N1 = slave_element(xi_gauss, time)
             N2 = master_element(xi_projected, time)
             S = w*N1'*N1
-            M = w*N1'*N2
+            M = w*(N1'*N2)'
+            # FIXME: why this needs now to be transpose?
+            # assembly / repeat
             for i=1:field_dim
                 sd = slave_dofs[i:field_dim:end]
                 md = master_dofs[i:field_dim:end]

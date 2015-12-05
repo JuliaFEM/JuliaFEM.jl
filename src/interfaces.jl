@@ -8,7 +8,7 @@ using JuliaFEM.API: Model
 Function for creating solver and all the necessary components
 for the calculation
 """
-function get_solver(model::Model, case_name::ASCIIString, time::Float64)
+function get_solver(model::Model, case_name::ASCIIString)
     case = model.load_cases[case_name]
     
     # Create core elements
@@ -41,15 +41,9 @@ function create_solver(model, case, core_elements, dirichlet_arr)
     end
 
     # Creating the solver and pushing problems and 
-    # boundary conditions
-#    if case.solver == :LinearSolver
-#        solver = JuliaFEM.Core.(case.solver)(field_problem,
-#                                             dirichlet_arr...) 
-#    else
-	    solver = JuliaFEM.Core.(case.solver)()
-	    push!(solver, field_problem)
-	    push!(solver, dirichlet_arr...)
-#     end
+	solver = JuliaFEM.Core.(case.solver)()
+	push!(solver, field_problem)
+	push!(solver, dirichlet_arr...)
     return solver
 end
 
@@ -76,7 +70,7 @@ function create_dirichlet_bcs(model, case, core_elements)
         end
         push!(dirichlet_arr, problem)
     end
-    dirichlet_arr
+    return dirichlet_arr
 end
 
 """
@@ -100,7 +94,7 @@ function create_core_elements(model)
         core_elements[el_id] = core_element
         model.elements[el_id].results = core_element
     end
-    core_elements
+    return core_elements
 end
 
 """
@@ -126,7 +120,7 @@ end
 """
 function solve!(model::Model, case_name::ASCIIString, time::Float64)
     # Create solver
-	solver = get_solver(model, case_name, time)
+	solver = get_solver(model, case_name)
 
     # Solve problem at given time 
     solver(time)

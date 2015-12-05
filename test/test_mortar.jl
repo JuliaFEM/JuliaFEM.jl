@@ -23,6 +23,13 @@ function get_test_2d_model()
     master2 = Seg2([8, 9])
     master2["geometry"] = Vector[N[8], N[9]]
 
+#=
+    master1 = Seg2([9, 8])
+    master1["geometry"] = Vector[N[9], N[8]]
+    master2 = Seg2([8, 7])
+    master2["geometry"] = Vector[N[8], N[7]]
+=#
+
     slave1 = Seg2([10, 11])
     slave1["geometry"] = Vector[N[10], N[11]]
     # should be n = [0 -1]' and t = [1 0]'
@@ -202,8 +209,9 @@ function test_2d_mortar_multiple_bodies_multiple_dirichlet_bc()
     push!(solver, boundary2)
     push!(solver, boundary3)
 
+    solver.name = "test_2d_mortar_multiple_bodies_multiple_dirichlet_bcs"
     solver.dump_matrices = true
-    solver.method = :LU
+    solver.method = :UMFPACK
     # launch solver
     solver(0.0)
 
@@ -324,7 +332,7 @@ function test_2d_mortar_three_bodies_shared_nodes()
     push!(solver, bc5)
 
     # launch solver
-    solver.method = :LU
+    solver.method = :UMFPACK
     call(solver, 0.0)
 
     disp = e2("displacement", [1.0, 1.0], 0.0)

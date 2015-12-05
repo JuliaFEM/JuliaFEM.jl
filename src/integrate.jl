@@ -36,7 +36,7 @@ function get_integration_points(::Type{Seg3}, ::Type{Val{4}})
     ]
 end
 
-function get_integration_points(::Type{Seg3}, ::Type{Val{5}})
+function get_integration_points(::Union{Type{Seg2}, Type{Seg3}}, ::Type{Val{5}})
     [
         IntegrationPoint([-1/3*sqrt(5 + 2*sqrt(10/7))], (322-13*sqrt(70))/900),
         IntegrationPoint([-1/3*sqrt(5 - 2*sqrt(10/7))], (322+13*sqrt(70))/900),
