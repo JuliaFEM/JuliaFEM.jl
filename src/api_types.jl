@@ -93,6 +93,7 @@ type Model
     elsets :: Dict{ASCIIString, ElementSet}
     nsets :: Dict{ASCIIString, NodeSet}
     load_cases :: Dict{ASCIIString, Simulation}
+    renum_nodes :: Dict{Union{Int64, ASCIIString}, Int64}
     #settings :: Dict{AbstractString, Real}
 end
 
@@ -134,6 +135,7 @@ Model(name::ASCIIString) = Model(
     Dict{ASCIIString, NodeSet}(),
     Dict{ASCIIString, ElementSet}(),
     Dict{ASCIIString, Simulation}(),
+    Dict{Union{Int64, ASCIIString}, Int64}()
 )
 
 function Base.setindex!(dict::Dict{Union{ASCIIString, Int64}, Node},
