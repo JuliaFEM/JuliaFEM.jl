@@ -5,10 +5,16 @@ function add_boundary_condition!(case::Simulation, bc::NeumannBC)
     push!(case.neumann_boundary_conditions, bc)
 end
 
+
+"""
+Add node to model and renumber for output
+"""
 function add_node!(model::Model, index::Union{Int64, ASCIIString},
     coords::Vector{Float64})
     node = Node(index, coords)
     model.nodes[index] = node
+    node_number = length(model.nodes)
+    model.renum_nodes[index] = node_number
 end
 
 
