@@ -24,22 +24,56 @@ Returns
     Array{Float64, (6,6)}
 """
 #=
-my_kron(i,j) = i == j ? 1 : 0
-II = zeros(Float64, (3, 3, 3, 3))
-for i=1:3
-    for j=1:3
-        for k=1:3
-            for l=1:3
-                A[i,j,k,l] = my_kron(i, j) * my_kron(k, l)
+function outer_prod(a, b)
+    out = zeros(3,3,3,3)
+    for i=1:3
+        for j=1:3
+            for k=1:3
+                for l=1:3
+                    out[i, j, k, l] = a[i, j] * b[k, l]
+                end
             end
         end
     end
+    out
+end
+
+function double_contract(a, b)
+    out = zeros(3, 3)
+    for i=1:3
+        for j=1:3
+            for k=1:3
+                for l=1:3
+                    out[i, j] = a[i,j,k,l] * b[k, l]
+                end
+            end
+        end
+    end
+    out
+end
+
+function stiffnessTensor(youngs_modulus, poissons_ratio, ::Type{Val{:isotropic}})
+    E = youngs_modulus
+    v = poissons_ratio
+    my_kron(i,j) = i == j ? 1 : 0
+    II = zeros(Float64, (3, 3, 3, 3))
+    for i=1:3
+        for j=1:3
+            for k=1:3
+                for l=1:3
+                    II[i,j,k,l] = my_kron(i, k) * my_kron(j, l)
+                end
+            end
+        end
+    end
+    mu = E/(2*(1+v))
+    lambda = E*v/((1+v)*(1-2*v))
+    I = eye(3)
+    return lambda * outer_prod(I, I) + 2 * mu * II
+    #C = λ * I ⊗ I + 2 * μ * II
 end
 =#
-#function outer_product(a, b)
-#
-#end
-function hookeStiffnessTensor(E, ν)
+function stiffnessTensor(E, ν)
     a = 1 - ν
     b = 1 - 2*ν
     c = 1 + ν
@@ -51,14 +85,6 @@ function hookeStiffnessTensor(E, ν)
                    0 0 0 0 b 0;
                    0 0 0 0 0 b].*multiplier
 end
-
-# Pick material values
-#E = 200.0e3
-#mu =  0.3
-#C = hookeStiffnessTensor(E, ν)
-#lambda =
-#nu =
-#C = λ * I ⊗ I + 2 * μ * II
 
 type State
     C :: Array{Float64, 2}

@@ -1,13 +1,7 @@
 module VonMisesTests
 
 using PyPlot
-
-macro R_str(s)
-    s
-end
-
-
-using JuliaFEM.MaterialModels: hookeStiffnessTensor, calculate_stress!, State
+using JuliaFEM.MaterialModels: stiffnessTensor, calculate_stress!, State
 
 function test_von_mises_basic()
 
@@ -17,7 +11,7 @@ function test_von_mises_basic()
     E = 200.0e3
     nu =  0.3
     ν = 0.3
-    C = hookeStiffnessTensor(E, ν)
+    C = stiffnessTensor(E, ν)
 
     ϵ_tot = zeros(Float64, (steps, 6))
     ϵ_tot2 = zeros(Float64, (steps, 6))
