@@ -1,10 +1,79 @@
-# imports
-
-
-
 using ForwardDiff
 using NLsolve
 
+function outer_prod(a, b)
+    out = zeros(3,3,3,3)
+    for i=1:3
+        for j=1:3
+            for k=1:3
+                for l=1:3
+                    out[i, j, k, l] = a[i, j] * b[k, l]
+                end
+            end
+        end
+    end
+    out
+end
+
+function double_contr(a, b)
+    out = zeros(3, 3)
+    for i=1:3
+        for j=1:3
+            for k=1:3
+                for l=1:3
+                    out[i, j] += a[i,j,k,l] * b[k, l]
+                end
+            end
+        end
+    end
+    out
+end
+
+"""
+Symmetric fourth order identity tensor
+
+Definition can be found from:
+  http://www.ce.berkeley.edu/~sanjay/ce231mse211/symidentity.pdf
+"""
+function identity_tensor_symm_4th_order()
+    my_kron(i,j) = i == j ? 1 : 0
+    II = zeros(Float64, (3, 3, 3, 3))
+    for i=1:3
+        for j=1:3
+            for k=1:3
+                for l=1:3
+                    v1 = my_kron(i, k)
+                    v2 = my_kron(j, l)
+                    v3 = my_kron(i, l)
+                    v4 = my_kron(j, k)
+                    II[i,j,k,l] = 0.5 * (v1*v2 + v3*v4)
+                end
+            end
+        end
+    end
+    II
+end
+
+"""
+Fourth order stiffness tensor
+
+C = λ * I ⊗ I + 2 * μ * II
+Definition: https://en.wikipedia.org/wiki/Hooke's_law
+
+Literature from tensors and vectors
+# http://www.iith.ac.in/~ashok/Maths_Lectures/Tutorial/VectTensColMat.pdf
+# https://en.wikipedia.org/wiki/Tensor_product
+# http://www.math.psu.edu/yzheng/m597k/m597kL11.pdf
+"""
+function stiffnessTensor(youngs_modulus, poissons_ratio, ::Type{Val{:isotropic}})
+    E = youngs_modulus
+    v = poissons_ratio
+    I = eye(3)
+    II = identity_tensor_symm_4th_order()
+    mu = E/(2*(1+v))
+    lambda = E*v/((1+v)*(1-2*v))
+    return lambda * outer_prod(I, I) + 2 * mu * II
+end
 
 """
 Create a isotropic Hooke material matrix C
@@ -23,56 +92,6 @@ Returns
 -------
     Array{Float64, (6,6)}
 """
-#=
-function outer_prod(a, b)
-    out = zeros(3,3,3,3)
-    for i=1:3
-        for j=1:3
-            for k=1:3
-                for l=1:3
-                    out[i, j, k, l] = a[i, j] * b[k, l]
-                end
-            end
-        end
-    end
-    out
-end
-
-function double_contract(a, b)
-    out = zeros(3, 3)
-    for i=1:3
-        for j=1:3
-            for k=1:3
-                for l=1:3
-                    out[i, j] = a[i,j,k,l] * b[k, l]
-                end
-            end
-        end
-    end
-    out
-end
-
-function stiffnessTensor(youngs_modulus, poissons_ratio, ::Type{Val{:isotropic}})
-    E = youngs_modulus
-    v = poissons_ratio
-    my_kron(i,j) = i == j ? 1 : 0
-    II = zeros(Float64, (3, 3, 3, 3))
-    for i=1:3
-        for j=1:3
-            for k=1:3
-                for l=1:3
-                    II[i,j,k,l] = my_kron(i, k) * my_kron(j, l)
-                end
-            end
-        end
-    end
-    mu = E/(2*(1+v))
-    lambda = E*v/((1+v)*(1-2*v))
-    I = eye(3)
-    return lambda * outer_prod(I, I) + 2 * mu * II
-    #C = λ * I ⊗ I + 2 * μ * II
-end
-=#
 function stiffnessTensor(E, ν)
     a = 1 - ν
     b = 1 - 2*ν
@@ -85,6 +104,7 @@ function stiffnessTensor(E, ν)
                    0 0 0 0 b 0;
                    0 0 0 0 0 b].*multiplier
 end
+
 
 type State
     C :: Array{Float64, 2}
