@@ -14,7 +14,7 @@ function assemble!(assembly::Assembly, problem::BoundaryProblem{DirichletProblem
     field_name = problem.parent_field_name
 
     gdofs = get_gdofs(element, field_dim)
-    for ip in get_integration_points(element)
+    for ip in get_integration_points(element, Val{2})
         w = ip.weight * det(element, ip, time)
         N = element(ip, time)
         A = w*N'*N
