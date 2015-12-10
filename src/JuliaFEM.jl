@@ -19,7 +19,7 @@ include("api.jl")
 end
 
 module Preprocess
-include("abaqus_reader.jl") 
+include("abaqus_reader.jl")
 include("aster_reader.jl")
 end
 
@@ -32,6 +32,9 @@ module Test
 include("test.jl")
 end
 
+module MaterialModels
+include("vonmises.jl")
+end
 
 module Interfaces
 include("interfaces.jl")
