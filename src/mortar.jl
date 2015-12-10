@@ -364,6 +364,30 @@ function get_points_inside_triangle(Y::Matrix, X::Matrix)
 end
 
 
+""" Return unique objects with some given tolerance. This is used in next function
+    because traditional unique() command returns row vectors as non-unique if they
+    differs only a "little".
+"""
+function uniquetol(P, dim::Int; args...)
+    @assert dim == 2
+    items = Vector{Float64}[P[:,i] for i=1:size(P,dim)]
+    new_items = Vector{Float64}[]
+    for item in items
+        has_found = false
+        for new_item in new_items
+            if isapprox(item, new_item; args...)
+                has_found = true
+                break
+            end
+        end
+        if !has_found
+            push!(new_items, item)
+        end
+    end
+    return reshape([new_items...;], length(new_items[]), length(new_items))
+end
+
+
 """
 Make polygon clipping of shapes S and M.
 
@@ -400,13 +424,13 @@ function clip_polygon(S::Matrix, M::Matrix)
     P2 = get_points_inside_triangle(M, S)
     P3 = get_points_inside_triangle(S, M)
     P = hcat(P1, P2, P3)
+    P = uniquetol(P, 2)
     meanval = mean(P, 2)
     tmp = P .- meanval
     angles = atan2(tmp[2,:], tmp[1,:])
     angles = reshape(angles, length(angles))
     order = sortperm(angles)
-    P = copy(unique(P[:, order], 2))
-    return P, neighbours
+    return P[:, order], neighbours
 end
 
 
@@ -569,7 +593,9 @@ end
 
 # Mortar assembly
 
-function assemble!(assembly::Assembly, problem::BoundaryProblem{MortarProblem}, slave_element::Element, time::Number)
+typealias MortarElements2D Union{Seg2, Seg3}
+
+function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::BoundaryProblem{MortarProblem}, slave_element::Element{E}, time::Real)
 
     # get dimension and name of PARENT field
     field_dim = problem.parent_field_dim
@@ -612,3 +638,75 @@ function assemble!(assembly::Assembly, problem::BoundaryProblem{MortarProblem}, 
         end
     end
 end
+
+
+typealias MortarElements3D Union{Tri3}
+
+function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::BoundaryProblem{MortarProblem}, slave_element::Element{E}, time::Real)
+    field_dim = problem.parent_field_dim
+    field_name = problem.parent_field_name
+    slave_dofs = get_gdofs(slave_element, field_dim)
+#   info("Slave dofs: $slave_dofs")
+#   info("Field dim: $field_dim")
+
+    # create auxiliary plane and project slave nodes to it
+    # x0 = origo, Q = local basis
+    x0, Q = create_auxiliary_plane(slave_element, time)
+    S = Vector{Float64}[]
+    for p in slave_element("geometry", time)
+        push!(S, project_point_to_auxiliary_plane(p, x0, Q))
+    end
+    S = reshape([S...;], 2, 3)
+
+    integration_points = get_integration_points(E, Val{5})
+
+    for master_element in slave_element["master elements"]
+        master_dofs = get_gdofs(master_element, field_dim)
+        # project master nodes to auxiliary plane and create polygon clipping
+        M = Vector{Float64}[]
+        for p in master_element("geometry", time)
+            push!(M, project_point_to_auxiliary_plane(p, x0, Q))
+        end
+        M = reshape([M...;], 2, 3)
+        P, neighbours = clip_polygon(S, M)
+        C = calculate_polygon_centerpoint(P)
+
+        npts = size(P, 2) # number of vertices in polygon
+#       S = zeros(3, 3)
+#       M = zeros(3, 3)
+        for i=1:npts # loop vertices and create temporary integrate cells
+            xvec = [C[1], P[1, i], P[1, mod(i, npts)+1]]
+            yvec = [C[2], P[2, i], P[2, mod(i, npts)+1]]
+            X = hcat(xvec, yvec)'
+            geom = Field(Vector{Float64}[X[:,j] for j=1:size(X,2)])
+            for ip in integration_points
+                # calculate determiant of jacobian
+                dN = get_dbasis(E, ip.xi)
+                J = sum([kron(dN[:,j], geom[j]') for j=1:length(geom)])
+                w = ip.weight*det(J)
+                # gauss point in auxiliary plane
+                N = get_basis(E, ip.xi)
+                x = vec(N*geom)
+                # find projection of gauss point to master and slave elements
+                theta1 = project_point_from_plane_to_surface(x, x0, Q, slave_element, time)
+                theta2 = project_point_from_plane_to_surface(x, x0, Q, master_element, time)
+                # evaluate shape functions values in gauss point and add contribution to matrices
+                N1 = slave_element(theta1[2:3], time)
+                N2 = master_element(theta2[2:3], time)
+                S = w*N1'*N1
+                M = w*N1'*N2
+                for k=1:field_dim
+                    sd = slave_dofs[k:field_dim:end]
+                    md = master_dofs[k:field_dim:end]
+                    add!(assembly.stiffness_matrix, sd, sd, S)
+                    add!(assembly.stiffness_matrix, sd, md, -M)
+#                   info("sd = $sd")
+#                   info("md = $md")
+                end
+            end
+        end
+#       info("S = \n$S")
+#       info("M = \n$M")
+    end
+end
+

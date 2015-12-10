@@ -15,7 +15,8 @@ using JuliaFEM.Core: project_from_slave_to_master, project_from_master_to_slave
 using JuliaFEM.Core: create_auxiliary_plane, project_point_to_auxiliary_plane,
                      get_edge_intersections, get_points_inside_triangle,
                      clip_polygon, calculate_polygon_centerpoint,
-                     project_point_from_plane_to_surface
+                     project_point_from_plane_to_surface, assemble
+
 
 function get_test_2d_model()
     # this is hand calculated and given as an example in my thesis
@@ -68,6 +69,7 @@ function test_calc_flat_2d_projection_slave_to_master()
     @test X2 == [3/4, 1.0]
 end
 
+
 function test_calc_flat_2d_projection_master_to_slave()
     slaves, masters = get_test_2d_model()
     slave1, slave2 = slaves
@@ -79,6 +81,7 @@ function test_calc_flat_2d_projection_master_to_slave()
     @test X1 == [5/4, 1.0]
 end
 #test_calc_flat_2d_projection_master_to_slave()
+
 
 function test_calc_flat_2d_projection_rotated()
     master1 = Seg2([3, 4])
@@ -101,6 +104,7 @@ function test_calc_flat_2d_projection_rotated()
     @test xi == [-1.0]
 
 end
+
 
 function test_create_flat_2d_assembly()
     slaves, masters = get_test_2d_model()
@@ -148,6 +152,7 @@ function test_create_flat_2d_assembly()
     @test isapprox(B, B_expected)
 end
 #test_create_flat_2d_assembly()
+
 
 function test_2d_mortar_multiple_bodies_multiple_dirichlet_bc()
     N = Vector[
@@ -351,6 +356,7 @@ function test_2d_mortar_three_bodies_shared_nodes()
 end
 #test_2d_mortar_three_bodies_shared_nodes()
 
+
 function test_auxiliary_plane_transforms()
     nodes = Vector{Float64}[
         [0.0, 0.0, 0.0],
@@ -380,7 +386,7 @@ function test_auxiliary_plane_transforms()
     info("projected point = $X")
     @test isapprox(X, Float64[1.0/3.0+0.1, 1.0/3.0+0.1, 0.0])
 end
-test_auxiliary_plane_transforms()
+#test_auxiliary_plane_transforms()
 
 
 function test_get_edge_intersections()
@@ -458,6 +464,35 @@ function test_calculate_polygon_centerpoint()
     @test isapprox(C, [1.0397440690338993, 0.8047003412233396])
 end
 #test_calculate_polygon_centerpoint()
+
+
+function test_assemble_3d_problem()
+    nodes = Vector{Float64}[
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.1],
+        [1.0, 0.0, 0.1],
+        [0.0, 1.0, 0.1]]
+    mel = Tri3([4, 5, 6])
+    mel["geometry"] = Vector{Float64}[nodes[4], nodes[5], nodes[6]]
+    sel = Tri3([1, 2, 3])
+    sel["geometry"] = Vector{Float64}[nodes[1], nodes[2], nodes[3]]
+    R = [0.0 1.0 0.0
+         0.0 0.0 1.0
+         1.0 0.0 0.0]
+    sel["nodal ntsys"] = Matrix{Float64}[R, R, R]
+    sel["master elements"] = Element[mel]
+    prob = MortarProblem("temperature", 1)
+    push!(prob, sel)
+    stiffness_matrix = full(assemble(prob, 0.0).stiffness_matrix)
+    info("stiffness matrix for this problem:\n$stiffness_matrix")
+    M = D = 1/24*[2 1 1; 1 2 1; 1 1 2]
+    B = [D -M]  # slave dofs are first in this.
+    info("expected matrix for this problem:\n$B")
+    @test isapprox(stiffness_matrix, B)
+end
+#test_assemble_3d_problem()
 
 
 end
