@@ -5,9 +5,17 @@ module MortarTests
 
 using JuliaFEM.Test
 
-using JuliaFEM.Core: Element, Seg2, Quad4, MortarProblem, Assembly, assemble!
+using JuliaFEM.Core: Element, Seg2, Quad4, Tri3, MortarProblem, Assembly, assemble!
 using JuliaFEM.Core: PlaneStressElasticityProblem, DirichletProblem, DirectSolver
+
+# 2d stuff
 using JuliaFEM.Core: project_from_slave_to_master, project_from_master_to_slave
+
+# 3d stuff
+using JuliaFEM.Core: create_auxiliary_plane, project_point_to_auxiliary_plane,
+                     get_edge_intersections, get_points_inside_triangle,
+                     clip_polygon, calculate_polygon_centerpoint,
+                     project_point_from_plane_to_surface
 
 function get_test_2d_model()
     # this is hand calculated and given as an example in my thesis
@@ -118,7 +126,7 @@ function test_create_flat_2d_assembly()
     info("size of B = $(size(B))")
     info("B matrix in first slave element = \n$(B[10:11,:])")
     info("B matrix expected = \n$(B_expected[10:11,:])")
-    @test isapprox(B, B_expected) 
+    @test isapprox(B, B_expected)
 
     fill!(B_expected, 0.0)
     empty!(assembly)
@@ -184,7 +192,7 @@ function test_2d_mortar_multiple_bodies_multiple_dirichlet_bc()
     dy1 = Seg2([1, 2])
     dy1["geometry"] = Vector[N[1], N[2]]
     dy1["displacement 2"] = 0.0
-  
+
     boundary2 = DirichletProblem("displacement", 2)
     push!(boundary2, dy1)
 
@@ -282,7 +290,7 @@ function test_2d_mortar_three_bodies_shared_nodes()
     dy1 = Seg2([1, 2])
     dy1["geometry"] = Vector[N[1], N[2]]
     dy1["displacement 2"] = 0.0
-  
+
     bc2 = DirichletProblem("displacement", 2)
     push!(bc2, dy1)
 
@@ -342,5 +350,114 @@ function test_2d_mortar_three_bodies_shared_nodes()
 
 end
 #test_2d_mortar_three_bodies_shared_nodes()
+
+function test_auxiliary_plane_transforms()
+    nodes = Vector{Float64}[
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0]]
+    e1 = Tri3([1, 2, 3])
+    # local coordinate system N, T1, T2 in node
+    R = [0.0 1.0 0.0
+         0.0 0.0 1.0
+         1.0 0.0 0.0]
+    e1["geometry"] = Vector{Float64}[nodes[1], nodes[2], nodes[3]]
+    e1["nodal ntsys"] = Matrix{Float64}[R, R, R]
+    time::Real = 0.0
+    x0, Q = create_auxiliary_plane(e1, time)
+    info("x0 = $x0")
+    info("Q = $Q")
+    @test isapprox(x0, [1.0/3.0, 1.0/3.0, 0.0])
+    @test isapprox(Q, R)
+    p1 = Float64[1.0/3.0+0.1, 1.0/3.0+0.1, 1.0]
+    p2 = project_point_to_auxiliary_plane(p1, x0, Q)
+    info("point in auxiliary plane p2 = $p2")
+    @test isapprox(p2, [0.1, 0.1])
+    theta = project_point_from_plane_to_surface(p2, x0, Q, e1, time)
+    info("theta = $theta")
+    @test isapprox(theta[1], 0.0)
+    X = e1("geometry", theta[2:3], time)
+    info("projected point = $X")
+    @test isapprox(X, Float64[1.0/3.0+0.1, 1.0/3.0+0.1, 0.0])
+end
+test_auxiliary_plane_transforms()
+
+
+function test_get_edge_intersections()
+    # first case, two triangles
+    S = [ 0.0 0.0; 3.0  0.0; 0.0 3.0]'
+    M = [-1.0 1.0; 2.0 -0.5; 1.0 1.5]'
+    P, n = get_edge_intersections(S, M)
+    P_expected = [
+         1.00 1.75 0.00 0.00
+         0.00 0.00 0.50 1.25]
+    n_expected = [
+        1 1 0
+        0 0 0
+        1 0 1]
+    @test isapprox(P, P_expected)
+    @test isapprox(n, n_expected)
+
+    # slave 4 vertices non-convex, master triangle
+    S = [ 0.0 0.0; 2.5  0.0; 1.0 1.0; 0.0 2.0]'
+    M = [-1.0 1.0; 2.0 -0.5; 1.0 1.5]'
+    P, n = get_edge_intersections(S, M)
+    P_expected = [
+        1.0 1.75 1.375 0.60 0.00 0.00
+        0.0 0.00 0.750 1.40 0.50 1.25]
+    n_expected = [
+        1 1 0
+        0 1 0
+        0 0 1
+        1 0 1]
+    @test isapprox(P, P_expected)
+    @test isapprox(n, n_expected)
+
+    # slave 3 triangle, master 4 vertices
+    S = [ 0.0 0.0; 3.0  0.0; 0.0 3.0]'
+    M = [-1.0 1.0; 2.0 -0.5; 1.0 1.5; -1.0 2.0]'
+    P, n = get_edge_intersections(S, M)
+    P_expected = [
+        1.00 1.75 0.00 0.00
+        0.00 0.00 0.50 1.75]
+    n_expected = [
+        1 1 0 0
+        0 0 0 0
+        1 0 1 0]
+    @test isapprox(P, P_expected)
+    @test isapprox(n, n_expected)
+end
+#test_get_edge_intersections()
+
+
+function test_get_points_inside_triangle()
+    S = [0.0 0.0; 3.0 0.0; 0.0 3.0]'
+    pts = [-1.0 1.0; 2.0 -0.5; 1.0 1.5; 0.5 1.5]'
+    P = get_points_inside_triangle(S, pts)
+    @test isapprox(P, [1.0 1.5; 0.5 1.5]')
+end
+#test_get_points_inside_triangle()
+
+
+function test_polygon_clipping()
+    S = [0 0; 3 0; 0 3]'
+    M = [-1 1; 2 -1/2; 2 2]'
+    P, n = clip_polygon(S, M)
+    @test isapprox(P, [0.0 0.5; 1.0 0.0; 2.0 0.0; 2.0 1.0; 1.25 1.75; 0.0 4/3]')
+    @test isapprox(n, [1 0 1; 1 1 0; 0 1 1])
+end
+#test_polygon_clipping()
+
+
+function test_calculate_polygon_centerpoint()
+    P = [
+        0.0  1.0  2.0  2.0  1.25  0.0
+        0.5  0.0  0.0  1.0  1.75  1.33333]
+    C = calculate_polygon_centerpoint(P)
+    info("Polygon centerpoint: $C")
+    @test isapprox(C, [1.0397440690338993, 0.8047003412233396])
+end
+#test_calculate_polygon_centerpoint()
+
 
 end

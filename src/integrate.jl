@@ -54,23 +54,45 @@ function get_integration_points(::Type{Seg3})
     return get_integration_points(Seg3, Val{3})
 end
 
-### 2d elements
+### 2d triangular elements
 
-function get_integration_points(::Type{Tri3})
+# http://math2.uncc.edu/~shaodeng/TEACHING/math5172/Lectures/Lect_15.PDF
+
+typealias TriangularElements Union{Type{Tri3}, Type{Tri6}}
+
+function get_integration_points(::TriangularElements, ::Type{Val{1}})
     # http://libmesh.github.io/doxygen/quadrature__gauss__2D_8C_source.html
     [
         IntegrationPoint([1.0/3.0, 1.0/3.0], 0.5)
     ]
 end
 
-function get_integration_points(::Type{Tri6})
+function get_integration_points(::TriangularElements, ::Type{Val{2}})
     # http://libmesh.github.io/doxygen/quadrature__gauss__2D_8C_source.html
     [
-        IntegrationPoint([2.0/3.0, 1.0/6.0], 1.0/6.0)
-        IntegrationPoint([1.0/6.0, 2.0/3.0], 1.0/6.0)
+        IntegrationPoint([2.0/3.0, 1.0/6.0], 1.0/6.0),
+        IntegrationPoint([1.0/6.0, 2.0/3.0], 1.0/6.0),
         IntegrationPoint([1.0/6.0, 1.0/6.0], 1.0/6.0)
     ]
 end
+
+function get_integration_points(::TriangularElements, ::Type{Val{5}})
+    # http://math2.uncc.edu/~shaodeng/TEACHING/math5172/Lectures/Lect_15.PDF
+    [
+        IntegrationPoint([0.33333333333333, 0.33333333333333], 0.22500000000000),
+        IntegrationPoint([0.47014206410511, 0.47014206410511], 0.13239415278851),
+        IntegrationPoint([0.47014206410511, 0.05971587178977], 0.13239415278851),
+        IntegrationPoint([0.05971587178977, 0.47014206410511], 0.13239415278851),
+        IntegrationPoint([0.10128650732346, 0.10128650732346], 0.12593918054483),
+        IntegrationPoint([0.10128650732346, 0.79742698535309], 0.12593918054483),
+        IntegrationPoint([0.79742698535309, 0.10128650732346], 0.12593918054483)
+    ]
+end
+
+function get_integration_points(::Type{Tri3})
+    return get_integration_points(Tri3, Val{1})
+end
+
 
 function get_integration_points(::Type{Quad4})
     [
@@ -102,4 +124,3 @@ function get_integration_points(::Type{Tet10})
         IntegrationPoint([b, b, b], w)
     ]
 end
-
