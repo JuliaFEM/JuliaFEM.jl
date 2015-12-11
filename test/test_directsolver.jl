@@ -51,6 +51,8 @@ function test_solver_multiple_dirichlet_bc()
     push!(problem3, dy)
 
     solver = DirectSolver()
+    solver.dump_matrices = true
+    solver.name = "test_solver_multiple_dirichlet_bc"
     push!(solver, problem)
     push!(solver, problem2)
     push!(solver, problem3)
@@ -63,7 +65,7 @@ function test_solver_multiple_dirichlet_bc()
     @test isapprox(disp, [3.17431158889468E-02, -1.38591518927826E-01])
 
 end
-#test_solver_multiple_dirichlet_bc()
+test_solver_multiple_dirichlet_bc()
 
 function test_direct_cholesky_with_non_homogeneous_dirichlet_conditions()
 
