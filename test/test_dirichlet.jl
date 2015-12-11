@@ -4,7 +4,7 @@
 module TestDirichletBoundaryCondition
 
 using JuliaFEM.Test
-using JuliaFEM.Core: Seg2, DirichletProblem, Assembly, assemble
+using JuliaFEM.Core: Tri3, Seg2, DirichletProblem, Assembly, assemble
 
 function test_dirichlet_problem_1_dim()
     element = Seg2([1, 2])
@@ -51,6 +51,17 @@ function test_dirichlet_problem_2_dim_single_dof_fixed()
         0 1 0 2]
     @test isapprox(A, A_expected)
     @test isapprox(b, [0.0, 0.0, 0.0, 0.0])
+end
+
+function test_dirichlet_surface_tri3()
+    elem = Tri3([1, 2, 3])
+    elem["geometry"] = Vector{Float64}[[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]]
+    elem["temperature"] = 0.0
+    prob = DirichletProblem("temperature", 1)
+    push!(prob, elem)
+    ass = assemble(prob, 0.0)
+    k = full(ass.stiffness_matrix)
+    @test isapprox(k, 1/24*[2 1 1; 1 2 1; 1 1 2])
 end
 
 end

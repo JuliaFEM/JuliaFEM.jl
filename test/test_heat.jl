@@ -36,6 +36,8 @@ function test_one_element()  # always start test function with name test_
     A = full(assembly.stiffness_matrix)
     b = full(assembly.force_vector)
 
+    info("stiffness matrix = \n$(round(A, 3))")
+
     @test isapprox(A, [
          4.0 -1.0 -2.0 -1.0
         -1.0  4.0 -1.0 -2.0
