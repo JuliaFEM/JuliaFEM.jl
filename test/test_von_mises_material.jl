@@ -51,6 +51,7 @@ function test_von_mises_basic()
 
     info("Starting calculation")
     tic()
+    #= 
     for i=1:steps
         strain_new = reshape(strain_tot[i, :, :], (6, 1))
         dstrain = strain_new - mat.strain
@@ -62,6 +63,20 @@ function test_von_mises_basic()
         fill_tensor(eig_stress, mat.stress)
         eig_vals[i, :] = sort(eigvals(eig_stress))
     end
+    =#
+    stress = zeros(Float64, 6)
+    strain = zeros(Float64, 6)
+    for i=1:steps
+        strain_new = reshape(strain_tot[i, :, :], (6, 1))
+        dstrain = strain_new - strain
+        calculate_stress!(dstrain, stress, C, stress_y, Val{:vonMises})
+        strain = vec(strain_new)
+        push!(ss, stress[1])
+        push!(ee, strain[1])
+        fill_tensor(eig_stress, stress)
+        eig_vals[i, :] = sort(eigvals(eig_stress))
+    end
+    
     toc()
     # ================ Plotting =================== #
     n(θ, ϕ) = [sin(θ)*cos(ϕ)

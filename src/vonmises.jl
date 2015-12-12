@@ -1,80 +1,5 @@
 using ForwardDiff
-using NLsolve
-
-
-function outer_prod(a, b)
-    out = zeros(3,3,3,3)
-    for i=1:3
-        for j=1:3
-            for k=1:3
-                for l=1:3
-                    out[i, j, k, l] = a[i, j] * b[k, l]
-                end
-            end
-        end
-    end
-    out
-end
-
-function double_contr(a, b)
-    out = zeros(3, 3)
-    for i=1:3
-        for j=1:3
-            for k=1:3
-                for l=1:3
-                    out[i, j] += a[i,j,k,l] * b[k, l]
-                end
-            end
-        end
-    end
-    out
-end
-
-"""
-Symmetric fourth order identity tensor
-
-Definition can be found from:
-  http://www.ce.berkeley.edu/~sanjay/ce231mse211/symidentity.pdf
-"""
-function identity_tensor_symm_4th_order()
-    my_kron(i,j) = i == j ? 1 : 0
-    II = zeros(Float64, (3, 3, 3, 3))
-    for i=1:3
-        for j=1:3
-            for k=1:3
-                for l=1:3
-                    v1 = my_kron(i, k)
-                    v2 = my_kron(j, l)
-                    v3 = my_kron(i, l)
-                    v4 = my_kron(j, k)
-                    II[i,j,k,l] = 0.5 * (v1*v2 + v3*v4)
-                end
-            end
-        end
-    end
-    II
-end
-
-"""
-Fourth order stiffness tensor
-
-C = λ * I ⊗ I + 2 * μ * II
-Definition: https://en.wikipedia.org/wiki/Hooke's_law
-
-Literature from tensors and vectors
-# http://www.iith.ac.in/~ashok/Maths_Lectures/Tutorial/VectTensColMat.pdf
-# https://en.wikipedia.org/wiki/Tensor_product
-# http://www.math.psu.edu/yzheng/m597k/m597kL11.pdf
-"""
-function stiffnessTensor(youngs_modulus, poissons_ratio, ::Type{Val{:isotropic}})
-    E = youngs_modulus
-    v = poissons_ratio
-    I = eye(3)
-    II = identity_tensor_symm_4th_order()
-    mu = E/(2*(1+v))
-    lambda = E*v/((1+v)*(1-2*v))
-    return lambda * outer_prod(I, I) + 2 * mu * II
-end
+# using NLsolve
 
 """
 Create a isotropic Hooke material matrix C
@@ -109,19 +34,10 @@ end
 
 type State
     C :: Array{Float64, 2}
-    σ_y :: Float64
-    σ :: Array{Float64, 1}
-    ϵ :: Array{Float64, 1}
+    stress_y :: Float64
+    stress :: Array{Float64, 1}
+    strain :: Array{Float64, 1}
 end
-
-# using vectors with double contradiction
-# http://www-2.unipv.it/compmech/teaching/available/const_mod/const_mod_mat-review_notation.pdf
-M = [1 0 0 0 0 0;
-     0 1 0 0 0 0;
-     0 0 1 0 0 0;
-     0 0 0 2 0 0;
-     0 0 0 0 2 0;
-     0 0 0 0 0 2;]
 
 """
 Equivalent tensile stress.
@@ -138,9 +54,13 @@ Returns
 -------
     Float
 """
-function σₑ(σ)
-    s = σ[1:6] - 1/3 * sum([σ[1], σ[2], σ[3]]) * [1 1 1 0 0 0]'
-    return sqrt(3/2 * s' * M * s)[1]
+function stress_eq(stress)
+    stress_ten = [stress[1] stress[6] stress[5];
+                  stress[6] stress[2] stress[4];
+                  stress[5] stress[4] stress[3]]
+    stress_dev = stress_ten - 1/3 * trace(stress_ten) * eye(3)
+    s = vec(stress_dev)
+    return sqrt(3/2 * dot(s, s))
 end
 
 
@@ -160,8 +80,8 @@ Returns
 -------
     Float
 """
-function vonMisesYield(σ, k)
-    σₑ(σ) - k
+function vonMisesYield(stress, stress_y)
+    stress_eq(stress) - stress_y
 end
 
 """
@@ -190,23 +110,22 @@ Returns
 -------
     Array{Float64, 7}, return values for solver
 """
-function vonMisesRoot(params, dϵ, C, σ_y, σ_begin)
+function vonMisesRoot(params, dstrain, C, stress_y, stress_base)
 
     # Creating wrapper for gradient
-    yield_wrap(pars) = vonMisesYield(pars, σ_y)
-    dfdσ = ForwardDiff.gradient(yield_wrap)
+    vm_wrap(stress_) = vonMisesYield(stress_, stress_y)
+    dfds = ForwardDiff.gradient(vm_wrap)
 
-    # Stress rate
-    dσ = params[1:6]
-
-    σ_tot = [vec(σ_begin); 0.0] + params
+    # Stress rate and total strain
+    dstress = params[1:6]
+    stress_tot = vec(stress_base) + params[1:6]
 
     # Calculating plastic strain rate
-    dϵp = params[end] * dfdσ(σ_tot)
+    dstrain_p = params[end] * dfds(stress_tot)
 
     # Calculating equations
-    function_1 = dσ - C * (dϵ - dϵp[1:6])
-    function_2 = yield_wrap(σ_tot)
+    function_1 = dstress - C * (dstrain - dstrain_p)
+    function_2 = vm_wrap(stress_tot)
     [vec(function_1); function_2]
 end
 
@@ -233,26 +152,59 @@ Returns
     Tuple
     Plastic strain rate dϵᵖ and new stress vector σ
 """
-function calculate_stress!(dϵ, mat::State, ::Type{Val{:vonMises}})
-    σ = mat.σ
+function calculate_stress!(dstrain, mat::State, ::Type{Val{:vonMises}})
+    stress = mat.stress
     C = mat.C
-    σ_y = mat.σ_y
+    stress_y = mat.stress_y
     # Test stress
-    σ_tria = σ + C * dϵ
+    stress_tria = stress + C * dstrain
 
     # Calculating and checking for yield
-    yield = vonMisesYield(σ_tria, σ_y)
-    if yield > 0
+    yield = vonMisesYield(stress_tria, stress_y)
+    if isless(yield, 0.0)
+        mat.stress = vec(stress_tria)
+    else
         # Yielding happened
         # Creating functions for newton: xₙ₊₁ = xₙ - df⁻¹ * f and initial values
-        initial_guess = [vec(σ_tria - σ); 0.1]
-        f(σ_)  = vonMisesRoot(σ_, dϵ, C, σ_y, σ)
+        initial_guess = Float64[vec(stress_tria - stress); 0.1]
+        f(stress_)  = vonMisesRoot(stress_, dstrain, C, stress_y, stress)
         df     = ForwardDiff.jacobian(f)
 
         # Calculating root
         result = nlsolve(not_in_place(f, df), initial_guess).zero
-        mat.σ  += result[1:6]
-    else
-        mat.σ = vec(σ_tria)
+        mat.stress  += result[1:6]
     end
 end
+
+function calculate_stress!(dstrain, stress, C, stress_y, ::Type{Val{:vonMises}})
+    # Test stress
+    stress_tria = stress + C * dstrain
+
+    # Calculating and checking for yield
+    yield = vonMisesYield(stress_tria, stress_y)
+    if isless(yield, 0.0)
+        # stress[i] = stress_tria[i]
+        return 0.0 
+    else
+        # Yielding happened
+        # Creating functions for newton: xₙ₊₁ = xₙ - df⁻¹ * f and initial values
+        x = [vec(stress_tria - stress); 0.0]
+        f(stress_)  = vonMisesRoot(stress_, dstrain, C, stress_y, stress)
+        df     = ForwardDiff.jacobian(f)
+
+        # Calculating root
+        # result = nlsolve(not_in_place(f, df), initial_guess).zero 
+        max_iter = 10
+        converged = false
+        for i=1:5
+            dx = df(x) \ -f(x)
+            x += dx
+         #   println(x)
+            norm(dx) < 1e-10 && (converged = true; break)
+        end
+        converged || error("no convergence!")
+        # stress[:] += x[1:6]
+        return x[end]
+    end
+end
+

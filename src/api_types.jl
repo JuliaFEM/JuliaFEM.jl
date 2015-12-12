@@ -22,14 +22,14 @@ typealias HeatFluxBC NeumannBC
 """
 type Material
     name :: ASCIIString
-    scalar_data :: Dict{ASCIIString, Float64}
+    scalar_data :: Dict{ASCIIString, Any}
 end
 
 #Material(name, data) = Material(name, Dict(data))
-Material(name) = Material(name, Dict{ASCIIString, Float64}())
-Material() = Material("", Dict{ASCIIString, Float64}())
+Material(name) = Material(name, Dict{ASCIIString, Any}())
+Material() = Material("", Dict{ASCIIString, Any}())
 
-function Base.setindex!{T <: AbstractString }(material::Material, val::Real, name::T)
+function Base.setindex!{T <: AbstractString }(material::Material, val, name::T)
     material.scalar_data[name] = val 
 end
 
