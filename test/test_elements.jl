@@ -6,7 +6,8 @@ module ElementTests
 using JuliaFEM.Test
 
 using JuliaFEM.Core: AbstractElement, Element, Field, FieldSet, test_element
-import JuliaFEM.Core: get_basis, get_dbasis
+using JuliaFEM.Core: Tri3
+import JuliaFEM.Core: get_basis, get_dbasis, calculate_normal_tangential_coordinates!
 import Base: size
 
 """ Prototype element
@@ -74,5 +75,20 @@ function test_interpolate()
 #   info("gradT = $gradT")
 #   @test isapprox(gradT, 1/2*gradT_expected)
 end
+
+function test_calculate_normal_tangential_coordinates()
+    el = Tri3([1, 2, 3])
+    el["geometry"] = Vector{Float64}[
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0]]
+    calculate_normal_tangential_coordinates!(el, 0.0)
+    n = [0.0 0.0 1.0]'
+    t1 = [1.0 0.0 0.0]'
+    t2 = [0.0 1.0 0.0]'
+    R = [n t1 t2]
+    @test isapprox(el("normal-tangential coordinates", [0.0, 0.0], 0.0), R)
+end
+#test_calculate_normal_tangential_coordinates()
 
 end
