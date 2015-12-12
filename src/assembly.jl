@@ -61,7 +61,9 @@ function assemble(problem::AllProblems, time::Real, nchunks=10)
     for (j, elrange) in enumerate(slices)
         sub_assembly = assemble(problem, elrange, time)
         append!(assembly, sub_assembly)
-        info("Assembly: ", round(j/nchunks*100,1), " % done. ")
+        if ne > 100
+            info("Assembly: ", round(j/nchunks*100,1), " % done. ")
+        end
     end
 #   optimize!(assembly)
 #   dim = length(assembly.stiffness_matrix.I)
