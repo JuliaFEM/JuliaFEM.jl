@@ -1,6 +1,7 @@
 using ForwardDiff
 using NLsolve
 
+
 function outer_prod(a, b)
     out = zeros(3,3,3,3)
     for i=1:3

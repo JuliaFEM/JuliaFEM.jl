@@ -4,6 +4,7 @@
 # Elasticity problems
 
 abstract ElasticityProblem <: AbstractProblem
+abstract ElasticPlasticProblem <: AbstractProblem
 
 function get_unknown_field_name{P<:ElasticityProblem}(::Type{P})
     return "displacement"
@@ -13,8 +14,20 @@ function get_unknown_field_type{P<:ElasticityProblem}(::Type{P})
     return Vector{Float64}
 end
 
+function get_unknown_field_name{P<:ElasticPlasticProblem}(::Type{P})
+    return "displacement"
+end
+
+function get_unknown_field_type{P<:ElasticPlasticProblem}(::Type{P})
+    return Vector{Float64}
+end
+
 function ElasticityProblem(dim::Int=3, elements=[])
-    return Problem{PlaneStressElasticityProblem}(dim, elements)
+    return Problem{ElasticityProblem}(dim, elements)
+end
+
+function ElasticPlasticProblem(dim::Int=3, elements=[])
+    return Problem{ElasticPlasticProblem}(dim, elements)
 end
 
 abstract PlaneStressElasticityProblem <: ElasticityProblem
@@ -104,3 +117,60 @@ function get_residual_vector{P<:ElasticityProblem}(problem::Problem{P}, element:
     return vec(r)
 end
 
+"""
+
+"""
+function get_residual_vector{P<:ElasticPlasticProblem}(problem::Problem{P}, element::Element, ip::IntegrationPoint, time::Number; variation=nothing)
+
+
+    # u = element("displacement", ip, time, variation)
+
+    r = zeros(Float64, problem.dim, length(element))
+
+    # internal forces
+    if haskey(element, "youngs modulus") && haskey(element, "poissons ratio")
+        u = element("displacement", time, variation)
+        grad = element(ip, time, Val{:grad})
+#        gradu = element("displacement", ip, time, Val{:grad}, variation)
+        gradu = grad*u
+
+        F = I + gradu # deformation gradient
+
+        young = element("youngs modulus", ip, time)
+        poisson = element("poissons ratio", ip, time)
+
+        mu = young/(2*(1+poisson))
+        lambda = young*poisson/((1+poisson)*(1-2*poisson))
+        if P == PlaneStressElasticityProblem
+            lambda = 2*lambda*mu/(lambda + 2*mu)  # <- correction for 2d problems
+        end
+      
+
+        E = 1/2*(F'*F - I)       # large strain
+        #E = 1/2*(gradu + gradu')  # finite strain
+        S = lambda*trace(E)*I + 2*mu*E
+
+        #J = det(element, ip, time)
+        #T = J^-1*F*S*F'
+        #ip["cauchy stress"] = T
+        #ip["gl strain"] = E
+
+        r += F*S*grad
+    end
+
+    # external forces - volume load
+    if haskey(element, "displacement load")
+        basis = element(ip, time)
+        b = element("displacement load", ip, time)
+        r -= b*basis
+    end
+
+    # external forces - surface traction force
+    if haskey(element, "displacement traction force")
+        basis = element(ip, time)
+        T = element("displacement traction force", ip, time)
+        r -= T*basis
+    end
+
+    return vec(r)
+end
