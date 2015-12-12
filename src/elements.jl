@@ -210,3 +210,26 @@ function Base.haskey(element::Element, what)
     haskey(element.fields, what)
 end
 
+""" Calculate local normal-tangential coordinates for element. """
+function calculate_normal_tangential_coordinates!{E}(element::Element{E}, time::Real)
+    proj(u, v) = dot(v, u) / dot(u, u) * u
+    ntcoords = Matrix[]
+    refcoords = get_reference_element_coordinates(E)
+    x = element("geometry", time)
+    for xi in refcoords
+        dN = get_dbasis(E, xi)*x
+        normal = cross(dN[:,1], dN[:,2])
+        normal /= norm(normal)
+        u1 = normal
+        j = indmax(abs(u1))
+        v2 = zeros(3)
+        v2[mod(j,3)+1] = 1.0
+        u2 = v2 - proj(u1, v2)
+        u3 = cross(u1, u2)
+        tangent1 = u2/norm(u2)
+        tangent2 = u3/norm(u3)
+        push!(ntcoords, [normal tangent1 tangent2])
+    end
+    element["normal-tangential coordinates"] = ntcoords
+end
+

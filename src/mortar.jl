@@ -11,7 +11,7 @@ function project_from_slave_to_master{S,M}(slave::Element{S}, master::Element{M}
 
     # slave side geometry and normal direction at xi1
     X1 = slave("geometry", xi1, time)
-    N1 = slave("nodal ntsys", xi1, time)[:,1]
+    N1 = slave("normal-tangential coordinates", xi1, time)[:,1]
 
     # master side geometry at xi2
     #master_basis = master.basis.data.basis
@@ -59,7 +59,7 @@ function project_from_master_to_slave{S,M}(slave::Element{S}, master::Element{M}
     # slave side geometry and normal direction at xi1
 
     slave_geometry = slave("geometry")(time)
-    slave_normals = slave("nodal ntsys")(time)
+    slave_normals = slave("normal-tangential coordinates")(time)
     #slave_basis = slave.basis.data.basis
     #slave_dbasis = slave.basis.data.dbasis
     slave_basis(xi) = get_basis(S, [xi])
@@ -86,7 +86,7 @@ function project_from_master_to_slave{S,M}(slave::Element{S}, master::Element{M}
     end
 
     #X1(xi1) = slave_basis("geometry", [xi1], time)
-    #N1(xi1) = slave_basis("nodal ntsys", [xi1], time)[:,1]
+    #N1(xi1) = slave_basis("normal-tangential coordinates", [xi1], time)[:,1]
 
     #master_basis = get_basis(master)
 
@@ -187,11 +187,16 @@ Notes
 
 """
 # function create_auxiliary_plane(x, ximp, normals, basis)
-function create_auxiliary_plane(element::Element{Tri3}, time::Real)
-    proj(u, v) = dot(v, u) / dot(u, u) * u
-    xi = [1.0/3.0, 1.0/3.0]
+function create_auxiliary_plane{E}(element::Element{E}, time::Real)
+#   proj(u, v) = dot(v, u) / dot(u, u) * u
+#    xi = [1.0/3.0, 1.0/3.0]
+
+    xi = get_reference_element_midpoint(E)
     x0 = element("geometry", xi, time)
-    n = element("nodal ntsys", xi, time)[:, 1]
+    ntbasis = element("normal-tangential coordinates", xi, time)
+    return x0, ntbasis
+#=
+    n = element("normal-tangential coordinates", xi, time)[:, 1]
     n /= norm(n)
     # gram-schmidt
     u1 = n
@@ -204,6 +209,7 @@ function create_auxiliary_plane(element::Element{Tri3}, time::Real)
     t2 = u3/norm(u3)
     new_basis = [n t1 t2]
     return x0, new_basis
+=#
 end
 
 """
@@ -243,7 +249,14 @@ function project_point_to_auxiliary_plane(p::Vector, x0::Vector, Q::Matrix)
     n = Q[:,1]
     ph = p - dot(p-x0, n)*n
     qproj = Q'*(ph-x0)
-    @assert isapprox(qproj[1], 0.0)
+    if !isapprox(qproj[1], 0.0; atol=1.0e-12)
+        info("project_point_to_auxiliary_plane(): point not projected correctly.")
+        info("p: $p")
+        info("x0: $x0")
+        info("Q: \n$Q")
+        info("qproj: $qproj")
+        error("Failed to project point to auxiliary plane.")
+    end
     return qproj[2:3]
 end
 
@@ -626,6 +639,7 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::BoundaryPro
             N2 = master_element(xi_projected, time)
             S = w*N1'*N1
             M = w*(N1'*N2)'
+#           M = w*N1'*N2
             # FIXME: why this needs now to be transpose?
             # assembly / repeat
             for i=1:field_dim
