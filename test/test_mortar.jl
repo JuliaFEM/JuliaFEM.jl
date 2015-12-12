@@ -15,7 +15,8 @@ using JuliaFEM.Core: project_from_slave_to_master, project_from_master_to_slave
 using JuliaFEM.Core: create_auxiliary_plane, project_point_to_auxiliary_plane,
                      get_edge_intersections, get_points_inside_triangle,
                      clip_polygon, calculate_polygon_centerpoint,
-                     project_point_from_plane_to_surface, assemble
+                     project_point_from_plane_to_surface, assemble,
+                     calculate_normal_tangential_coordinates!
 
 
 function get_test_2d_model()
@@ -42,13 +43,13 @@ function get_test_2d_model()
     slave1 = Seg2([10, 11])
     slave1["geometry"] = Vector[N[10], N[11]]
     # should be n = [0 -1]' and t = [1 0]'
-    slave1["nodal ntsys"] = Matrix[rotation_matrix(-pi/2), rotation_matrix(-pi/2)]
+    slave1["normal-tangential coordinates"] = Matrix[rotation_matrix(-pi/2), rotation_matrix(-pi/2)]
     slave1["master elements"] = Element[master1, master2]
 
     slave2 = Seg2([11, 12])
     slave2["geometry"] = Vector[N[11], N[12]]
     # should be n = [0 -1]' and t = [1 0]'
-    slave2["nodal ntsys"] = Matrix[rotation_matrix(-pi/2), rotation_matrix(-pi/2)]
+    slave2["normal-tangential coordinates"] = Matrix[rotation_matrix(-pi/2), rotation_matrix(-pi/2)]
     slave2["master elements"] = Element[master1, master2]
 
     return [slave1, slave2], [master1, master2]
@@ -88,7 +89,7 @@ function test_calc_flat_2d_projection_rotated()
     master1["geometry"] = Vector{Float64}[[0.0, 1.0], [0.0, 0.0]]
     slave1 = Seg2([1, 2])
     slave1["geometry"] = Vector{Float64}[[0.0, 0.0], [0.0, 1.0]]
-    slave1["nodal ntsys"] = Matrix{Float64}[[1.0 0.0; 0.0 1.0], [1.0 0.0; 0.0 1.0]]
+    slave1["normal-tangential coordinates"] = Matrix{Float64}[[1.0 0.0; 0.0 1.0], [1.0 0.0; 0.0 1.0]]
     xi = project_from_master_to_slave(slave1, master1, [-1.0])
     info("xi = $xi")
     @test xi == [ 1.0]
@@ -209,7 +210,7 @@ function test_2d_mortar_multiple_bodies_multiple_dirichlet_bc()
 
     slave1 = Seg2([5, 6])
     slave1["geometry"] = Vector[N[5], N[6]]
-    slave1["nodal ntsys"] = Matrix[rotation_matrix(-pi/2), rotation_matrix(-pi/2)]
+    slave1["normal-tangential coordinates"] = Matrix[rotation_matrix(-pi/2), rotation_matrix(-pi/2)]
     slave1["master elements"] = Element[master1]
 
     boundary3 = MortarProblem("displacement", 2)
@@ -237,13 +238,19 @@ end
 
 
 function test_2d_mortar_three_bodies_shared_nodes()
-    N = Vector[
-        [0.0, 0.0], [2.0, 0.0],
-        [0.0, 1.0], [2.0, 1.0],
-        [0.0, 1.0], [1.0, 1.0],
-        [0.0, 2.0], [1.0, 2.0],
-        [1.0, 1.0], [2.0, 1.0],
-        [1.0, 2.0], [2.0, 2.0]]
+    N = Dict{Int, Vector{Float64}}(
+        1 => [0.0, 0.0],
+        2 => [2.0, 0.0],
+        3 => [0.0, 1.0],
+        4 => [2.0, 1.0],
+        5 => [0.0, 1.0],
+        6 => [1.3, 1.0],
+        7 => [0.0, 2.0],
+        8 => [1.3, 2.0],
+        9 => [1.3, 1.0],
+        10 => [2.0, 1.0],
+        11 => [1.3, 2.0],
+        12 => [2.0, 2.0])
 
     e1 = Quad4([1, 2, 4, 3])
     e1["geometry"] = Vector[N[1], N[2], N[4], N[3]]
@@ -307,7 +314,7 @@ function test_2d_mortar_three_bodies_shared_nodes()
 
     slave1 = Seg2([5, 6])
     slave1["geometry"] = Vector[N[5], N[6]]
-    slave1["nodal ntsys"] = Matrix[rotation_matrix(-pi/2), rotation_matrix(-pi/2)]
+    slave1["normal-tangential coordinates"] = Matrix[rotation_matrix(-pi/2), rotation_matrix(-pi/2)]
     slave1["master elements"] = Element[master1]
     bc3 = MortarProblem("displacement", 2)
     push!(bc3, slave1)
@@ -315,7 +322,7 @@ function test_2d_mortar_three_bodies_shared_nodes()
     # mortar boundary between body 1 and body 3
     slave2 = Seg2([9, 10])
     slave2["geometry"] = Vector[N[9], N[10]]
-    slave2["nodal ntsys"] = Matrix[rotation_matrix(-pi/2), rotation_matrix(-pi/2)]
+    slave2["normal-tangential coordinates"] = Matrix[rotation_matrix(-pi/2), rotation_matrix(-pi/2)]
     slave2["master elements"] = Element[master1]
     bc4 = MortarProblem("displacement", 2)
     push!(bc4, slave2)
@@ -326,8 +333,8 @@ function test_2d_mortar_three_bodies_shared_nodes()
 
     slave3 = Seg2([6, 8])
     slave3["geometry"] = Vector[N[6], N[8]]
-    #slave3["nodal ntsys"] = Matrix[rotation_matrix(-pi/2), rotation_matrix(-pi/2)]
-    slave3["nodal ntsys"] = Matrix[rotation_matrix(0.0), rotation_matrix(0.0)]
+    #slave3["normal-tangential coordinates"] = Matrix[rotation_matrix(-pi/2), rotation_matrix(-pi/2)]
+    slave3["normal-tangential coordinates"] = Matrix[rotation_matrix(0.0), rotation_matrix(0.0)]
     slave3["master elements"] = Element[master2]
     bc5 = MortarProblem("displacement", 2)
     push!(bc5, slave3)
@@ -346,12 +353,15 @@ function test_2d_mortar_three_bodies_shared_nodes()
 
     # launch solver
     solver.method = :UMFPACK
+    solver.name = "test_2d_mortar_three_bodies_shared_nodes"
+    solver.dump_matrices = true
     call(solver, 0.0)
 
-    disp = e2("displacement", [1.0, 1.0], 0.0)
-    info("displacement at tip: $disp")
+    X = e3("geometry", [1.0, 1.0], 0.0)
+    u = e3("displacement", [1.0, 1.0], 0.0)
+    info("displacement at $X: $u")
     # code aster verification, two_elements.comm
-    @test isapprox(disp, [3.17431158889468E-02, -2.77183037855653E-01])
+    @test isapprox(u, [2*3.17431158889468E-02, -2.77183037855653E-01])
 
 end
 #test_2d_mortar_three_bodies_shared_nodes()
@@ -368,7 +378,7 @@ function test_auxiliary_plane_transforms()
          0.0 0.0 1.0
          1.0 0.0 0.0]
     e1["geometry"] = Vector{Float64}[nodes[1], nodes[2], nodes[3]]
-    e1["nodal ntsys"] = Matrix{Float64}[R, R, R]
+    e1["normal-tangential coordinates"] = Matrix{Float64}[R, R, R]
     time::Real = 0.0
     x0, Q = create_auxiliary_plane(e1, time)
     info("x0 = $x0")
@@ -466,6 +476,7 @@ end
 #test_calculate_polygon_centerpoint()
 
 
+
 function test_assemble_3d_problem()
     nodes = Vector{Float64}[
         [0.0, 0.0, 0.0],
@@ -478,12 +489,14 @@ function test_assemble_3d_problem()
     mel["geometry"] = Vector{Float64}[nodes[4], nodes[5], nodes[6]]
     sel = Tri3([1, 2, 3])
     sel["geometry"] = Vector{Float64}[nodes[1], nodes[2], nodes[3]]
-    R = [0.0 1.0 0.0
-         0.0 0.0 1.0
-         1.0 0.0 0.0]
-    sel["nodal ntsys"] = Matrix{Float64}[R, R, R]
+#   Rv = [0.0 1.0 0.0
+#         0.0 0.0 1.0
+#         1.0 0.0 0.0]
+#   sel["normal-tangential coordinates"] = Matrix{Float64}[Rv, Rv, Rv]
+    calculate_normal_tangential_coordinates!(sel, 0.0)
     sel["master elements"] = Element[mel]
     prob = MortarProblem("temperature", 1)
+
     push!(prob, sel)
     stiffness_matrix = full(assemble(prob, 0.0).stiffness_matrix)
     info("stiffness matrix for this problem:\n$stiffness_matrix")
@@ -491,8 +504,36 @@ function test_assemble_3d_problem()
     B = [D -M]  # slave dofs are first in this.
     info("expected matrix for this problem:\n$B")
     @test isapprox(stiffness_matrix, B)
+
+    # rotate and translate surface and check that we are still having same results
+    Rx(t) = [
+        1.0 0.0     0.0
+        0.0 cos(t) -sin(t)
+        0.0 sin(t)  cos(t)]
+    Ry(t) = [
+        cos(t)  0.0 sin(t)
+        0.0     1.0 0.0
+        -sin(t) 0.0 cos(t)
+        ]
+    Rz(t) = [
+        cos(t) -sin(t) 0.0
+        sin(t)  cos(t) 0.0
+        0.0     0.0    1.0]
+    T = [1.0, 1.0, 1.0]
+    tx = pi/3.0
+    ty = pi/4.0
+    tz = pi/5.0
+    for node in nodes
+        node[:] = Rz(tz)*Ry(ty)*Rx(tx)*node + T
+    end
+    calculate_normal_tangential_coordinates!(sel, 0.0)
+    stiffness_matrix = full(assemble(prob, 0.0).stiffness_matrix)
+    info("sel midpnt: ", sel("geometry", [1/3, 1/3], 0.0))
+    info("nt basis: ", sel("normal-tangential coordinates", [1/3, 1/3], 0.0))
+    @test isapprox(stiffness_matrix, B)
+
 end
-#test_assemble_3d_problem()
+test_assemble_3d_problem()
 
 
 end
