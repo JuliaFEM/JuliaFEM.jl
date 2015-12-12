@@ -2,6 +2,34 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 
+function aster_parse_nodes(section::ASCIIString; strip_characters=true)
+    nodes = Dict{Any, Vector{Float64}}()
+    has_started = false
+    for line in split(section, '\n')
+        m = matchall(r"[\w.-]+", line)
+        if (length(m) != 1) && (!has_started)
+            continue
+        end
+        if length(m) == 1
+            if (m[1] == "COOR_2D") || (m[1] == "COOR_3D")
+                has_started = true
+                continue
+            end
+            if m[1] == "FINSF"
+                break
+            end
+        end
+        if length(m) == 4
+            nid = m[1]
+            if strip_characters
+                nid = matchall(r"\d", nid)
+                nid = parse(Int, nid[1])
+            end
+            nodes[nid] = float(m[2:end])
+        end
+    end
+    return nodes
+end
 
 function parse(mesh::ASCIIString, ::Type{Val{:CODE_ASTER_MAIL}})
     model = Dict{ASCIIString, Any}()

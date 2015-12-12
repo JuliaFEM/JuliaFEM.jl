@@ -6,20 +6,22 @@
 
 ### 1d elements
 
-function get_integration_points(::Type{Seg2}, ::Type{Val{1}})
+typealias LineElement Union{Type{Seg2}, Type{Seg3}}
+
+function get_integration_points(::LineElement, ::Type{Val{1}})
     [
         IntegrationPoint([0.0], 2.0)
     ]
 end
 
-function get_integration_points(::Type{Seg2}, ::Type{Val{2}})
+function get_integration_points(::LineElement, ::Type{Val{2}})
     [
         IntegrationPoint([-sqrt(1/3)], 1)
         IntegrationPoint([+sqrt(1/3)], 1)
     ]
 end
 
-function get_integration_points(::Type{Seg3}, ::Type{Val{3}})
+function get_integration_points(::LineElement, ::Type{Val{3}})
     [
         IntegrationPoint([0.0], 8/9),
         IntegrationPoint([-sqrt(3/5)], 5/9),
@@ -27,7 +29,7 @@ function get_integration_points(::Type{Seg3}, ::Type{Val{3}})
     ]
 end
 
-function get_integration_points(::Type{Seg3}, ::Type{Val{4}})
+function get_integration_points(::LineElement, ::Type{Val{4}})
     [
         IntegrationPoint([+sqrt(3/7 - 2/7*sqrt(6/5))], (18+sqrt(30))/36)
         IntegrationPoint([-sqrt(3/7 - 2/7*sqrt(6/5))], (18+sqrt(30))/36)
@@ -36,7 +38,7 @@ function get_integration_points(::Type{Seg3}, ::Type{Val{4}})
     ]
 end
 
-function get_integration_points(::Union{Type{Seg2}, Type{Seg3}}, ::Type{Val{5}})
+function get_integration_points(::LineElement, ::Type{Val{5}})
     [
         IntegrationPoint([-1/3*sqrt(5 + 2*sqrt(10/7))], (322-13*sqrt(70))/900),
         IntegrationPoint([-1/3*sqrt(5 - 2*sqrt(10/7))], (322+13*sqrt(70))/900),
@@ -58,16 +60,16 @@ end
 
 # http://math2.uncc.edu/~shaodeng/TEACHING/math5172/Lectures/Lect_15.PDF
 
-typealias TriangularElements Union{Type{Tri3}, Type{Tri6}}
+typealias TriangularElement Union{Type{Tri3}, Type{Tri6}}
 
-function get_integration_points(::TriangularElements, ::Type{Val{1}})
+function get_integration_points(::TriangularElement, ::Type{Val{1}})
     # http://libmesh.github.io/doxygen/quadrature__gauss__2D_8C_source.html
     [
         IntegrationPoint([1.0/3.0, 1.0/3.0], 0.5)
     ]
 end
 
-function get_integration_points(::TriangularElements, ::Type{Val{2}})
+function get_integration_points(::TriangularElement, ::Type{Val{2}})
     # http://libmesh.github.io/doxygen/quadrature__gauss__2D_8C_source.html
     [
         IntegrationPoint([2.0/3.0, 1.0/6.0], 1.0/6.0),
@@ -76,7 +78,7 @@ function get_integration_points(::TriangularElements, ::Type{Val{2}})
     ]
 end
 
-function get_integration_points(::TriangularElements, ::Type{Val{5}})
+function get_integration_points(::TriangularElement, ::Type{Val{5}})
     # http://math2.uncc.edu/~shaodeng/TEACHING/math5172/Lectures/Lect_15.PDF
     # FIXME: something wrong here with weights ..?
     [
@@ -95,7 +97,7 @@ function get_integration_points(::Type{Tri3})
 end
 
 
-function get_integration_points(::Type{Quad4})
+function get_integration_points(::Type{Quad4}, ::Type{Val{2}})
     [
         IntegrationPoint(1.0/sqrt(3.0)*[-1, -1], 1.0),
         IntegrationPoint(1.0/sqrt(3.0)*[ 1, -1], 1.0),
@@ -104,7 +106,22 @@ function get_integration_points(::Type{Quad4})
     ]
 end
 
+function get_integration_points(::Type{Quad4})
+    return get_integration_points(Quad4, Val{2})
+end
+
 ### 3d elements
+
+
+function get_integration_points(::Type{Hex8}, ::Type{Val{2}})
+    p = 1.0/sqrt(3.0)*[-1.0, 1.0]
+    w = 1.0
+    return vec([IntegrationPoint([p[i], p[j], p[k]], w) for i=1:2, j=1:2, k=1:2])
+end
+
+function get_integration_points(::Type{Hex8})
+    return get_integration_points(Hex8, Val{2})
+end
 
 function get_integration_points(::Type{Tet4})
     # http://libmesh.github.io/doxygen/quadrature__gauss__3D_8C_source.html

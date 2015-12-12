@@ -80,6 +80,7 @@ include("equations.jl")
 include("dirichlet.jl")
 include("heat.jl")
 include("elasticity.jl")
+include("linear_elasticity.jl")
 
 ### ASSEMBLY + SOLVE ###
 include("assembly.jl")

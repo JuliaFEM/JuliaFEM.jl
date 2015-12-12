@@ -6,7 +6,8 @@ module AsterReaderTests
 using JuliaFEM
 using JuliaFEM.Test
 
-using JuliaFEM: parse
+#using JuliaFEM: parse
+using JuliaFEM.Preprocess: aster_parse_nodes
 
 function test_read_mesh()
 mesh = """
@@ -44,7 +45,30 @@ mesh = """
     @test m["nsets"]["NALL"] == ["N1", "N2"]
 
 end
+#test_read_mesh()
 
-test_read_mesh()
+function test_parse_nodes()
+    section = """
+    N9  2.0 3.0 4.0
+    COOR_3D
+    N1          0.0 0.0 0.0
+    N2          1.0 0.0 0.0
+    N3          1.0 1.0 0.0
+    N4          0.0 1.0 0.0
+    N5          0.0 0.0 1.0
+    N6          1.0 0.0 1.0
+    N7          1.0 1.0 1.0
+    N8          0.0 1.0 1.0
+    FINSF
+    absdflasdf
+    N12 3.0 4.0 5.0 6.0
+    N13 3.0 4.0 5.0
+    """
+    nodes = aster_parse_nodes(section)
+    @test nodes[1] == Float64[0.0, 0.0, 0.0]
+    @test nodes[8] == Float64[0.0, 1.0, 1.0]
+    @test length(nodes) == 8
+end
+test_parse_nodes()
 
 end

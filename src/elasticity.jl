@@ -79,10 +79,10 @@ function get_residual_vector{P<:ElasticityProblem}(problem::Problem{P}, element:
     if haskey(element, "youngs modulus") && haskey(element, "poissons ratio")
         u = element("displacement", time, variation)
         grad = element(ip, time, Val{:grad})
-#        gradu = element("displacement", ip, time, Val{:grad}, variation)
         gradu = grad*u
 
         F = I + gradu # deformation gradient
+#       info("gradu = \n$(ForwardDiff.get_value(gradu))")
 
         young = element("youngs modulus", ip, time)
         poisson = element("poissons ratio", ip, time)

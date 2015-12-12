@@ -113,6 +113,20 @@ end
 
 # 3d Lagrange elements
 
+@create_lagrange_element(Hex8, "8 node hexahedra",
+    [-1.0  1.0  1.0 -1.0 -1.0  1.0 1.0 -1.0
+     -1.0 -1.0  1.0  1.0 -1.0 -1.0 1.0  1.0
+     -1.0 -1.0 -1.0 -1.0  1.0  1.0 1.0  1.0],
+    (xi) -> [
+    1.0,
+    xi[1],
+    xi[2],
+    xi[1]*xi[2],
+    xi[3],
+    xi[1]*xi[3],
+    xi[2]*xi[3],
+    xi[1]*xi[2]*xi[3]])
+
 @create_lagrange_element(Tet4, "4 node tetrahedron",
     [0.0 1.0 0.0 0.0
      0.0 0.0 1.0 0.0
