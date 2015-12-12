@@ -13,20 +13,20 @@ function test_von_mises_basic()
     ν = 0.3
     C = stiffnessTensor(E, ν)
 
-    ϵ_tot = zeros(Float64, (steps, 6))
-    ϵ_tot2 = zeros(Float64, (steps, 6))
-    ϵ_tot3 = zeros(Float64, (steps, 6))
+    strain_tot = zeros(Float64, (steps, 6))
+    strain_tot2 = zeros(Float64, (steps, 6))
+    strain_tot3 = zeros(Float64, (steps, 6))
 
     # Adding only strain in x-axis and counting for the poisson effect
-    ϵ_tot[:, 1] = strain_max * sin(2 * pi * linspace(0, num_cycles, steps))
-    ϵ_tot[:, 2] = strain_max * sin(2 * pi * linspace(0, num_cycles, steps)).*-ν
-    ϵ_tot[:, 3] = strain_max * sin(2 * pi * linspace(0, num_cycles, steps)).*-ν
-    ϵ_tot[:, 4] = strain_max / 10 * sin(2 * pi * linspace(0, num_cycles, steps))
+    strain_tot[:, 1] = strain_max * sin(2 * pi * linspace(0, num_cycles, steps))
+    strain_tot[:, 2] = strain_max * sin(2 * pi * linspace(0, num_cycles, steps)).*-ν
+    strain_tot[:, 3] = strain_max * sin(2 * pi * linspace(0, num_cycles, steps)).*-ν
+    strain_tot[:, 4] = strain_max / 10 * sin(2 * pi * linspace(0, num_cycles, steps))
 
-    ϵ_last = zeros(Float64, (6))
-    ϵᵖ = zeros(Float64, (6))
-    σ = zeros(Float64, (6, 1))
-    σy =  200.0
+    strain_last = zeros(Float64, (6))
+    strain_p = zeros(Float64, (6))
+    stress = zeros(Float64, (6, 1))
+    stress_y =  200.0
     ss = Float64[]
     ee = Float64[]
 
@@ -47,19 +47,19 @@ function test_von_mises_basic()
         a[3, 2] = b[4]
     end
 
-    mat = State(C, σy, zeros(Float64, 6), zeros(Float64, 6))
+    mat = State(C, stress_y, zeros(Float64, 6), zeros(Float64, 6))
 
     info("Starting calculation")
     tic()
     for i=1:steps
-        ϵ_new = reshape(ϵ_tot[i, :, :], (6, 1))
-        dϵ = ϵ_new - mat.ϵ
-        calculate_stress!(dϵ, mat, Val{:vonMises})
-        mat.ϵ += vec(dϵ)
-        push!(ss, mat.σ[1])
-        push!(ee, mat.ϵ[1])
+        strain_new = reshape(strain_tot[i, :, :], (6, 1))
+        dstrain = strain_new - mat.strain
+        calculate_stress!(dstrain, mat, Val{:vonMises})
+        mat.strain += vec(dstrain)
+        push!(ss, mat.stress[1])
+        push!(ee, mat.strain[1])
 
-        fill_tensor(eig_stress, mat.σ)
+        fill_tensor(eig_stress, mat.stress)
         eig_vals[i, :] = sort(eigvals(eig_stress))
     end
     toc()

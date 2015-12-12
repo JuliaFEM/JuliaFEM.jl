@@ -5,7 +5,6 @@ function add_boundary_condition!(case::Simulation, bc::NeumannBC)
     push!(case.neumann_boundary_conditions, bc)
 end
 
-
 """
 Add node to model and renumber for output
 """
