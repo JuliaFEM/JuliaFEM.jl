@@ -51,7 +51,7 @@ function test_linearsolver()
     info("Temperature at point X = $X is T = $T")
     @test isapprox(T, 100.0)
 end
-#test_basic()
+#test_linearsolver()
 
 function test_solvers()
     K =  [
@@ -88,7 +88,8 @@ function test_solvers()
     @test isapprox(u1, expected)
     u2, la2 = solve(K, f, C, g, Val{:CHOLMOD})
     @test isapprox(u2, expected)
-    include(Pkg.dir("JuliaFEM"*"/src/petsc.jl"))
+    # FIXME: how to dynamically include packages only if they are installed?
+    #include(Pkg.dir("JuliaFEM"*"/src/petsc.jl"))
     u3, la3 = solve(K, f, C, g, Val{:PETSc_GMRES})
     @test isapprox(u3, expected)
 end

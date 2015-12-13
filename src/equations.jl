@@ -77,15 +77,15 @@ function assemble!(assembly::Assembly, problem::Problem, element::Element, time:
     # 1. if equations are defined we just integrate them, without caring how they are done
     if has_mass_matrix(problem, element) || has_stiffness_matrix(problem, element) || has_force_vector(problem, element)
         for ip in get_integration_points(element)
-            s = ip.weight*det(element, ip, time)
+            w = ip.weight*det(J)
             if has_mass_matrix(element)
-                add!(assembly.mass_matrix, gdofs, gdofs, s*get_mass_matrix(problem, element, ip, time))
+                add!(assembly.mass_matrix, gdofs, gdofs, w*get_mass_matrix(problem, element, ip, time))
             end
             if has_stiffness_matrix(element)
-                add!(assembly.stiffness_matrix, gdofs, gdofs, s*get_stiffness_matrix(problem, element, ip, time))
+                add!(assembly.stiffness_matrix, gdofs, gdofs, w*get_stiffness_matrix(problem, element, ip, time))
             end
             if has_force_vector(element)
-                add!(assembly.force_vector, gdofs, s*get_force_vector(problem, element, ip, time))
+                add!(assembly.force_vector, gdofs, w*get_force_vector(problem, element, ip, time))
             end
         end
         # external loads -- if any nodal loads is defined add to force vector
@@ -104,16 +104,15 @@ function assemble!(assembly::Assembly, problem::Problem, element::Element, time:
             df = similar(field, data)
             # integrate potential energy
             for ip in get_integration_points(element)
-                s = ip.weight*det(element, ip, time)
                 dw = get_potential_energy(problem, element, ip, time; variation=df)
-                W += s*dw
+                W += ip.weight*dw
             end
             # external energy -- if any nodal loads is defined, decrease from potential energy
             if haskey(element, "$unknown_field_name nodal load")
                 P = element["$unknown_field_name nodal load"](time)
                 W -= dot(vec(P), vec(df))
             end
-            return isa(W, Array) ? W[1] : W
+            return W[1]
         end
 
         hessian, allresults = ForwardDiff.hessian(calc_W, vec(field), AllResults, cache=autodiffcache)
@@ -133,9 +132,8 @@ function assemble!(assembly::Assembly, problem::Problem, element::Element, time:
             gauss_fields = IntegrationPoint[]
             # integrate residual vector
             for ip in get_integration_points(element)
-                s = ip.weight*det(element, ip, time)
                 dr = get_residual_vector(problem, element, ip, time; variation=df)
-                R += s*dr
+                R += ip.weight*dr
                 if ip.changed
                     push!(gauss_fields, ip)
                 end

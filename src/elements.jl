@@ -197,13 +197,35 @@ function call(element::Element, field_name::ASCIIString)
     return element[field_name]
 end
 
-function LinAlg.det{E<:AbstractElement}(element::Element{E}, ip::IntegrationPoint, time::Number=0.0)
+
+""" Return the jacobian of element. """
+function get_jacobian{E}(element::Element{E}, xi::Vector{Float64}, time::Real)
     X = element("geometry", time)
-    dN = get_dbasis(E, ip.xi)
+    dN = get_dbasis(E, xi)
     J = sum([kron(dN[:,i], X[i]') for i=1:length(X)])
-    m, n = size(J)
-    return m == n ? det(J) : norm(J)
+    return J
 end
+function get_jacobian{E}(element::Element{E}, ip::IntegrationPoint, time::Real)
+    return get_jacobian(element, ip.xi, time)
+end
+
+""" Return the determinant of jacobian. """
+function LinAlg.det{E<:AbstractElement}(element::Element{E}, xi::Vector{Float64}, time::Real)
+    warn("det(element, ip, time) is ambiguous: use J = get_jacobian(element, ip, time); det(J) instead.")
+    J = get_jacobian(element, xi, time)
+    n, m = size(J)
+    if n == m
+        return det(J)
+    end
+    JT = transpose(J)
+    s = size(JT, 2) == 1 ? norm(JT) : norm(cross(JT[:,1], JT[:,2]))
+    return s
+end
+function LinAlg.det{E<:AbstractElement}(element::Element{E}, ip::IntegrationPoint, time::Real)
+    return det(element, ip.xi, time)
+end
+
+
 
 """ Check does field exist. """
 function Base.haskey(element::Element, what)

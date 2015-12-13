@@ -36,13 +36,13 @@ function test_plane_stress_linear_elasticity_with_surface_load()
 
     free_dofs = Int64[3, 5, 6, 8]
 
-    info("initial force vector")
     ass = assemble(problem, 0.0)
     f = full(ass.force_vector)
     K = full(ass.stiffness_matrix)
-    dump(reshape(f, 2, 4))
-    info("initial stiffness matrix")
-    dump(round(Int, K)[free_dofs, free_dofs])
+#   info("initial force vector")
+#   dump(reshape(f, 2, 4))
+#   info("initial stiffness matrix")
+#   dump(round(Int, K)[free_dofs, free_dofs])
 
     u = zeros(2, 4)
     u[free_dofs] = K[free_dofs, free_dofs] \ f[free_dofs]
@@ -75,7 +75,7 @@ function test_continuum_elasticity_with_surface_load()
     end
     element1 = Hex8([1, 2, 3, 4, 5, 6, 7, 8])
     set_geometry!(element1, nodes)
-    element1["youngs modulus"] = 9000.0
+    element1["youngs modulus"] = 900.0
     element1["poissons ratio"] = 0.25
 
     element2 = Quad4([5, 6, 7, 8])
@@ -100,13 +100,13 @@ function test_continuum_elasticity_with_surface_load()
     free_dofs = find(vec(free_dofs'))
     info("free dofs: $free_dofs")
 
-    info("initial force vector")
     ass = assemble(problem, 0.0)
     f = full(ass.force_vector)
     K = full(ass.stiffness_matrix)
-    dump(reshape(f, 3, 8))
-    info("initial stiffness matrix")
-    dump(round(Int, K)[free_dofs, free_dofs])
+#   info("initial force vector")
+#   dump(reshape(f, 3, 8))
+#   info("initial stiffness matrix")
+#   dump(round(Int, K)[free_dofs, free_dofs])
 
     u = zeros(3, 8)
     u[free_dofs] = K[free_dofs, free_dofs] \ f[free_dofs]
