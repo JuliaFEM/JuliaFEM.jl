@@ -46,24 +46,25 @@ function assemble!(assembly::Assembly, problem::Problem{HeatProblem}, element::E
 
     gdofs = get_gdofs(element, problem.dim)
     for ip in get_integration_points(element)
-        w = ip.weight*det(element, ip, time)
+        w = ip.weight
+        J = get_jacobian(element, ip, time)
         N = element(ip, time)
         if haskey(element, "density")
             rho = element("density", ip, time)
-            add!(assembly.mass_matrix, gdofs, gdofs, w*rho*N'*N)
+            add!(assembly.mass_matrix, gdofs, gdofs, w*rho*N'*N*det(J))
         end
         if haskey(element, "temperature thermal conductivity")
             dN = element(ip, time, Val{:grad})
             k = element("temperature thermal conductivity", ip, time)
-            add!(assembly.stiffness_matrix, gdofs, gdofs, w*k*dN'*dN)
+            add!(assembly.stiffness_matrix, gdofs, gdofs, w*k*dN'*dN*det(J))
         end
         if haskey(element, "temperature load")
             f = element("temperature load", ip, time)
-            add!(assembly.force_vector, gdofs, w*N'*f)
+            add!(assembly.force_vector, gdofs, w*N'*f*det(J))
         end
         if haskey(element, "temperature flux")
             g = element("temperature flux", ip, time)
-            add!(assembly.force_vector, gdofs, w*N'*g)
+            add!(assembly.force_vector, gdofs, w*N'*g*norm(J))
         end
     end
 end

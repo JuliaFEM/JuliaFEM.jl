@@ -6,7 +6,7 @@ module ElementTests
 using JuliaFEM.Test
 
 using JuliaFEM.Core: AbstractElement, Element, Field, FieldSet, test_element
-using JuliaFEM.Core: Tri3
+using JuliaFEM.Core: Tri3, Quad4
 import JuliaFEM.Core: get_basis, get_dbasis, calculate_normal_tangential_coordinates!
 import Base: size
 
@@ -90,5 +90,16 @@ function test_calculate_normal_tangential_coordinates()
     @test isapprox(el("normal-tangential coordinates", [0.0, 0.0], 0.0), R)
 end
 #test_calculate_normal_tangential_coordinates()
+
+function test_manifold_determinant()
+    el = Quad4([1, 2, 3, 4])
+    #el["geometry"] = Vector{Float64}[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+    el["geometry"] = Vector{Float64}[[0.0, 0.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 1.0], [0.0, 1.0, 1.0]]
+    # mother element area = 2*2 = 4, this element is 1, determinant should be 1/4 everywhere
+    d = det(el, [0.1, 0.2], 0.0)
+    d_expected = 0.25
+    @test d == d_expected
+end
+#test_manifold_determinant()
 
 end

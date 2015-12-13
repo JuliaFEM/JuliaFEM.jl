@@ -16,7 +16,8 @@ function assemble!{E<:CG, P<:LinearElasticityProblem}(assembly::Assembly, proble
     ndim, nnodes = size(E)
     B = zeros(6, 3*nnodes)
     for ip in get_integration_points(element)
-        w = ip.weight*det(element, ip, time)
+        w = ip.weight
+        J = get_jacobian(element, ip, time)
         N = element(ip, time)
         if haskey(element, "youngs modulus") && haskey(element, "poissons ratio")
             v = element("poissons ratio", ip, time)
@@ -44,16 +45,16 @@ function assemble!{E<:CG, P<:LinearElasticityProblem}(assembly::Assembly, proble
                 B[6, 3*(i-1)+1] = dN[3,i]
                 B[6, 3*(i-1)+3] = dN[1,i]
             end
-            add!(assembly.stiffness_matrix, gdofs, gdofs, w*B'*C*B)
+            add!(assembly.stiffness_matrix, gdofs, gdofs, w*B'*C*B*det(J))
         end
         if haskey(element, "displacement load")
             b = element("displacement load", ip, time)
-            add!(assembly.force_vector, gdofs, w*N'*b)
+            add!(assembly.force_vector, gdofs, w*N'*b*det(J))
         end
         if haskey(element, "displacement traction force")
             T = element("displacement traction force", ip, time)
-            L = w*T*N
-#           dump(L)
+            JT = transpose(J)
+            L = w*T*N*norm(cross(JT[:,1], JT[:,2]))
             add!(assembly.force_vector, gdofs, vec(L))
         end
     end
@@ -72,7 +73,8 @@ function assemble!{E<:CG, P<:PlaneStressLinearElasticityProblem}(assembly::Assem
     ndim, nnodes = size(E)
     B = zeros(3, 2*nnodes)
     for ip in get_integration_points(element)
-        w = ip.weight*det(element, ip, time)
+        w = ip.weight
+        J = get_jacobian(element, ip, time)
         N = element(ip, time)
         if haskey(element, "youngs modulus") && haskey(element, "poissons ratio")
             nu = element("poissons ratio", ip, time)
@@ -89,17 +91,17 @@ function assemble!{E<:CG, P<:PlaneStressLinearElasticityProblem}(assembly::Assem
                 B[3, 2*(i-1)+1] = dN[2,i]
                 B[3, 2*(i-1)+2] = dN[1,i]
             end
-            add!(assembly.stiffness_matrix, gdofs, gdofs, w*B'*C*B)
+            add!(assembly.stiffness_matrix, gdofs, gdofs, w*B'*C*B*det(J))
         end
         if haskey(element, "displacement load")
             b = element("displacement load", ip, time)
-            add!(assembly.force_vector, gdofs, w*N'*b)
+            add!(assembly.force_vector, gdofs, w*N'*b*det(J))
         end
         if haskey(element, "displacement traction force")
             T = element("displacement traction force", ip, time)
-            L = w*T*N
-#           dump(L)
+            L = w*T*N*norm(J)
             add!(assembly.force_vector, gdofs, vec(L))
         end
     end
 end
+

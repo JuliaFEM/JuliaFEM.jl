@@ -7,7 +7,7 @@ using JuliaFEM.Test
 
 using JuliaFEM.Core: AbstractProblem, Problem
 using JuliaFEM.Core: Element, Seg2, Quad4
-using JuliaFEM.Core: IntegrationPoint, solve!
+using JuliaFEM.Core: IntegrationPoint, solve!, get_jacobian
 
 import JuliaFEM.Core: get_unknown_field_name, get_unknown_field_type, get_potential_energy
 
@@ -34,7 +34,9 @@ function get_potential_energy(problem::Problem{HeatProblem}, element::Element{Qu
     gradT = element("temperature", ip, time, Val{:grad}, variation)
     Wint = (k + c*T) * 1/2*vecdot(gradT, gradT)
     Wext = f*T
-    return Wint - Wext
+    W = Wint - Wext
+    J = get_jacobian(element, ip, time)
+    return W*det(J)
 end
 
 function get_potential_energy(problem::Problem{HeatProblem}, element::Element{Seg2}, ip::IntegrationPoint, time::Number; variation=nothing)
@@ -45,7 +47,8 @@ function get_potential_energy(problem::Problem{HeatProblem}, element::Element{Se
     Wint = 0.0
     Wext = q0*T
     W = Wint - Wext
-    return W
+    J = get_jacobian(element, ip, time)
+    return W*norm(J)
 end
 
 function test_potential_energy_method()
