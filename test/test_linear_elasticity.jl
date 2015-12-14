@@ -7,7 +7,8 @@ using JuliaFEM
 using JuliaFEM.Test
 
 using JuliaFEM.Core: Seg2, Quad4, Hex8, LinearElasticityProblem, get_connectivity,
-                     assemble, PlaneStressLinearElasticityProblem
+                     assemble, PlaneStressLinearElasticityProblem, DirichletProblem,
+                     LinearSolver
 using JuliaFEM.Preprocess: aster_parse_nodes
 
 
@@ -85,7 +86,7 @@ function test_continuum_elasticity_with_surface_load()
     problem = LinearElasticityProblem()
     push!(problem, element1)
     push!(problem, element2)
-
+#=
     free_dofs = zeros(Bool, 8, 3)
     x = 1
     y = 2
@@ -107,15 +108,38 @@ function test_continuum_elasticity_with_surface_load()
 #   dump(reshape(f, 3, 8))
 #   info("initial stiffness matrix")
 #   dump(round(Int, K)[free_dofs, free_dofs])
-
     u = zeros(3, 8)
     u[free_dofs] = K[free_dofs, free_dofs] \ f[free_dofs]
-
     info("result vector")
     dump(u)
+=#
+
+    dx = Quad4([1, 4, 8, 5])
+    dx["displacement 1"] = 0.0
+    dy = Quad4([1, 5, 6, 2])
+    dy["displacement 2"] = 0.0
+    dz = Quad4([1, 2, 3, 4])
+    dz["displacement 3"] = 0.0
+    bc = DirichletProblem("displacement", 3)
+    for el in [dx, dy, dz]
+        set_geometry!(el, nodes)
+        push!(bc, el)
+    end
+    solver = LinearSolver()
+    push!(solver, problem)
+    push!(solver, bc)
+#   solver.dump_matrices = true
+#   solver.name = "3d_hex8"
+    solver(0.0)
+
+    X = element1("geometry", [1.0, 1.0, 1.0], 0.0)
+    u = element1("displacement", [1.0, 1.0, 1.0], 0.0)
+    info("displacement at $X = $u")
+
     # verified using Code Aster.
     # 2015-12-12-continuum-elasticity/c3d_linear.*
-    @test isapprox(u[:,7], [2.77777777777778E-02, 2.77777777777778E-02, -1.11111111111111E-01])
+    # [1/36, 1/36, -1/9]
+    @test isapprox(u, [2.77777777777778E-02, 2.77777777777778E-02, -1.11111111111111E-01])
 end
 #test_continuum_elasticity_with_surface_load()
 

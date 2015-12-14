@@ -16,7 +16,8 @@ using JuliaFEM.Core: create_auxiliary_plane, project_point_to_auxiliary_plane,
                      get_edge_intersections, get_points_inside_triangle,
                      clip_polygon, calculate_polygon_centerpoint,
                      project_point_from_plane_to_surface, assemble,
-                     calculate_normal_tangential_coordinates!
+                     calculate_normal_tangential_coordinates!,
+                     is_point_inside_convex_polygon
 
 
 function get_test_2d_model()
@@ -455,14 +456,38 @@ end
 #test_get_points_inside_triangle()
 
 
-function test_polygon_clipping()
+function test_is_point_inside_convex_polygon()
+    X = Vector{Float64}[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+    @test is_point_inside_convex_polygon([0.5, 0.5], X) == true
+    @test is_point_inside_convex_polygon([1.0, 0.5], X) == true
+    @test is_point_inside_convex_polygon([1.1, 0.5], X) == false
+    @test is_point_inside_convex_polygon([1.0, 1.0], X) == true
+    @test is_point_inside_convex_polygon([0.0, 0.3], X) == true
+    @test is_point_inside_convex_polygon([0.0, -0.000001], X) == false
+end
+
+
+function test_polygon_clipping_easy()
     S = [0 0; 3 0; 0 3]'
     M = [-1 1; 2 -1/2; 2 2]'
     P, n = clip_polygon(S, M)
     @test isapprox(P, [0.0 0.5; 1.0 0.0; 2.0 0.0; 2.0 1.0; 1.25 1.75; 0.0 4/3]')
     @test isapprox(n, [1 0 1; 1 1 0; 0 1 1])
 end
-#test_polygon_clipping()
+
+function test_polygon_clipping_no_clip()
+    # no clipping at all
+    S = [-0.125   0.125  0.125  -0.125
+         -0.125  -0.125  0.125   0.125]
+    M = [-0.291667  -0.625     -0.625  -0.291667
+         -0.208333  -0.208333   0.125   0.125   ]
+    P, n = clip_polygon(S, M)
+    # FIXME: check better.
+    @test isa(P, Void)
+    @test isa(n, Void)
+
+end
+#test_polygon_clipping_no_clip()
 
 
 function test_calculate_polygon_centerpoint()
@@ -477,7 +502,7 @@ end
 
 
 
-function test_assemble_3d_problem()
+function test_assemble_3d_problem_tri3()
     nodes = Vector{Float64}[
         [0.0, 0.0, 0.0],
         [1.0, 0.0, 0.0],
@@ -533,7 +558,47 @@ function test_assemble_3d_problem()
     @test isapprox(stiffness_matrix, B)
 
 end
-test_assemble_3d_problem()
+#test_assemble_3d_problem_tri3()
 
+
+function test_assemble_3d_problem_quad4()
+    nodes = Vector{Float64}[
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [1.0, 1.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.1],
+        [1.0, 0.0, 0.1],
+        [1.0, 1.0, 0.1],
+        [0.0, 1.0, 0.1]]
+#=
+    nodes = Vector{Float64}[
+        [-1.0, -1.0, 0.0],
+        [+1.0, -1.0, 0.0],
+        [+1.0, +1.0, 0.0],
+        [-1.0, +1.0, 0.0],
+        [-1.0, -1.0, 0.1],
+        [+1.0, -1.0, 0.1],
+        [+1.0, +1.0, 0.1],
+        [-1.0, +1.0, 0.1]]
+=#
+    mel = Quad4([5, 6, 7, 8])
+    mel["geometry"] = Vector{Float64}[nodes[5], nodes[6], nodes[7], nodes[8]]
+    sel = Quad4([1, 2, 3, 4])
+    sel["geometry"] = Vector{Float64}[nodes[1], nodes[2], nodes[3], nodes[4]]
+    calculate_normal_tangential_coordinates!(sel, 0.0)
+    sel["master elements"] = Element[mel]
+    prob = MortarProblem("temperature", 1)
+
+    push!(prob, sel)
+    stiffness_matrix = full(assemble(prob, 0.0).stiffness_matrix)
+    info("stiffness matrix for this problem:\n$stiffness_matrix")
+    M = D = 1/36*[4 2 1 2; 2 4 2 1; 1 2 4 2; 2 1 2 4]
+    B = [D -M]  # slave dofs are first in this.
+    info("expected matrix for this problem:\n$B")
+    @test isapprox(stiffness_matrix, B)
+
+end
+#test_assemble_3d_problem_quad4()
 
 end

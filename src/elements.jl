@@ -8,6 +8,10 @@ type Element{E<:AbstractElement}
     fields :: Dict{ASCIIString, Field}
 end
 
+function Base.size{E}(::Element{E})
+    return size(E)
+end
+
 function convert{E}(::Type{Element{E}}, connectivity::Vector{Int})
 #   return Element{E}(connectivity, get_integration_points(E), Dict())
     return Element{E}(connectivity, Dict())
@@ -211,15 +215,20 @@ end
 
 """ Return the determinant of jacobian. """
 function LinAlg.det{E<:AbstractElement}(element::Element{E}, xi::Vector{Float64}, time::Real)
-    warn("det(element, ip, time) is ambiguous: use J = get_jacobian(element, ip, time); det(J) instead.")
     J = get_jacobian(element, xi, time)
     n, m = size(J)
     if n == m
+        warn("det(element, ip, time) is ambiguous: use J = get_jacobian(element, ip, time); det(J) instead.")
         return det(J)
     end
     JT = transpose(J)
-    s = size(JT, 2) == 1 ? norm(JT) : norm(cross(JT[:,1], JT[:,2]))
-    return s
+    if size(JT, 2) == 1
+        warn("det(element, ip, time) is ambiguous: use J = get_jacobian(element, ip, time); norm(J) instead.")
+        return norm(JT)
+    else
+        warn("det(element, ip, time) is ambiguous: use J = get_jacobian(element, ip, time); norm(cross(...)) instead.")
+        return norm(cross(JT[:,1], JT[:,2]))
+    end
 end
 function LinAlg.det{E<:AbstractElement}(element::Element{E}, ip::IntegrationPoint, time::Real)
     return det(element, ip.xi, time)
