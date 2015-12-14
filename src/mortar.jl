@@ -376,6 +376,29 @@ function get_points_inside_triangle(Y::Matrix, X::Matrix)
     return P
 end
 
+"""
+Determine is point P inside or on boudary of polygon X.
+
+http://paulbourke.net/geometry/polygonmesh/#insidepoly
+"""
+function is_point_inside_convex_polygon(P, X)
+    x, y = P
+    for i=1:length(X)
+        x0, y0 = X[i]
+        x1, y1 = X[mod(i, length(X))+1]
+        if (y-y0)*(x1-x0) - (x-x0)*(y1-y0) < 0
+            return false
+        end
+    end
+    return true
+end
+
+function get_points_inside_convex_polygon(pts, X)
+    # TODO: Make more readable
+    X2 = [X[:,i] for i=1:size(X,2)]
+    c = filter(P->is_point_inside_convex_polygon(P, X2), [pts[:,i] for i=1:size(pts, 2)])
+    return length(c) == 0 ? zeros(2, 0) : hcat(c...)
+end
 
 """ Return unique objects with some given tolerance. This is used in next function
     because traditional unique() command returns row vectors as non-unique if they
@@ -434,9 +457,18 @@ julia> n
 """
 function clip_polygon(S::Matrix, M::Matrix)
     P1, neighbours = get_edge_intersections(M, S)
-    P2 = get_points_inside_triangle(M, S)
-    P3 = get_points_inside_triangle(S, M)
+    #P2 = get_points_inside_triangle(M, S)
+    #P3 = get_points_inside_triangle(S, M)
+    P2 = get_points_inside_convex_polygon(M, S)
+    P3 = get_points_inside_convex_polygon(S, M)
+#   info("polygon clipping: P1 = $P1")
+#   info("polygon clipping: P2 = $P2")
+#   info("polygon clipping: P3 = $P3")
+#   info("hcat P = $P")
     P = hcat(P1, P2, P3)
+    if length(P) == 0
+        return nothing, nothing
+    end
     P = uniquetol(P, 2)
     meanval = mean(P, 2)
     tmp = P .- meanval
@@ -654,7 +686,7 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::BoundaryPro
 end
 
 
-typealias MortarElements3D Union{Tri3}
+typealias MortarElements3D Union{Tri3, Quad4}
 
 function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::BoundaryProblem{MortarProblem}, slave_element::Element{E}, time::Real)
     field_dim = problem.parent_field_dim
@@ -666,13 +698,14 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::BoundaryPro
     # create auxiliary plane and project slave nodes to it
     # x0 = origo, Q = local basis
     x0, Q = create_auxiliary_plane(slave_element, time)
-    S = Vector{Float64}[]
+    Sl = Vector{Float64}[]
     for p in slave_element("geometry", time)
-        push!(S, project_point_to_auxiliary_plane(p, x0, Q))
+        push!(Sl, project_point_to_auxiliary_plane(p, x0, Q))
     end
-    S = reshape([S...;], 2, 3)
+    #S = reshape([S...;], 2, size(slave_element)[2])
+    S = hcat(Sl...)
 
-    integration_points = get_integration_points(E, Val{5})
+    integration_points = get_integration_points(Tri3, Val{5})
 
     for master_element in slave_element["master elements"]
         master_dofs = get_gdofs(master_element, field_dim)
@@ -681,25 +714,48 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::BoundaryPro
         for p in master_element("geometry", time)
             push!(M, project_point_to_auxiliary_plane(p, x0, Q))
         end
-        M = reshape([M...;], 2, 3)
-        P, neighbours = clip_polygon(S, M)
+        #M = reshape([M...;], 2, size(master_element)[2])
+        M = hcat(M...)
+        P = nothing
+        neighbours = nothing
+        try
+            P, neighbours = clip_polygon(S, M)
+        catch
+            info("polygon clipping failed")
+            info("S = ")
+            dump(S)
+            info("M = ")
+            dump(M)
+            info("original Sl = ")
+            info(Sl)
+            error("cannot continue")
+        end
+        isa(P, Void) && continue # no clipping
+#       info("polygon on auxilyary plane: ")
+#       dump(round(P, 3))
         C = calculate_polygon_centerpoint(P)
+#       info("center point = $C")
 
         npts = size(P, 2) # number of vertices in polygon
+#       info("number of vectices in polygon: $npts")
 #       S = zeros(3, 3)
 #       M = zeros(3, 3)
         for i=1:npts # loop vertices and create temporary integrate cells
             xvec = [C[1], P[1, i], P[1, mod(i, npts)+1]]
             yvec = [C[2], P[2, i], P[2, mod(i, npts)+1]]
             X = hcat(xvec, yvec)'
+#           info("cell $i, coords = ")
+#           dump(round(X, 3))
             geom = Field(Vector{Float64}[X[:,j] for j=1:size(X,2)])
             for ip in integration_points
                 # calculate determiant of jacobian
-                dN = get_dbasis(E, ip.xi)
+                #dN = get_dbasis(E, ip.xi)
+                dN = get_dbasis(Tri3, ip.xi)
                 J = sum([kron(dN[:,j], geom[j]') for j=1:length(geom)])
                 w = ip.weight*det(J)
                 # gauss point in auxiliary plane
-                N = get_basis(E, ip.xi)
+                #N = get_basis(E, ip.xi)
+                N = get_basis(Tri3, ip.xi)
                 x = vec(N*geom)
                 # find projection of gauss point to master and slave elements
                 theta1 = project_point_from_plane_to_surface(x, x0, Q, slave_element, time)
@@ -707,13 +763,13 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::BoundaryPro
                 # evaluate shape functions values in gauss point and add contribution to matrices
                 N1 = slave_element(theta1[2:3], time)
                 N2 = master_element(theta2[2:3], time)
-                S = w*N1'*N1
-                M = w*N1'*N2
+                Sm = w*N1'*N1
+                Mm = w*N1'*N2
                 for k=1:field_dim
                     sd = slave_dofs[k:field_dim:end]
                     md = master_dofs[k:field_dim:end]
-                    add!(assembly.stiffness_matrix, sd, sd, S)
-                    add!(assembly.stiffness_matrix, sd, md, -M)
+                    add!(assembly.stiffness_matrix, sd, sd, Sm)
+                    add!(assembly.stiffness_matrix, sd, md, -Mm)
 #                   info("sd = $sd")
 #                   info("md = $md")
                 end

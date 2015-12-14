@@ -37,8 +37,9 @@ using LightXML
 # > #define XDMF_3DCORECTMESH   0x1102
 
 global eltypes = Dict{Symbol, Int}(
-    :Tet4  => 0x6,
     :Quad4 => 0x5,
+    :Tet4  => 0x6,
+    :Hex8  => 0x9,
     :Tet10 => 0x0026)
 
 function xdmf_new_model(xdmf_version="2.1")

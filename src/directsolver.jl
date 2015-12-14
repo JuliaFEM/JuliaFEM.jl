@@ -207,6 +207,7 @@ function call(solver::DirectSolver, time::Number=0.0)
         end
         K = sparse(field_assembly.stiffness_matrix)
         dim = size(K, 1)
+        info("dim = $dim")
         f = sparse(field_assembly.force_vector, dim, 1)
         field_assembly = nothing
         gc()

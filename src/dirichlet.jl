@@ -15,7 +15,14 @@ function assemble!(assembly::Assembly, problem::BoundaryProblem{DirichletProblem
 
     gdofs = get_gdofs(element, field_dim)
     for ip in get_integration_points(element, Val{2})
-        w = ip.weight * det(element, ip, time)
+        w = ip.weight
+        J = get_jacobian(element, ip, time)
+        JT = transpose(J)
+        if size(JT, 2) == 1  # plane problem
+            w *= norm(JT)
+        else
+            w *= norm(cross(JT[:,1], JT[:,2]))
+        end
         N = element(ip, time)
         A = w*N'*N
 

@@ -87,6 +87,7 @@ common situation, i.e., some main field problem and it's Dirichlet boundary.
 """
 function call(solver::LinearSolver, time::Float64)
 
+    t0 = Base.time()
     field_name = get_unknown_field_name(solver.field_problems[1])
     field_dim = get_unknown_field_dimension(solver.field_problems[1])
     info("solving $field_name problem, $field_dim dofs / nodes")
@@ -94,7 +95,7 @@ function call(solver::LinearSolver, time::Float64)
     field_assembly = assemble(solver.field_problems[1], time)
     boundary_assembly = assemble(solver.boundary_problems[1], time)
 
-    info("Creating sparse matrices")
+    #info("Creating sparse matrices")
     K = sparse(field_assembly.stiffness_matrix)
     dim = size(K, 1)
     f = sparse(field_assembly.force_vector, dim, 1)
@@ -132,6 +133,8 @@ function call(solver::LinearSolver, time::Float64)
         end
     end
 
+    t1 = round(Base.time()-t0, 2)
+    info("solved problem in $t1 seconds.")
     return norm(u)
 end
 
