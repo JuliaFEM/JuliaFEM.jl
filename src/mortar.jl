@@ -702,10 +702,11 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::BoundaryPro
     for p in slave_element("geometry", time)
         push!(Sl, project_point_to_auxiliary_plane(p, x0, Q))
     end
+    @debug info("auxiliary plane coords and basis: origo = $x0")
+    @debug info("basis:")
+    @debug dump(round(Q, 3))
     #S = reshape([S...;], 2, size(slave_element)[2])
     S = hcat(Sl...)
-
-    integration_points = get_integration_points(Tri3, Val{5})
 
     for master_element in slave_element["master elements"]
         master_dofs = get_gdofs(master_element, field_dim)
@@ -718,6 +719,9 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::BoundaryPro
         M = hcat(M...)
         P = nothing
         neighbours = nothing
+        @debug info("applying polygon clip algorithm, S & M = ")
+        @debug dump(round(S, 3))
+        @debug dump(round(M, 3))
         try
             P, neighbours = clip_polygon(S, M)
         catch
@@ -731,23 +735,23 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::BoundaryPro
             error("cannot continue")
         end
         isa(P, Void) && continue # no clipping
-#       info("polygon on auxilyary plane: ")
-#       dump(round(P, 3))
+        @debug info("polygon on auxilyary plane: ")
+        @debug dump(round(P, 3))
         C = calculate_polygon_centerpoint(P)
-#       info("center point = $C")
+        @debug info("center point = $C")
 
         npts = size(P, 2) # number of vertices in polygon
-#       info("number of vectices in polygon: $npts")
+        @debug info("number of vectices in polygon: $npts")
 #       S = zeros(3, 3)
 #       M = zeros(3, 3)
         for i=1:npts # loop vertices and create temporary integrate cells
             xvec = [C[1], P[1, i], P[1, mod(i, npts)+1]]
             yvec = [C[2], P[2, i], P[2, mod(i, npts)+1]]
             X = hcat(xvec, yvec)'
-#           info("cell $i, coords = ")
-#           dump(round(X, 3))
+            @debug info("cell $i, coords = ")
+            @debug dump(round(X, 3))
             geom = Field(Vector{Float64}[X[:,j] for j=1:size(X,2)])
-            for ip in integration_points
+            for ip in get_integration_points(Tri3, Val{5})
                 # calculate determiant of jacobian
                 #dN = get_dbasis(E, ip.xi)
                 dN = get_dbasis(Tri3, ip.xi)
@@ -764,7 +768,8 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::BoundaryPro
                 N1 = slave_element(theta1[2:3], time)
                 N2 = master_element(theta2[2:3], time)
                 Sm = w*N1'*N1
-                Mm = w*N1'*N2
+                # FIXME: master side transpose -- why?
+                Mm = w*(N1'*N2)'
                 for k=1:field_dim
                     sd = slave_dofs[k:field_dim:end]
                     md = master_dofs[k:field_dim:end]

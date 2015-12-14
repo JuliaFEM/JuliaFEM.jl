@@ -143,7 +143,6 @@ end
 function call(solver::DirectSolver, time::Number=0.0)
     info("# of field problems: $(length(solver.field_problems))")
     info("# of boundary problems: $(length(solver.boundary_problems))")
-    @assert solver.nonlinear_problem == true
 
     timing = Dict{ASCIIString, Float64}()
     tic(timing, "solver")
@@ -275,7 +274,7 @@ function call(solver::DirectSolver, time::Number=0.0)
         toc(timing, "non-linear iteration")
 
         if true
-            info("timing info for non-linear iteration:")
+            info("timing info for iteration:")
             info("boundary assembly       : ", time_elapsed(timing, "boundary assembly"))
             info("field assembly          : ", time_elapsed(timing, "field assembly"))
             info("dump matrices to disk   : ", time_elapsed(timing, "dump matrices to disk"))
@@ -284,7 +283,7 @@ function call(solver::DirectSolver, time::Number=0.0)
             info("non-linear iteration    : ", time_elapsed(timing, "non-linear iteration"))
         end
 
-        if norm(sol) < solver.tol
+        if (norm(sol) < solver.tol) || !solver.nonlinear_problem
             toc(timing, "solver")
             info("solver finished in ", time_elapsed(timing, "solver"), " seconds.")
             return (iter, true)

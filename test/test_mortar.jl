@@ -562,26 +562,17 @@ end
 
 
 function test_assemble_3d_problem_quad4()
+    info("assemble 3d problem in quad4-quad4")
     nodes = Vector{Float64}[
         [0.0, 0.0, 0.0],
         [1.0, 0.0, 0.0],
         [1.0, 1.0, 0.0],
         [0.0, 1.0, 0.0],
         [0.0, 0.0, 0.1],
-        [1.0, 0.0, 0.1],
-        [1.0, 1.0, 0.1],
-        [0.0, 1.0, 0.1]]
-#=
-    nodes = Vector{Float64}[
-        [-1.0, -1.0, 0.0],
-        [+1.0, -1.0, 0.0],
-        [+1.0, +1.0, 0.0],
-        [-1.0, +1.0, 0.0],
-        [-1.0, -1.0, 0.1],
-        [+1.0, -1.0, 0.1],
-        [+1.0, +1.0, 0.1],
-        [-1.0, +1.0, 0.1]]
-=#
+        [2.0, 0.0, 0.1],
+        [2.0, 2.0, 0.1],
+        [0.0, 2.0, 0.1]]
+
     mel = Quad4([5, 6, 7, 8])
     mel["geometry"] = Vector{Float64}[nodes[5], nodes[6], nodes[7], nodes[8]]
     sel = Quad4([1, 2, 3, 4])
@@ -591,14 +582,115 @@ function test_assemble_3d_problem_quad4()
     prob = MortarProblem("temperature", 1)
 
     push!(prob, sel)
-    stiffness_matrix = full(assemble(prob, 0.0).stiffness_matrix)
-    info("stiffness matrix for this problem:\n$stiffness_matrix")
-    M = D = 1/36*[4 2 1 2; 2 4 2 1; 1 2 4 2; 2 1 2 4]
+    stiffness_matrix = full(assemble(prob, 0.0).stiffness_matrix)*144
+    D = [16 8 4 8; 8  16 8 4;  4 8 16 8;  8 4 8 16]
+    M = [25 5 1 5; 20 10 2 4; 16 8  4 8; 20 4 2 10]
     B = [D -M]  # slave dofs are first in this.
-    info("expected matrix for this problem:\n$B")
+    info("expected matrix for this problem:")
+    dump(round(B, 3))
+
+    info("stiffness matrix for this problem:")
+    dump(round(stiffness_matrix, 3))
     @test isapprox(stiffness_matrix, B)
 
 end
 #test_assemble_3d_problem_quad4()
+
+
+function test_assemble_3d_problem_quad4_2()
+    info("assemble 3d problem in quad4-quad4")
+    nodes = Vector{Float64}[
+        [0.0, 0.0, 0.0],
+        [1/4, 0.0, 0.0],
+        [1/4, 1/4, 0.0],
+        [0.0, 1/4, 0.0],
+        [0.0, 0.0, 0.0],
+        [1/3, 0.0, 0.0],
+        [1/3, 1/3, 0.0],
+        [0.0, 1/3, 0.0]]
+
+    mel = Quad4([5, 6, 7, 8])
+    mel["geometry"] = Vector{Float64}[nodes[5], nodes[6], nodes[7], nodes[8]]
+    sel = Quad4([1, 2, 3, 4])
+    sel["geometry"] = Vector{Float64}[nodes[1], nodes[2], nodes[3], nodes[4]]
+    calculate_normal_tangential_coordinates!(sel, 0.0)
+    sel["master elements"] = Element[mel]
+    prob = MortarProblem("temperature", 1)
+
+    push!(prob, sel)
+    stiffness_matrix = full(assemble(prob, 0.0).stiffness_matrix)*589824
+    D = [
+        4096 2048 1024 2048
+        2048 4096 2048 1024
+        1024 2048 4096 2048
+        2048 1024 2048 4096
+        ]
+         
+    M = [
+        5184 1728  576 1728
+        3456 3456 1152 1152
+        2304 2304 2304 2304
+        3456 1152 1152 3456
+        ]
+    B = [D -M]  # slave dofs are first in this.
+    info("expected matrix for this problem:")
+    dump(round(B, 3))
+
+    info("stiffness matrix for this problem:")
+    dump(round(stiffness_matrix, 3))
+    @test isapprox(stiffness_matrix, B)
+
+end
+#test_assemble_3d_problem_quad4_2()
+
+
+function test_assemble_3d_problem_quad4_3()
+    info("assemble 3d problem in quad4-quad4")
+    a = 1/4
+    b = 1/3
+    nodes = Vector{Float64}[
+        [2*a,   a, 0],
+        [3*a,   a, 0],
+        [3*a, 2*a, 0],
+        [2*a, 2*a, 0],
+        [  b,   0, 0],
+        [2*b,   0, 0],
+        [2*b,   b, 0],
+        [  b,   b, 0]]
+
+    mel = Quad4([5, 6, 7, 8])
+    mel["geometry"] = Vector{Float64}[nodes[5], nodes[6], nodes[7], nodes[8]]
+    sel = Quad4([1, 2, 3, 4])
+    sel["geometry"] = Vector{Float64}[nodes[1], nodes[2], nodes[3], nodes[4]]
+    calculate_normal_tangential_coordinates!(sel, 0.0)
+    sel["master elements"] = Element[mel]
+    prob = MortarProblem("temperature", 1)
+
+    push!(prob, sel)
+    stiffness_matrix = full(assemble(prob, 0.0).stiffness_matrix)*186624*9
+    D = [
+        7904 3040 560 1456
+        3040 2432 448  560
+         560  448 128  160
+        1456  560 160  416
+        ]
+
+    M = [
+        504 1224 7956 3276
+        144  720 4680  936
+         18   90  990  198
+         63  153 1683  693
+        ]
+
+    B = [D -M]  # slave dofs are first in this.
+    info("expected matrix for this problem:")
+    dump(round(B, 3))
+
+    info("stiffness matrix for this problem:")
+    dump(round(stiffness_matrix, 3))
+    @test isapprox(stiffness_matrix, B)
+
+end
+test_assemble_3d_problem_quad4_3()
 
 end
