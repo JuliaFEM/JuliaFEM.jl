@@ -100,6 +100,14 @@ function get_element_sets(med::MEDFile, mesh_name)
     return es
 end
 
+# hex8 nodes rotating cw first in yz plane then x+1
+
+global const med_elmap = Dict{Symbol, Vector{Int}}(
+    :HE8 => [4, 8, 7, 3, 1, 5, 6, 2],
+    :QU4 => [4, 3, 2, 1],
+    :SE2 => [2, 1]
+)
+
 function get_connectivity(med::MEDFile, elsets, mesh_name)
     elsets[0] = :OTHER
     increments = keys(med.data["ENS_MAA"][mesh_name])
@@ -116,7 +124,16 @@ function get_connectivity(med::MEDFile, elsets, mesh_name)
         element_dim = round(Int, length(element_connectivity)/nelements)
         element_connectivity = reshape(element_connectivity, nelements, element_dim)'
         for i=1:nelements
-            d[element_ids[i]] = (Symbol(eltype), Symbol(elsets[elset_ids[i]]), element_connectivity[:, i])
+            eltype = Symbol(eltype)
+            elco = element_connectivity[:, i]
+            elset = Symbol(elsets[elset_ids[i]])
+            if haskey(med_elmap, eltype)
+                elco = elco[med_elmap[eltype]]
+            else
+                warn("no element mapping info found for element type $eltype")
+                warn("consider this as a warning: element may have french nodal ordering")
+            end
+            d[element_ids[i]] = (eltype, elset, elco)
         end
     end
     return d
