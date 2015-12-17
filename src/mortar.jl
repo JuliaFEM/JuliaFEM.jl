@@ -749,6 +749,12 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::BoundaryPro
     for p in slave_element("geometry", time)
         push!(Sl, project_point_to_auxiliary_plane(p, x0, Q))
     end
+
+    #=
+    Sl = reverse(Sl)
+    slave_dofs = reverse(slave_dofs)
+    =#
+
     @debug begin
         info("auxiliary plane coords and basis: origo = $x0")
         info("basis:")
@@ -871,6 +877,7 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::BoundaryPro
                 end
                 # evaluate shape functions values in gauss point and add contribution to matrices
                 N1 = slave_element(xi_slave, time)
+                #N1 = reshape(reverse(vec(N1)), size(N1))
                 N2 = master_element(xi_master, time)
 
                 # calculate determiant of jacobian
