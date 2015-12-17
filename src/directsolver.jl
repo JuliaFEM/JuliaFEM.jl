@@ -143,6 +143,7 @@ end
 function call(solver::DirectSolver, time::Number=0.0)
     info("# of field problems: $(length(solver.field_problems))")
     info("# of boundary problems: $(length(solver.boundary_problems))")
+    (length(solver.field_problems) != 0) || error("no field problems defined.")
 
     timing = Dict{ASCIIString, Float64}()
     tic(timing, "solver")

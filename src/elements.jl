@@ -264,3 +264,13 @@ function calculate_normal_tangential_coordinates!{E}(element::Element{E}, time::
     element["normal-tangential coordinates"] = ntcoords
 end
 
+""" Pick values from nodes and set to element according to connectivity. """
+function update(element::Element, field_name::ASCIIString, data::Union{Vector, Dict})
+    element[field_name] = [data[i] for i in get_connectivity(element)]
+end
+function update(elements::Vector{Element}, field_name::ASCIIString, data::Union{Vector, Dict})
+#   info("update $field_name for $(length(elements)) elements.")
+    for element in elements
+        update(element, field_name, data)
+    end
+end

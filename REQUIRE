@@ -1,9 +1,7 @@
 julia 0.4 
+BaseTestNext
 ForwardDiff
-Logging
 LightXML
-Docile
-Lexicon
-FactCheck
 HDF5
-Lint
+JLD
+

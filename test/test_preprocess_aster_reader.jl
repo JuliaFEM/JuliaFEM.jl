@@ -7,7 +7,8 @@ using JuliaFEM
 using JuliaFEM.Test
 
 #using JuliaFEM: parse
-using JuliaFEM.Preprocess: aster_parse_nodes
+using JuliaFEM.Preprocess: aster_parse_nodes, aster_renumber_nodes!,
+                           aster_renumber_elements!, aster_combine_meshes
 
 function test_read_mesh()
 mesh = """
@@ -69,6 +70,48 @@ function test_parse_nodes()
     @test nodes[8] == Float64[0.0, 1.0, 1.0]
     @test length(nodes) == 8
 end
-test_parse_nodes()
+#test_parse_nodes()
+
+@testset "test combining meshes" begin
+
+    mesh1 = Dict{ASCIIString, Any}(
+        "nodes" => Dict{Int64, Vector{Float64}}(
+            1 => [1.0, 2.0],
+            2 => [2.0, 3.0]
+        ),
+        "connectivity" => Dict{Int64, Tuple{Symbol, Symbol, Vector{Int64}}}(
+            1 => (:SE2, :GRP1, [1, 2])
+        ),
+    )
+
+    mesh2 = Dict{ASCIIString, Any}(
+        "nodes" => Dict{Int64, Vector{Float64}}(
+            1 => [3.0, 4.0],
+            2 => [4.0, 5.0]
+        ),
+        "connectivity" => Dict{Int64, Tuple{Symbol, Symbol, Vector{Int64}}}(
+            1 => (:SE2, :GRP1, [1, 2])
+        ),
+    )
+
+    aster_renumber_nodes!(mesh1, mesh2)
+    @test length(mesh2["nodes"]) == 2
+    @test 3 in keys(mesh2["nodes"])
+    @test 4 in keys(mesh2["nodes"])
+    @test mesh2["connectivity"][1] == (:SE2, :GRP1, [3, 4])
+
+    aster_renumber_elements!(mesh1, mesh2)
+    @test length(mesh2["connectivity"]) == 1
+    @test mesh2["connectivity"][2] == (:SE2, :GRP1, [3, 4])
+
+    mesh = aster_combine_meshes(mesh1, mesh2)
+    @test length(mesh["nodes"]) == 4
+    @test mesh["nodes"][1] == [1.0, 2.0]
+    @test mesh["nodes"][2] == [2.0, 3.0]
+    @test mesh["nodes"][3] == [3.0, 4.0]
+    @test mesh["nodes"][4] == [4.0, 5.0]
+    @test mesh["connectivity"][1] == (:SE2, :GRP1, [1, 2])
+    @test mesh["connectivity"][2] == (:SE2, :GRP1, [3, 4])
+end
 
 end

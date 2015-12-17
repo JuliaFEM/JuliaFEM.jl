@@ -5,7 +5,8 @@ module MortarTests
 
 using JuliaFEM.Test
 
-using JuliaFEM.Core: Element, Seg2, Quad4, Tri3, MortarProblem, Assembly, assemble!
+using JuliaFEM.Core: Element, Seg2, Quad4, Tri3, Hex8, MortarProblem, Assembly, assemble!,
+                     get_connectivity, update
 using JuliaFEM.Core: PlaneStressElasticityProblem, DirichletProblem, DirectSolver
 
 # 2d stuff
@@ -19,6 +20,7 @@ using JuliaFEM.Core: create_auxiliary_plane, project_point_to_auxiliary_plane,
                      calculate_normal_tangential_coordinates!,
                      is_point_inside_convex_polygon
 
+using JuliaFEM.Core: LinearElasticityProblem
 
 function get_test_2d_model()
     # this is hand calculated and given as an example in my thesis
@@ -691,6 +693,240 @@ function test_assemble_3d_problem_quad4_3()
     @test isapprox(stiffness_matrix, B)
 
 end
-test_assemble_3d_problem_quad4_3()
+#test_assemble_3d_problem_quad4_3()
+
+
+function test_3d_problem()
+    nodes = Vector{Float64}[
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [1.0, 1.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.5],
+        [1.0, 0.0, 0.5],
+        [1.0, 1.0, 0.5],
+        [0.0, 1.0, 0.5],
+
+        [0.0, 0.0, 0.5],
+        [1.0, 0.0, 0.5],
+        [1.0, 1.0, 0.5],
+        [0.0, 1.0, 0.5],
+        [0.0, 0.0, 1.0],
+        [1.0, 0.0, 1.0],
+        [1.0, 1.0, 1.0],
+        [0.0, 1.0, 1.0],
+    ]
+    el1 = Hex8([1, 2, 3, 4, 5, 6, 7, 8])
+    el2 = Hex8([9, 10, 11, 12, 13, 14, 15, 16])
+    sym121 = Quad4([1, 2, 3, 4])
+    sym131 = Quad4([1, 2, 6, 5])
+    sym132 = Quad4([9, 10, 14, 13])
+    sym231 = Quad4([4, 1, 5, 8])
+    sym232 = Quad4([12, 9, 13, 16])
+    force = Quad4([14, 15, 16, 13])
+    l2u = Quad4([5, 6, 7, 8])
+    u2l = Quad4([9, 10, 11, 12])
+    elements = Element[el1, el2, sym121, sym131, sym132, sym231, sym232, force, l2u, u2l]
+    update(elements, "geometry", nodes)
+    el1["youngs modulus"] = el2["youngs modulus"] = 900.0
+    el1["poissons ratio"] = el2["poissons ratio"] = 0.25
+    sym121["displacement 3"] = 0.0
+    sym131["displacement 2"] = sym132["displacement 2"] = 0.0
+    sym231["displacement 1"] = sym232["displacement 1"] = 0.0
+    force["displacement traction force 3"] = -100.0
+    l2u["master elements"] = Element[u2l]
+    calculate_normal_tangential_coordinates!(l2u, 0.0)
+    fb = LinearElasticityProblem("two elastic blocks")
+    push!(fb, el1, el2, force)
+    bc = DirichletProblem("symmetry boundaries", "displacement", 3)
+    push!(bc, sym121, sym131, sym132, sym231, sym232)
+    tie = MortarProblem("tie contact between bodies", "displacement", 3)
+    push!(tie, l2u)
+    solver = DirectSolver("solution of elasticity problem")
+    push!(solver, fb)
+    push!(solver, bc)
+    push!(solver, tie)
+    solver.nonlinear_problem = false
+    solver.method = :UMFPACK
+    call(solver, 0.0)
+    X = el2("geometry", [1.0, 1.0, 1.0], 0.0)
+    u = el2("displacement", [1.0, 1.0, 1.0], 0.0)
+    info("displacement at $X = $u")
+    @test isapprox(u, 1/36*[1, 1, -4])
+end
+#test_3d_problem()
+
+#=
+@testset "plane quad4 projector tests" begin
+    a = 1/2
+    b = 1/3
+    nodes = Dict{Int64, Vector{Float64}}(
+        1 => [0.0, 0.0, 0.0],
+        2 => [1/2, 0.0, 0.0],
+        3 => [1.0, 0.0, 0.0],
+        4 => [0.0, 1.0, 0.0],
+        5 => [1/2, 1.0, 0.0],
+        6 => [1.0, 1.0, 0.0],
+
+        7 => [0.0, 0.0, 0.0],
+        8 => [1/3, 0.0, 0.0],
+        9 => [2/3, 0.0, 0.0],
+       10 => [1.0, 0.0, 0.0],
+       11 => [0.0, 1/2, 0.0],
+       12 => [1/3, 1/2, 0.0],
+       13 => [2/3, 1/2, 0.0],
+       14 => [1.0, 1/2, 0.0],
+       15 => [0.0, 1.0, 0.0],
+       16 => [1/3, 1.0, 0.0],
+       17 => [2/3, 1.0, 0.0],
+       18 => [1.0, 1.0, 0.0],
+    )
+    sel1 = Quad4([1, 2, 5, 4])
+    sel2 = Quad4([2, 3, 6, 5])
+    mel1 = Quad4([7, 8, 12, 11])
+    mel2 = Quad4([8, 9, 13, 12])
+    mel3 = Quad4([9, 10, 14, 13])
+    mel4 = Quad4([11, 12, 16, 15])
+    mel5 = Quad4([12, 13, 17, 16])
+    mel6 = Quad4([13, 14, 18, 17])
+    update(Element[sel1, sel2, mel1, mel2, mel3, mel4, mel5, mel6], "geometry", nodes)
+    calculate_normal_tangential_coordinates!(sel1, 0.0)
+    calculate_normal_tangential_coordinates!(sel2, 0.0)
+    prob = MortarProblem("temperature", 1)
+    push!(prob, sel1)
+    push!(prob, sel2)
+
+    sel1["master elements"] = [mel1, mel2, mel4, mel5]
+    sel2["master elements"] = [mel2, mel3, mel5, mel6]
+    stiffness_matrix = full(assemble(prob, 0.0).stiffness_matrix)*2592*6
+    info("interface matrix:")
+    dump(round(stiffness_matrix, 3))
+    B = [
+        864  432   0 432  216   0 -420 -375  -15    0 -504 -450  -18    0  -84  -75   -3    0
+        432 1728 432 216  864 216 -120 -690 -690 -120 -144 -828 -828 -144  -24 -138 -138  -24
+          0  432 864   0  216 432    0  -15 -375 -420    0  -18 -450 -504    0   -3  -75  -84
+        432  216   0 864  432   0  -84  -75   -3    0 -504 -450  -18    0 -420 -375  -15    0
+        216  864 216 432 1728 432  -24 -138 -138  -24 -144 -828 -828 -144 -120 -690 -690 -120
+          0  216 432   0  432 864    0   -3  -75  -84    0  -18 -450 -504    0  -15 -375 -420
+        ]
+    info("expected interface matrix:")
+    dump(round(B, 3))
+    @test isapprox(stiffness_matrix, B)
+end
+=#
+
+@testset "plane quad4 projector master 3x3 slave 2x2" begin
+    a = 1/2
+    b = 1/3
+    nodes = Dict{Int64, Vector{Float64}}(
+        1 => [0*a, 0*a, 0.0],
+        2 => [1*a, 0*a, 0.0],
+        3 => [2*a, 0*a, 0.0],
+        4 => [0*a, 1*a, 0.0],
+        5 => [1*a, 1*a, 0.0],
+        6 => [2*a, 1*a, 0.0],
+        7 => [0*a, 2*a, 0.0],
+        8 => [1*a, 2*a, 0.0],
+        9 => [2*a, 2*a, 0.0],
+
+       10 => [0*b, 0*b, 0.0],
+       11 => [1*b, 0*b, 0.0],
+       12 => [2*b, 0*b, 0.0],
+       13 => [3*b, 0*b, 0.0],
+       14 => [0*b, 1*b, 0.0],
+       15 => [1*b, 1*b, 0.0],
+       16 => [2*b, 1*b, 0.0],
+       17 => [3*b, 1*b, 0.0],
+       18 => [0*b, 2*b, 0.0],
+       19 => [1*b, 2*b, 0.0],
+       20 => [2*b, 2*b, 0.0],
+       21 => [3*b, 2*b, 0.0],
+       22 => [0*b, 3*b, 0.0],
+       23 => [1*b, 3*b, 0.0],
+       24 => [2*b, 3*b, 0.0],
+       25 => [3*b, 3*b, 0.0],
+    )
+    sel1 = Quad4([1, 2, 5, 4])
+    sel2 = Quad4([2, 3, 6, 5])
+    sel3 = Quad4([4, 5, 8, 7])
+    sel4 = Quad4([5, 6, 9, 8])
+    mel1 = Quad4([10, 11, 15, 14])
+    mel2 = Quad4([11, 12, 16, 15])
+    mel3 = Quad4([12, 13, 17, 16])
+    mel4 = Quad4([14, 15, 19, 18])
+    mel5 = Quad4([15, 16, 20, 19])
+    mel6 = Quad4([16, 17, 21, 20])
+    mel7 = Quad4([18, 19, 23, 22])
+    mel8 = Quad4([19, 20, 24, 23])
+    mel9 = Quad4([20, 21, 25, 24])
+    update(Element[sel1, sel2, sel3, sel4, mel1, mel2, mel3,
+                   mel4, mel5, mel6, mel7, mel8, mel9], "geometry", nodes)
+    calculate_normal_tangential_coordinates!(sel1, 0.0)
+    calculate_normal_tangential_coordinates!(sel2, 0.0)
+    calculate_normal_tangential_coordinates!(sel3, 0.0)
+    calculate_normal_tangential_coordinates!(sel4, 0.0)
+    prob = MortarProblem("temperature", 1)
+    push!(prob, sel1)
+    push!(prob, sel2)
+    push!(prob, sel3)
+    push!(prob, sel4)
+
+    master_elements = [mel1, mel2, mel3, mel4, mel5, mel6, mel7, mel8, mel9]
+    sel1["master elements"] = master_elements
+    sel2["master elements"] = master_elements
+    sel3["master elements"] = master_elements
+    sel4["master elements"] = master_elements
+    B = sparse(assemble(prob, 0.0).stiffness_matrix, 25, 25)*46656
+    B = full(B)
+    D = B[1:9,1:9]
+    M = B[1:9,10:end]
+    info("interface matrix D:")
+    dump(round(D, 3))
+    info("interface matrix M:")
+    dump(round(M, 3))
+    D_expected = [
+        1296  648    0  648  324    0    0    0    0
+         648 2592  648  324 1296  324    0    0    0
+           0  648 1296    0  324  648    0    0    0
+         648  324    0 2592 1296    0  648  324    0
+         324 1296  324 1296 5184 1296  324 1296  324
+           0  324  648    0 1296 2592    0  324  648
+           0    0    0  648  324    0 1296  648    0
+           0    0    0  324 1296  324  648 2592  648
+           0    0    0    0  324  648    0  648 1296]
+
+    M_expected = [
+        -784  -700   -28    0  -700  -625   -25     0   -28   -25    -1     0    0     0     0    0
+        -224 -1288 -1288 -224  -200 -1150 -1150  -200    -8   -46   -46    -8    0     0     0    0
+           0   -28  -700 -784     0   -25  -625  -700     0    -1   -25   -28    0     0     0    0
+        -224  -200    -8    0 -1288 -1150   -46     0 -1288 -1150   -46     0 -224  -200    -8    0
+         -64  -368  -368  -64  -368 -2116 -2116  -368  -368 -2116 -2116  -368  -64  -368  -368  -64
+           0    -8  -200 -224     0   -46 -1150 -1288     0   -46 -1150 -1288    0    -8  -200 -224
+           0     0     0    0   -28   -25    -1     0  -700  -625   -25     0 -784  -700   -28    0
+           0     0     0    0    -8   -46   -46    -8  -200 -1150 -1150  -200 -224 -1288 -1288 -224
+           0     0     0    0     0    -1   -25   -28     0   -25  -625  -700    0   -28  -700 -784]
+
+
+    info("D - D_expected")
+    dump(D - D_expected)
+    info("M - M_expected")
+    dump(M - M_expected)
+    
+    @test isapprox(D, D_expected)
+    @test isapprox(M, M_expected)
+    #=
+    B = [
+        864  432   0 432  216   0 -420 -375  -15    0 -504 -450  -18    0  -84  -75   -3    0
+        432 1728 432 216  864 216 -120 -690 -690 -120 -144 -828 -828 -144  -24 -138 -138  -24
+          0  432 864   0  216 432    0  -15 -375 -420    0  -18 -450 -504    0   -3  -75  -84
+        432  216   0 864  432   0  -84  -75   -3    0 -504 -450  -18    0 -420 -375  -15    0
+        216  864 216 432 1728 432  -24 -138 -138  -24 -144 -828 -828 -144 -120 -690 -690 -120
+          0  216 432   0  432 864    0   -3  -75  -84    0  -18 -450 -504    0  -15 -375 -420
+        ]
+    info("expected interface matrix:")
+    dump(round(B, 3))
+    @test isapprox(stiffness_matrix, B)
+=#
+end
 
 end
