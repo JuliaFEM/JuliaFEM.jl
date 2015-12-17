@@ -1,5 +1,4 @@
 using ForwardDiff
-# using NLsolve
 
 """
 Create a isotropic Hooke material matrix C
@@ -31,6 +30,17 @@ function stiffnessTensor(E, ν)
                    0 0 0 0 0 b].*multiplier
 end
 
+# Creating functions for newton: xₙ₊₁ = xₙ - df⁻¹ * f and initial values
+function find_root!(f, df, x; max_iter=50, norm_acc=1e-10)
+    converged = false
+    for i=1:max_iter
+        dx = df(x) \ -f(x)
+        x += dx
+        norm(dx) < norm_acc && (converged = true; break)
+    end
+    converged || error("no convergence!")
+    x
+end
 
 type State
     C :: Array{Float64, 2}
@@ -176,7 +186,9 @@ function calculate_stress!(dstrain, mat::State, ::Type{Val{:vonMises}})
     end
 end
 
-function calculate_stress!(dstrain, stress, C, stress_y, ::Type{Val{:vonMises}})
+function calculate_stress(dstrain, stress, C, stress_y,
+     ::Type{Val{:vonMises}},
+     ::Type{Val{:ElasticPlasticProblem}})
     # Test stress
     stress_tria = stress + C * dstrain
 
@@ -184,7 +196,7 @@ function calculate_stress!(dstrain, stress, C, stress_y, ::Type{Val{:vonMises}})
     yield = vonMisesYield(stress_tria, stress_y)
     if isless(yield, 0.0)
         # stress[i] = stress_tria[i]
-        return 0.0 
+        return 0.0
     else
         # Yielding happened
         # Creating functions for newton: xₙ₊₁ = xₙ - df⁻¹ * f and initial values
@@ -193,7 +205,7 @@ function calculate_stress!(dstrain, stress, C, stress_y, ::Type{Val{:vonMises}})
         df     = ForwardDiff.jacobian(f)
 
         # Calculating root
-        # result = nlsolve(not_in_place(f, df), initial_guess).zero 
+        # result = nlsolve(not_in_place(f, df), initial_guess).zero
         max_iter = 10
         converged = false
         for i=1:5
@@ -208,3 +220,83 @@ function calculate_stress!(dstrain, stress, C, stress_y, ::Type{Val{:vonMises}})
     end
 end
 
+##################################################################################
+# ----- AFTER THIS POINT: VON MISES : PLANE STRESS IMPLEMENTATION          ----- #
+##################################################################################
+
+"""
+http://www.efunda.com/formulae/solid_mechanics/mat_mechanics/hooke_plane_stress.cfm
+"""
+function stiffnessTensorPlaneStress(E, ν)
+    a = 1 - ν^2
+    b = 1 - ν
+    multiplier = E / a
+    return Float64[1 ν 0;
+                   ν 1 0;
+                   0 0 b].*multiplier
+end
+
+# von mises: plane stress
+# https://andriandriyana.files.wordpress.com/2008/03/yield_criteria.pdf
+function stress_eq_plane_stress(stress)
+    s1, s2, t12  = stress
+    # Calculating principal stresses
+    # http://www.engineersedge.com/material_science/principal_vonmises_stress__13418.htm
+    se1 = (s1 + s2)/2 + sqrt(((s1 - s2)/2)^2 + t12^2)
+    se2 = (s1 + s2)/2 - sqrt(((s1 - s2)/2)^2 + t12^2)
+    return sqrt(se1^2 -se1*se2 + se2^2)
+end
+
+# https://andriandriyana.files.wordpress.com/2008/03/yield_criteria.pdf
+function vonMisesYieldPlaneStress(stress, stress_y)
+    stress_eq_plane_stress(stress) - stress_y
+end
+
+function vonMisesRootPlaneStress(params, dstrain, C, stress_y, stress_base)
+
+    # Creating wrapper for gradient
+    vm_wrap(stress_) = vonMisesYieldPlaneStress(stress_, stress_y)
+    dfds = ForwardDiff.gradient(vm_wrap)
+
+    # Stress rate and total strain
+    dstress = params[1:3]
+    stress_tot = vec(stress_base) + params[1:3]
+
+    # Calculating plastic strain rate
+    dstrain_p = params[end] * dfds(stress_tot)
+
+    # Calculating equations
+    function_1 = dstress - C * (dstrain - dstrain_p)
+    function_2 = vm_wrap(stress_tot)
+    [vec(function_1); function_2]
+end
+
+function calculate_stress(dstrain, stress, C, stress_y,
+                          ::Type{Val{:vonMises}},
+                          ::Type{Val{:PlaneStressElasticPlasticProblem}})
+    # Test stress
+    dstress = C * dstrain
+    stress_tria = stress + dstress
+
+    # Calculating and checking for yield
+    yield = vonMisesYieldPlaneStress(stress_tria, stress_y)
+    if isless(yield, 0.0)
+        return dstress, zeros(3)
+    else
+        info("yielded")
+        # Yielding happened
+        # Creating functions for newton: xₙ₊₁ = xₙ - df⁻¹ * f and initial values
+        x = [vec(stress_tria - stress); 0.0]
+        f(stress_)  = vonMisesRootPlaneStress(stress_, dstrain, C, stress_y, stress)
+        df = ForwardDiff.jacobian(f)
+        # Calculating root
+        results = find_root!(f, df, x)
+        stress_tot = stress + results[1:3]
+        plastic_multiplier = results[end]
+        vm_wrap(stress_) = vonMisesYieldPlaneStress(stress_, stress_y)
+        dfds = ForwardDiff.gradient(vm_wrap)
+        dep = plastic_multiplier * dfds(stress_tot)
+        info("II ", stress_tot)
+        return results[1:3], dep
+    end
+end

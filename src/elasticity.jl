@@ -1,27 +1,17 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-include("vonmises.jl")
+include("elasticplastic.jl")
 
 # Elasticity problems
-
-abstract ElasticityProblem     <: AbstractProblem
-
-abstract PlaneStressElasticityProblem     <: ElasticityProblem
+abstract ElasticityProblem            <: AbstractProblem
+abstract PlaneStressElasticityProblem <: ElasticityProblem
 
 function get_unknown_field_name{P<:ElasticityProblem}(::Type{P})
     return "displacement"
 end
 
 function get_unknown_field_type{P<:ElasticityProblem}(::Type{P})
-    return Vector{Float64}
-end
-
-function get_unknown_field_name{P<:ElasticPlasticProblem}(::Type{P})
-    return "displacement"
-end
-
-function get_unknown_field_type{P<:ElasticPlasticProblem}(::Type{P})
     return Vector{Float64}
 end
 
@@ -67,8 +57,6 @@ https://en.wikipedia.org/wiki/Hooke's_law
 
 """
 function get_residual_vector{P<:ElasticityProblem}(problem::Problem{P}, element::Element, ip::IntegrationPoint, time::Number; variation=nothing)
-#function get_residual_vector{P<:ElasticPlasticProblem}(problem::Problem{P}, element::Element, ip::IntegrationPoint, time::Number; variation=nothing)
-
     r = zeros(Float64, problem.dim, length(element))
 
     J = get_jacobian(element, ip, time)
