@@ -27,12 +27,12 @@ end
 
 # 3D Elasticity problems
 function ElasticityProblem(dim::Int=3, elements=[])
-    return Problem{ElasticityProblem}(dim, elements)
+    return Problem{ElasticityProblem}("elasticity problem", dim, elements)
 end
 
 # 2D Plane stress elasticity problems
 function PlaneStressElasticityProblem(dim::Int=2, elements=[])
-    return Problem{PlaneStressElasticityProblem}(dim, elements)
+    return Problem{PlaneStressElasticityProblem}("plane stress elasticity problem", dim, elements)
 end
 
 
