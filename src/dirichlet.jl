@@ -3,8 +3,11 @@
 
 abstract DirichletProblem <: AbstractProblem
 
-function DirichletProblem(parent_field_name, parent_field_dim, dim=1, elements=[])
-    return BoundaryProblem{DirichletProblem}(parent_field_name, parent_field_dim, dim, elements)
+function DirichletProblem(parent_field_name::ASCIIString, parent_field_dim::Int, dim::Int=1, elements=Element[])
+    return BoundaryProblem{DirichletProblem}("dirichlet boundary", parent_field_name, parent_field_dim, dim, elements)
+end
+function DirichletProblem(problem_name::ASCIIString, parent_field_name::ASCIIString, parent_field_dim::Int, dim::Int=1, elements=Element[])
+    return BoundaryProblem{DirichletProblem}(problem_name, parent_field_name, parent_field_dim, dim, elements)
 end
 
 function assemble!(assembly::Assembly, problem::BoundaryProblem{DirichletProblem}, element::Element, time::Number)

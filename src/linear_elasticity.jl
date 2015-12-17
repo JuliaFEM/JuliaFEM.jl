@@ -5,8 +5,8 @@
 
 abstract LinearElasticityProblem <: ElasticityProblem
 
-function LinearElasticityProblem(dim::Int=3, elements=[])
-    return Problem{LinearElasticityProblem}(dim, elements)
+function LinearElasticityProblem(name="linear elasticity", dim::Int=3, elements=[])
+    return Problem{LinearElasticityProblem}(name, dim, elements)
 end
 
 """ Elasticity equations, general 3D case. """
@@ -57,13 +57,22 @@ function assemble!{E<:CG, P<:LinearElasticityProblem}(assembly::Assembly, proble
             L = w*T*N*norm(cross(JT[:,1], JT[:,2]))
             add!(assembly.force_vector, gdofs, vec(L))
         end
+        for dim in 1:problem.dim
+            if haskey(element, "displacement traction force $dim")
+                T = element("displacement traction force $dim", ip, time)
+                ldofs = gdofs[dim:problem.dim:end]
+                JT = transpose(J)
+                L = w*T*N*norm(cross(JT[:,1], JT[:,2]))
+                add!(assembly.force_vector, ldofs, vec(L))
+            end
+        end
     end
 end
 
 abstract PlaneStressLinearElasticityProblem <: LinearElasticityProblem
 
-function PlaneStressLinearElasticityProblem(dim::Int=2, elements=[])
-    return Problem{PlaneStressLinearElasticityProblem}(dim, elements)
+function PlaneStressLinearElasticityProblem(name="plane stress linear elasticity", dim::Int=2, elements=[])
+    return Problem{PlaneStressLinearElasticityProblem}(name, dim, elements)
 end
 
 """ Elasticity equations, plane stress. """
