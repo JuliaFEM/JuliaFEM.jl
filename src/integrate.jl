@@ -78,6 +78,19 @@ function get_integration_points(::TriangularElement, ::Type{Val{2}})
     ]
 end
 
+function get_integration_points(::TriangularElement, ::Type{Val{4}})
+    # http://math2.uncc.edu/~shaodeng/TEACHING/math5172/Lectures/Lect_15.PDF
+    # FIXME: something wrong here with weights ..?
+    [
+        IntegrationPoint([0.44594849091597, 0.44594849091597], 0.5*0.22338158967801),
+        IntegrationPoint([0.44594849091597, 0.10810301816807], 0.5*0.22338158967801),
+        IntegrationPoint([0.10810301816807, 0.44594849091597], 0.5*0.22338158967801),
+        IntegrationPoint([0.09157621350977, 0.09157621350977], 0.5*0.10995174365532),
+        IntegrationPoint([0.09157621350977, 0.81684757298046], 0.5*0.10995174365532),
+        IntegrationPoint([0.81684757298046, 0.09157621350977], 0.5*0.10995174365532)
+    ]
+end
+
 function get_integration_points(::TriangularElement, ::Type{Val{5}})
     # http://math2.uncc.edu/~shaodeng/TEACHING/math5172/Lectures/Lect_15.PDF
     # FIXME: something wrong here with weights ..?
