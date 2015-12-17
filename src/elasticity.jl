@@ -25,7 +25,7 @@ function get_unknown_field_type{P<:ElasticPlasticProblem}(::Type{P})
 end
 
 function ElasticityProblem(dim::Int=3, elements=[])
-    return Problem{ElasticityProblem}(dim, elements)
+    return Problem{ElasticityProblem}("elasticity problem", dim, elements)
 end
 
 function ElasticPlasticProblem(dim::Int=3, elements=[])
@@ -35,7 +35,7 @@ end
 abstract PlaneStressElasticityProblem <: ElasticityProblem
 
 function PlaneStressElasticityProblem(dim::Int=2, elements=[])
-    return Problem{PlaneStressElasticityProblem}(dim, elements)
+    return Problem{PlaneStressElasticityProblem}("plane stress elasticity problem", dim, elements)
 end
 
 """ Elasticity equations.
