@@ -4,11 +4,13 @@
 abstract AbstractProblem
 
 type Problem{T<:AbstractProblem}
+    name :: ASCIIString
     dim :: Int
     elements :: Vector{Element}
 end
 
 type BoundaryProblem{T<:AbstractProblem}
+    name :: ASCIIString
     parent_field_name :: ASCIIString
     parent_field_dim :: Int
     dim :: Int
@@ -36,3 +38,4 @@ end
 function Base.push!(problem::AllProblems, element::Element)
     push!(problem.elements, element)
 end
+

@@ -6,6 +6,8 @@ This is JuliaFEM -- Finite Element Package
 """
 module JuliaFEM
 
+# include("common.jl")
+
 """ JuliaFEM Core module. """
 module Core
 include("core.jl")
@@ -19,6 +21,10 @@ include("api.jl")
 end
 
 module Preprocess
+macro debug(msg)
+    haskey(ENV, "DEBUG") || return
+    return msg
+end
 include("abaqus_reader.jl")
 include("preprocess_aster_reader.jl")
 end

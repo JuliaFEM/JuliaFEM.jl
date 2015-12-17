@@ -1,7 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using Base.Test
+using BaseTestNext
 
 abstract TestResult
 
@@ -159,5 +159,4 @@ function print_test_statistics()
     return passed, failed, errors, critical
 end
 
-export @test, run_test, print_test_statistics
-
+export @test, @testset, @test_throws, run_test, print_test_statistics

@@ -1,6 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+using JuliaFEM
+
 using HDF5
 
 function aster_parse_nodes(section::ASCIIString; strip_characters=true)
@@ -52,6 +54,144 @@ function parse(mesh::ASCIIString, ::Type{Val{:CODE_ASTER_MAIL}})
     end
     return model
 end
+
+
+function aster_renumber_nodes_!(mesh, node_numbering)
+    old_nodes = mesh["nodes"]
+    new_nodes = typeof(old_nodes)()
+    for (node_id, node_coords) in old_nodes
+        new_node_id = node_numbering[node_id]
+        new_nodes[new_node_id] = node_coords
+    end
+    mesh["nodes"] = new_nodes
+    for (elid, (eltype, elset, elcon)) in mesh["connectivity"]
+        new_elcon = [node_numbering[node_id] for node_id in elcon]
+        mesh["connectivity"][elid] = (eltype, elset, new_elcon)
+    end
+end
+
+
+function aster_renumber_nodes!(mesh1, mesh2)
+
+    reserved_node_ids = Set(collect(keys(mesh1["nodes"])))
+    @debug info("already reserved node ids: $reserved_node_ids")
+    mesh2_node_numbering = Dict{Int64, Int64}()
+
+    # find new node ids assigned for mesh 2
+    k = 1
+    for node_id in sort(collect(keys(mesh2["nodes"])))
+        @debug info("mesh2: processing node $node_id")
+        # if node id is reserved in mesh 1, find new number
+        if node_id in reserved_node_ids
+            @debug info("node id conflict, $node_id already defined in mesh 1, renumbering")
+            while k in reserved_node_ids
+                k += 1
+            end
+            @debug info("mesh2: node $node_id -> $k")
+            mesh2_node_numbering[node_id] = k
+            push!(reserved_node_ids, k)
+        else
+            mesh2_node_numbering[node_id] = node_id
+        end
+    end
+    @debug info("new node numering:")
+    @debug println(mesh2_node_numbering)
+    aster_renumber_nodes_!(mesh2, mesh2_node_numbering)
+
+#=
+    # create new nodes
+    mesh2_old_nodes = mesh2["nodes"]
+    mesh2_new_nodes = typeof(mesh2_old_nodes)()
+    for (node_id, node_coords) in mesh2_old_nodes
+        new_node_id = mesh2_node_numbering[node_id]
+        mesh2_new_nodes[new_node_id] = node_coords
+    end
+    mesh2["nodes"] = mesh2_new_nodes
+
+    # update connectivity
+    for (elid, (eltype, elset, elcon)) in mesh2["connectivity"]
+        new_elcon = [mesh2_node_numbering[node_id] for node_id in elcon]
+        mesh2["connectivity"][elid] = (eltype, elset, new_elcon)
+    end
+=#
+
+end
+
+
+function aster_renumber_elements!(mesh1, mesh2)
+
+    reserved_element_ids = Set(collect(keys(mesh1["connectivity"])))
+    @debug info("already reserved element ids: $reserved_element_ids")
+    mesh2_element_numbering = Dict{Int64, Int64}()
+
+    # find new element ids assigned for mesh 2
+    k = 1
+    for element_id in sort(collect(keys(mesh2["connectivity"])))
+        @debug info("mesh2: processing element $element_id")
+        # if node id is reserved in mesh 1, find new number
+        if element_id in reserved_element_ids
+            @debug info("element id conflict, $element_id already defined in mesh 1, renumbering")
+            while k in reserved_element_ids
+                k += 1
+            end
+            @debug info("mesh2: element $element_id -> $k")
+            mesh2_element_numbering[element_id] = k
+            push!(reserved_element_ids, k)
+        else
+            mesh2_element_numbering[element_id] = element_id
+        end
+    end
+    @debug info("element numbering for mesh 2:")
+    @debug info(mesh2_element_numbering)
+
+    # create new elements
+    mesh2_old_elements = mesh2["connectivity"]
+    mesh2_new_elements = typeof(mesh2_old_elements)()
+    for (element_id, element_data) in mesh2_old_elements
+        new_element_id = mesh2_element_numbering[element_id]
+        mesh2_new_elements[new_element_id] = element_data
+    end
+    mesh2["connectivity"] = mesh2_new_elements
+
+end
+
+
+function aster_combine_meshes(mesh1, mesh2)
+
+    # check that meshes are ready to be combined
+    node_ids_mesh_1 = collect(keys(mesh1["nodes"]))
+    node_ids_mesh_2 = collect(keys(mesh2["nodes"]))
+    if length(intersect(node_ids_mesh_1, node_ids_mesh_2)) != 0
+        error("nodes with same id number in both meshes, failed.")
+    end
+    element_ids_mesh_1 = collect(keys(mesh1["connectivity"]))
+    element_ids_mesh_2 = collect(keys(mesh2["connectivity"]))
+    if length(intersect(element_ids_mesh_1, element_ids_mesh_2)) != 0
+        error("elements with same id number in both meshes, failed.")
+    end
+    @assert similar(mesh1) == similar(mesh2)
+    @assert similar(mesh1["nodes"]) == similar(mesh2["nodes"])
+    @assert similar(mesh1["connectivity"]) == similar(mesh2["connectivity"])
+
+    new_mesh = similar(mesh1)
+    new_mesh["nodes"] = similar(mesh1["nodes"])
+    new_mesh["connectivity"] = similar(mesh1["connectivity"])
+
+    for (node_id, node_coords) in mesh1["nodes"]
+        new_mesh["nodes"][node_id] = node_coords
+    end
+    for (node_id, node_coords) in mesh2["nodes"]
+        new_mesh["nodes"][node_id] = node_coords
+    end
+    for (element_id, element_data) in mesh1["connectivity"]
+        new_mesh["connectivity"][element_id] = element_data
+    end
+    for (element_id, element_data) in mesh2["connectivity"]
+        new_mesh["connectivity"][element_id] = element_data
+    end
+    return new_mesh
+end
+
 
 """
 Code Aster binary file (.med), which is exported from SALOME.

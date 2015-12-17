@@ -1,30 +1,9 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+using JuliaFEM
+
 import Base: +, -, /, *, push!, convert, getindex, setindex!, length, similar, call, vec, endof, append!
-
-"""
-A very simple debugging macro. It prints debug message if environment variable
-JULIAFEM_DEBUG is found.
-
-Usage: instead of starting session `julia file.jl` do `DEBUG=1 julia file.jl`.
-Or set `export DEBUG=1` for your `.bashrc`.
-"""
-macro debug(msg)
-    haskey(ENV, "DEBUG") || return
-#   return :( println("DEBUG: ", $msg) )
-    return msg
-end
-
-function set_debug_on!()
-    ENV["DEBUG"] = 1;
-end
-
-function set_debug_off!()
-    pop!(ENV, "DEBUG");
-end
-
-export @debug, set_debug_on!, set_debug_off!
 
 using ForwardDiff
 autodiffcache = ForwardDiffCache()
