@@ -64,7 +64,7 @@ end
 
 
 """
-Solve problem 
+Solve problem
 
     Ku + C'λ = f
     Cu       = g
@@ -295,4 +295,3 @@ function call(solver::DirectSolver, time::Number=0.0)
     return (solver.max_iterations, false)
 
 end
-
