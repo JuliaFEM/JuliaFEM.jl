@@ -244,8 +244,7 @@ end
 
 global const med_elmap = Dict{Symbol, Vector{Int}}(
     :HE8 => [4, 8, 7, 3, 1, 5, 6, 2],
-    :QU4 => [4, 3, 2, 1],
-    :SE2 => [2, 1]
+    :TE4 => [2, 3, 4, 1]
 )
 
 function get_connectivity(med::MEDFile, elsets, mesh_name)
@@ -270,8 +269,8 @@ function get_connectivity(med::MEDFile, elsets, mesh_name)
             if haskey(med_elmap, eltype)
                 elco = elco[med_elmap[eltype]]
             else
-                warn("no element mapping info found for element type $eltype")
-                warn("consider this as a warning: element may have french nodal ordering")
+                #warn("no element mapping info found for element type $eltype")
+                #warn("consider this as a warning: element may have french nodal ordering")
             end
             d[element_ids[i]] = (eltype, elset, elco)
         end
