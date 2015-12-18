@@ -291,12 +291,14 @@ function calculate_stress(dstrain, stress, C, stress_y,
         df = ForwardDiff.jacobian(f)
         # Calculating root
         results = find_root!(f, df, x)
-        stress_tot = stress + results[1:3]
+        dstress = results[1:3]
+        stress_tot = stress + dstress
         plastic_multiplier = results[end]
         vm_wrap(stress_) = vonMisesYieldPlaneStress(stress_, stress_y)
         dfds = ForwardDiff.gradient(vm_wrap)
-        dep = plastic_multiplier * dfds(stress_tot)
+        dep = plastic_multiplier * dfds(vec(stress_tot))
         info("II ", stress_tot)
-        return results[1:3], dep
+        info(vm_wrap(stress_tot))
+        return dstress, dep
     end
 end
