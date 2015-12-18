@@ -45,6 +45,13 @@ function assemble!{E<:CG, P<:LinearElasticityProblem}(assembly::Assembly, proble
                 B[6, 3*(i-1)+1] = dN[3,i]
                 B[6, 3*(i-1)+3] = dN[1,i]
             end
+            # L = b * B'
+            # D = 0.5 * (L' + L)
+            # F = ...
+            # E = 0.5 * (F'*F - I)
+            # de = E - E_last
+            # S = vonMisesStress(de, stress)
+            # K = B' * S * J * w
             add!(assembly.stiffness_matrix, gdofs, gdofs, w*B'*C*B*det(J))
         end
         if haskey(element, "displacement load")
@@ -114,3 +121,51 @@ function assemble!{E<:CG, P<:PlaneStressLinearElasticityProblem}(assembly::Assem
     end
 end
 
+###############################
+#     Plastic material        #
+###############################
+include("vonmises.jl")
+abstract PlaneStressLinearElasticPlasticProblem <: LinearElasticityProblem
+
+function PlaneStressLinearElasticPlasticProblem(name="plane stress linear elasticity", dim::Int=2, elements=[])
+    return Problem{PlaneStressLinearElasticPlasticProblem}(name, dim, elements)
+end
+
+""" Elasticity equations, plane stress. """
+function assemble!{E<:CG, P<:PlaneStressLinearElasticPlasticProblem}(assembly::Assembly, problem::Problem{P}, element::Element{E}, time::Real)
+
+    gdofs = get_gdofs(element, problem.dim)
+    ndim, nnodes = size(E)
+    B = zeros(3, 2*nnodes)
+    for ip in get_integration_points(element)
+        w = ip.weight
+        J = get_jacobian(element, ip, time)
+        N = element(ip, time)
+        if haskey(element, "youngs modulus") && haskey(element, "poissons ratio")
+            nu = element("poissons ratio", ip, time)
+            E_ = element("youngs modulus", ip, time)
+            C = E_/(1.0 - nu^2) .* [
+                1.0  nu 0.0
+                nu  1.0 0.0
+                0.0 0.0 (1.0-nu)/2.0]
+            dN = element(ip, time, Val{:grad})
+            fill!(B, 0.0)
+            for i=1:size(dN, 2)
+                B[1, 2*(i-1)+1] = dN[1,i]
+                B[2, 2*(i-1)+2] = dN[2,i]
+                B[3, 2*(i-1)+1] = dN[2,i]
+                B[3, 2*(i-1)+2] = dN[1,i]
+            end
+            add!(assembly.stiffness_matrix, gdofs, gdofs, w*B'*C*B*det(J))
+        end
+        if haskey(element, "displacement load")
+            b = element("displacement load", ip, time)
+            add!(assembly.force_vector, gdofs, w*N'*b*det(J))
+        end
+        if haskey(element, "displacement traction force")
+            T = element("displacement traction force", ip, time)
+            L = w*T*N*norm(J)
+            add!(assembly.force_vector, gdofs, vec(L))
+        end
+    end
+end

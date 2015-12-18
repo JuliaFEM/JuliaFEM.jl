@@ -81,7 +81,6 @@ function get_residual_vector{P<:ElasticityProblem}(problem::Problem{P}, element:
 
         # strain
         E = 1/2*(F'*F - I)
-
         # stress
         S = lambda*trace(E)*I + 2*mu*E
 

@@ -58,16 +58,14 @@ function get_residual_vector{P<:PlaneStressElasticPlasticProblem}(problem::Probl
         F = I + gradu
         E = 1/2*(F'*F - I)
 
+        #E = 1/2*(gradu + gradu') # finite strain (total)
+
         # material
         young = element("youngs modulus", ip, time)
         poisson = element("poissons ratio", ip, time)
         stress_y = element("yield stress", time).data
-        mu = young/(2*(1+poisson))
-        lambda = young*poisson/((1+poisson)*(1-2*poisson))
-        if P == PlaneStressElasticPlasticProblem
-            lambda = 2*lambda*mu/(lambda + 2*mu)  # <- correction for 2d problems
-        end
         dstrain = E - last_strain
+        de_v = [dstrain[1,1], dstrain[2,2], dstrain[1,2]]
         material_model = element("material model", time)
         s = last_stress
         de = copy(ForwardDiff.get_value(dstrain))
@@ -90,14 +88,8 @@ function get_residual_vector{P<:PlaneStressElasticPlasticProblem}(problem::Probl
                                            stress_y,
                                            Val{:vonMises},
                                            Val{problem_stress_type})
-        nd = [dep[1] dep[3];
-              dep[3] dep[2]]
-    #    a = dstrain - nd
-    #    b = C * a
         info("%% ", dep)
-        dif = dstrain - nd
-        mm = [dif[1,1], dif[2,2], dif[1,2]]
-        s_v += C * mm
+        s_v += C * (de_v - dep)
         info("--: ", ForwardDiff.get_value(s_v))
         # stress
         if P == PlaneStressElasticPlasticProblem
