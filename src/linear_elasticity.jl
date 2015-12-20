@@ -118,6 +118,23 @@ function assemble!{E<:CG, P<:PlaneStressLinearElasticityProblem}(assembly::Assem
             L = w*T*N*norm(J)
             add!(assembly.force_vector, gdofs, vec(L))
         end
+        for dim in 1:problem.dim
+            if haskey(element, "displacement traction force $dim")
+                T = element("displacement traction force $dim", ip, time)
+                ldofs = gdofs[dim:problem.dim:end]
+                L = w*T*N*norm(J)
+                add!(assembly.force_vector, ldofs, vec(L))
+            end
+        end
+        if haskey(element, "displacement traction force N")
+            # surface pressure
+            p = zeros(2)
+            p[1] = element("displacement traction force N", ip, time)
+            R = element("normal-tangential coordinates", ip, time)
+            T = R'*p
+            L = w*T*N*norm(J)
+            add!(assembly.force_vector, gdofs, vec(L))
+        end
     end
 end
 

@@ -6,7 +6,7 @@ module MortarTests
 using JuliaFEM.Test
 
 using JuliaFEM.Core: Element, Seg2, Quad4, Tri3, Hex8, MortarProblem, Assembly, assemble!,
-                     get_connectivity, update
+                     get_connectivity, update!
 using JuliaFEM.Core: PlaneStressElasticityProblem, DirichletProblem, DirectSolver
 
 # 2d stuff
@@ -727,7 +727,7 @@ function test_3d_problem()
     l2u = Quad4([5, 6, 7, 8])
     u2l = Quad4([9, 10, 11, 12])
     elements = Element[el1, el2, sym121, sym131, sym132, sym231, sym232, force, l2u, u2l]
-    update(elements, "geometry", nodes)
+    update!(elements, "geometry", nodes)
     el1["youngs modulus"] = el2["youngs modulus"] = 900.0
     el1["poissons ratio"] = el2["poissons ratio"] = 0.25
     sym121["displacement 3"] = 0.0
@@ -859,8 +859,8 @@ end
     mel7 = Quad4([18, 19, 23, 22])
     mel8 = Quad4([19, 20, 24, 23])
     mel9 = Quad4([20, 21, 25, 24])
-    update(Element[sel1, sel2, sel3, sel4, mel1, mel2, mel3,
-                   mel4, mel5, mel6, mel7, mel8, mel9], "geometry", nodes)
+    update!(Element[sel1, sel2, sel3, sel4, mel1, mel2, mel3,
+                    mel4, mel5, mel6, mel7, mel8, mel9], "geometry", nodes)
     calculate_normal_tangential_coordinates!(sel1, 0.0)
     calculate_normal_tangential_coordinates!(sel2, 0.0)
     calculate_normal_tangential_coordinates!(sel3, 0.0)
