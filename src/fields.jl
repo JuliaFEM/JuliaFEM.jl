@@ -180,8 +180,12 @@ for op = (:+, :*, :/, :-)
     @eval ($op)(increment::Increment, field::DCTI) = ($op)(increment.data, field.data)
     @eval ($op)(field::DCTI, increment::Increment) = ($op)(increment.data, field.data)
     @eval ($op)(field1::DCTI, field2::DCTI) = ($op)(field1.data, field2.data)
-    @eval ($op)(field::DCTI, k) = ($op)(field.data, k)
-    @eval ($op)(k, field::DCTI) = ($op)(field.data, k)
+    @eval ($op)(field::DCTI, k::Number) = ($op)(field.data, k)
+    @eval ($op)(k::Number, field::DCTI) = ($op)(field.data, k)
+end
+
+function Base.(:+)(f1::DVTI, f2::DVTI)
+    return DVTI(f1.data + f2.data)
 end
 
 function Base.vec(field::DVTI)

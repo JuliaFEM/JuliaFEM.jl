@@ -141,9 +141,10 @@ end
 
 """ Call solver to solve a set of problems. """
 function call(solver::DirectSolver, time::Number=0.0)
+    info("Starting solver $(solver.name)")
     info("# of field problems: $(length(solver.field_problems))")
     info("# of boundary problems: $(length(solver.boundary_problems))")
-    (length(solver.field_problems) != 0) || error("no field problems defined.")
+    (length(solver.field_problems) != 0) || error("no field problems defined for solver, use push!(solver, problem, ...) to define field problems.")
 
     timing = Dict{ASCIIString, Float64}()
     tic(timing, "solver")
@@ -202,7 +203,7 @@ function call(solver::DirectSolver, time::Number=0.0)
         info("Assembling field problems...")
         field_assembly = Assembly()
         for (i, problem) in enumerate(solver.field_problems)
-            info("Assembling body $i...")
+            info("Assembling body $i: $(problem.name)")
             append!(field_assembly, assemble(problem, time))
         end
         K = sparse(field_assembly.stiffness_matrix)
@@ -217,7 +218,7 @@ function call(solver::DirectSolver, time::Number=0.0)
         info("Assembling boundary problems...")
         boundary_assembly = Assembly()
         for (i, problem) in enumerate(solver.boundary_problems)
-            info("Assembling boundary $i...")
+            info("Assembling boundary $i: $(problem.name)")
             append!(boundary_assembly, assemble(problem, time))
         end
         C = sparse(boundary_assembly.stiffness_matrix, dim, dim)

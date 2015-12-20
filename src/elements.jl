@@ -243,34 +243,48 @@ end
 
 """ Calculate local normal-tangential coordinates for element. """
 function calculate_normal_tangential_coordinates!{E}(element::Element{E}, time::Real)
-    proj(u, v) = dot(v, u) / dot(u, u) * u
     ntcoords = Matrix[]
     refcoords = get_reference_element_coordinates(E)
     x = element("geometry", time)
     for xi in refcoords
         dN = get_dbasis(E, xi)*x
-        normal = cross(dN[:,1], dN[:,2])
-        normal /= norm(normal)
-        u1 = normal
-        j = indmax(abs(u1))
-        v2 = zeros(3)
-        v2[mod(j,3)+1] = 1.0
-        u2 = v2 - proj(u1, v2)
-        u3 = cross(u1, u2)
-        tangent1 = u2/norm(u2)
-        tangent2 = u3/norm(u3)
-        push!(ntcoords, [normal tangent1 tangent2])
+        n, m = size(dN)
+        @assert n != m # if n == m -> this is not manifold
+        if m == 1 # plane case
+            tangent = dN / norm(dN)
+            normal = [-tangent[2] tangent[1]]'
+            push!(ntcoords, [normal tangent])
+        elseif m == 2
+            normal = cross(dN[:,1], dN[:,2])
+            normal /= norm(normal)
+            u1 = normal
+            j = indmax(abs(u1))
+            v2 = zeros(3)
+            v2[mod(j,3)+1] = 1.0
+            u2 = v2 - dot(u1, v2) / dot(v2, v2) * v2
+            u3 = cross(u1, u2)
+            tangent1 = u2/norm(u2)
+            tangent2 = u3/norm(u3)
+            push!(ntcoords, [normal tangent1 tangent2])
+        else
+            error("calculate_normal_tangential_coordinates!(): n=$n, m=$m")
+        end
     end
     element["normal-tangential coordinates"] = ntcoords
 end
+function calculate_normal_tangential_coordinates!{E}(elements::Vector{Element{E}}, time::Real)
+    for element in elements
+        calculate_normal_tangential_coordinates!(element, time)
+    end
+end
 
 """ Pick values from nodes and set to element according to connectivity. """
-function update(element::Element, field_name::ASCIIString, data::Union{Vector, Dict})
+function update!(element::Element, field_name::ASCIIString, data::Union{Vector, Dict})
     element[field_name] = [data[i] for i in get_connectivity(element)]
 end
-function update(elements::Vector{Element}, field_name::ASCIIString, data::Union{Vector, Dict})
+function update!(elements::Vector{Element}, field_name::ASCIIString, data::Union{Vector, Dict})
 #   info("update $field_name for $(length(elements)) elements.")
     for element in elements
-        update(element, field_name, data)
+        update!(element, field_name, data)
     end
 end
