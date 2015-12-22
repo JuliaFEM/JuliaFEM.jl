@@ -662,7 +662,7 @@ end
 
 typealias MortarElements2D Union{Seg2, Seg3}
 
-function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::BoundaryProblem{MortarProblem}, slave_element::Element{E}, time::Real)
+function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly, problem::BoundaryProblem{MortarProblem}, slave_element::Element{E}, time::Real)
 
     # get dimension and name of PARENT field
     field_dim = problem.parent_field_dim
@@ -675,13 +675,14 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::BoundaryPro
         xi1b = project_from_master_to_slave(slave_element, master_element, [ 1.0])
         xi1 = clamp([xi1a xi1b], -1.0, 1.0)
         l = 1/2*(xi1[2]-xi1[1])
-        if abs(l) < 1.0e-6
-            warn("No contribution")
+        if abs(l) < 1.0e-9
+            #warn("No contribution")
             continue # no contribution
         end
         master_dofs = get_gdofs(master_element, field_dim)
         for ip in get_integration_points(slave_element, Val{5})
-            w = ip.weight*det(slave_element, ip, time)*l
+            J = get_jacobian(slave_element, ip, time)
+            w = ip.weight*norm(J)*l
 
             # integration point on slave side segment
             xi_gauss = 1/2*(1-ip.xi)*xi1[1] + 1/2*(1+ip.xi)*xi1[2]
@@ -692,15 +693,14 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::BoundaryPro
             N1 = slave_element(xi_gauss, time)
             N2 = master_element(xi_projected, time)
             S = w*N1'*N1
-            M = w*(N1'*N2)'
-#           M = w*N1'*N2
-            # FIXME: why this needs now to be transpose?
-            # assembly / repeat
+            M = w*N1'*N2
             for i=1:field_dim
                 sd = slave_dofs[i:field_dim:end]
                 md = master_dofs[i:field_dim:end]
-                add!(assembly.stiffness_matrix, sd, sd, S)
-                add!(assembly.stiffness_matrix, sd, md, -M)
+                add!(assembly.C1, sd, sd, S)
+                add!(assembly.C1, sd, md, -M)
+                add!(assembly.C2, sd, sd, S)
+                add!(assembly.C2, sd, md, -M)
             end
 
         end
@@ -735,7 +735,7 @@ function find_master_elements(slave_element::Element, time::Real)
     return master_elements
 end
 
-function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::BoundaryProblem{MortarProblem}, slave_element::Element{E}, time::Real)
+function assemble!{E<:MortarElements3D}(assembly::BoundaryAssembly, problem::BoundaryProblem{MortarProblem}, slave_element::Element{E}, time::Real)
     field_dim = problem.parent_field_dim
     field_name = problem.parent_field_name
     slave_dofs = get_gdofs(slave_element, field_dim)
@@ -893,13 +893,14 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::BoundaryPro
                 @debug info("weight S = $wS, weight M = $wM, weight C = $wC")
 
                 Sm = ip.weight*N1'*N1*wC
-                # FIXME: master side transpose -- why?
-                Mm = ip.weight*(N1'*N2)'*wC
+                Mm = ip.weight*N1'*N2*wC
                 for k=1:field_dim
                     sd = slave_dofs[k:field_dim:end]
                     md = master_dofs[k:field_dim:end]
-                    add!(assembly.stiffness_matrix, sd, sd, Sm)
-                    add!(assembly.stiffness_matrix, sd, md, -Mm)
+                    add!(assembly.C1, sd, sd, Sm)
+                    add!(assembly.C1, sd, md, -Mm)
+                    add!(assembly.C2, sd, sd, Sm)
+                    add!(assembly.C2, sd, md, -Mm)
                 end
             end
 #           info("breaking on first")

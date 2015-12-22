@@ -25,6 +25,13 @@ function append!(assembly::Assembly, sub_assembly::Assembly)
     append!(assembly.force_vector, sub_assembly.force_vector)
 end
 
+function append!(assembly::BoundaryAssembly, sub_assembly::BoundaryAssembly)
+    append!(assembly.C1, sub_assembly.C1)
+    append!(assembly.C2, sub_assembly.C2)
+    append!(assembly.D, sub_assembly.D)
+    append!(assembly.g, sub_assembly.g)
+end
+
 function assemble!(assembly::Assembly, problem::AllProblems, time::Float64, empty_assembly::Bool=true)
     if empty_assembly
         empty!(assembly)
@@ -34,17 +41,24 @@ function assemble!(assembly::Assembly, problem::AllProblems, time::Float64, empt
     end
 end
 
+""" Decide assembly type from given problem type. """
+function new_assembly{P}(problem_type::Type{FieldProblem{P}})
+    return FieldAssembly()
+end
+
+""" Decide assembly type from given problem type. """
+function new_assembly{P}(problem_type::Type{BoundaryProblem{P}})
+    return BoundaryAssembly()
+end
+
 function assemble(problem::AllProblems, elrange::UnitRange{Int64}, time::Real, optimize=false)
     elements = get_elements(problem)[elrange]
-    assembly = Assembly()
+    assembly = new_assembly(typeof(problem))
     for (i, element) in enumerate(elements)
         assemble!(assembly, problem, element, time)
     end
     if optimize
-        dim1 = length(assembly.stiffness_matrix.I)
         optimize!(assembly)
-        dim2 = length(assembly.stiffness_matrix.I)
-        info("combine: dim1 = $dim1, dim2 = $dim2")
     end
     return assembly
 end
@@ -53,11 +67,7 @@ function assemble(problem::AllProblems, time::Real, nchunks=10)
     ne = length(get_elements(problem))
     kk = round(Int, collect(linspace(0, ne, nchunks+1)))
     slices = [kk[j]+1:kk[j+1] for j=1:nchunks]
-
-#   sub_assemblies = map( (elrange) -> assemble(problem, elrange, time), slices)
-#   assembly = sum(sub_assemblies)
-
-    assembly = Assembly()
+    assembly = new_assembly(typeof(problem))
     for (j, elrange) in enumerate(slices)
         sub_assembly = assemble(problem, elrange, time)
         append!(assembly, sub_assembly)
@@ -65,9 +75,6 @@ function assemble(problem::AllProblems, time::Real, nchunks=10)
             info("Assembly: ", round(j/nchunks*100,1), " % done. ")
         end
     end
-#   optimize!(assembly)
-#   dim = length(assembly.stiffness_matrix.I)
-#   info("dim of COO: $dim")
     return assembly
 end
 
@@ -173,3 +180,4 @@ function Base.(:+)(ass1::Assembly, ass2::Assembly)
     force_vector = ass1.force_vector + ass2.force_vector
     return Assembly(mass_matrix, stiffness_matrix, force_vector)
 end
+

@@ -24,6 +24,9 @@ end
 function PlaneStressElasticityProblem(dim::Int=2, elements=[])
     return Problem{PlaneStressElasticityProblem}("plane stress elasticity problem", dim, elements)
 end
+function PlaneStressElasticityProblem(problem_name::ASCIIString, dim::Int=2, elements=[])
+    return Problem{PlaneStressElasticityProblem}(problem_name, dim, elements)
+end
 
 
 """ Elasticity equations.

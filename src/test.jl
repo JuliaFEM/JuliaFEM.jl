@@ -1,7 +1,12 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using BaseTestNext
+if VERSION >= v"0.5-"
+    using Base.Test
+else
+    using BaseTestNext
+end
+
 
 abstract TestResult
 

@@ -38,11 +38,11 @@ function DirectSolver(name="DirectSolver")
         1.0e-6, # convergence tolerance
         false, # dump matrices
         true, # reduce stiffness matrix
-        :CHOLMOD # method: CHOLMOD, UMFPACK, PETSc_GMRES
+        :UMFPACK # method: CHOLMOD, UMFPACK, PETSc_GMRES
     )
 end
 
-function push!(solver::DirectSolver, problem::Problem)
+function push!(solver::DirectSolver, problem::FieldProblem)
     push!(solver.field_problems, problem)
 end
 
@@ -138,9 +138,21 @@ function solve(K, f, C, g, ::Type{Val{:UMFPACK}})
     return u[1:dim], u[dim+1:end]
 end
 
+function solve(K, f, C1, C2, D, g, ::Type{Val{:UMFPACK}})
+    t0 = time()
+    dim = size(K, 1)
+    A = [K C1'; C2 D]
+    b = [f; g]
+    nz1 = sort(unique(rowvals(A)))
+    nz2 = sort(unique(rowvals(A')))
+    u = zeros(length(b))
+    u[nz1] = lufact(A[nz1,nz2]) \ full(b[nz1])
+    info("UMFPACK: solved in ", time()-t0, " seconds. norm = ", norm(u[1:dim]))
+    return u[1:dim], u[dim+1:end]
+end
 
 """ Call solver to solve a set of problems. """
-function call(solver::DirectSolver, time::Number=0.0)
+function call(solver::DirectSolver, time::Real=0.0)
     info("Starting solver $(solver.name)")
     info("# of field problems: $(length(solver.field_problems))")
     info("# of boundary problems: $(length(solver.boundary_problems))")
@@ -201,7 +213,7 @@ function call(solver::DirectSolver, time::Number=0.0)
 
         tic(timing, "field assembly")
         info("Assembling field problems...")
-        field_assembly = Assembly()
+        field_assembly = FieldAssembly()
         for (i, problem) in enumerate(solver.field_problems)
             info("Assembling body $i: $(problem.name)")
             append!(field_assembly, assemble(problem, time))
@@ -216,36 +228,38 @@ function call(solver::DirectSolver, time::Number=0.0)
 
         tic(timing, "boundary assembly")
         info("Assembling boundary problems...")
-        boundary_assembly = Assembly()
+        boundary_assembly = BoundaryAssembly()
         for (i, problem) in enumerate(solver.boundary_problems)
             info("Assembling boundary $i: $(problem.name)")
             append!(boundary_assembly, assemble(problem, time))
         end
-        C = sparse(boundary_assembly.stiffness_matrix, dim, dim)
-        g = sparse(boundary_assembly.force_vector, dim, 1)
+
+        C1 = sparse(boundary_assembly.C1, dim, dim)
+        C2 = sparse(boundary_assembly.C2, dim, dim)
+        D = sparse(boundary_assembly.D, dim, dim)
+        g = sparse(boundary_assembly.g, dim, 1)
         boundary_assembly = nothing
         gc()
         toc(timing, "boundary assembly")
-
-
-#       resize!(C, dim, dim)
-#       resize!(g, dim, 1)
-#       resize!(f, dim, 1)
 
         tic(timing, "dump matrices to disk")
         if solver.dump_matrices
             filename = "matrices_$(solver.name)_host_$(myid())_iteration_$(iter).jld"
             info("dumping matrices to disk, file = $filename")
-            save(filename, "stiffness matrix", K, "force vector", f,
-                 "constraint matrix lhs", C, "constraint matrix rhs", g)
+            save(filename, "stiffness matrix K", K, "force vector f", f,
+                 "constraint matrix C1", C1,
+                 "constraint matrix C2", C2,
+                 "constraint matrix D", D,
+                 "constraint vector g", g)
         end
         toc(timing, "dump matrices to disk")
 
         tic(timing, "solution of system")
         info("Solving system")
         gc()
-#       whos()
-        sol, la = solve(K, f, C, g, Val{solver.method})
+#       sol, la = solve(K, f, C, g, Val{solver.method})
+        sol, la = solve(K, f, C1, C2, D, g, Val{solver.method})
+
         gc()
         toc(timing, "solution of system")
 
@@ -297,3 +311,4 @@ function call(solver::DirectSolver, time::Number=0.0)
     return (solver.max_iterations, false)
 
 end
+

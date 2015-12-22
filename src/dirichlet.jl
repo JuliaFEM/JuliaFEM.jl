@@ -10,7 +10,7 @@ function DirichletProblem(problem_name::ASCIIString, parent_field_name::ASCIIStr
     return BoundaryProblem{DirichletProblem}(problem_name, parent_field_name, parent_field_dim, dim, elements)
 end
 
-function assemble!(assembly::Assembly, problem::BoundaryProblem{DirichletProblem}, element::Element, time::Number)
+function assemble!(assembly::BoundaryAssembly, problem::BoundaryProblem{DirichletProblem}, element::Element, time::Real)
 
     # get dimension and name of PARENT field
     field_dim = problem.parent_field_dim
@@ -34,18 +34,19 @@ function assemble!(assembly::Assembly, problem::BoundaryProblem{DirichletProblem
             for i=1:field_dim
                 g = element(field_name, ip, time)
                 ldofs = gdofs[i:field_dim:end]
-                add!(assembly.stiffness_matrix, ldofs, ldofs, A)
-                add!(assembly.force_vector, ldofs, w*g*N')
+                add!(assembly.C1, ldofs, ldofs, A)
+                add!(assembly.C2, ldofs, ldofs, A)
+                add!(assembly.g, ldofs, w*g*N')
             end
         end
   
         for i=1:field_dim
-            # add per dof if defined element["blaa 1"] = 1.0, element["blaa 2"] = 0.0 etc.
             if haskey(element, field_name*" $i")
                 g = element(field_name*" $i", ip, time)
                 ldofs = gdofs[i:field_dim:end]
-                add!(assembly.stiffness_matrix, ldofs, ldofs, A)
-                add!(assembly.force_vector, ldofs, w*g*N')
+                add!(assembly.C1, ldofs, ldofs, A)
+                add!(assembly.C2, ldofs, ldofs, A)
+                add!(assembly.g, ldofs, w*g*N')
             end
         end
     end

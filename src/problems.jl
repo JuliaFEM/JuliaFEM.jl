@@ -3,7 +3,7 @@
 
 abstract AbstractProblem
 
-type Problem{T<:AbstractProblem}
+type FieldProblem{T<:AbstractProblem}
     name :: ASCIIString
     dim :: Int
     elements :: Vector{Element}
@@ -17,9 +17,9 @@ type BoundaryProblem{T<:AbstractProblem}
     elements :: Vector{Element}
 end
 
-typealias FieldProblem Problem
+typealias Problem FieldProblem
 
-typealias AllProblems Union{Problem, BoundaryProblem}
+typealias AllProblems Union{FieldProblem, BoundaryProblem}
 
 function get_elements(problem::AllProblems)
     return problem.elements

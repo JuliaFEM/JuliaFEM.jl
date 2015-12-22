@@ -4,16 +4,23 @@
 # Sparse utils to make assembly of local and global matrices easier.
 # Unoptimized but should do all necessary stuff for at start.
 
-type SparseMatrixIJV
+type SparseMatrixCOO
     I :: Vector{Int}
     J :: Vector{Int}
     V :: Vector{Float64}
 end
 
-typealias SparseMatrixCOO SparseMatrixIJV
+typealias SparseMatrixIJV SparseMatrixCOO
 
+#=
 function SparseMatrixIJV()
-    SparseMatrixIJV([], [], [])
+    warn("use SparseMatrixCOO to construct sparse matrix.""")
+    SparseMatrixCOO([], [], [])
+end
+=#
+
+function SparseMatrixCOO()
+    SparseMatrixCOO([], [], [])
 end
 
 function Base.sparse(A::SparseMatrixIJV, args...)
@@ -85,8 +92,8 @@ Example
 """
 function add!(A::SparseMatrixIJV, dofs1::Vector{Int}, dofs2::Vector{Int}, data::Matrix{Float64})
     n, m = size(data)
-    for i=1:n
-        for j=1:m
+    for j=1:m
+        for i=1:n
             push!(A.I, dofs1[i])
             push!(A.J, dofs2[j])
         end

@@ -3,17 +3,39 @@
 
 # Functions to handle element level things -- integration, assembly, ...
 
-type Assembly
-    mass_matrix :: SparseMatrixIJV
-    stiffness_matrix :: SparseMatrixIJV
-    force_vector :: SparseMatrixIJV
+type FieldAssembly
+    mass_matrix :: SparseMatrixCOO
+    stiffness_matrix :: SparseMatrixCOO
+    force_vector :: SparseMatrixCOO
 end
 
-function Assembly()
-    return Assembly(
-        SparseMatrixIJV(),
-        SparseMatrixIJV(),
-        SparseMatrixIJV())
+function FieldAssembly()
+    return FieldAssembly(
+        SparseMatrixCOO(),
+        SparseMatrixCOO(),
+        SparseMatrixCOO())
+end
+
+typealias Assembly FieldAssembly
+
+"""
+"Boundary" matrices C₁, C₂, D, g for general problem type
+Au + C₁'λ = f
+C₂u + Dλ  = g
+"""
+type BoundaryAssembly
+    C1 :: SparseMatrixCOO
+    C2 :: SparseMatrixCOO
+    D :: SparseMatrixCOO
+    g :: SparseMatrixCOO
+end
+
+function BoundaryAssembly()
+    return BoundaryAssembly(
+        SparseMatrixCOO(),
+        SparseMatrixCOO(),
+        SparseMatrixCOO(),
+        SparseMatrixCOO())
 end
 
 function Base.empty!(assembly::Assembly)
