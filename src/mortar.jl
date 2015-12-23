@@ -658,7 +658,21 @@ function MortarProblem(problem_name::ASCIIString, parent_field_name::ASCIIString
     return BoundaryProblem{MortarProblem}(problem_name, parent_field_name, parent_field_dim, dim, elements)
 end
 
-# Mortar assembly
+abstract ContactProblem{T} <: AbstractProblem
+
+abstract AbstractContact
+abstract TieContact <: AbstractContact
+abstract SmallSlidingContact <: AbstractContact
+
+function ContactProblem(problem_name::ASCIIString, parent_field_name::ASCIIString, parent_field_dim::Int, dim::Int=1, elements=[]; contact_type=TieContact)
+    return BoundaryProblem{ContactProblem{contact_type}}(
+        problem_name,
+        parent_field_name,
+        parent_field_dim,
+        dim, elements)
+end
+
+# Mortar assembly 2d
 
 typealias MortarElements2D Union{Seg2, Seg3}
 
@@ -707,6 +721,122 @@ function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly, problem::Bou
     end
 end
 
+""" Calculate bi-orthogonal basis transformation matrix Aₑ. """
+function get_biorthogonal_transformation_matrix(element::Element, time::Real)
+    nnodes = size(element, 2)
+    De = zeros(nnodes, nnodes)
+    Me = zeros(nnodes, nnodes)
+    for ip in get_integration_points(element, Val{5})
+        w = ip.weight
+        J = get_jacobian(element, ip, time)
+        JT = transpose(J)
+        if size(JT, 2) == 1  # plane problem
+            w *= norm(JT)
+        else
+            w *= norm(cross(JT[:,1], JT[:,2]))
+        end
+        N = element(ip, time)
+        De += w*diagm(vec(N))
+        Me += w*N'*N
+    end
+    Ae = De*inv(Me)
+    return Ae
+end
+
+"""
+Small strain theory, allow frictionless tangential sliding, keep bodies in contact.
+"""
+function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly, problem::BoundaryProblem{ContactProblem{SmallSlidingContact}}, slave_element::Element{E}, time::Real)
+
+    # get dimension and name of PARENT field
+    field_dim = problem.parent_field_dim
+    field_name = problem.parent_field_name
+    slave_dofs = get_gdofs(slave_element, field_dim)
+    info("slave dofs of element: $slave_dofs")
+
+    for master_element in slave_element["master elements"]
+        xi1a = project_from_master_to_slave(slave_element, master_element, [-1.0])
+        xi1b = project_from_master_to_slave(slave_element, master_element, [ 1.0])
+        xi1 = clamp([xi1a xi1b], -1.0, 1.0)
+        l = 1/2*(xi1[2]-xi1[1])
+        abs(l) > 1.0e-9 || continue
+
+#       Ae = get_biorthogonal_transformation_matrix(slave_element, time)
+        nnodes = size(element, 2)
+        De = zeros(nnodes, nnodes)
+        Me = zeros(nnodes, nnodes)
+        for ip_ in get_integration_points(slave_element, Val{5})
+            xi_gauss = 1/2*(1-ip_.xi)*xi1[1] + 1/2*(1+ip_.xi)*xi1[2]
+            ip = IntegrationPoint(xi_gauss, ip_.weight)
+            w = ip.weight
+            J = get_jacobian(slave_element, ip, time)
+            JT = transpose(J)
+            if size(JT, 2) == 1  # plane problem
+                w *= norm(JT)
+            else
+                w *= norm(cross(JT[:,1], JT[:,2]))
+            end
+            N = element(ip, time)
+            De += w*diagm(vec(N))
+            Me += w*N'*N
+        end
+        Ae = De*inv(Me)
+
+        master_dofs = get_gdofs(master_element, field_dim)
+        for ip in get_integration_points(slave_element, Val{5})
+            J = get_jacobian(slave_element, ip, time)
+            w = ip.weight*norm(J)*l
+
+            # integration point on slave side segment
+            xi_gauss = 1/2*(1-ip.xi)*xi1[1] + 1/2*(1+ip.xi)*xi1[2]
+            # projected integration point
+            xi_projected = project_from_slave_to_master(slave_element, master_element, xi_gauss)
+
+            # add contribution to C1
+            N1 = slave_element(xi_gauss, time)
+            Phi = (Ae*N1')'
+            N2 = master_element(xi_projected, time)
+            S = w*Phi'*N1
+            M = w*Phi'*N2
+            for i=1:field_dim
+                sd = slave_dofs[i:field_dim:end]
+                md = master_dofs[i:field_dim:end]
+                add!(assembly.C1, sd, sd, S)
+                add!(assembly.C1, sd, md, -M)
+            end
+
+            # construct C2 & D
+            nt = slave_element("normal-tangential coordinates", ip, time)
+            nt = transpose(nt)
+            ntS = nt*S
+            ntM = nt*M
+            info("normal dofs: $(slave_dofs[1:2:end])")
+            info("tangent dofs: $(slave_dofs[2:2:end])")
+            # contribution in normal direction
+            for dof in slave_dofs[1:2:end]
+                add!(assembly.C2, [dofs], sd, ntS[1,:])
+                add!(assembly.C2, sd[1:2:end], md, -ntM[1,:])
+            end
+                # contribution in tangent direction
+                add!(assembly.C2, sd[2:2:end], sd, ntS[2,:])
+                add!(assembly.C2, sd[2:2:end], md, -ntM[2,:])
+                # set lagrange multipliers to zero in tangent direction
+                #tangent = nt[2, :]
+                #add!(assembly.D, sd[2:2:end], sd, tangent)
+            end
+#=
+            nt = transpose(nt)
+            normal = nt[1,:]
+            tangent = nt[2,:]
+            for nid in get_connectivity(slave_element)
+                ndofs = [2*(nid-1)+1, 2*(nid-1)+2]
+                add!(assembly.C2, [2*(nid-1)+1], ndofs, normal)
+                add!(assembly.D, [2*(nid-1)+2], ndofs, tangent)
+            end
+=#
+        end
+    end
+end
 
 typealias MortarElements3D Union{Tri3, Quad4}
 
