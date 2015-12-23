@@ -12,6 +12,10 @@ function Base.size{E}(::Element{E})
     return size(E)
 end
 
+function Base.size{E}(::Element{E}, i::Int64)
+    return size(E)[i]
+end
+
 function convert{E}(::Type{Element{E}}, connectivity::Vector{Int})
 #   return Element{E}(connectivity, get_integration_points(E), Dict())
     return Element{E}(connectivity, Dict())

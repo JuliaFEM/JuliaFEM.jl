@@ -1,6 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+typealias Node Vector{Float64}
+
 function ForwardDiff.derivative{T}(f::Function, S::Matrix{T}, args...)
     shape = size(S)
     wrapper(S::Vector) = f(reshape(S, shape))
