@@ -63,6 +63,10 @@ function assemble(problem::AllProblems, elrange::UnitRange{Int64}, time::Real, o
     return assembly
 end
 
+""" Run postprocess for assembly. """
+function postprocess_assembly!
+end
+
 function assemble(problem::AllProblems, time::Real, nchunks=10)
     ne = length(get_elements(problem))
     kk = round(Int, collect(linspace(0, ne, nchunks+1)))
@@ -74,6 +78,11 @@ function assemble(problem::AllProblems, time::Real, nchunks=10)
         if ne > 100
             info("Assembly: ", round(j/nchunks*100,1), " % done. ")
         end
+    end
+    args = Tuple{typeof(assembly), typeof(problem), Real}
+    if method_exists(postprocess_assembly!, args)
+        info("assemble: doing postprocess for problem ", typeof(problem), " assembly")
+        postprocess_assembly!(assembly, problem, time)
     end
     return assembly
 end
@@ -180,4 +189,3 @@ function Base.(:+)(ass1::Assembly, ass2::Assembly)
     force_vector = ass1.force_vector + ass2.force_vector
     return Assembly(mass_matrix, stiffness_matrix, force_vector)
 end
-
