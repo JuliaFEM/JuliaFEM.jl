@@ -752,7 +752,7 @@ function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly, problem::Bou
     field_dim = problem.parent_field_dim
     field_name = problem.parent_field_name
     slave_dofs = get_gdofs(slave_element, field_dim)
-    info("slave dofs of element: $slave_dofs")
+    #info("slave dofs of element: $slave_dofs")
 
     for master_element in slave_element["master elements"]
         xi1a = project_from_master_to_slave(slave_element, master_element, [-1.0])
@@ -762,21 +762,15 @@ function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly, problem::Bou
         abs(l) > 1.0e-9 || continue
 
 #       Ae = get_biorthogonal_transformation_matrix(slave_element, time)
-        nnodes = size(element, 2)
+        nnodes = size(slave_element, 2)
         De = zeros(nnodes, nnodes)
         Me = zeros(nnodes, nnodes)
         for ip_ in get_integration_points(slave_element, Val{5})
             xi_gauss = 1/2*(1-ip_.xi)*xi1[1] + 1/2*(1+ip_.xi)*xi1[2]
             ip = IntegrationPoint(xi_gauss, ip_.weight)
-            w = ip.weight
             J = get_jacobian(slave_element, ip, time)
-            JT = transpose(J)
-            if size(JT, 2) == 1  # plane problem
-                w *= norm(JT)
-            else
-                w *= norm(cross(JT[:,1], JT[:,2]))
-            end
-            N = element(ip, time)
+            w = ip.weight*norm(J)
+            N = slave_element(ip, time)
             De += w*diagm(vec(N))
             Me += w*N'*N
         end
@@ -796,44 +790,53 @@ function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly, problem::Bou
             N1 = slave_element(xi_gauss, time)
             Phi = (Ae*N1')'
             N2 = master_element(xi_projected, time)
-            S = w*Phi'*N1
-            M = w*Phi'*N2
+            #S = w*Phi'*N1
+            #M = w*Phi'*N2
+            S = w*N1'*N1
+            M = w*N1'*N2
+
+            nt = slave_element("normal-tangential coordinates", ip, time)
+            #println("normal tangential = ")
+            #println(round(nt, 3))
+            nt = [1 0; 0 1]
+            ntS = nt'*S
+            ntM = nt'*M
+
             for i=1:field_dim
                 sd = slave_dofs[i:field_dim:end]
                 md = master_dofs[i:field_dim:end]
                 add!(assembly.C1, sd, sd, S)
                 add!(assembly.C1, sd, md, -M)
+                add!(assembly.C2, sd, sd, ntS)
+                add!(assembly.C2, sd, md, -ntM)
             end
 
             # construct C2 & D
-            nt = slave_element("normal-tangential coordinates", ip, time)
-            nt = transpose(nt)
-            ntS = nt*S
-            ntM = nt*M
-            info("normal dofs: $(slave_dofs[1:2:end])")
-            info("tangent dofs: $(slave_dofs[2:2:end])")
+#            info("normal dofs: $(slave_dofs[1:2:end])")
+#            info("tangent dofs: $(slave_dofs[2:2:end])")
+#=
             # contribution in normal direction
             for dof in slave_dofs[1:2:end]
-                add!(assembly.C2, [dofs], sd, ntS[1,:])
-                add!(assembly.C2, sd[1:2:end], md, -ntM[1,:])
+                add!(assembly.C2, [dof], sd, ntS[1,:])
+                add!(assembly.C2, [dof], md, -ntM[1,:])
             end
-                # contribution in tangent direction
+            # contribution in tangent direction
+            for dof in slave_dofs[1:2:end]
                 add!(assembly.C2, sd[2:2:end], sd, ntS[2,:])
                 add!(assembly.C2, sd[2:2:end], md, -ntM[2,:])
                 # set lagrange multipliers to zero in tangent direction
-                #tangent = nt[2, :]
-                #add!(assembly.D, sd[2:2:end], sd, tangent)
+                tangent = nt[2, :]
+                add!(assembly.D, sd[2:2:end], sd, tangent)
             end
-#=
-            nt = transpose(nt)
-            normal = nt[1,:]
-            tangent = nt[2,:]
+
             for nid in get_connectivity(slave_element)
                 ndofs = [2*(nid-1)+1, 2*(nid-1)+2]
-                add!(assembly.C2, [2*(nid-1)+1], ndofs, normal)
-                add!(assembly.D, [2*(nid-1)+2], ndofs, tangent)
+                add!(assembly.C2, [2*(nid-1)+1], ndofs,  ntS[1,:])
+                add!(assembly.C2, [2*(nid-1)+1], ndofs, -ntM[1,:])
             end
-=#
+
+            =#
+
         end
     end
 end
@@ -1038,4 +1041,3 @@ function assemble!{E<:MortarElements3D}(assembly::BoundaryAssembly, problem::Bou
         end
     end
 end
-

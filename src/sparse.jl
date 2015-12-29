@@ -23,6 +23,10 @@ function SparseMatrixCOO()
     SparseMatrixCOO([], [], [])
 end
 
+function Base.convert(::Type{SparseMatrixCOO}, A::SparseMatrixCSC)
+    return SparseMatrixCOO(findnz(A)...)
+end
+
 function Base.sparse(A::SparseMatrixIJV, args...)
     return sparse(A.I, A.J, A.V, args...)
 end
