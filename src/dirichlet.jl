@@ -32,23 +32,29 @@ function assemble!(assembly::BoundaryAssembly, problem::BoundaryProblem{Dirichle
         A = w*N'*N
 
         if haskey(element, field_name)
-            # add all dimensions at once if defined element["blaa"] = 0.0
+            # add all dimensions at once if defined
+            # element["blaa"] = 0.0
+            # or
+            # element["blaa"] = Vector{Float64}[[0.1, 0.2], [0.3, 0.4]]
+            g = element(field_name, ip, time)
+            if length(g) != length(N)
+                g = g*ones(length(N))
+            end
             for i=1:field_dim
-                g = element(field_name, ip, time)
                 ldofs = gdofs[i:field_dim:end]
                 add!(assembly.C1, ldofs, ldofs, A)
                 add!(assembly.C2, ldofs, ldofs, A)
-                add!(assembly.g, ldofs, w*g*N')
             end
+            add!(assembly.g, gdofs, w*g*N)
         end
-  
+
         for i=1:field_dim
             if haskey(element, field_name*" $i")
                 g = element(field_name*" $i", ip, time)
                 ldofs = gdofs[i:field_dim:end]
                 add!(assembly.C1, ldofs, ldofs, A)
                 add!(assembly.C2, ldofs, ldofs, A)
-                add!(assembly.g, ldofs, w*g*N')
+                add!(assembly.g, ldofs, w*g*N)
             end
         end
     end
