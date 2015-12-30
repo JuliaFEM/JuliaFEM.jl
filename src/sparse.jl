@@ -107,8 +107,13 @@ function add!(A::SparseMatrixIJV, dofs1::Vector{Int}, dofs2::Vector{Int}, data::
     append!(A.V, vec(data))
 end
 
-""" Sparse vector version. """
-function add!(A::SparseMatrixIJV, dofs::Vector{Int}, data::Array{Float64})
+""" Add new data to COO Sparse vector. """
+function add!(A::SparseMatrixCOO, dofs::Vector{Int}, data::Array{Float64})
+    if length(dofs) != length(data)
+        info("dofs = $dofs")
+        info("data = $(vec(data))")
+        error("when adding to sparse vector dimension mismatch!")
+    end
     append!(A.I, dofs)
     append!(A.J, ones(Int, length(dofs)))
     append!(A.V, vec(data))
