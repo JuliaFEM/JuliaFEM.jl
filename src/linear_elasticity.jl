@@ -52,7 +52,15 @@ function assemble!{E<:CG, P<:LinearElasticityProblem}(assembly::Assembly, proble
             # de = E - E_last
             # S = vonMisesStress(de, stress)
             # K = B' * S * J * w
-            add!(assembly.stiffness_matrix, gdofs, gdofs, w*B'*C*B*det(J))
+            Kt = w*B'*C*B*det(J)
+            add!(assembly.stiffness_matrix, gdofs, gdofs, Kt)
+            # solve residual, i.e. K du = K \ -(Ku(prev) - F)
+            # in first iteration u(prev) typically 0 -> no effect
+            # but if geometrical or material nonlinearities iterations are needed
+            if haskey(element, "displacement")
+                u_prev = vec(element("displacement", ip, time))
+                add!(assembly.force_vector, gdofs, -Kt*u_prev)
+            end
         end
         if haskey(element, "displacement load")
             b = element("displacement load", ip, time)
@@ -107,7 +115,19 @@ function assemble!{E<:CG, P<:PlaneStressLinearElasticityProblem}(assembly::Assem
                 B[3, 2*(i-1)+1] = dN[2,i]
                 B[3, 2*(i-1)+2] = dN[1,i]
             end
-            add!(assembly.stiffness_matrix, gdofs, gdofs, w*B'*C*B*det(J))
+            Kt = w*B'*C*B*det(J)
+            add!(assembly.stiffness_matrix, gdofs, gdofs, Kt)
+            # solve residual, i.e. K du = K \ -(Ku(prev) - F)
+            # in first iteration u(prev) typically 0 -> no effect
+            # but if geometrical or material nonlinearities iterations are needed
+            if haskey(element, "displacement")
+                u_prev = element("displacement", time)
+#               info("u_prev = $u_prev")
+#               info("Kt = $Kt")
+                u_prev = vec(u_prev)
+#               info("u_prev = $u_prev")
+                add!(assembly.force_vector, gdofs, -Kt*u_prev)
+            end
         end
         if haskey(element, "displacement load")
             b = element("displacement load", ip, time)
