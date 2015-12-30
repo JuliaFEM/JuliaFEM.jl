@@ -703,11 +703,21 @@ function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly, problem::Bou
             # projected integration point
             xi_projected = project_from_slave_to_master(slave_element, master_element, xi_gauss)
 
-            # add contribution to left hand side
+            # add contribution
             N1 = slave_element(xi_gauss, time)
             N2 = master_element(xi_projected, time)
-            S = w*N1'*N1
-            M = w*N1'*N2
+            S = w*kron(N1', N1)
+            M = w*kron(N1', N2)
+            X1 = slave_element("geometry", xi_gauss, time)
+            u1 = slave_element("displacement", xi_gauss, time)
+            X2 = master_element("geometry", xi_projected, time)
+            u2 = master_element("displacement", xi_projected, time)
+            x1 = X1+u1
+            x2 = X2+u2
+            g = x1-x2 # gap in strong form
+#           info("gap in strong form", g)
+            gh = w*g*N1 # weighted gap (gap in weak form)
+#           info("weighted gap", gh)
             for i=1:field_dim
                 sd = slave_dofs[i:field_dim:end]
                 md = master_dofs[i:field_dim:end]
@@ -715,6 +725,7 @@ function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly, problem::Bou
                 add!(assembly.C1, sd, md, -M)
                 add!(assembly.C2, sd, sd, S)
                 add!(assembly.C2, sd, md, -M)
+                add!(assembly.g, sd, gh[i,:])
             end
 
         end
