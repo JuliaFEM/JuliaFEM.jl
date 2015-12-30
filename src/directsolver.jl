@@ -193,6 +193,8 @@ function call(solver::DirectSolver, time::Real=0.0)
         for element in get_elements(boundary_problem)
             gdofs = get_gdofs(element, field_dim)
             data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
+
+            # add new field "reaction force" for boundary element if not found
             if haskey(element, "reaction force")
                 if !isapprox(last(element["reaction force"]).time, time)
                     push!(element["reaction force"], time => data)
@@ -200,6 +202,18 @@ function call(solver::DirectSolver, time::Real=0.0)
             else
                 element["reaction force"] = (time => data)
             end
+
+            # add new primary field for boundary element if not found
+            if haskey(element, field_name)
+                if !isapprox(last(element[field_name]).time, time)
+                    last_data = copy(last(element[field_name]).data)
+                    push!(element[field_name], time => last_data)
+                end
+            else
+                data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
+                element[field_name] = (time => data)
+            end
+
         end
     end
 
@@ -283,6 +297,16 @@ function call(solver::DirectSolver, time::Real=0.0)
                 local_sol = reshape(local_sol, field_dim, length(element))
                 local_sol = Vector{Float64}[local_sol[:,i] for i=1:length(element)]
                 last(element["reaction force"]).data = local_sol  # <-- replaced
+                # FIXME: Quick and dirty, updating dirichlet boundary problem
+                # is causing drifting and convergence issue
+                if typeof(boundary_problem) <: BoundaryProblem{DirichletProblem{StandardBasis}}
+#                    info("skipping dirichlet problem update")
+                    continue
+                end
+                primary_sol = sol[gdofs]  # solution of primary field
+                primary_sol = reshape(primary_sol, field_dim, length(element))
+                primary_sol = Vector{Float64}[primary_sol[:,i] for i=1:length(element)]
+                last(element[field_name]).data = primary_sol
             end
         end
         toc(timing, "update element data")
@@ -311,4 +335,3 @@ function call(solver::DirectSolver, time::Real=0.0)
     return (solver.max_iterations, false)
 
 end
-
