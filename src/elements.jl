@@ -3,7 +3,7 @@
 
 abstract AbstractElement
 
-type Element{E<:AbstractElement}
+type Element{E}
     connectivity :: Vector{Int}
     fields :: Dict{ASCIIString, Field}
 end
@@ -292,4 +292,3 @@ function update!{T}(elements::Vector{Element{T}}, field_name::ASCIIString, data:
         update!(element, field_name, data)
     end
 end
-
