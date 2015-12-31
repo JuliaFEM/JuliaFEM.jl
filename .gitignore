@@ -10,3 +10,4 @@ docs/build/html
 *.out
 *.tex
 *.export
+*.jld
