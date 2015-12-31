@@ -57,7 +57,7 @@ elements
     elements used to calculate vector
 time
 """
-function calculate_nodal_vector{T}(field_name::ASCIIString, field_dim::Int, elements::Vector{Element{T}}, time::Real)
+function calculate_nodal_vector(field_name::ASCIIString, field_dim::Int, elements::Vector{Element}, time::Real)
     A = SparseMatrixCOO()
     b = SparseMatrixCOO()
     for element in elements
@@ -82,4 +82,3 @@ function calculate_nodal_vector{T}(field_name::ASCIIString, field_dim::Int, elem
     x[nz, :] = A[nz,nz] \ b[nz, :]
     return vec(transpose(x))
 end
-
