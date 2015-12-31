@@ -62,24 +62,24 @@ function calculate_nodal_vector{T}(field_name::ASCIIString, field_dim::Int, elem
     b = SparseMatrixCOO()
     for element in elements
         haskey(element, field_name) || continue
-        gdofs = get_gdofs(element, field_dim)
+        gdofs = get_gdofs(element, 1)
 #       info("gdofs = $gdofs")
         for ip in get_integration_points(element, Val{2})
             J = get_jacobian(element, ip, time)
             w = ip.weight*norm(J)
             f = element(field_name, ip, time)
             N = element(ip, time)
-            for i=1:field_dim
-                ldofs = gdofs[i:field_dim:end]
-                add!(A, ldofs, ldofs, w*kron(N', N))
+            add!(A, gdofs, gdofs, w*kron(N', N))
+            for dim=1:field_dim
+                add!(b, gdofs, w*f[dim]*N, dim)
             end
-            add!(b, gdofs, w*f*N)
         end
     end
     A = sparse(A)
-    dim = size(A, 1)
-    b = sparse(b, dim, 1)
-    x = A \ full(b)
-    return x
+    b = sparse(b)
+    nz = sort(unique(rowvals(A)))
+    x = zeros(size(b)...)
+    x[nz, :] = A[nz,nz] \ b[nz, :]
+    return vec(transpose(x))
 end
 
