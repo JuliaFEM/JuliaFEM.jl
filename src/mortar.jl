@@ -678,6 +678,9 @@ typealias MortarElements2D Union{Seg2, Seg3}
 
 function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly, problem::BoundaryProblem{MortarProblem}, slave_element::Element{E}, time::Real)
 
+    # slave element must have a set of master elements
+    haskey(slave_element, "master elements") || return
+
     # get dimension and name of PARENT field
     field_dim = problem.parent_field_dim
     field_name = problem.parent_field_name
