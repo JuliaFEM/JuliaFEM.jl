@@ -286,9 +286,10 @@ end
 function update!(element::Element, field_name::ASCIIString, data::Union{Vector, Dict})
     element[field_name] = [data[i] for i in get_connectivity(element)]
 end
-function update!(elements::Vector{Element}, field_name::ASCIIString, data::Union{Vector, Dict})
+function update!{T}(elements::Vector{Element{T}}, field_name::ASCIIString, data::Union{Vector, Dict})
 #   info("update $field_name for $(length(elements)) elements.")
     for element in elements
         update!(element, field_name, data)
     end
 end
+
