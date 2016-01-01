@@ -53,8 +53,8 @@ function add_postprocessor!(problem::Union{FieldProblem, BoundaryProblem}, postp
     push!(problem.postprocessors, (postprocessor_name, args, kwargs))
 end
 
-function add_preprocessor!(problem::Union{FieldProblem, BoundaryProblem}, postprocessor_name::Symbol, args...; kwargs...)
-    push!(problem.preprocessors, (postprocessor_name, args, kwargs))
+function add_preprocessor!(problem::Union{FieldProblem, BoundaryProblem}, preprocessor_name::Symbol, args...; kwargs...)
+    push!(problem.preprocessors, (preprocessor_name, args, kwargs))
 end
 
 typealias Problem FieldProblem
