@@ -1,12 +1,6 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-#= Solution norms for piston model
-
-piston_19611_P2.inp     iter 1      2.048090408266966
-
-=#
-
 ## Direct solver
 
 using JuliaFEM
@@ -18,28 +12,34 @@ type DirectSolver <: Solver
     field_problems :: Vector{Problem}
     boundary_problems :: Vector{BoundaryProblem}
     parallel :: Bool
-    nonlinear_problem :: Bool
-    max_iterations :: Int64
-    tol :: Float64
-    dump_matrices :: Bool
-    reduce_stiffness_matrix :: Bool
-    method :: Symbol
+    nonlinear_max_iterations :: Int64
+    nonlinear_convergence_tolerance :: Float64
+    linear_system_solver_preprocessors :: Vector{Symbol}
+    linear_system_solvers :: Vector{Symbol}
+    linear_system_solver_postprocessors :: Vector{Symbol}
 end
 
 """ Default initializer. """
 function DirectSolver(name="DirectSolver")
     DirectSolver(
         name,
-        [], # field problems
-        [], # boundary problems
-        false, # parallel run?
-        true, # nonlinear problem?
-        10, # max nonlinear iterations
-        1.0e-6, # convergence tolerance
-        false, # dump matrices
-        true, # reduce stiffness matrix
-        :UMFPACK # method: CHOLMOD, UMFPACK, PETSc_GMRES
+        [],                             # field problems
+        [],                             # boundary problems
+        false,                          # parallel run?
+        10,                             # nonlinear problem max iterations
+        5.0e-6,                         # nonlinear convergence tolerance
+        Vector{Symbol}(),               # default solution preprocessors
+        Vector{Symbol}([:UMFPACK]),     # linear system solver: CHOLMOD, UMFPACK
+        Vector{Symbol}(),               # default solution postprocessors
     )
+end
+
+function set_linear_system_solver!(solver::DirectSolver, method::Symbol)
+    solver.linear_system_solvers = Vector{Symbol}([method])
+end
+
+function set_nonlinear_max_iterations!(solver::DirectSolver, max_iterations::Int)
+    solver.nonlinear_max_iterations = max_iterations
 end
 
 function push!(solver::DirectSolver, problem::FieldProblem)
@@ -62,84 +62,15 @@ function time_elapsed(timing, what::ASCIIString)
     return timing[what * " finish"] - timing[what * " start"]
 end
 
+"""
+Linear system solver for problem
+
+    Ku  + C₁'λ = f
+    C₂u + Dλ   = g
 
 """
-Solve problem
-
-    Ku + C'λ = f
-    Cu       = g
-
-"""
-function solve(K, f, C, g, ::Type{Val{:CHOLMOD}})
-
-    t0 = time()
-    # make sure K is symmetric
-#   K = Symmetric(K)
-    s = maximum(abs(1/2*(K + K') - K))
-    @assert s < 1.0e-6
-    K = 1/2*(K + K')
-
-    dim = size(K, 1)
-
-    # make sure C is square
-    boundary_dofs = unique(rowvals(C))
-    boundary_dofs2 = unique(rowvals(C'))
-    @assert length(boundary_dofs) == length(boundary_dofs2)
-    @assert setdiff(Set(boundary_dofs), Set(boundary_dofs2)) == Set()
-
-    all_dofs = unique(rowvals(K))
-    interior_dofs = setdiff(all_dofs, boundary_dofs)
-    info("CHOLMOD: all dofs = $(length(all_dofs))")
-    info("CHOLMOD: interior dofs = $(length(interior_dofs))")
-    info("CHOLMOD: boundary dofs = $(length(boundary_dofs))")
-
-    # solve displacement on known boundary
-    LUF = lufact(C[boundary_dofs, boundary_dofs])
-    u = zeros(dim)
-    u[boundary_dofs] = LUF \ full(g[boundary_dofs])
-    info("CHOLMOD: displacement on boundary solved.")
-    normub = norm(u[boundary_dofs])
-    if isapprox(normub, 0.0)
-        info("CHOLMOD: homogeneous dirichlet boundary")
-    end
-
-    # factorize interior domain using cholmod
-    t = time()
-    CF = cholfact(K[interior_dofs, interior_dofs])
-    Kib = K[interior_dofs, boundary_dofs]
-    Kbb = K[boundary_dofs, boundary_dofs]
-    fi = f[interior_dofs]
-    info("CHOLMOD: LDLt factorization done in ", time()-t, " seconds")
-
-    # solve interior domain + lagrange multipliers
-    u[interior_dofs] = CF \ (fi - Kib*u[boundary_dofs])
-    la = zeros(dim)
-    la[boundary_dofs] = LUF \ full(Kib'*u[interior_dofs] - Kbb*u[boundary_dofs])
-    info("CHOLMOD: solved in ", time()-t0, " seconds. norm = ", norm(u))
-    return u, la
-end
-
-function solve(K, f, C, g, ::Type{Val{:UMFPACK}})
-    t0 = time()
-    dim = size(K, 1)
-    A = nothing
-    try
-        A = [K C'; C spzeros(dim, dim)]
-    catch
-        info("UMFPACK: size(K) = ", size(K))
-        info("UMFPACK: size(C) = ", size(C))
-        error("UMFPACK: Failed to construct problem. dim = $dim")
-    end
-    b = [f; g]
-    nz = sort(unique(rowvals(A)))
-    u = zeros(length(b))
-    u[nz] = lufact(A[nz,nz]) \ full(b[nz])
-    info("UMFPACK: solved in ", time()-t0, " seconds. norm = ", norm(u[1:dim]))
-    return u[1:dim], u[dim+1:end]
-end
-
-function solve(K, f, C1, C2, D, g, ::Type{Val{:UMFPACK}})
-    t0 = time()
+function linear_system_solver_solve!(solver, iter, time, K, f, C1, C2, D, g, sol, la, ::Type{Val{:UMFPACK}})
+    t0 = Base.time()
     dim = size(K, 1)
     A = [K C1'; C2 D]
     b = [f; g]
@@ -147,9 +78,31 @@ function solve(K, f, C1, C2, D, g, ::Type{Val{:UMFPACK}})
     nz2 = sort(unique(rowvals(A')))
     u = zeros(length(b))
     u[nz1] = lufact(A[nz1,nz2]) \ full(b[nz1])
-    info("UMFPACK: solved in ", time()-t0, " seconds. norm = ", norm(u[1:dim]))
-    return u[1:dim], u[dim+1:end]
+    sol[:] = u[1:dim]
+    la[:] = u[dim+1:end]
+    info("UMFPACK: solved in ", Base.time()-t0, " seconds. norm = ", norm(sol))
 end
+
+""" Solution preprocessor: dump matrices to disk before solution.
+
+Examples
+--------
+julia> solver = DirectSolver()
+julia> push!(solver.linear_system_solver_preprocessors, :dump_matrices)
+
+"""
+function linear_system_solver_preprocess!(solver, iter, time, K, f, C1, C2, D, g, sol, la, ::Type{Val{:dump_matrices}})
+    filename = "matrices_$(solver.name)_host_$(myid())_iteration_$(iter).jld"
+    info("dumping matrices to disk, file = $filename")
+    save(filename,
+        "stiffness matrix K", K,
+        "force vector f", f,
+        "constraint matrix C1", C1,
+        "constraint matrix C2", C2,
+        "constraint matrix D", D,
+        "constraint vector g", g)
+end
+
 
 """ Call solver to solve a set of problems. """
 function call(solver::DirectSolver, time::Real=0.0)
@@ -219,10 +172,12 @@ function call(solver::DirectSolver, time::Real=0.0)
 
     toc(timing, "initialization")
 
-    dim = 0
+    dim = nothing
+    sol = nothing
+    la = nothing
 
-    for iter=1:solver.max_iterations
-        info("Starting iteration $iter")
+    for iter=1:solver.nonlinear_max_iterations
+        info("Starting nonlinear iteration $iter")
         tic(timing, "non-linear iteration")
 
         tic(timing, "field assembly")
@@ -234,7 +189,6 @@ function call(solver::DirectSolver, time::Real=0.0)
         end
         K = sparse(field_assembly.stiffness_matrix)
         dim = size(K, 1)
-        info("dim = $dim")
         f = sparse(field_assembly.force_vector, dim, 1)
         field_assembly = nothing
         gc()
@@ -256,26 +210,33 @@ function call(solver::DirectSolver, time::Real=0.0)
         gc()
         toc(timing, "boundary assembly")
 
-        tic(timing, "dump matrices to disk")
-        if solver.dump_matrices
-            filename = "matrices_$(solver.name)_host_$(myid())_iteration_$(iter).jld"
-            info("dumping matrices to disk, file = $filename")
-            save(filename, "stiffness matrix K", K, "force vector f", f,
-                 "constraint matrix C1", C1,
-                 "constraint matrix C2", C2,
-                 "constraint matrix D", D,
-                 "constraint vector g", g)
+        if iter == 1
+            # initialize vectors in first iteration
+            sol = zeros(dim)
+            la = zeros(dim)
         end
-        toc(timing, "dump matrices to disk")
 
+        tic(timing, "preprocess solution")
+        # NOTE: sol and la are vectors from previous solution
+        for preprocessor in solver.linear_system_solver_preprocessors
+            linear_system_solver_preprocess!(solver, iter, time, K, f, C1, C2, D, g, sol, la, Val{preprocessor})
+        end
+        toc(timing, "preprocess solution")
+
+        gc()
         tic(timing, "solution of system")
-        info("Solving system")
-        gc()
-#       sol, la = solve(K, f, C, g, Val{solver.method})
-        sol, la = solve(K, f, C1, C2, D, g, Val{solver.method})
-
-        gc()
+        info("Solving linear system Ax=b")
+        for linear_solver in solver.linear_system_solvers
+            linear_system_solver_solve!(solver, iter, time, K, f, C1, C2, D, g, sol, la, Val{linear_solver})
+        end
         toc(timing, "solution of system")
+        gc()
+
+        tic(timing, "postprocess solution")
+        for postprocessor in solver.linear_system_solver_postprocessors
+            linear_system_solver_postprocess!(solver, iter, time, K, f, C1, C2, D, g, sol, la, Val{postprocessor})
+        end
+        toc(timing, "postprocess solution")
 
         tic(timing, "update element data")
         # update elements in field problems
@@ -315,15 +276,15 @@ function call(solver::DirectSolver, time::Real=0.0)
 
         if true
             info("timing info for iteration:")
-            info("boundary assembly       : ", time_elapsed(timing, "boundary assembly"))
-            info("field assembly          : ", time_elapsed(timing, "field assembly"))
-            info("dump matrices to disk   : ", time_elapsed(timing, "dump matrices to disk"))
-            info("solve problem           : ", time_elapsed(timing, "solution of system"))
-            info("update element data     : ", time_elapsed(timing, "update element data"))
-            info("non-linear iteration    : ", time_elapsed(timing, "non-linear iteration"))
+            info("boundary assembly        : ", time_elapsed(timing, "boundary assembly"))
+            info("field assembly           : ", time_elapsed(timing, "field assembly"))
+            info("preprocess of solution   : ", time_elapsed(timing, "preprocess solution"))
+            info("solve linearized problem : ", time_elapsed(timing, "solution of system"))
+            info("update element data      : ", time_elapsed(timing, "update element data"))
+            info("non-linear iteration     : ", time_elapsed(timing, "non-linear iteration"))
         end
 
-        if (norm(sol) < solver.tol) || !solver.nonlinear_problem
+        if (norm(sol) < solver.nonlinear_convergence_tolerance)
             toc(timing, "solver")
             info("solver finished in ", time_elapsed(timing, "solver"), " seconds.")
             return (iter, true)
@@ -331,7 +292,7 @@ function call(solver::DirectSolver, time::Real=0.0)
 
     end
 
-    info("Warning: did not coverge in $(solver.max_iterations) iterations!")
-    return (solver.max_iterations, false)
+    info("Warning: did not coverge in $(solver.nonlinear_max_iterations) iterations!")
+    return (solver.nonlinear_max_iterations, false)
 
 end
