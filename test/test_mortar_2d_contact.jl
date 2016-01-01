@@ -9,9 +9,17 @@ using JuliaFEM.Core: Node, Seg2, Tri3, update!, calculate_normal_tangential_coor
                      FieldProblem, set_linear_system_solver!, set_nonlinear_max_iterations!,
                      get_elements, Element, BoundaryAssembly, BoundaryProblem,
                      get_integration_points, get_jacobian, get_connectivity, StandardBasis,
-                     add_postprocessor!, add_preprocessor!
+                     add_postprocessor!, add_preprocessor!, SparseMatrixCOO, add!,
+                     add_linear_system_solver_preprocessor!,
+                     add_linear_system_solver_postprocessor!
 
-import JuliaFEM.Core: assemble_postprocess!, linear_system_solver_preprocess!
+import JuliaFEM.Core: assemble_preprocess!, assemble_postprocess!,
+                      linear_system_solver_preprocess!, linear_system_solver_postprocess!
+
+macro debug(msg)
+    haskey(ENV, "DEBUG") || return
+    return msg
+end
 
 function calculate_normal_tangential_coordinates(elements::Vector{Element}, time::Real)
     P = SparseMatrixCOO()
@@ -38,16 +46,30 @@ function calculate_normal_tangential_coordinates(elements::Vector{Element}, time
             P[i,:] = P[i,:] / n
         end
     end
-    return P
+    return SparseMatrixCOO(P)
+end
+
+function assemble_postprocess!(assembly, problem, time::Real, ::Type{Val{:remove_constraint_from_dofs}}, dofs)
+    # giving additional arguments and keywords is possible too
+    C1 = sparse(assembly.C1)
+    C2 = sparse(assembly.C2)
+    info("removing constraints from dofs: $dofs")
+    for d in dofs
+        C1[d,:] = 0
+        C2[d,:] = 0
+    end
+    assembly.C1 = C1
+    assembly.C2 = C2
 end
 
 function assemble_postprocess!(assembly, problem, time::Real, ::Type{Val{:remove_tangential_constraints}})
     # example how to use postprocessor to manipulate constraint matrix before summing assemblies together
     info("postprocess mortar assembly: remove contraints in tangent direction on boundary.")
-    C1 = sparse(assembly.C1)
-    C2 = sparse(assembly.C2)
-    dim = size(C1, 1)
+    dim = 12
+    C1 = sparse(assembly.C1, dim, dim)
+    C2 = sparse(assembly.C2, dim, dim)
     P = calculate_normal_tangential_coordinates(get_elements(problem), time)
+    P = sparse(P, dim, dim)
     info("projection matrix for normals: ")
     dump(round(full(P), 3))
     C1 = P*C1
@@ -61,44 +83,94 @@ function assemble_postprocess!(assembly, problem, time::Real, ::Type{Val{:remove
     info("postprocess mortar assembly: done.")
 end
 
-function assemble_postprocess!(assembly, problem, time::Real, ::Type{Val{:remove_constraint_from_dofs}}, dofs)
-    # giving additional arguments and keywords is possible too
-    C1 = sparse(assembly.C1)
-    C2 = sparse(assembly.C2)
-    info("removing constraints from dofs: $dofs")
-    info(round(full(C1), 3))
-    for d in dofs
-        C1[d,:] = 0
-        C2[d,:] = 0
+function assemble_postprocess!(assembly, problem, time::Real, ::Type{Val{:primal_dual_active_set_strategy}})
+    info("PDASS: determining active contact set")
+    dim = 12
+    C1 = sparse(assembly.C1, dim, dim)
+    C2 = sparse(assembly.C2, dim, dim)
+    elements = get_elements(problem)
+    P = calculate_normal_tangential_coordinates(get_elements(problem), time)
+    P = sparse(P, dim, dim)
+
+    la = calculate_nodal_vector("reaction force", 2, elements, time)
+    X = calculate_nodal_vector("geometry", 2, elements, time)
+    u = calculate_nodal_vector("displacement", 2, elements, time)
+    resize!(la, 12)
+    resize!(X, 12)
+    resize!(u, 12)
+    x = X+u
+    info("x = \n", reshape(round(x, 2), 2, 6))
+    P = sparse(eye(dim))
+    C1 = P*C1
+    C2 = P*C2
+    gn = P*C1*X
+    un = P*C1*u
+    la = P*la
+    info("weighted gap in nt =")
+    dump(reshape(round(gn+un, 2), 2, 6))
+    info("lambda in nt =")
+    dump(reshape(round(la, 2), 2, 6))
+    # complementarity function
+    cn = 1.0
+    C = la - clamp(la - cn*(gn+un), 0, Inf)
+    info("complementarity function =")
+    dump(reshape(round(C, 2), 2, 6))
+
+    g = zeros(length(gn))
+
+    for i=1:2:dim
+        #if C[i] < 0
+        if i==1
+            info("dof $i in active set")
+            g[i] = -gn[i]
+        else
+            info("dof $i not in active set")
+            C1[i,:] = 0
+            C2[i,:] = 0
+        end
     end
+
+    for i=2:2:dim
+        C1[i,:] = 0
+        C2[i,:] = 0
+    end
+
+    assembly.g = sparse(g)
     assembly.C1 = C1
     assembly.C2 = C2
+    info("PDASS ready.")
 end
 
-function linear_system_solver_preprocess!(solver, iter, time, K, f, C1, C2, D, g, sol, la, ::Type{Val{:foo}})
+function linear_system_solver_preprocess!(solver, iter, time, K, f, C1, C2, D, g, sol, la, ::Type{Val{:before_solution}})
     # example how to use preprocessor to dump matrices before solution
-    info("stiffness matrix")
-    dump(round(full(K), 3))
-    info("constraint matrix C1")
-    dump(round(full(C1), 3))
-    info("constraint matrix C2")
-    dump(round(full(C2), 3))
-    info("force vector")
-    dump(round(full(f)', 3))
-    info("constraint vector")
-    dump(round(full(g)', 3))
+    @debug begin
+        info("stiffness matrix")
+        dump(round(full(K), 3))
+        info("constraint matrix C1")
+        dump(round(full(C1), 3))
+        info("constraint matrix C2")
+        dump(round(full(C2), 3))
+        info("force vector")
+        dump(round(full(f)', 3))
+        info("constraint vector")
+        dump(round(full(g)', 3))
+    end
 end
 
-macro debug(msg)
-    haskey(ENV, "DEBUG") || return
-    return msg
+function linear_system_solver_postprocess!(solver, iter, time, K, f, C1, C2, D, g, x, la, ::Type{Val{:after_solution}})
+    @debug begin
+        info("solution vector")
+        dump(round(full(x)', 3))
+        info("reaction force vector")
+        dump(round(full(la)', 3))
+    end
 end
 
 @testset "2d frictionless contact" begin
-    gap = [0.0, 0.0]
+    gap = [1.0, 0.0]
     nodes = Node[
         [6.0, 6.0],
-        [6.0, 8.0]+gap,
+        [6.0, 12.0]+gap,
         [0.0, 0.0],
         [6.0, 0.0],
         [6.0, 0.0]+gap,
@@ -118,7 +190,7 @@ end
     push!(prob, force)
     update!([fel1, fel2], "youngs modulus", 90.0)
     update!([fel1, fel2], "poissons ratio", 0.25)
-    update!([force], "displacement traction force 1", 6/sqrt(2))
+    update!([force], "displacement traction force 1", 2*6/sqrt(2))
 
     bc = BoundaryProblem(DirichletProblem, "support", "displacement", 2)
     push!(bc, bnd1, bnd2)
@@ -131,7 +203,11 @@ end
     info("normal direction = $(nt)")
     sel["master elements"] = [mel]
     # remove coefficients from node 4 (dofs 7-8) because this conflicts with dirichlet bc.
-    add_postprocessor!(cont, :remove_constraint_from_dofs, [7, 8])
+    # add_postprocessor!(cont, :remove_constraint_from_dofs, [7, 8])
+    # remove tangential direction constraints
+    # add_postprocessor!(cont, :remove_tangential_constraints)
+    # apply PDASS
+    add_postprocessor!(cont, :primal_dual_active_set_strategy)
 
     @debug begin
         info("fel1.fields = $(fel1.fields)")
@@ -141,9 +217,11 @@ end
     push!(solver, prob)
     push!(solver, bc)
     push!(solver, cont)
+    solver.solve_residual = false
     set_linear_system_solver!(solver, :UMFPACK)
-    set_nonlinear_max_iterations!(solver, 2)
-    push!(solver.linear_system_solver_preprocessors, :foo)
+    set_nonlinear_max_iterations!(solver, 5)
+    add_linear_system_solver_preprocessor!(solver, :before_solution)
+    add_linear_system_solver_postprocessor!(solver, :after_solution)
     time = 0.0
     call(solver, time)
 
