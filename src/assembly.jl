@@ -64,11 +64,11 @@ function assemble(problem::AllProblems, elrange::UnitRange{Int64}, time::Real, o
 end
 
 """ Run preprocess for assembly. """
-function preprocess_assembly!
+function assemble_preprocess!
 end
 
 """ Run postprocess for assembly. """
-function postprocess_assembly!
+function assemble_postprocess!
 end
 
 function assemble(problem::AllProblems, time::Real, nchunks=10)
@@ -77,9 +77,8 @@ function assemble(problem::AllProblems, time::Real, nchunks=10)
     slices = [kk[j]+1:kk[j+1] for j=1:nchunks]
     assembly = new_assembly(typeof(problem))
 
-    args = Tuple{typeof(assembly), typeof(problem), Real}
-    if method_exists(preprocess_assembly!, args)
-        preprocess_assembly!(assembly, problem, time)
+    for (preprocessor, args, kwargs) in problem.preprocessors
+        assemble_preprocess!(assembly, problem, time, Val{preprocessor}, args...; kwargs...)
     end
 
     for (j, elrange) in enumerate(slices)
@@ -90,9 +89,8 @@ function assemble(problem::AllProblems, time::Real, nchunks=10)
         end
     end
 
-    args = Tuple{typeof(assembly), typeof(problem), Real}
-    if method_exists(postprocess_assembly!, args)
-        postprocess_assembly!(assembly, problem, time)
+    for (postprocessor, args, kwargs) in problem.postprocessors
+        assemble_postprocess!(assembly, problem, time, Val{postprocessor}, args...; kwargs...)
     end
 
     return assembly
