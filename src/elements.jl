@@ -282,12 +282,33 @@ function calculate_normal_tangential_coordinates!{E}(elements::Vector{Element{E}
     end
 end
 
-""" Pick values from nodes and set to element according to connectivity. """
+""" Update element field based on a vector or dictionary of nodal data and connectivity information.
+
+Examples
+--------
+julia> data = Dict(1 => [0.0, 0.0], 2 => [1.0, 2.0])
+julia> element = Seg2([1, 2])
+julia> update!(element, "geometry", data)
+
+As a result element now have time invariant (variable) vector field "geometry" with data ([0.0, 0.0], [1.0, 2.0]).
+
+"""
 function update!(element::Element, field_name::ASCIIString, data::Union{Vector, Dict})
     element[field_name] = [data[i] for i in get_connectivity(element)]
 end
-function update!{T}(elements::Vector{Element{T}}, field_name::ASCIIString, data::Union{Vector, Dict})
-#   info("update $field_name for $(length(elements)) elements.")
+
+function update!(element::Element, field_name::ASCIIString, data::Union{Real, Pair})
+    element[field_name] = data
+end
+
+""" Update values for several elements at once. """
+# FIXME: with or without {T} ?
+function update!{T}(elements::Vector{Element{T}}, field_name::ASCIIString, data)
+    for element in elements
+        update!(element, field_name, data)
+    end
+end
+function update!(elements::Vector{Element}, field_name::ASCIIString, data)
     for element in elements
         update!(element, field_name, data)
     end
