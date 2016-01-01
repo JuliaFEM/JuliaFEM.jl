@@ -12,11 +12,12 @@ type DirectSolver <: Solver
     field_problems :: Vector{Problem}
     boundary_problems :: Vector{BoundaryProblem}
     parallel :: Bool
+    solve_residual :: Bool
     nonlinear_max_iterations :: Int64
     nonlinear_convergence_tolerance :: Float64
-    linear_system_solver_preprocessors :: Vector{Symbol}
-    linear_system_solvers :: Vector{Symbol}
-    linear_system_solver_postprocessors :: Vector{Symbol}
+    linear_system_solver_preprocessors :: Vector{Tuple{Symbol,Any,Any}}
+    linear_system_solvers :: Vector{Tuple{Symbol,Any,Any}}
+    linear_system_solver_postprocessors :: Vector{Tuple{Symbol,Any,Any}}
 end
 
 """ Default initializer. """
@@ -26,11 +27,12 @@ function DirectSolver(name="DirectSolver")
         [],                             # field problems
         [],                             # boundary problems
         false,                          # parallel run?
+        true,                           # solve residual or total quantity
         10,                             # nonlinear problem max iterations
         5.0e-6,                         # nonlinear convergence tolerance
-        Vector{Symbol}(),               # default solution preprocessors
-        Vector{Symbol}([:UMFPACK]),     # linear system solver: CHOLMOD, UMFPACK
-        Vector{Symbol}(),               # default solution postprocessors
+        [],                             # default solution preprocessors
+        [(:UMFPACK, (), [])],           # linear system solver: CHOLMOD, UMFPACK
+        [],                             # default solution postprocessors
     )
 end
 
@@ -39,7 +41,7 @@ function set_name!(solver::DirectSolver, name::ASCIIString)
 end
 
 function set_linear_system_solver!(solver::DirectSolver, method::Symbol)
-    solver.linear_system_solvers = Vector{Symbol}([method])
+    solver.linear_system_solvers = [(method, (), [])]
 end
 
 function set_nonlinear_max_iterations!(solver::DirectSolver, max_iterations::Int)
@@ -52,6 +54,14 @@ end
 
 function push!(solver::DirectSolver, problem::BoundaryProblem)
     push!(solver.boundary_problems, problem)
+end
+
+function add_linear_system_solver_preprocessor!(solver::DirectSolver, preprocessor_name::Symbol, args...; kwargs...)
+    push!(solver.linear_system_solver_preprocessors, (preprocessor_name, args, kwargs))
+end
+
+function add_linear_system_solver_postprocessor!(solver::DirectSolver, postprocessor_name::Symbol, args...; kwargs...)
+    push!(solver.linear_system_solver_postprocessors, (postprocessor_name, args, kwargs))
 end
 
 function tic(timing, what::ASCIIString)
@@ -180,7 +190,9 @@ function call(solver::DirectSolver, time::Real=0.0)
 
     dim = nothing
     sol = nothing
+    last_sol = nothing
     la = nothing
+    last_la = nothing
 
     for iter=1:solver.nonlinear_max_iterations
         info("Starting nonlinear iteration $iter")
@@ -220,27 +232,33 @@ function call(solver::DirectSolver, time::Real=0.0)
             # initialize vectors in first iteration
             sol = zeros(dim)
             la = zeros(dim)
+            last_sol = zeros(dim)
+            last_la = zeros(dim)
         end
 
         tic(timing, "preprocess solution")
         # NOTE: sol and la are vectors from previous solution
-        for preprocessor in solver.linear_system_solver_preprocessors
-            linear_system_solver_preprocess!(solver, iter, time, K, f, C1, C2, D, g, sol, la, Val{preprocessor})
+        for (preprocessor, args, kwargs) in solver.linear_system_solver_preprocessors
+            linear_system_solver_preprocess!(solver, iter, time, K, f, C1, C2, D, g, sol, la, Val{preprocessor}, args...; kwargs...)
         end
         toc(timing, "preprocess solution")
 
         gc()
         tic(timing, "solution of system")
         info("Solving linear system Ax=b")
-        for linear_solver in solver.linear_system_solvers
-            linear_system_solver_solve!(solver, iter, time, K, f, C1, C2, D, g, sol, la, Val{linear_solver})
+        for (linear_solver, args, kwargs) in solver.linear_system_solvers
+            last_sol = copy(sol)
+            last_la = copy(la)
+            sol = fill!(sol, 0.0)
+            la = fill!(la, 0.0)
+            linear_system_solver_solve!(solver, iter, time, K, f, C1, C2, D, g, sol, la, Val{linear_solver}, args...; kwargs...)
         end
         toc(timing, "solution of system")
         gc()
 
         tic(timing, "postprocess solution")
-        for postprocessor in solver.linear_system_solver_postprocessors
-            linear_system_solver_postprocess!(solver, iter, time, K, f, C1, C2, D, g, sol, la, Val{postprocessor})
+        for (postprocessor, args, kwargs) in solver.linear_system_solver_postprocessors
+            linear_system_solver_postprocess!(solver, iter, time, K, f, C1, C2, D, g, sol, la, Val{postprocessor}, args...; kwargs...)
         end
         toc(timing, "postprocess solution")
 
@@ -252,7 +270,11 @@ function call(solver::DirectSolver, time::Real=0.0)
                 local_sol = sol[gdofs]  # incremental data for element
                 local_sol = reshape(local_sol, field_dim, length(element))
                 local_sol = Vector{Float64}[local_sol[:,i] for i=1:length(element)]
-                last(element[field_name]).data += local_sol  # <-- added
+                if solver.solve_residual
+                    last(element[field_name]).data += local_sol
+                else
+                    last(element[field_name]).data = local_sol
+                end
             end
         end
 
@@ -290,7 +312,21 @@ function call(solver::DirectSolver, time::Real=0.0)
             info("non-linear iteration     : ", time_elapsed(timing, "non-linear iteration"))
         end
 
-        if (norm(sol) < solver.nonlinear_convergence_tolerance)
+        # check convergence
+        function is_converged(solver, sol, last_sol, la, last_la)
+            if solver.solve_residual
+                if norm(sol) < solver.nonlinear_convergence_tolerance
+                    return true
+                end
+            else
+                if abs(norm(sol) - norm(last_sol)) < solver.nonlinear_convergence_tolerance
+                    return true
+                end
+            end
+            return false
+        end
+
+        if is_converged(solver, sol, last_sol, la, last_la)
             toc(timing, "solver")
             info("converged in $iter iterations! solver finished in ", time_elapsed(timing, "solver"), " seconds.")
             return (iter, true)
