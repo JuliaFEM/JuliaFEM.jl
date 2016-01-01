@@ -103,6 +103,8 @@ function linear_system_solver_preprocess!(solver, iter, time, K, f, C1, C2, D, g
         "constraint vector g", g)
 end
 
+function linear_system_solver_postprocess!
+end
 
 """ Call solver to solve a set of problems. """
 function call(solver::DirectSolver, time::Real=0.0)
@@ -286,7 +288,7 @@ function call(solver::DirectSolver, time::Real=0.0)
 
         if (norm(sol) < solver.nonlinear_convergence_tolerance)
             toc(timing, "solver")
-            info("solver finished in ", time_elapsed(timing, "solver"), " seconds.")
+            info("converged! solver finished in ", time_elapsed(timing, "solver"), " seconds.")
             return (iter, true)
         end
 
