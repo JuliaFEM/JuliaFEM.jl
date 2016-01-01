@@ -17,6 +17,33 @@ type BoundaryProblem{T<:AbstractProblem}
     elements :: Vector{Element}
 end
 
+""" Construct new field problem.
+
+Examples
+--------
+Create vector-valued (dim=3) elasticity problem:
+
+julia> prob = FieldProblem(ElasticityProblem, "this is my problem", 3)
+
+"""
+function FieldProblem(problem_type::DataType, name::ASCIIString, dim::Int, elements=[])
+    FieldProblem{problem_type}(name, dim, elements)
+end
+
+
+""" Construct new boundary problem.
+
+Examples
+--------
+Create Dirichlet boundary problem for vector-valued (dim=3) elasticity problem.
+
+julia> bc1 = FieldProblem(DirichletProblem, "support dy=0", "displacement", 3)
+
+"""
+function BoundaryProblem(problem_type::DataType, name::ASCIIString, parent_field_name::ASCIIString, parent_field_dim::Int, dim::Int=1, elements=[])
+    BoundaryProblem{problem_type}(name, parent_field_name, parent_field_dim, dim, elements)
+end
+
 typealias Problem FieldProblem
 
 typealias AllProblems Union{FieldProblem, BoundaryProblem}
