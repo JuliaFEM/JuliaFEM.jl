@@ -34,6 +34,10 @@ function DirectSolver(name="DirectSolver")
     )
 end
 
+function set_name!(solver::DirectSolver, name::ASCIIString)
+    solver.name = name
+end
+
 function set_linear_system_solver!(solver::DirectSolver, method::Symbol)
     solver.linear_system_solvers = Vector{Symbol}([method])
 end
@@ -262,7 +266,7 @@ function call(solver::DirectSolver, time::Real=0.0)
                 last(element["reaction force"]).data = local_sol  # <-- replaced
                 # FIXME: Quick and dirty, updating dirichlet boundary problem
                 # is causing drifting and convergence issue
-                if typeof(boundary_problem) <: BoundaryProblem{DirichletProblem{StandardBasis}}
+                if typeof(boundary_problem) <: BoundaryProblem{DirichletProblem}
 #                    info("skipping dirichlet problem update")
                     continue
                 end
@@ -288,7 +292,7 @@ function call(solver::DirectSolver, time::Real=0.0)
 
         if (norm(sol) < solver.nonlinear_convergence_tolerance)
             toc(timing, "solver")
-            info("converged! solver finished in ", time_elapsed(timing, "solver"), " seconds.")
+            info("converged in $iter iterations! solver finished in ", time_elapsed(timing, "solver"), " seconds.")
             return (iter, true)
         end
 

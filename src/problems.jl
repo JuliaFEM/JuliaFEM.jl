@@ -7,6 +7,8 @@ type FieldProblem{T<:AbstractProblem}
     name :: ASCIIString
     dim :: Int
     elements :: Vector{Element}
+    preprocessors :: Vector{Tuple{Symbol,Any,Any}}
+    postprocessors :: Vector{Tuple{Symbol,Any,Any}}
 end
 
 type BoundaryProblem{T<:AbstractProblem}
@@ -15,6 +17,8 @@ type BoundaryProblem{T<:AbstractProblem}
     parent_field_dim :: Int
     dim :: Int
     elements :: Vector{Element}
+    preprocessors :: Vector{Tuple{Symbol,Any,Any}}
+    postprocessors :: Vector{Tuple{Symbol,Any,Any}}
 end
 
 """ Construct new field problem.
@@ -26,8 +30,8 @@ Create vector-valued (dim=3) elasticity problem:
 julia> prob = FieldProblem(ElasticityProblem, "this is my problem", 3)
 
 """
-function FieldProblem(problem_type::DataType, name::ASCIIString, dim::Int, elements=[])
-    FieldProblem{problem_type}(name, dim, elements)
+function FieldProblem(problem_type::DataType, name::ASCIIString, dim::Int, elements=[], preprocessors=[], postprocessors=[])
+    FieldProblem{problem_type}(name, dim, elements, preprocessors, postprocessors)
 end
 
 
@@ -40,8 +44,17 @@ Create Dirichlet boundary problem for vector-valued (dim=3) elasticity problem.
 julia> bc1 = FieldProblem(DirichletProblem, "support dy=0", "displacement", 3)
 
 """
-function BoundaryProblem(problem_type::DataType, name::ASCIIString, parent_field_name::ASCIIString, parent_field_dim::Int, dim::Int=1, elements=[])
-    BoundaryProblem{problem_type}(name, parent_field_name, parent_field_dim, dim, elements)
+function BoundaryProblem(problem_type::DataType, name::ASCIIString, parent_field_name::ASCIIString, parent_field_dim::Int, dim::Int=1, elements=[], preprocessors=[], postprocessors=[])
+    BoundaryProblem{problem_type}(name, parent_field_name, parent_field_dim, dim, elements, preprocessors, postprocessors)
+end
+
+
+function add_postprocessor!(problem::Union{FieldProblem, BoundaryProblem}, postprocessor_name::Symbol, args...; kwargs...)
+    push!(problem.postprocessors, (postprocessor_name, args, kwargs))
+end
+
+function add_preprocessor!(problem::Union{FieldProblem, BoundaryProblem}, postprocessor_name::Symbol, args...; kwargs...)
+    push!(problem.preprocessors, (postprocessor_name, args, kwargs))
 end
 
 typealias Problem FieldProblem
