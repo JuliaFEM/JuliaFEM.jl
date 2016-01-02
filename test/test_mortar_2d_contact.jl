@@ -88,6 +88,16 @@ function assemble_postprocess!(assembly, problem, time::Real, ::Type{Val{:primal
     dim = 12
     C1 = sparse(assembly.C1, dim, dim)
     C2 = sparse(assembly.C2, dim, dim)
+#   C1[[7,8], :] = 0
+#   C2[[7,8], :] = 0
+
+    info("PDASS: constraint matrix C1")
+#   dump(round(full(C1[1:2:end,1:2:end]), 3))
+    dump(round(full(C1), 3))
+    info("PDASS: constraint matrix C2")
+#   dump(round(full(C2[1:2:end,1:2:end]), 3))
+    dump(round(full(C2), 3))
+
     elements = get_elements(problem)
     P = calculate_normal_tangential_coordinates(get_elements(problem), time)
     P = sparse(P, dim, dim)
@@ -103,26 +113,37 @@ function assemble_postprocess!(assembly, problem, time::Real, ::Type{Val{:primal
     P = sparse(eye(dim))
     C1 = P*C1
     C2 = P*C2
-    gn = P*C1*X
+    gn = P*C1*X #*4/6 ..?
     un = P*C1*u
     la = P*la
     info("weighted gap in nt =")
+    dump(reshape(round(gn, 2), 2, 6))
+    info("weighted u in nt =")
+    dump(reshape(round(un, 2), 2, 6))
+    info("weighted joo in nt =")
     dump(reshape(round(gn+un, 2), 2, 6))
     info("lambda in nt =")
     dump(reshape(round(la, 2), 2, 6))
     # complementarity function
     cn = 1.0
-    C = la - clamp(la - cn*(gn+un), 0, Inf)
+#   C = la - clamp(la - cn*(gn+un), 0, Inf)
+#   C = la + clamp(la - cn*(gn+un), 0, Inf)
+    C = la + cn*(un - gn)
     info("complementarity function =")
     dump(reshape(round(C, 2), 2, 6))
 
     g = zeros(length(gn))
 
     for i=1:2:dim
-        #if C[i] < 0
-        if i==1
+        if i == 1
+        #if C[i] > 0
+            if i == 7
+                info("skipping root dof 7")
+                continue
+            end
             info("dof $i in active set")
-            g[i] = -gn[i]
+            #g[i] = -gn[i]*4/6
+            g[i] =  -gn[i]
         else
             info("dof $i not in active set")
             C1[i,:] = 0
@@ -181,7 +202,7 @@ end
     bnd1 = Seg2([3, 4])
     bnd2 = Seg2([5, 6])
     sel = Seg2([1, 4])
-    mel = Seg2([5, 2])
+    mel = Seg2([2, 5])
     update!([fel1, fel2, force, sel, mel], "geometry", nodes)
     update!([bnd1, bnd2], "geometry", nodes)
 
@@ -207,7 +228,7 @@ end
     # remove tangential direction constraints
     # add_postprocessor!(cont, :remove_tangential_constraints)
     # apply PDASS
-    add_postprocessor!(cont, :primal_dual_active_set_strategy)
+    # add_postprocessor!(cont, :primal_dual_active_set_strategy)
 
     @debug begin
         info("fel1.fields = $(fel1.fields)")
@@ -222,6 +243,7 @@ end
     set_nonlinear_max_iterations!(solver, 5)
     add_linear_system_solver_preprocessor!(solver, :before_solution)
     add_linear_system_solver_postprocessor!(solver, :after_solution)
+    add_linear_system_solver_preprocessor!(solver, :dump_matrices)
     time = 0.0
     call(solver, time)
 
