@@ -4,10 +4,8 @@
 ## Direct solver
 
 using JuliaFEM
-@everywhere using JuliaFEM
-@everywhere assemble = JuliaFEM.Core.assemble
 
-type DirectSolver <: Solver
+type DirectSolver
     name :: ASCIIString
     field_problems :: Vector{Problem}
     boundary_problems :: Vector{BoundaryProblem}
@@ -120,58 +118,45 @@ end
 function linear_system_solver_postprocess!
 end
 
-""" Call solver to solve a set of problems. """
-function call(solver::DirectSolver, time::Real=0.0)
-    info("Starting solver $(solver.name)")
-    info("# of field problems: $(length(solver.field_problems))")
-    info("# of boundary problems: $(length(solver.boundary_problems))")
-    (length(solver.field_problems) != 0) || error("no field problems defined for solver, use push!(solver, problem, ...) to define field problems.")
-
-    timing = Dict{ASCIIString, Float64}()
-    tic(timing, "solver")
-    tic(timing, "initialization")
-
-    # check that all problems are "same kind"
-    field_name = get_unknown_field_name(solver.field_problems[1])
-    field_dim = get_unknown_field_dimension(solver.field_problems[1])
-    for field_problem in solver.field_problems
-        get_unknown_field_name(field_problem) == field_name || error("several different fields not supported yet")
-        get_unknown_field_dimension(field_problem) == field_dim || error("several different field dimensions not supported yet")
-    end
-
-    # create initial fields for this increment
-    # i.e., copy last known values as initial guess
-    # for this increment
-
-    for field_problem in solver.field_problems
-        for element in get_elements(field_problem)
-            gdofs = get_gdofs(element, field_dim)
-            if haskey(element, field_name)
-                if !isapprox(last(element[field_name]).time, time)
-                    last_data = copy(last(element[field_name]).data)
-                    push!(element[field_name], time => last_data)
-                end
-            else
-                data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
-                element[field_name] = (time => data)
+""" Initialize unknown field ready for nonlinear iterations, i.e.,
+    take last known value and set it as a initial quess for next
+    time increment.
+"""
+function initialize!(problem::FieldProblem, time::Real)
+    field_name = get_unknown_field_name(problem)
+    field_dim = get_unknown_field_dimension(problem)
+    for element in get_elements(problem)
+        gdofs = get_gdofs(element, problem)
+        if haskey(element, field_name)
+            if !isapprox(last(element[field_name]).time, time)
+                last_data = copy(last(element[field_name]).data)
+                push!(element[field_name], time => last_data)
             end
+        else # if field not found at all, initialize new zero field.
+            data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
+            element[field_name] = (time => data)
         end
     end
+end
 
-    for boundary_problem in solver.boundary_problems
-        for element in get_elements(boundary_problem)
-            gdofs = get_gdofs(element, field_dim)
-            data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
+function initialize!(problem::BoundaryProblem, time::Real; initialize_primary_field=false)
+    field_name = problem.parent_field_name
+    field_dim = problem.parent_field_dim
 
-            # add new field "reaction force" for boundary element if not found
-            if haskey(element, "reaction force")
-                if !isapprox(last(element["reaction force"]).time, time)
-                    push!(element["reaction force"], time => data)
-                end
-            else
-                element["reaction force"] = (time => data)
+    for element in get_elements(problem)
+        gdofs = get_gdofs(element, problem)
+        data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
+
+        # add new field "reaction force" for boundary element if not found
+        if haskey(element, "reaction force")
+            if !isapprox(last(element["reaction force"]).time, time)
+                push!(element["reaction force"], time => data)
             end
+        else
+            element["reaction force"] = (time => data)
+        end
 
+        if initialize_primary_field
             # add new primary field for boundary element if not found
             if haskey(element, field_name)
                 if !isapprox(last(element[field_name]).time, time)
@@ -182,10 +167,60 @@ function call(solver::DirectSolver, time::Real=0.0)
                 data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
                 element[field_name] = (time => data)
             end
-
         end
     end
+end
 
+function update!(problem::FieldProblem, solution::Vector, ::Type{Val{:elements}})
+    field_name = get_unknown_field_name(problem)
+    field_dim = get_unknown_field_dimension(problem)
+    for element in get_elements(problem)
+        gdofs = get_gdofs(element, problem)
+        local_sol = solution[gdofs]
+        local_sol = reshape(local_sol, field_dim, length(element))
+        local_sol = Vector{Float64}[local_sol[:,i] for i=1:length(element)]
+        last(element[field_name]).data = local_sol
+    end
+end
+
+function update!(problem::BoundaryProblem, solution::Vector, ::Type{Val{:elements}})
+    field_name = problem.parent_field_name
+    field_dim = problem.parent_field_dim
+    for element in get_elements(problem)
+        gdofs = get_gdofs(element, field_dim)
+        local_sol = solution[gdofs]
+        local_sol = reshape(local_sol, field_dim, length(element))
+        local_sol = Vector{Float64}[local_sol[:,i] for i=1:length(element)]
+        last(element["reaction force"]).data = local_sol
+    end
+end
+
+
+""" Call solver to solve a set of problems. """
+function call(solver::DirectSolver, time::Real=0.0)
+    info("Starting solver $(solver.name)")
+    info("# of field problems: $(length(solver.field_problems))")
+    info("# of boundary problems: $(length(solver.boundary_problems))")
+    (length(solver.field_problems) != 0) || error("no field problems defined for solver, use push!(solver, problem, ...) to define field problems.")
+
+    timing = Dict{ASCIIString, Float64}()
+    tic(timing, "solver")
+
+    # check that all problems are "same kind"
+    field_name = get_unknown_field_name(solver.field_problems[1])
+    field_dim = get_unknown_field_dimension(solver.field_problems[1])
+    for field_problem in solver.field_problems
+        get_unknown_field_name(field_problem) == field_name || error("several different fields not supported yet")
+        get_unknown_field_dimension(field_problem) == field_dim || error("several different field dimensions not supported yet")
+    end
+
+    tic(timing, "initialization")
+    for field_problem in solver.field_problems
+        initialize!(field_problem, time)
+    end
+    for boundary_problem in solver.boundary_problems
+        initialize!(boundary_problem, time)
+    end
     toc(timing, "initialization")
 
     dim = nothing
@@ -252,6 +287,8 @@ function call(solver::DirectSolver, time::Real=0.0)
             sol = fill!(sol, 0.0)
             la = fill!(la, 0.0)
             linear_system_solver_solve!(solver, iter, time, K, f, C1, C2, D, g, sol, la, Val{linear_solver}, args...; kwargs...)
+            # if solved only difference, add to last known solution, i.e. x(i+1) = x(i) + Δx
+            solver.solve_residual && (sol += last_sol)
         end
         toc(timing, "solution of system")
         gc()
@@ -263,46 +300,17 @@ function call(solver::DirectSolver, time::Real=0.0)
         toc(timing, "postprocess solution")
 
         tic(timing, "update element data")
-        # update elements in field problems
-        for field_problem in solver.field_problems
-            for element in get_elements(field_problem)
-                gdofs = get_gdofs(element, field_dim)
-                local_sol = sol[gdofs]  # incremental data for element
-                local_sol = reshape(local_sol, field_dim, length(element))
-                local_sol = Vector{Float64}[local_sol[:,i] for i=1:length(element)]
-                if solver.solve_residual
-                    last(element[field_name]).data += local_sol
-                else
-                    last(element[field_name]).data = local_sol
-                end
-            end
+        for problem in solver.field_problems
+            update!(problem, sol, Val{:elements})
         end
-
-        # update elements in boundary problems
-        for boundary_problem in solver.boundary_problems
-            for element in get_elements(boundary_problem)
-                gdofs = get_gdofs(element, field_dim)
-                local_sol = la[gdofs]
-                local_sol = reshape(local_sol, field_dim, length(element))
-                local_sol = Vector{Float64}[local_sol[:,i] for i=1:length(element)]
-                last(element["reaction force"]).data = local_sol  # <-- replaced
-                # FIXME: Quick and dirty, updating dirichlet boundary problem
-                # is causing drifting and convergence issue
-                if typeof(boundary_problem) <: BoundaryProblem{DirichletProblem}
-#                    info("skipping dirichlet problem update")
-                    continue
-                end
-                primary_sol = sol[gdofs]  # solution of primary field
-                primary_sol = reshape(primary_sol, field_dim, length(element))
-                primary_sol = Vector{Float64}[primary_sol[:,i] for i=1:length(element)]
-                last(element[field_name]).data = primary_sol
-            end
+        for problem in solver.boundary_problems
+            update!(problem, la, Val{:elements})
         end
         toc(timing, "update element data")
 
         toc(timing, "non-linear iteration")
 
-        if true
+        if false
             info("timing info for iteration:")
             info("boundary assembly        : ", time_elapsed(timing, "boundary assembly"))
             info("field assembly           : ", time_elapsed(timing, "field assembly"))
