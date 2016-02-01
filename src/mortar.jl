@@ -648,35 +648,15 @@ node_csys
     coordinate system in node, normal + tangent + "binormal"
     in 3d 3x3 matrix, in 2d 2x2 matrix, respectively
 """
-abstract MortarProblem <: AbstractProblem
-
-function MortarProblem(parent_field_name::ASCIIString, parent_field_dim::Int, dim::Int=1, elements=[])
-    return BoundaryProblem{MortarProblem}("mortar problem", parent_field_name, parent_field_dim, dim, elements)
-end
-
-function MortarProblem(problem_name::ASCIIString, parent_field_name::ASCIIString, parent_field_dim::Int, dim::Int=1, elements=[])
-    return BoundaryProblem{MortarProblem}(problem_name, parent_field_name, parent_field_dim, dim, elements)
-end
-
-abstract ContactProblem{T} <: AbstractProblem
-
-abstract AbstractContact
-abstract TieContact <: AbstractContact
-abstract SmallSlidingContact <: AbstractContact
-
-function ContactProblem(problem_name::ASCIIString, parent_field_name::ASCIIString, parent_field_dim::Int, dim::Int=1, elements=[]; contact_type=TieContact)
-    return BoundaryProblem{ContactProblem{contact_type}}(
-        problem_name,
-        parent_field_name,
-        parent_field_dim,
-        dim, elements)
-end
+abstract MortarProblem{T} <: AbstractProblem
 
 # Mortar assembly 2d
 
 typealias MortarElements2D Union{Seg2, Seg3}
 
-function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly, problem::BoundaryProblem{MortarProblem}, slave_element::Element{E}, time::Real)
+function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly,
+                                        problem::BoundaryProblem{MortarProblem},
+                                        slave_element::Element{E}, time::Real)
 
     # slave element must have a set of master elements
     haskey(slave_element, "master elements") || return
@@ -688,15 +668,28 @@ function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly, problem::Bou
     slave_dofs = get_gdofs(slave_element, field_dim)
 
     for master_element in slave_element["master elements"]
+        master_dofs = get_gdofs(master_element, field_dim)
         xi1a = project_from_master_to_slave(slave_element, master_element, [-1.0])
         xi1b = project_from_master_to_slave(slave_element, master_element, [ 1.0])
         xi1 = clamp([xi1a xi1b], -1.0, 1.0)
         l = 1/2*(xi1[2]-xi1[1])
-        if abs(l) < 1.0e-9
-            #warn("No contribution")
-            continue # no contribution
+        abs(l) > 1.0e-9 || continue # no contribution
+
+        # Construct dual basis
+        nnodes = size(slave_element, 2)
+        De = zeros(nnodes, nnodes)
+        Me = zeros(nnodes, nnodes)
+        for ip in get_integration_points(slave_element, Val{5})
+            J = get_jacobian(slave_element, ip, time)
+            w = ip.weight*norm(J)*l
+            xi = 1/2*(1-ip.xi)*xi1[1] + 1/2*(1+ip.xi)*xi1[2]
+            N = slave_element(xi, time)
+            De += w*diagm(vec(N))
+            Me += w*N'*N
         end
-        master_dofs = get_gdofs(master_element, field_dim)
+#       info("Dual basis: De = \n$De")
+        Ae = De*inv(Me)
+
         for ip in get_integration_points(slave_element, Val{5})
             J = get_jacobian(slave_element, ip, time)
             w = ip.weight*norm(J)*l
@@ -708,9 +701,10 @@ function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly, problem::Bou
 
             # add contribution
             N1 = slave_element(xi_gauss, time)
+            Phi = (Ae*N1')'
             N2 = master_element(xi_projected, time)
-            S = w*kron(N1', N1)
-            M = w*kron(N1', N2)
+            S = w*kron(Phi', N1)
+            M = w*kron(Phi', N2)
             for i=1:field_dim
                 sd = slave_dofs[i:field_dim:end]
                 md = master_dofs[i:field_dim:end]
@@ -719,126 +713,6 @@ function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly, problem::Bou
                 add!(assembly.C2, sd, sd, S)
                 add!(assembly.C2, sd, md, -M)
             end
-
-        end
-    end
-end
-
-""" Calculate bi-orthogonal basis transformation matrix Aₑ. """
-function get_biorthogonal_transformation_matrix(element::Element, time::Real)
-    nnodes = size(element, 2)
-    De = zeros(nnodes, nnodes)
-    Me = zeros(nnodes, nnodes)
-    for ip in get_integration_points(element, Val{5})
-        w = ip.weight
-        J = get_jacobian(element, ip, time)
-        JT = transpose(J)
-        if size(JT, 2) == 1  # plane problem
-            w *= norm(JT)
-        else
-            w *= norm(cross(JT[:,1], JT[:,2]))
-        end
-        N = element(ip, time)
-        De += w*diagm(vec(N))
-        Me += w*N'*N
-    end
-    Ae = De*inv(Me)
-    return Ae
-end
-
-"""
-Small strain theory, allow frictionless tangential sliding, keep bodies in contact.
-"""
-function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly, problem::BoundaryProblem{ContactProblem{SmallSlidingContact}}, slave_element::Element{E}, time::Real)
-
-    # get dimension and name of PARENT field
-    field_dim = problem.parent_field_dim
-    field_name = problem.parent_field_name
-    slave_dofs = get_gdofs(slave_element, field_dim)
-    #info("slave dofs of element: $slave_dofs")
-
-    for master_element in slave_element["master elements"]
-        xi1a = project_from_master_to_slave(slave_element, master_element, [-1.0])
-        xi1b = project_from_master_to_slave(slave_element, master_element, [ 1.0])
-        xi1 = clamp([xi1a xi1b], -1.0, 1.0)
-        l = 1/2*(xi1[2]-xi1[1])
-        abs(l) > 1.0e-9 || continue
-
-#       Ae = get_biorthogonal_transformation_matrix(slave_element, time)
-        nnodes = size(slave_element, 2)
-        De = zeros(nnodes, nnodes)
-        Me = zeros(nnodes, nnodes)
-        for ip_ in get_integration_points(slave_element, Val{5})
-            xi_gauss = 1/2*(1-ip_.xi)*xi1[1] + 1/2*(1+ip_.xi)*xi1[2]
-            ip = IntegrationPoint(xi_gauss, ip_.weight)
-            J = get_jacobian(slave_element, ip, time)
-            w = ip.weight*norm(J)
-            N = slave_element(ip, time)
-            De += w*diagm(vec(N))
-            Me += w*N'*N
-        end
-        Ae = De*inv(Me)
-
-        master_dofs = get_gdofs(master_element, field_dim)
-        for ip in get_integration_points(slave_element, Val{5})
-            J = get_jacobian(slave_element, ip, time)
-            w = ip.weight*norm(J)*l
-
-            # integration point on slave side segment
-            xi_gauss = 1/2*(1-ip.xi)*xi1[1] + 1/2*(1+ip.xi)*xi1[2]
-            # projected integration point
-            xi_projected = project_from_slave_to_master(slave_element, master_element, xi_gauss)
-
-            # add contribution to C1
-            N1 = slave_element(xi_gauss, time)
-            Phi = (Ae*N1')'
-            N2 = master_element(xi_projected, time)
-            #S = w*Phi'*N1
-            #M = w*Phi'*N2
-            S = w*N1'*N1
-            M = w*N1'*N2
-
-            nt = slave_element("normal-tangential coordinates", ip, time)
-            #println("normal tangential = ")
-            #println(round(nt, 3))
-            nt = [1 0; 0 1]
-            ntS = nt'*S
-            ntM = nt'*M
-
-            for i=1:field_dim
-                sd = slave_dofs[i:field_dim:end]
-                md = master_dofs[i:field_dim:end]
-                add!(assembly.C1, sd, sd, S)
-                add!(assembly.C1, sd, md, -M)
-                add!(assembly.C2, sd, sd, ntS)
-                add!(assembly.C2, sd, md, -ntM)
-            end
-
-            # construct C2 & D
-#            info("normal dofs: $(slave_dofs[1:2:end])")
-#            info("tangent dofs: $(slave_dofs[2:2:end])")
-#=
-            # contribution in normal direction
-            for dof in slave_dofs[1:2:end]
-                add!(assembly.C2, [dof], sd, ntS[1,:])
-                add!(assembly.C2, [dof], md, -ntM[1,:])
-            end
-            # contribution in tangent direction
-            for dof in slave_dofs[1:2:end]
-                add!(assembly.C2, sd[2:2:end], sd, ntS[2,:])
-                add!(assembly.C2, sd[2:2:end], md, -ntM[2,:])
-                # set lagrange multipliers to zero in tangent direction
-                tangent = nt[2, :]
-                add!(assembly.D, sd[2:2:end], sd, tangent)
-            end
-
-            for nid in get_connectivity(slave_element)
-                ndofs = [2*(nid-1)+1, 2*(nid-1)+2]
-                add!(assembly.C2, [2*(nid-1)+1], ndofs,  ntS[1,:])
-                add!(assembly.C2, [2*(nid-1)+1], ndofs, -ntM[1,:])
-            end
-
-            =#
 
         end
     end
