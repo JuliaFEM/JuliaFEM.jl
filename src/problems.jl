@@ -3,25 +3,40 @@
 
 abstract AbstractProblem
 
-type FieldProblem{T<:AbstractProblem}
-    name :: ASCIIString
-    dim :: Int
-    elements :: Vector{Element}
-    preprocessors :: Vector{Tuple{Symbol,Any,Any}}
-    postprocessors :: Vector{Tuple{Symbol,Any,Any}}
+function get_formulation_type{P<:AbstractProblem}(::Type{P})
+    return :total
 end
 
-type BoundaryProblem{T<:AbstractProblem}
-    name :: ASCIIString
-    parent_field_name :: ASCIIString
-    parent_field_dim :: Int
-    dim :: Int
-    elements :: Vector{Element}
-    preprocessors :: Vector{Tuple{Symbol,Any,Any}}
-    postprocessors :: Vector{Tuple{Symbol,Any,Any}}
+type FieldAssembly
+    mass_matrix :: SparseMatrixCOO
+    stiffness_matrix :: SparseMatrixCOO
+    force_vector :: SparseMatrixCOO
+    solution :: Vector{Float64}
+    previous_solution :: Vector{Float64}
+    solution_norm_change :: Real
+    prehooks :: Vector{Tuple{Symbol,Any,Any}}
+    posthooks :: Vector{Tuple{Symbol,Any,Any}}
+    changed :: Bool  # flag to control is reassembly needed
 end
 
-""" Construct new field problem.
+function FieldAssembly()
+    return FieldAssembly(
+        SparseMatrixCOO(),
+        SparseMatrixCOO(),
+        SparseMatrixCOO(),
+        [], [], Inf, [], [], true)
+end
+
+function Base.empty!(assembly::FieldAssembly)
+    empty!(assembly.mass_matrix)
+    empty!(assembly.stiffness_matrix)
+    empty!(assembly.force_vector)
+    assembly.changed = true
+end
+
+typealias Assembly FieldAssembly
+
+""" Construct a new field problem.
 
 Examples
 --------
@@ -30,25 +45,110 @@ Create vector-valued (dim=3) elasticity problem:
 julia> prob = FieldProblem(ElasticityProblem, "this is my problem", 3)
 
 """
-function FieldProblem(problem_type::DataType, name::ASCIIString, dim::Int, elements=[], preprocessors=[], postprocessors=[])
-    FieldProblem{problem_type}(name, dim, elements, preprocessors, postprocessors)
+type FieldProblem{T}
+    name :: ASCIIString
+    dim :: Int
+    elements :: Vector{Element}
+    assembly :: FieldAssembly
+end
+function FieldProblem(problem_type::DataType, name::ASCIIString, dim::Int,
+                      elements=[])
+    FieldProblem{problem_type}(name, dim, elements, FieldAssembly())
 end
 
 
-""" Construct new boundary problem.
+function update!{P}(problem::FieldProblem{P}, solution::Vector{Float64})
+    # resize & fill with zeros solution vector if length mismatch with current solution
+    if length(solution) != length(problem.assembly.solution)
+        resize!(problem.assembly.solution, length(solution))
+        fill!(problem.assembly.solution, 0.0)
+    end
+    problem.assembly.previous_solution = copy(problem.assembly.solution)
+    if get_formulation_type(P) == :incremental
+        problem.assembly.solution += solution
+    else
+        problem.assembly.solution = solution
+    end
+    problem.assembly.solution_norm_change = norm(problem.assembly.solution - problem.assembly.previous_solution)
+end
+
+
+"""
+Interface matrices C₁, C₂ & D, g for general problem type
+Au + C₁'λ = f
+C₂u + Dλ  = g
+"""
+type BoundaryAssembly
+    C1 :: SparseMatrixCOO
+    C2 :: SparseMatrixCOO
+    D :: SparseMatrixCOO
+    g :: SparseMatrixCOO
+    solution :: Vector{Float64}
+    previous_solution :: Vector{Float64}
+    solution_norm_change :: Real
+    prehooks :: Vector{Tuple{Symbol,Any,Any}}
+    posthooks :: Vector{Tuple{Symbol,Any,Any}}
+    changed :: Bool   # flag to control is reassembly needed
+end
+
+function BoundaryAssembly()
+    return BoundaryAssembly(
+        SparseMatrixCOO(),
+        SparseMatrixCOO(),
+        SparseMatrixCOO(),
+        SparseMatrixCOO(),
+        [], [], Inf, [], [], true)
+end
+
+function Base.empty!(assembly::BoundaryAssembly)
+    empty!(assembly.C1)
+    empty!(assembly.C2)
+    empty!(assembly.D)
+    empty!(assembly.g)
+    assembly.changed = true
+end
+
+
+""" Construct a new boundary problem.
 
 Examples
 --------
 Create Dirichlet boundary problem for vector-valued (dim=3) elasticity problem.
 
-julia> bc1 = FieldProblem(DirichletProblem, "support dy=0", "displacement", 3)
+julia> bc1 = FieldProblem(DirichletProblem, "support", "displacement", 3)
 
 """
-function BoundaryProblem(problem_type::DataType, name::ASCIIString, parent_field_name::ASCIIString, parent_field_dim::Int, dim::Int=1, elements=[], preprocessors=[], postprocessors=[])
-    BoundaryProblem{problem_type}(name, parent_field_name, parent_field_dim, dim, elements, preprocessors, postprocessors)
+type BoundaryProblem{T}
+    name :: ASCIIString
+    parent_field_name :: ASCIIString
+    parent_field_dim :: Int
+    elements :: Vector{Element}
+    assembly :: BoundaryAssembly
+end
+function BoundaryProblem(problem_type::DataType,
+                         name::ASCIIString,
+                         parent_field_name::ASCIIString,
+                         parent_field_dim::Int,
+                         elements=[])
+    BoundaryProblem{problem_type}(name, parent_field_name, parent_field_dim,
+                                  elements, BoundaryAssembly())
 end
 
+function update!{P}(problem::BoundaryProblem{P}, solution::Vector{Float64})
+    if length(solution) != length(problem.assembly.solution)
+        resize!(problem.assembly.solution, length(solution))
+        fill!(problem.assembly.solution, 0.0)
+    end
+    problem.assembly.previous_solution = copy(problem.assembly.solution)
+    if get_formulation_type(P) == :incremental
+        problem.assembly.solution += solution
+    else
+        problem.assembly.solution = solution
+    end
+    problem.assembly.solution_norm_change = norm(problem.assembly.solution - problem.assembly.previous_solution)
+end
 
+#=
 function add_postprocessor!(problem::Union{FieldProblem, BoundaryProblem}, postprocessor_name::Symbol, args...; kwargs...)
     push!(problem.postprocessors, (postprocessor_name, args, kwargs))
 end
@@ -56,6 +156,8 @@ end
 function add_preprocessor!(problem::Union{FieldProblem, BoundaryProblem}, preprocessor_name::Symbol, args...; kwargs...)
     push!(problem.preprocessors, (preprocessor_name, args, kwargs))
 end
+
+=#
 
 typealias Problem FieldProblem
 
@@ -71,7 +173,7 @@ function get_unknown_field_dimension(problem::Problem)
 end
 
 """ Return the name of the unknown field of this problem. """
-function get_unknown_field_name{P<:AbstractProblem}(problem::Problem{P})
+function get_unknown_field_name{P}(problem::Problem{P})
     return get_unknown_field_name(P)
 end
 
@@ -103,7 +205,6 @@ function calculate_nodal_vector(field_name::ASCIIString, field_dim::Int, element
     for element in elements
         haskey(element, field_name) || continue
         gdofs = get_gdofs(element, 1)
-#       info("gdofs = $gdofs")
         for ip in get_integration_points(element, Val{2})
             J = get_jacobian(element, ip, time)
             w = ip.weight*norm(J)
@@ -122,3 +223,4 @@ function calculate_nodal_vector(field_name::ASCIIString, field_dim::Int, element
     x[nz, :] = A[nz,nz] \ b[nz, :]
     return vec(transpose(x))
 end
+
