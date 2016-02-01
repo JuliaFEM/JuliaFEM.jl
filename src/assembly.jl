@@ -32,68 +32,18 @@ function append!(assembly::BoundaryAssembly, sub_assembly::BoundaryAssembly)
     append!(assembly.g, sub_assembly.g)
 end
 
-function assemble!(assembly::Assembly, problem::AllProblems, time::Float64, empty_assembly::Bool=true)
-    if empty_assembly
-        empty!(assembly)
-    end
+function assemble!(problem::Union{FieldProblem, BoundaryProblem}, time::Float64; empty_assembly::Bool=true)
+    !problem.assembly.changed && return
+    empty_assembly && empty!(problem.assembly)
     for element in get_elements(problem)
-        assemble!(assembly, problem, element, time)
+        assemble!(problem.assembly, problem, element, time)
     end
+    problem.assembly.changed = true
 end
 
-""" Decide assembly type from given problem type. """
-function new_assembly{P}(problem_type::Type{FieldProblem{P}})
-    return FieldAssembly()
-end
-
-""" Decide assembly type from given problem type. """
-function new_assembly{P}(problem_type::Type{BoundaryProblem{P}})
-    return BoundaryAssembly()
-end
-
-function assemble(problem::AllProblems, elrange::UnitRange{Int64}, time::Real, optimize=false)
-    elements = get_elements(problem)[elrange]
-    assembly = new_assembly(typeof(problem))
-    for (i, element) in enumerate(elements)
-        assemble!(assembly, problem, element, time)
-    end
-    if optimize
-        optimize!(assembly)
-    end
-    return assembly
-end
-
-""" Run preprocess for assembly. """
-function assemble_preprocess!
-end
-
-""" Run postprocess for assembly. """
-function assemble_postprocess!
-end
-
-function assemble(problem::AllProblems, time::Real, nchunks=10)
-    ne = length(get_elements(problem))
-    kk = round(Int, collect(linspace(0, ne, nchunks+1)))
-    slices = [kk[j]+1:kk[j+1] for j=1:nchunks]
-    assembly = new_assembly(typeof(problem))
-
-    for (preprocessor, args, kwargs) in problem.preprocessors
-        assemble_preprocess!(assembly, problem, time, Val{preprocessor}, args...; kwargs...)
-    end
-
-    for (j, elrange) in enumerate(slices)
-        sub_assembly = assemble(problem, elrange, time)
-        append!(assembly, sub_assembly)
-        if ne > 100
-            info("Assembly: ", round(j/nchunks*100,1), " % done. ")
-        end
-    end
-
-    for (postprocessor, args, kwargs) in problem.postprocessors
-        assemble_postprocess!(assembly, problem, time, Val{postprocessor}, args...; kwargs...)
-    end
-
-    return assembly
+function assemble(problem::Union{FieldProblem, BoundaryProblem}, time::Real)
+    assemble!(problem, time; empty_assembly=true)
+    return problem.assembly
 end
 
 """ Calculate reduced stiffness matrix.
