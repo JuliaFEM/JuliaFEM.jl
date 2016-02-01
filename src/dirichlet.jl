@@ -3,7 +3,8 @@
 
 abstract DirichletProblem{T} <: AbstractProblem
 abstract StandardBasis
-abstract BiorthogonalBasis
+abstract DualBasis
+global const BiorthogonalBasis = DualBasis
 
 function DirichletProblem(parent_field_name::ASCIIString, parent_field_dim::Int, dim::Int=1, elements=Element[]; basis=StandardBasis)
     return BoundaryProblem{DirichletProblem{basis}}("dirichlet boundary", parent_field_name, parent_field_dim, dim, elements)
@@ -102,16 +103,17 @@ function assemble!(assembly::BoundaryAssembly, problem::BoundaryProblem{Dirichle
         A[abs(A) .< 1.0e-9] = 0
 
         # C1 matrix is always the same
-        for i=1:field_dim
-            ldofs = gdofs[i:field_dim:end]
-            add!(assembly.C1, ldofs, ldofs, A)
-        end
+#       for i=1:field_dim
+#           ldofs = gdofs[i:field_dim:end]
+#           add!(assembly.C1, ldofs, ldofs, A)
+#       end
 
         if haskey(element, field_name)
             # add all dimensions at once if defined element["blaa"] = 0.0
             for i=1:field_dim
                 g = element(field_name, ip, time)
                 ldofs = gdofs[i:field_dim:end]
+                add!(assembly.C1, ldofs, ldofs, A)
                 add!(assembly.C2, ldofs, ldofs, A)
                 add!(assembly.g, ldofs, w*g*Phi')
             end
@@ -120,10 +122,11 @@ function assemble!(assembly::BoundaryAssembly, problem::BoundaryProblem{Dirichle
                 ldofs = gdofs[i:field_dim:end]
                 if haskey(element, field_name*" $i")
                     g = element(field_name*" $i", ip, time)
+                    add!(assembly.C1, ldofs, ldofs, A)
                     add!(assembly.C2, ldofs, ldofs, A)
                     add!(assembly.g, ldofs, w*g*Phi')
-                else
-                    add!(assembly.D, ldofs, ldofs, A)
+#               else
+#                   add!(assembly.D, ldofs, ldofs, A)
                 end
             end
         end
