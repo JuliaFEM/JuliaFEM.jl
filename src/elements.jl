@@ -282,7 +282,7 @@ function calculate_normal_tangential_coordinates!{E}(elements::Vector{Element{E}
     end
 end
 
-""" Update element field based on a vector or dictionary of nodal data and connectivity information.
+""" Update element field based on a dictionary of nodal data and connectivity information.
 
 Examples
 --------
@@ -293,11 +293,11 @@ julia> update!(element, "geometry", data)
 As a result element now have time invariant (variable) vector field "geometry" with data ([0.0, 0.0], [1.0, 2.0]).
 
 """
-function update!(element::Element, field_name::ASCIIString, data::Union{Vector, Dict})
+function update!(element::Element, field_name::ASCIIString, data::Dict)
     element[field_name] = [data[i] for i in get_connectivity(element)]
 end
 
-function update!(element::Element, field_name::ASCIIString, data::Union{Real, Pair})
+function update!(element::Element, field_name::ASCIIString, data::Union{Real, Vector, Pair})
     element[field_name] = data
 end
 
