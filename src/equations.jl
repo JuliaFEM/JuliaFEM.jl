@@ -1,49 +1,6 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-# Functions to handle element level things -- integration, assembly, ...
-
-type FieldAssembly
-    mass_matrix :: SparseMatrixCOO
-    stiffness_matrix :: SparseMatrixCOO
-    force_vector :: SparseMatrixCOO
-end
-
-function FieldAssembly()
-    return FieldAssembly(
-        SparseMatrixCOO(),
-        SparseMatrixCOO(),
-        SparseMatrixCOO())
-end
-
-typealias Assembly FieldAssembly
-
-"""
-"Boundary" matrices C₁, C₂, D, g for general problem type
-Au + C₁'λ = f
-C₂u + Dλ  = g
-"""
-type BoundaryAssembly
-    C1 :: SparseMatrixCOO
-    C2 :: SparseMatrixCOO
-    D :: SparseMatrixCOO
-    g :: SparseMatrixCOO
-end
-
-function BoundaryAssembly()
-    return BoundaryAssembly(
-        SparseMatrixCOO(),
-        SparseMatrixCOO(),
-        SparseMatrixCOO(),
-        SparseMatrixCOO())
-end
-
-function Base.empty!(assembly::Assembly)
-    empty!(assembly.mass_matrix)
-    empty!(assembly.stiffness_matrix)
-    empty!(assembly.force_vector)
-end
-
 function get_mass_matrix
 end
 
@@ -88,6 +45,16 @@ function get_gdofs(element::Element, dim::Int)
     conn = get_connectivity(element)
     gdofs = vec(vcat([dim*conn'-i for i=dim-1:-1:0]...))
     return gdofs
+end
+
+function get_gdofs(element::Element, problem::FieldProblem)
+    dim = problem.dim
+    return get_gdofs(element, dim)
+end
+
+function get_gdofs(element::Element, problem::BoundaryProblem)
+    dim = problem.parent_field_dim
+    return get_gdofs(element, dim)
 end
 
 """ Assemble element. """
