@@ -245,6 +245,7 @@ end
 global const med_elmap = Dict{Symbol, Vector{Int}}(
     :HE8 => [4, 8, 7, 3, 1, 5, 6, 2],
     :TE4 => [2, 3, 4, 1]
+#    :SE2 => [2, 1]
 )
 
 function get_connectivity(med::MEDFile, elsets, mesh_name)
