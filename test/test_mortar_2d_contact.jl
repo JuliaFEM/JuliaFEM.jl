@@ -88,8 +88,6 @@ function assemble_postprocess!(assembly, problem, time::Real, ::Type{Val{:primal
     dim = 12
     C1 = sparse(assembly.C1, dim, dim)
     C2 = sparse(assembly.C2, dim, dim)
-#   C1[[7,8], :] = 0
-#   C2[[7,8], :] = 0
 
     info("PDASS: constraint matrix C1")
 #   dump(round(full(C1[1:2:end,1:2:end]), 3))
@@ -109,7 +107,8 @@ function assemble_postprocess!(assembly, problem, time::Real, ::Type{Val{:primal
     resize!(X, 12)
     resize!(u, 12)
     x = X+u
-    info("x = \n", reshape(round(x, 2), 2, 6))
+    info("x")
+    dump(reshape(round(x, 2), 2, 6))
     P = sparse(eye(dim))
     C1 = P*C1
     C2 = P*C2
@@ -142,19 +141,24 @@ function assemble_postprocess!(assembly, problem, time::Real, ::Type{Val{:primal
                 continue
             end
             info("dof $i in active set")
-            #g[i] = -gn[i]*4/6
-            g[i] =  -gn[i]
+#           g[i] =  -gn[i]
         else
             info("dof $i not in active set")
-            C1[i,:] = 0
-            C2[i,:] = 0
+#           C1[i,:] = 0
+#           C2[i,:] = 0
         end
     end
 
+    g[1] = 2.0
+    g[3] = 2.0
+#=
     for i=2:2:dim
         C1[i,:] = 0
         C2[i,:] = 0
     end
+=#
+    d = [7, 8]
+    C2[d, :] = 0
 
     assembly.g = sparse(g)
     assembly.C1 = C1
@@ -228,7 +232,7 @@ end
     # remove tangential direction constraints
     # add_postprocessor!(cont, :remove_tangential_constraints)
     # apply PDASS
-    # add_postprocessor!(cont, :primal_dual_active_set_strategy)
+    add_postprocessor!(cont, :primal_dual_active_set_strategy)
 
     @debug begin
         info("fel1.fields = $(fel1.fields)")
