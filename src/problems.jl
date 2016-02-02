@@ -50,10 +50,11 @@ type FieldProblem{T}
     dim :: Int
     elements :: Vector{Element}
     assembly :: FieldAssembly
+    properties :: T
 end
-function FieldProblem(problem_type::DataType, name::ASCIIString, dim::Int,
+function FieldProblem(problem::DataType, name::ASCIIString, dim::Int,
                       elements=[])
-    FieldProblem{problem_type}(name, dim, elements, FieldAssembly())
+    FieldProblem{problem}(name, dim, elements, FieldAssembly(), problem())
 end
 
 
@@ -124,14 +125,15 @@ type BoundaryProblem{T}
     parent_field_dim :: Int
     elements :: Vector{Element}
     assembly :: BoundaryAssembly
+    properties :: T
 end
-function BoundaryProblem(problem_type::DataType,
+function BoundaryProblem(problem::DataType,
                          name::ASCIIString,
                          parent_field_name::ASCIIString,
                          parent_field_dim::Int,
                          elements=[])
-    BoundaryProblem{problem_type}(name, parent_field_name, parent_field_dim,
-                                  elements, BoundaryAssembly())
+    BoundaryProblem{problem}(name, parent_field_name, parent_field_dim,
+                                  elements, BoundaryAssembly(), problem())
 end
 
 function update!{P}(problem::BoundaryProblem{P}, solution::Vector{Float64})
