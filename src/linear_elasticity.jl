@@ -3,6 +3,88 @@
 
 # Linear elasticity
 
+""" Concrete Elasticity type. """
+type Elasticity <: AbstractProblem
+    plane_stress :: Bool
+    nonlinear_geometry :: Bool
+end
+function Elasticity()
+    Elasticity(false, false)
+end
+
+function get_unknown_field_name(::Type{Elasticity})
+    return "displacement"
+end
+
+function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::Element, time::Real)
+
+    # assemble plane stress problem
+    if problem.properties.plane_stress
+        return assemble!(assembly, problem, element, time, Val{:plane_stress})
+    end
+
+end
+
+""" Elasticity equations, plane stress. """
+function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::Element, time::Real, ::Type{Val{:plane_stress}})
+
+    gdofs = get_gdofs(element, problem.dim)
+    ndim, nnodes = size(element)
+    B = zeros(3, 2*nnodes)
+    for ip in get_integration_points(element)
+        w = ip.weight
+        J = get_jacobian(element, ip, time)
+        N = element(ip, time)
+        if haskey(element, "youngs modulus") && haskey(element, "poissons ratio")
+            nu = element("poissons ratio", ip, time)
+            E_ = element("youngs modulus", ip, time)
+            C = E_/(1.0 - nu^2) .* [
+                1.0  nu 0.0
+                nu  1.0 0.0
+                0.0 0.0 (1.0-nu)/2.0]
+            dN = element(ip, time, Val{:grad})
+            fill!(B, 0.0)
+            for i=1:size(dN, 2)
+                B[1, 2*(i-1)+1] = dN[1,i]
+                B[2, 2*(i-1)+2] = dN[2,i]
+                B[3, 2*(i-1)+1] = dN[2,i]
+                B[3, 2*(i-1)+2] = dN[1,i]
+            end
+            Kt = w*B'*C*B*det(J)
+            add!(assembly.stiffness_matrix, gdofs, gdofs, Kt)
+        end
+        if haskey(element, "displacement load")
+            b = element("displacement load", ip, time)
+            add!(assembly.force_vector, gdofs, w*N'*b*det(J))
+        end
+        if haskey(element, "displacement traction force")
+            T = element("displacement traction force", ip, time)
+            L = w*T*N*norm(J)
+            add!(assembly.force_vector, gdofs, vec(L))
+        end
+        for dim in 1:problem.dim
+            if haskey(element, "displacement traction force $dim")
+                T = element("displacement traction force $dim", ip, time)
+                ldofs = gdofs[dim:problem.dim:end]
+                L = w*T*N*norm(J)
+                add!(assembly.force_vector, ldofs, vec(L))
+            end
+        end
+        if haskey(element, "displacement traction force N")
+            # surface pressure
+            p = zeros(2)
+            p[1] = element("displacement traction force N", ip, time)
+            R = element("normal-tangential coordinates", ip, time)
+            T = R'*p
+            L = w*T*N*norm(J)
+            add!(assembly.force_vector, gdofs, vec(L))
+        end
+    end
+end
+
+
+
+
 abstract LinearElasticityProblem <: ElasticityProblem
 
 function LinearElasticityProblem(name="linear elasticity", dim::Int=3, elements=[])
@@ -84,76 +166,6 @@ function assemble!{E<:CG, P<:LinearElasticityProblem}(assembly::Assembly, proble
     end
 end
 
-abstract PlaneStressLinearElasticityProblem <: LinearElasticityProblem
-
-function PlaneStressLinearElasticityProblem(name="plane stress linear elasticity", dim::Int=2, elements=[])
-    return Problem{PlaneStressLinearElasticityProblem}(name, dim, elements)
-end
-
-""" Elasticity equations, plane stress. """
-function assemble!{E<:CG, P<:PlaneStressLinearElasticityProblem}(assembly::Assembly, problem::Problem{P}, element::Element{E}, time::Real)
-
-    gdofs = get_gdofs(element, problem.dim)
-    ndim, nnodes = size(E)
-    B = zeros(3, 2*nnodes)
-    for ip in get_integration_points(element)
-        w = ip.weight
-        J = get_jacobian(element, ip, time)
-        N = element(ip, time)
-        if haskey(element, "youngs modulus") && haskey(element, "poissons ratio")
-            nu = element("poissons ratio", ip, time)
-            E_ = element("youngs modulus", ip, time)
-            C = E_/(1.0 - nu^2) .* [
-                1.0  nu 0.0
-                nu  1.0 0.0
-                0.0 0.0 (1.0-nu)/2.0]
-            dN = element(ip, time, Val{:grad})
-            fill!(B, 0.0)
-            for i=1:size(dN, 2)
-                B[1, 2*(i-1)+1] = dN[1,i]
-                B[2, 2*(i-1)+2] = dN[2,i]
-                B[3, 2*(i-1)+1] = dN[2,i]
-                B[3, 2*(i-1)+2] = dN[1,i]
-            end
-            Kt = w*B'*C*B*det(J)
-            add!(assembly.stiffness_matrix, gdofs, gdofs, Kt)
-            # solve residual, i.e. K du = K \ -(Ku(prev) - F)
-            # in first iteration u(prev) typically 0 -> no effect
-            # but if geometrical or material nonlinearities iterations are needed
-#           if haskey(element, "displacement")
-#               u_prev = element("displacement", time)
-#               u_prev = vec(u_prev)
-#               add!(assembly.force_vector, gdofs, -Kt*u_prev)
-#           end
-        end
-        if haskey(element, "displacement load")
-            b = element("displacement load", ip, time)
-            add!(assembly.force_vector, gdofs, w*N'*b*det(J))
-        end
-        if haskey(element, "displacement traction force")
-            T = element("displacement traction force", ip, time)
-            L = w*T*N*norm(J)
-            add!(assembly.force_vector, gdofs, vec(L))
-        end
-        for dim in 1:problem.dim
-            if haskey(element, "displacement traction force $dim")
-                T = element("displacement traction force $dim", ip, time)
-                ldofs = gdofs[dim:problem.dim:end]
-                L = w*T*N*norm(J)
-                add!(assembly.force_vector, ldofs, vec(L))
-            end
-        end
-        if haskey(element, "displacement traction force N")
-            # surface pressure
-            p = zeros(2)
-            p[1] = element("displacement traction force N", ip, time)
-            R = element("normal-tangential coordinates", ip, time)
-            T = R'*p
-            L = w*T*N*norm(J)
-            add!(assembly.force_vector, gdofs, vec(L))
-        end
-    end
-end
 
 ###############################
 #     Plastic material        #
