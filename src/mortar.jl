@@ -703,17 +703,32 @@ function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly,
             N1 = slave_element(xi_gauss, time)
             Phi = (Ae*N1')'
             N2 = master_element(xi_projected, time)
+
+            Q = slave_element("normal-tangential coordinates", xi_gauss, time)
+            Z = zeros(2, 2)
+            Q2 = [Q Z; Z Q]
+
             S = w*kron(Phi', N1)
             M = w*kron(Phi', N2)
+            S2 = zeros(4, 4)
+            M2 = zeros(4, 4)
             for i=1:field_dim
-                sd = slave_dofs[i:field_dim:end]
-                md = master_dofs[i:field_dim:end]
-                add!(assembly.C1, sd, sd, S)
-                add!(assembly.C1, sd, md, -M)
-                add!(assembly.C2, sd, sd, S)
-                add!(assembly.C2, sd, md, -M)
+                S2[i:field_dim:end,i:field_dim:end] += S
+                M2[i:field_dim:end,i:field_dim:end] += M
             end
 
+            add!(assembly.C1, slave_dofs, slave_dofs, S2)
+            add!(assembly.C1, slave_dofs, master_dofs, -M2)
+            S2 = Q2*S2
+            M2 = Q2*M2
+            add!(assembly.C2, slave_dofs, slave_dofs, S2)
+            add!(assembly.C2, slave_dofs, master_dofs, -M2)
+
+            X1 = slave_element("geometry", xi_gauss, time)
+            X2 = master_element("geometry", xi_projected, time)
+            g = norm(X2-X1)
+            gh1 = w*Phi*g
+            add!(assembly.g, slave_dofs[1:field_dim:end], gh1)
         end
     end
 end
