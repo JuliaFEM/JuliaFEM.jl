@@ -643,6 +643,15 @@ end
 # Mortar assembly 2d
 
 type Mortar <: BoundaryProblem
+    formulation :: Symbol
+end
+
+function Mortar()
+    Mortar(:Equality)
+end
+
+function get_unknown_field_name(::Type{Mortar})
+    return "reaction force"
 end
 
 typealias MortarElements2D Union{Seg2, Seg3}
@@ -711,8 +720,8 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
 
             add!(assembly.C1, slave_dofs, slave_dofs, S2)
             add!(assembly.C1, slave_dofs, master_dofs, -M2)
-            S2 = Q2*S2
-            M2 = Q2*M2
+            S2 = Q2'*S2
+            M2 = Q2'*M2
             add!(assembly.C2, slave_dofs, slave_dofs, S2)
             add!(assembly.C2, slave_dofs, master_dofs, -M2)
 

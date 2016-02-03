@@ -265,7 +265,7 @@ end
 
 """ Solve linear system using LU factorization (UMFPACK).
 """
-function solve_linear_system!(solver::Solver, ::Type{Val{:DirectLinearSolver}})
+function solve_linear_system(solver::Solver, ::Type{Val{:DirectLinearSolver}})
     info("solving linear system of $(length(solver.problems)) problems.")
     t0 = time()
 
@@ -290,15 +290,10 @@ function solve_linear_system!(solver::Solver, ::Type{Val{:DirectLinearSolver}})
     x = zeros(length(b))
     x[nz1] = lufact(A[nz1,nz2]) \ full(b[nz1])
 
-    # update solutions
     u = x[1:dim]
     la = x[dim+1:end]
-    for problem in solver.problems
-        is_field_problem(problem) && update!(problem, u)
-        is_boundary_problem(problem) && update!(problem, la)
-    end
-
     info("UMFPACK: solved in ", time()-t0, " seconds. norm = ", norm(u))
+    return u, la
 end
 
 """ Check convergence of problems.
@@ -307,12 +302,16 @@ Notes
 -----
 Default convergence criteria is obtained by checking each sub-problem convergence.
 """
-function has_converged(solver::Solver; print_convergence_information=true)
+function has_converged(solver::Solver)
     converged = true
+    eps = solver.nonlinear_system_convergence_tolerance
     for problem in solver.problems
-        has_converged = problem.assembly.solution_norm_change < solver.nonlinear_system_convergence_tolerance
-        if print_convergence_information
-            @printf "% 30s | %8.3f | %s\n" problem.name problem.assembly.solution_norm_change has_converged
+        has_converged = true
+        if is_field_problem(problem)
+            has_converged = problem.assembly.u_norm_change/norm(problem.assembly.u) < eps
+        end
+        if is_boundary_problem(problem)
+            has_converged = problem.assembly.la_norm_change/norm(problem.assembly.la) < eps
         end
         converged &= has_converged
     end
@@ -326,82 +325,6 @@ end
 function Base.showerror(io::IO, exception::NonlinearConvergenceError)
     max_iters = exception.solver.nonlinear_system_max_iterations
     print(io, "nonlinear iteration did not converge in $max_iters iterations!")
-end
-
-""" Initialize unknown field ready for nonlinear iterations, i.e.,
-    take last known value and set it as a initial quess for next
-    time increment.
-"""
-function initialize!{P<:FieldProblem}(problem::Problem{P}, time::Real)
-    field_name = get_unknown_field_name(problem)
-    field_dim = get_unknown_field_dimension(problem)
-    for element in get_elements(problem)
-        gdofs = get_gdofs(element, problem)
-        if haskey(element, field_name)
-            if !isapprox(last(element[field_name]).time, time)
-                last_data = copy(last(element[field_name]).data)
-                push!(element[field_name], time => last_data)
-            end
-        else # if field not found at all, initialize new zero field.
-            data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
-            element[field_name] = (time => data)
-        end
-    end
-end
-
-function initialize!{P<:BoundaryProblem}(problem::Problem{P}, time::Real; initialize_primary_field=false)
-    field_name = problem.parent_field_name
-    field_dim = problem.dimension
-
-    for element in get_elements(problem)
-        gdofs = get_gdofs(element, problem)
-        data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
-
-        # add new field "reaction force" for boundary element if not found
-        if haskey(element, "reaction force")
-            if !isapprox(last(element["reaction force"]).time, time)
-                push!(element["reaction force"], time => data)
-            end
-        else
-            element["reaction force"] = (time => data)
-        end
-
-        if initialize_primary_field
-            # add new primary field for boundary element if not found
-            if haskey(element, field_name)
-                if !isapprox(last(element[field_name]).time, time)
-                    last_data = copy(last(element[field_name]).data)
-                    push!(element[field_name], time => last_data)
-                end
-            else
-                data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
-                element[field_name] = (time => data)
-            end
-        end
-    end
-end
-
-function update!{P<:FieldProblem}(problem::Problem{P}, solution::Vector, ::Type{Val{:elements}})
-    field_name = get_unknown_field_name(problem)
-    field_dim = get_unknown_field_dimension(problem)
-    for element in get_elements(problem)
-        gdofs = get_gdofs(element, problem)
-        local_sol = solution[gdofs]
-        local_sol = reshape(local_sol, field_dim, length(element))
-        local_sol = Vector{Float64}[local_sol[:,i] for i=1:length(element)]
-        last(element[field_name]).data = local_sol
-    end
-end
-
-function update!{P<:BoundaryProblem}(problem::Problem{P}, solution::Vector, ::Type{Val{:elements}})
-    field_dim = get_unknown_field_dimension(problem)
-    for element in get_elements(problem)
-        gdofs = get_gdofs(element, field_dim)
-        local_sol = solution[gdofs]
-        local_sol = reshape(local_sol, field_dim, length(element))
-        local_sol = Vector{Float64}[local_sol[:,i] for i=1:length(element)]
-        last(element["reaction force"]).data = local_sol
-    end
 end
 
 """ Main solver loop.
@@ -421,11 +344,12 @@ function call(solver::Solver)
         end
 
         # 2.2 call solver for linearized system (default: direct lu factorization)
-        solve_linear_system!(solver, Val{solver.linear_system_solver})
+        u, la = solve_linear_system(solver, Val{solver.linear_system_solver})
 
         # 2.3 update solution back to elements
         for problem in solver.problems
-            update!(problem, problem.assembly.solution, Val{:elements})
+            update_assembly!(problem, u, la)
+            update_elements!(problem, u, la)
         end
 
         # 2.4 check convergence

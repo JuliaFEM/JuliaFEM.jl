@@ -69,3 +69,6 @@ include("directsolver.jl") # parallel sparse direct solver for non-linear proble
 include("mortar.jl")  # mortar projection
 
 include("abaqus_reader_old.jl")
+
+# rest of things
+include("utils.jl")
