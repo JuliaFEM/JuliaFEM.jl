@@ -20,29 +20,22 @@ function optimize!(assembly::Assembly)
 end
 
 function append!(assembly::Assembly, sub_assembly::Assembly)
-    append!(assembly.mass_matrix, sub_assembly.mass_matrix)
-    append!(assembly.stiffness_matrix, sub_assembly.stiffness_matrix)
-    append!(assembly.force_vector, sub_assembly.force_vector)
-end
-
-function append!(assembly::BoundaryAssembly, sub_assembly::BoundaryAssembly)
+    append!(assembly.M, sub_assembly.M)
+    append!(assembly.K, sub_assembly.K)
+    append!(assembly.f, sub_assembly.f)
     append!(assembly.C1, sub_assembly.C1)
     append!(assembly.C2, sub_assembly.C2)
     append!(assembly.D, sub_assembly.D)
     append!(assembly.g, sub_assembly.g)
 end
 
-function assemble!(problem::Union{FieldProblem, BoundaryProblem}, time::Float64; empty_assembly::Bool=true)
+function assemble!(problem::Problem, time::Float64; empty_assembly::Bool=true)
     !problem.assembly.changed && return
     empty_assembly && empty!(problem.assembly)
     for element in get_elements(problem)
         assemble!(problem.assembly, problem, element, time)
     end
     problem.assembly.changed = true
-end
-
-function assemble(problem::Union{FieldProblem, BoundaryProblem}, time::Real)
-    assemble!(problem, time; empty_assembly=true)
     return problem.assembly
 end
 

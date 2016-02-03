@@ -54,19 +54,19 @@ end
 type LinearSolver
     name :: ASCIIString
     field_problems :: Vector{Problem}
-    boundary_problems :: Vector{BoundaryProblem}
+    boundary_problems :: Vector{Problem}
 end
 
 function LinearSolver(name="LinearSolver")
     LinearSolver(name, [], [])
 end
 
-function push!(solver::LinearSolver, problem::Problem)
+function push!{P<:FieldProblem}(solver::LinearSolver, problem::Problem{P})
     length(solver.field_problems) == 0 || error("Only one field problem allowed for LinearSolver")
     push!(solver.field_problems, problem)
 end
 
-function push!(solver::LinearSolver, problem::BoundaryProblem)
+function push!{P<:BoundaryProblem}(solver::LinearSolver, problem::Problem{P})
     length(solver.boundary_problems) == 0 || error("Only one boundary problem allowed for LinearSolver")
     push!(solver.boundary_problems, problem)
 end
@@ -141,7 +141,7 @@ type Solver
     name :: ASCIIString
     time :: Real
     iteration :: Int
-    problems :: Vector{Union{FieldProblem, BoundaryProblem}}
+    problems :: Vector{Problem}
     is_linear_system :: Bool
     nonlinear_system_max_iterations :: Int64
     nonlinear_system_convergence_tolerance :: Float64
@@ -161,27 +161,38 @@ function Solver(name::ASCIIString="default solver", time::Real=0.0)
         )
 end
 
-function push!(solver::Solver, problem::Union{FieldProblem, BoundaryProblem})
+function push!(solver::Solver, problem)
     push!(solver.problems, problem)
 end
 
 # one-liner helpers to identify problem types
 
 function is_field_problem(problem)
-    return typeof(problem) <: FieldProblem
+    return false
+end
+function is_field_problem{P<:FieldProblem}(problem::Problem{P})
+    return true
 end
 
 function is_boundary_problem(problem)
-    return typeof(problem) <: BoundaryProblem
+    return false
+end
+function is_boundary_problem{P<:BoundaryProblem}(problem::Problem{P})
+    return true
 end
 
 function is_dirichlet_problem(problem)
-    return typeof(problem) <: Union{BoundaryProblem{DirichletProblem}, BoundaryProblem{DirichletProblem{DualBasis}}}
+    return false
+end
+function is_dirichlet_problem{P<:Problem{Dirichlet}}(problem::P)
+    return true
 end
 
-function is_mortar_problem(problem)
-    return typeof(problem) <: BoundaryProblem{MortarProblem}
+#=
+function is_mortar_problem{P<:Problem{Mortar}}(problem::P)
+    return true
 end
+=#
 
 function get_field_problems(solver::Solver)
     filter(is_field_problem, solver.problems)
@@ -218,12 +229,12 @@ problems must have unique node ids.
 function get_field_assembly(solver::Solver)
     return get_field_assembly(get_field_problems(solver))
 end
-function get_field_assembly(problems::Vector{Union{BoundaryProblem, FieldProblem}})
+function get_field_assembly(problems::Vector{Problem})
     K = SparseMatrixCOO()
     f = SparseMatrixCOO()
     for problem in problems
-        append!(K, problem.assembly.stiffness_matrix)
-        append!(f, problem.assembly.force_vector)
+        append!(K, problem.assembly.K)
+        append!(f, problem.assembly.f)
     end
     return K, f
 end
@@ -238,7 +249,7 @@ C1, C2, D, g :: SparseMatrixCOO
 function get_boundary_assembly(solver::Solver)
     return get_boundary_assembly(get_boundary_problems(solver))
 end
-function get_boundary_assembly(problems::Vector{Union{BoundaryProblem, FieldProblem}})
+function get_boundary_assembly(problems::Vector{Problem})
     C1 = SparseMatrixCOO()
     C2 = SparseMatrixCOO()
     D = SparseMatrixCOO()
@@ -283,8 +294,8 @@ function solve_linear_system!(solver::Solver, ::Type{Val{:DirectLinearSolver}})
     u = x[1:dim]
     la = x[dim+1:end]
     for problem in solver.problems
-        typeof(problem) <: FieldProblem && update!(problem, u)
-        typeof(problem) <: BoundaryProblem && update!(problem, la)
+        is_field_problem(problem) && update!(problem, u)
+        is_boundary_problem(problem) && update!(problem, la)
     end
 
     info("UMFPACK: solved in ", time()-t0, " seconds. norm = ", norm(u))
@@ -315,6 +326,82 @@ end
 function Base.showerror(io::IO, exception::NonlinearConvergenceError)
     max_iters = exception.solver.nonlinear_system_max_iterations
     print(io, "nonlinear iteration did not converge in $max_iters iterations!")
+end
+
+""" Initialize unknown field ready for nonlinear iterations, i.e.,
+    take last known value and set it as a initial quess for next
+    time increment.
+"""
+function initialize!{P<:FieldProblem}(problem::Problem{P}, time::Real)
+    field_name = get_unknown_field_name(problem)
+    field_dim = get_unknown_field_dimension(problem)
+    for element in get_elements(problem)
+        gdofs = get_gdofs(element, problem)
+        if haskey(element, field_name)
+            if !isapprox(last(element[field_name]).time, time)
+                last_data = copy(last(element[field_name]).data)
+                push!(element[field_name], time => last_data)
+            end
+        else # if field not found at all, initialize new zero field.
+            data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
+            element[field_name] = (time => data)
+        end
+    end
+end
+
+function initialize!{P<:BoundaryProblem}(problem::Problem{P}, time::Real; initialize_primary_field=false)
+    field_name = problem.parent_field_name
+    field_dim = problem.dimension
+
+    for element in get_elements(problem)
+        gdofs = get_gdofs(element, problem)
+        data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
+
+        # add new field "reaction force" for boundary element if not found
+        if haskey(element, "reaction force")
+            if !isapprox(last(element["reaction force"]).time, time)
+                push!(element["reaction force"], time => data)
+            end
+        else
+            element["reaction force"] = (time => data)
+        end
+
+        if initialize_primary_field
+            # add new primary field for boundary element if not found
+            if haskey(element, field_name)
+                if !isapprox(last(element[field_name]).time, time)
+                    last_data = copy(last(element[field_name]).data)
+                    push!(element[field_name], time => last_data)
+                end
+            else
+                data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
+                element[field_name] = (time => data)
+            end
+        end
+    end
+end
+
+function update!{P<:FieldProblem}(problem::Problem{P}, solution::Vector, ::Type{Val{:elements}})
+    field_name = get_unknown_field_name(problem)
+    field_dim = get_unknown_field_dimension(problem)
+    for element in get_elements(problem)
+        gdofs = get_gdofs(element, problem)
+        local_sol = solution[gdofs]
+        local_sol = reshape(local_sol, field_dim, length(element))
+        local_sol = Vector{Float64}[local_sol[:,i] for i=1:length(element)]
+        last(element[field_name]).data = local_sol
+    end
+end
+
+function update!{P<:BoundaryProblem}(problem::Problem{P}, solution::Vector, ::Type{Val{:elements}})
+    field_dim = get_unknown_field_dimension(problem)
+    for element in get_elements(problem)
+        gdofs = get_gdofs(element, field_dim)
+        local_sol = solution[gdofs]
+        local_sol = reshape(local_sol, field_dim, length(element))
+        local_sol = Vector{Float64}[local_sol[:,i] for i=1:length(element)]
+        last(element["reaction force"]).data = local_sol
+    end
 end
 
 """ Main solver loop.

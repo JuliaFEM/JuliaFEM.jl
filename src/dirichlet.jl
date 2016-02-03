@@ -1,12 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-abstract DirichletProblem{T} <: AbstractProblem
-abstract StandardBasis
-abstract DualBasis
-global const BiorthogonalBasis = DualBasis
-
-type Dirichlet <: AbstractProblem
+type Dirichlet <: BoundaryProblem
     dual_basis :: Bool
 end
 
@@ -14,12 +9,12 @@ function Dirichlet()
     Dirichlet(true)
 end
 
-function assemble!(assembly::BoundaryAssembly, problem::BoundaryProblem{Dirichlet}, element::Element, time::Real)
+function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Element, time::Real)
 
     @assert problem.properties.dual_basis
 
     # get dimension and name of PARENT field
-    field_dim = problem.parent_field_dim
+    field_dim = problem.dimension
     field_name = problem.parent_field_name
     gdofs = get_gdofs(element, field_dim)
 
@@ -79,8 +74,9 @@ function assemble!(assembly::BoundaryAssembly, problem::BoundaryProblem{Dirichle
     end
 end
 
+#=
 
-function assemble!(assembly::BoundaryAssembly, problem::BoundaryProblem{DirichletProblem}, element::Element, time::Real)
+function assemble!(assembly::Assembly, problem::Problem{DirichletProblem}, element::Element, time::Real)
 
     # get dimension and name of PARENT field
     field_dim = problem.parent_field_dim
@@ -127,4 +123,4 @@ function assemble!(assembly::BoundaryAssembly, problem::BoundaryProblem{Dirichle
         end
     end
 end
-
+=#
