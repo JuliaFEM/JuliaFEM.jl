@@ -2,8 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM.Test
-using JuliaFEM.Core: Node, update!, Quad4, Seg2, assemble, BoundaryProblem,
-                     Problem, Elasticity, Solver, Dirichlet
+using JuliaFEM.Core: Node, update!, Quad4, Seg2, Problem, Elasticity, Solver, Dirichlet
 
 @testset "test 2d linear elasticity with surface load." begin
 
@@ -26,8 +25,9 @@ using JuliaFEM.Core: Node, update!, Quad4, Seg2, assemble, BoundaryProblem,
     update!(element1, "poissons ratio", nu)
 #   update!(element2, "displacement traction force", [0.0, f])
     update!(element2, "displacement traction force", Vector{Float64}[[0.0, f], [0.0, f]])
+    # type, name, dimension
     elasticity_problem = Problem(Elasticity, "block", 2)
-    elasticity_problem.properties.plane_stress = true
+    elasticity_problem.properties.formulation = :plane_stress
     push!(elasticity_problem, element1, element2)
 
     # dirichlet boundary condition, symmetry
@@ -36,8 +36,8 @@ using JuliaFEM.Core: Node, update!, Quad4, Seg2, assemble, BoundaryProblem,
     update!([sym13, sym23], "geometry", nodes)
     update!(sym13, "displacement 2", 0.0)
     update!(sym23, "displacement 1", 0.0)
-    # name, unknown field, unknown field dimension
-    boundary_problem = BoundaryProblem(Dirichlet, "symmetry boundaries", "displacement", 2)
+    # type, name, dimension, unknown_field_name
+    boundary_problem = Problem(Dirichlet, "symmetry boundaries", 2, "displacement")
     push!(boundary_problem, sym13, sym23)
 
     solver = Solver("solve block problem")

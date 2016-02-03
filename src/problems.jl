@@ -2,106 +2,51 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 abstract AbstractProblem
+abstract FieldProblem <: AbstractProblem
+abstract BoundaryProblem <: AbstractProblem
+abstract MixedProblem <: AbstractProblem
 
-function get_formulation_type{P<:AbstractProblem}(::Type{P})
-    return :total
-end
+"""
+General linearized problem to solve
+    K*u +   C1'*la  = f
+    C2*u +  D*la    = g
+"""
+type Assembly
+    # for field assembly
+    M :: SparseMatrixCOO  # mass matrix
+    K :: SparseMatrixCOO  # stiffness matrix
+    f :: SparseMatrixCOO  # force vector
+    # for boundary assembly
+    C1 :: SparseMatrixCOO
+    C2 :: SparseMatrixCOO
+    D :: SparseMatrixCOO 
+    g :: SparseMatrixCOO
 
-type FieldAssembly
-    mass_matrix :: SparseMatrixCOO
-    stiffness_matrix :: SparseMatrixCOO
-    force_vector :: SparseMatrixCOO
-    solution :: Vector{Float64}
-    previous_solution :: Vector{Float64}
-    solution_norm_change :: Real
-    prehooks :: Vector{Tuple{Symbol,Any,Any}}
-    posthooks :: Vector{Tuple{Symbol,Any,Any}}
+    solution :: Vector{Float64}  # full solution vector when solving problem Ax = b
+    previous_solution :: Vector{Float64}  # previous solution vector
+    solution_norm_change :: Real  # for convergence studies
+    prehooks :: Vector{Tuple{Symbol,Any,Any}}  # assign possible prehooks before assembly
+    posthooks :: Vector{Tuple{Symbol,Any,Any}}  # assign possible posthooks after assembly
     changed :: Bool  # flag to control is reassembly needed
 end
 
-function FieldAssembly()
-    return FieldAssembly(
-        SparseMatrixCOO(),
-        SparseMatrixCOO(),
-        SparseMatrixCOO(),
-        [], [], Inf, [], [], true)
-end
-
-function Base.empty!(assembly::FieldAssembly)
-    empty!(assembly.mass_matrix)
-    empty!(assembly.stiffness_matrix)
-    empty!(assembly.force_vector)
-    assembly.changed = true
-end
-
-typealias Assembly FieldAssembly
-
-""" Construct a new field problem.
-
-Examples
---------
-Create vector-valued (dim=3) elasticity problem:
-
-julia> prob = FieldProblem(ElasticityProblem, "this is my problem", 3)
-
-"""
-type FieldProblem{T}
-    name :: ASCIIString
-    dim :: Int
-    elements :: Vector{Element}
-    assembly :: FieldAssembly
-    properties :: T
-end
-function FieldProblem(problem::DataType, name::ASCIIString, dim::Int,
-                      elements=[])
-    FieldProblem{problem}(name, dim, elements, FieldAssembly(), problem())
-end
-
-
-function update!{P}(problem::FieldProblem{P}, solution::Vector{Float64})
-    # resize & fill with zeros solution vector if length mismatch with current solution
-    if length(solution) != length(problem.assembly.solution)
-        resize!(problem.assembly.solution, length(solution))
-        fill!(problem.assembly.solution, 0.0)
-    end
-    problem.assembly.previous_solution = copy(problem.assembly.solution)
-    if get_formulation_type(P) == :incremental
-        problem.assembly.solution += solution
-    else
-        problem.assembly.solution = solution
-    end
-    problem.assembly.solution_norm_change = norm(problem.assembly.solution - problem.assembly.previous_solution)
-end
-
-
-"""
-Interface matrices C₁, C₂ & D, g for general problem type
-Au + C₁'λ = f
-C₂u + Dλ  = g
-"""
-type BoundaryAssembly
-    C1 :: SparseMatrixCOO
-    C2 :: SparseMatrixCOO
-    D :: SparseMatrixCOO
-    g :: SparseMatrixCOO
-    solution :: Vector{Float64}
-    previous_solution :: Vector{Float64}
-    solution_norm_change :: Real
-    prehooks :: Vector{Tuple{Symbol,Any,Any}}
-    posthooks :: Vector{Tuple{Symbol,Any,Any}}
-    changed :: Bool   # flag to control is reassembly needed
-end
-
-function BoundaryAssembly()
-    return BoundaryAssembly(
+function Assembly()
+    return Assembly(
         SparseMatrixCOO(),
         SparseMatrixCOO(),
         SparseMatrixCOO(),
         SparseMatrixCOO(),
-        [], [], Inf, [], [], true)
+        SparseMatrixCOO(),
+        SparseMatrixCOO(),
+        SparseMatrixCOO(),
+        [], [], Inf,
+        [], [], true)
 end
 
-function Base.empty!(assembly::BoundaryAssembly)
+function Base.empty!(assembly::Assembly)
+    empty!(assembly.M)
+    empty!(assembly.K)
+    empty!(assembly.f)
     empty!(assembly.C1)
     empty!(assembly.C2)
     empty!(assembly.D)
@@ -109,6 +54,27 @@ function Base.empty!(assembly::BoundaryAssembly)
     assembly.changed = true
 end
 
+type Problem{P<:AbstractProblem}
+    name :: ASCIIString              # descriptive name for problem
+    dimension :: Int                 # degrees of freedom per node
+    parent_field_name :: ASCIIString # (optional) name of parent field e.g. "displacement"
+    elements :: Vector{Element}
+    assembly :: Assembly
+    properties :: P
+end
+
+""" Construct a new field problem.
+
+Examples
+--------
+Create vector-valued (dim=3) elasticity problem:
+
+julia> prob = Problem(Elasticity, "this is my problem", 3)
+
+"""
+function Problem{P<:FieldProblem}(::Type{P}, name, dimension, elements=[])
+    Problem{P}(name, dimension, "none", elements, Assembly(), P())
+end
 
 """ Construct a new boundary problem.
 
@@ -116,38 +82,41 @@ Examples
 --------
 Create Dirichlet boundary problem for vector-valued (dim=3) elasticity problem.
 
-julia> bc1 = FieldProblem(DirichletProblem, "support", "displacement", 3)
+julia> bc1 = Problem(Dirichlet, "support", 3, "displacement")
 
 """
-type BoundaryProblem{T}
-    name :: ASCIIString
-    parent_field_name :: ASCIIString
-    parent_field_dim :: Int
-    elements :: Vector{Element}
-    assembly :: BoundaryAssembly
-    properties :: T
-end
-function BoundaryProblem(problem::DataType,
-                         name::ASCIIString,
-                         parent_field_name::ASCIIString,
-                         parent_field_dim::Int,
-                         elements=[])
-    BoundaryProblem{problem}(name, parent_field_name, parent_field_dim,
-                                  elements, BoundaryAssembly(), problem())
+function Problem{P<:BoundaryProblem}(::Type{P}, name, dimension, parent_field_name, elements=[])
+    Problem{P}(name, dimension, parent_field_name, elements, Assembly(), P())
 end
 
-function update!{P}(problem::BoundaryProblem{P}, solution::Vector{Float64})
-    if length(solution) != length(problem.assembly.solution)
-        resize!(problem.assembly.solution, length(solution))
-        fill!(problem.assembly.solution, 0.0)
+function get_formulation_type{P<:FieldProblem}(problem::Problem{P})
+    return :total
+end
+
+function get_formulation_type{P<:BoundaryProblem}(problem::Problem{P})
+    return :total
+end
+
+function get_assembly(problem)
+    return problem.assembly
+end
+
+""" Update problem solution vector.
+"""
+function update!(problem::Problem, solution::Vector{Float64})
+    assembly = get_assembly(problem)
+    # resize & fill with zeros solution vector if length mismatch with current solution
+    if length(solution) != length(assembly.solution)
+        resize!(assembly.solution, length(solution))
+        fill!(assembly.solution, 0.0)
     end
-    problem.assembly.previous_solution = copy(problem.assembly.solution)
-    if get_formulation_type(P) == :incremental
-        problem.assembly.solution += solution
+    assembly.previous_solution = copy(assembly.solution)
+    if get_formulation_type(problem) == :incremental
+        assembly.solution += solution
     else
-        problem.assembly.solution = solution
+        assembly.solution = solution
     end
-    problem.assembly.solution_norm_change = norm(problem.assembly.solution - problem.assembly.previous_solution)
+    assembly.solution_norm_change = norm(assembly.solution - assembly.previous_solution)
 end
 
 #=
@@ -161,17 +130,13 @@ end
 
 =#
 
-typealias Problem FieldProblem
-
-typealias AllProblems Union{FieldProblem, BoundaryProblem}
-
-function get_elements(problem::AllProblems)
+function get_elements(problem)
     return problem.elements
 end
 
 """ Return the dimension of the unknown field of this problem. """
 function get_unknown_field_dimension(problem::Problem)
-    return problem.dim
+    return problem.dimension
 end
 
 """ Return the name of the unknown field of this problem. """
@@ -179,9 +144,11 @@ function get_unknown_field_name{P}(problem::Problem{P})
     return get_unknown_field_name(P)
 end
 
-function Base.push!(problem::AllProblems, element::Element)
+function push!(problem::Problem, element)
     push!(problem.elements, element)
 end
+
+
 
 # TODO: better place for utility functions?
 

@@ -47,14 +47,12 @@ function get_gdofs(element::Element, dim::Int)
     return gdofs
 end
 
-function get_gdofs(element::Element, problem::FieldProblem)
-    dim = problem.dim
-    return get_gdofs(element, dim)
+function get_gdofs(element::Element, problem::Problem)
+    return get_gdofs(element, problem.dimension)
 end
 
-function get_gdofs(element::Element, problem::BoundaryProblem)
-    dim = problem.parent_field_dim
-    return get_gdofs(element, dim)
+function get_gdofs(problem::Problem, element::Element)
+    return get_gdofs(element, problem.dimension)
 end
 
 """ Assemble element. """

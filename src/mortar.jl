@@ -638,31 +638,23 @@ function project_point_from_plane_to_surface{E}(p::Vector, x0::Vector, Q::Matrix
     error("project_point_to_surface: did not converge in $max_iterations iterations!")
 end
 
-
 ### Mortar problem
-
-"""
-Parameters
-----------
-node_csys
-    coordinate system in node, normal + tangent + "binormal"
-    in 3d 3x3 matrix, in 2d 2x2 matrix, respectively
-"""
-abstract MortarProblem{T} <: AbstractProblem
-
+# abstract MortarProblem{T} <: AbstractProblem
 # Mortar assembly 2d
+
+type Mortar <: BoundaryProblem
+end
 
 typealias MortarElements2D Union{Seg2, Seg3}
 
-function assemble!{E<:MortarElements2D}(assembly::BoundaryAssembly,
-                                        problem::BoundaryProblem{MortarProblem},
+function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mortar},
                                         slave_element::Element{E}, time::Real)
 
     # slave element must have a set of master elements
     haskey(slave_element, "master elements") || return
 
     # get dimension and name of PARENT field
-    field_dim = problem.parent_field_dim
+    field_dim = problem.dimension
     field_name = problem.parent_field_name
 
     slave_dofs = get_gdofs(slave_element, field_dim)
@@ -760,8 +752,9 @@ function find_master_elements(slave_element::Element, time::Real)
     return master_elements
 end
 
-function assemble!{E<:MortarElements3D}(assembly::BoundaryAssembly, problem::BoundaryProblem{MortarProblem}, slave_element::Element{E}, time::Real)
-    field_dim = problem.parent_field_dim
+function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::Problem{Mortar},
+                                        slave_element::Element{E}, time::Real)
+    field_dim = problem.dimension
     field_name = problem.parent_field_name
     slave_dofs = get_gdofs(slave_element, field_dim)
 #   info("Slave dofs: $slave_dofs")
