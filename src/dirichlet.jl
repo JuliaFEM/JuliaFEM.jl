@@ -2,11 +2,16 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 type Dirichlet <: BoundaryProblem
+    formulation :: Symbol
     dual_basis :: Bool
 end
 
 function Dirichlet()
-    Dirichlet(true)
+    Dirichlet(:Equality, true)
+end
+
+function get_unknown_field_name(::Type{Dirichlet})
+    return "reaction force"
 end
 
 function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Element, time::Real)
@@ -14,8 +19,8 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Ele
     @assert problem.properties.dual_basis
 
     # get dimension and name of PARENT field
-    field_dim = problem.dimension
-    field_name = problem.parent_field_name
+    field_dim = get_unknown_field_dimension(problem)
+    field_name = get_parent_field_name(problem)
     gdofs = get_gdofs(element, field_dim)
 
     # calculate bi-orthogonal basis transformation matrix Ae

@@ -6,6 +6,7 @@ abstract AbstractElement
 type Element{E}
     connectivity :: Vector{Int}
     fields :: Dict{ASCIIString, Field}
+    dualbasis :: Matrix{Float64} # coefficients to construct dual basis
 end
 
 function Base.size{E}(::Element{E})
@@ -18,7 +19,7 @@ end
 
 function convert{E}(::Type{Element{E}}, connectivity::Vector{Int})
 #   return Element{E}(connectivity, get_integration_points(E), Dict())
-    return Element{E}(connectivity, Dict())
+    return Element{E}(connectivity, Dict(), Matrix())
 end
 
 function get_integration_points{E}(element::Element{E}, args...)
@@ -183,6 +184,25 @@ function call{E}(element::Element{E}, xi::VecOrIP, time::Float64=0.0)
     return get_basis(element, xi)
 end
 
+function call(element::Element, xi::VecOrIP, time::Real, ::Type{Val{:dualbasis}})
+    if length(element.dualbasis) == 0
+        nnodes = size(element, 2)
+        De = zeros(nnodes, nnodes)
+        Me = zeros(nnodes, nnodes)
+        for ip in get_integration_points(element, Val{3})
+            J = get_jacobian(element, ip, time)
+            w = ip.weight*norm(J)
+            N = element(ip, time)
+            De += w*diagm(vec(N))
+            Me += w*N'*N
+        end
+        element.dualbasis = De*inv(Me)
+    end
+    N = get_basis(element, xi)
+    Phi = element.dualbasis*N'
+    return Phi'
+end
+
 function get_basis{E}(element::Element{E})
     basis = CVTI(
         (xi::Vector) -> get_basis(E, xi),
@@ -248,6 +268,7 @@ end
 """ Calculate local normal-tangential coordinates for element. """
 function calculate_normal_tangential_coordinates!{E}(element::Element{E}, time::Real)
     ntcoords = Matrix[]
+    normals = Vector{Float64}[]
     refcoords = get_reference_element_coordinates(E)
     x = element("geometry", time)
     for xi in refcoords
@@ -257,6 +278,7 @@ function calculate_normal_tangential_coordinates!{E}(element::Element{E}, time::
         if m == 1 # plane case
             tangent = dN / norm(dN)
             normal = [-tangent[2] tangent[1]]'
+            push!(normals, vec(normal))
             push!(ntcoords, [normal tangent])
         elseif m == 2
             normal = cross(dN[:,1], dN[:,2])
@@ -270,15 +292,37 @@ function calculate_normal_tangential_coordinates!{E}(element::Element{E}, time::
             tangent1 = u2/norm(u2)
             tangent2 = u3/norm(u3)
             push!(ntcoords, [normal tangent1 tangent2])
+            push!(normals, vec(normal))
         else
             error("calculate_normal_tangential_coordinates!(): n=$n, m=$m")
         end
     end
     element["normal-tangential coordinates"] = ntcoords
+    element["normals"] = normals
 end
-function calculate_normal_tangential_coordinates!{E}(elements::Vector{Element{E}}, time::Real)
+
+""" Calculate normal-tangential coordinates for a set of elements. 
+
+Notes
+-----
+Average normals so that normals are unique in nodes.
+"""
+function calculate_normal_tangential_coordinates!(elements::Vector, time::Real)
     for element in elements
         calculate_normal_tangential_coordinates!(element, time)
+    end
+    n = calculate_nodal_vector("normals", 2, elements, time)
+    n = reshape(n, 2, round(Int, length(n)/2))
+    t = zeros(n)
+    for node_id=1:size(n,2)
+        n[:,node_id] = n[:,node_id] / norm(n[:,node_id])
+        t[:,node_id] = [-n[2,node_id], n[1,node_id]]
+    end
+    for element in elements
+        node_ids = get_connectivity(element)
+        Q = Matrix{Float64}[ [n[:,node_id] t[:,node_id]] for node_id in node_ids]
+        element["normal-tangential coordinates"] = Q
+        element["normals"] = Vector{Float64}[n[:,node_id] for node_id in node_ids]
     end
 end
 

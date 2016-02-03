@@ -69,7 +69,7 @@ function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::El
         for dim in 1:get_unknown_field_dimension(problem)
             if haskey(element, "displacement traction force $dim")
                 T = element("displacement traction force $dim", ip, time)
-                ldofs = gdofs[dim:problem.dim:end]
+                ldofs = gdofs[dim:get_unknown_field_dimension(problem):end]
                 L = w*T*N*norm(J)
                 add!(assembly.f, ldofs, vec(L))
             end
