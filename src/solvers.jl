@@ -362,4 +362,3 @@ function call(solver::Solver)
     # 3. did not converge
     throw(NonlinearConvergenceError(solver))
 end
-

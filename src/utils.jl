@@ -15,16 +15,18 @@ field_dim
     degrees of freedom / node
 elements
     elements used to calculate vector
+vec_dim
+    used to resize solution vector if given
 time
 """
-function calculate_nodal_vector(field_name::ASCIIString, field_dim::Int,
-                                elements::Vector{Element}, time::Real)
+function calculate_nodal_vector(field_name, field_dim, elements::Vector{Element},
+                                time, vec_dim=0)
     A = SparseMatrixCOO()
     b = SparseMatrixCOO()
     for element in elements
         haskey(element, field_name) || continue
         gdofs = get_gdofs(element, 1)
-        for ip in get_integration_points(element, Val{2})
+        for ip in get_integration_points(element, Val{3})
             J = get_jacobian(element, ip, time)
             w = ip.weight*norm(J)
             f = element(field_name, ip, time)
@@ -40,11 +42,18 @@ function calculate_nodal_vector(field_name::ASCIIString, field_dim::Int,
     nz = sort(unique(rowvals(A)))
     x = zeros(size(b)...)
     x[nz, :] = A[nz,nz] \ b[nz, :]
-    return vec(transpose(x))
+    x = vec(transpose(x))
+    if vec_dim != 0
+        v = zeros(vec_dim)
+        v[1:length(x)] = x
+        return v
+    else
+        return x
+    end
 end
 
-function calculate_rotated_nodal_vector(field_name::ASCIIString, field_dim::Int,
-                                elements::Vector{Element}, time::Real)
+function calculate_rotated_nodal_vector(field_name, field_dim, elements::Vector{Element},
+                                        time, vec_dim=0)
     A = SparseMatrixCOO()
     b = SparseMatrixCOO()
     for element in elements
@@ -68,7 +77,13 @@ function calculate_rotated_nodal_vector(field_name::ASCIIString, field_dim::Int,
     nz = sort(unique(rowvals(A)))
     x = zeros(size(b)...)
     x[nz, :] = A[nz,nz] \ b[nz, :]
-    return vec(transpose(x))
+    if vec_dim != 0
+        v = zeros(vec_dim)
+        v[1:length(x)] = x
+        return v
+    else
+        return x
+    end
 end
 
 """ Collect normal-tangential coordinates to rotation matrix Q.
@@ -93,4 +108,3 @@ function get_rotation_matrix(elements, time)
     end
     return R
 end
-
