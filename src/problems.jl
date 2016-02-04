@@ -8,7 +8,7 @@ abstract MixedProblem <: AbstractProblem
 
 """
 General linearized problem to solve
-    K*u +   C1'*la  = f
+    K*u +   C1.T*la  = f
     C2*u +  D*la    = g
 """
 type Assembly
@@ -19,7 +19,7 @@ type Assembly
     # for boundary assembly
     C1 :: SparseMatrixCOO
     C2 :: SparseMatrixCOO
-    D :: SparseMatrixCOO 
+    D :: SparseMatrixCOO
     g :: SparseMatrixCOO
 
     u :: Vector{Float64}  # solution vector u
@@ -127,6 +127,24 @@ function initialize!(problem::Problem, time::Real)
             element[field_name] = (time => data)
         end
     end
+    # if this is boundary problem and not dirichlet problem, initialize field
+    # for primary variable too
+    is_boundary_problem(problem) || return
+    is_dirichlet_problem(problem) && return
+    field_name = get_parent_field_name(problem)
+    for element in get_elements(problem)
+        gdofs = get_gdofs(element, problem)
+        if haskey(element, field_name)
+            # if field is found, copy last known solution to new time as initial guess
+            if !isapprox(last(element[field_name]).time, time)
+                last_data = copy(last(element[field_name]).data)
+                push!(element[field_name], time => last_data)
+            end
+        else # if field not found at all, initialize new zero field.
+            data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
+            element[field_name] = (time => data)
+        end
+    end
 end
 
 """ Update problem solution vector for assembly. """
@@ -169,20 +187,31 @@ This assumes that element is properly initialized so that last known field data
 is from current time. For boundary problems solution is updated from lambda vector
 and for field problems from actual solution vector.
 """
-function update_elements!(problem, u, la)
+function update_elements!{P<:FieldProblem}(problem::Problem{P}, u, la)
     field_name = get_unknown_field_name(problem)
     field_dim = get_unknown_field_dimension(problem)
     nnodes = round(Int, length(u)/field_dim)
-
-    solution = nothing
-    if is_field_problem(problem)
-        solution = reshape(u, field_dim, nnodes)
-    elseif is_boundary_problem(problem)
-        solution = reshape(la, field_dim, nnodes)
-    else
-        error("update_elements!(): unknown problem type $(typeof(problem))")
+    solution = reshape(u, field_dim, nnodes)
+    for element in get_elements(problem)
+        connectivity = get_connectivity(element) # node ids
+        local_sol = Vector{Float64}[solution[:, node_id] for node_id in connectivity]
+        last(element[field_name]).data = local_sol
     end
-
+end
+function update_elements!{P<:BoundaryProblem}(problem::Problem{P}, u, la)
+    field_name = get_unknown_field_name(problem)
+    field_dim = get_unknown_field_dimension(problem)
+    nnodes = round(Int, length(u)/field_dim)
+    solution = reshape(la, field_dim, nnodes)
+    for element in get_elements(problem)
+        connectivity = get_connectivity(element) # node ids
+        local_sol = Vector{Float64}[solution[:, node_id] for node_id in connectivity]
+        last(element[field_name]).data = local_sol
+    end
+    # if boundary problem is not dirichlet, update also data of main problem
+    is_dirichlet_problem(problem) && return
+    field_name = get_parent_field_name(problem)
+    solution = reshape(u, field_dim, nnodes)
     for element in get_elements(problem)
         connectivity = get_connectivity(element) # node ids
         local_sol = Vector{Float64}[solution[:, node_id] for node_id in connectivity]
@@ -223,4 +252,3 @@ end
 function push!(problem::Problem, element)
     push!(problem.elements, element)
 end
-
