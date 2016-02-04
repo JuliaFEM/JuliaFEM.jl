@@ -43,6 +43,34 @@ function calculate_nodal_vector(field_name::ASCIIString, field_dim::Int,
     return vec(transpose(x))
 end
 
+function calculate_rotated_nodal_vector(field_name::ASCIIString, field_dim::Int,
+                                elements::Vector{Element}, time::Real)
+    A = SparseMatrixCOO()
+    b = SparseMatrixCOO()
+    for element in elements
+        haskey(element, field_name) || continue
+        gdofs = get_gdofs(element, 1)
+        for ip in get_integration_points(element, Val{5})
+            J = get_jacobian(element, ip, time)
+            w = ip.weight*norm(J)
+            Q = element("normal-tangential coordinates", ip, time)
+            f = element(field_name, ip, time)
+            f = Q'*f
+            N = element(ip, time)
+            add!(A, gdofs, gdofs, w*kron(N', N))
+            for dim=1:field_dim
+                add!(b, gdofs, w*f[dim]*N, dim)
+            end
+        end
+    end
+    A = sparse(A)
+    b = sparse(b)
+    nz = sort(unique(rowvals(A)))
+    x = zeros(size(b)...)
+    x[nz, :] = A[nz,nz] \ b[nz, :]
+    return vec(transpose(x))
+end
+
 """ Collect normal-tangential coordinates to rotation matrix Q.
 """
 function get_rotation_matrix(elements, time)
