@@ -17,5 +17,11 @@ end
     dim = 3
     nodes = find_nodes_by_dofs(dim, dofs)
     @test nodes == [1, 3]
+
+    dofs = [2, 12]
+    dim = 2
+    nodes = find_nodes_by_dofs(dim,dofs)
+    @test nodes == [1, 6]
+
 end
 

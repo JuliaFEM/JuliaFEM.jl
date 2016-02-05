@@ -188,10 +188,10 @@ end
 
 """ Return dual basis transformation matrix Ae. """
 function get_dualbasis(element::Element, time::Real)
-    if length(element.dualbasis) == 0
+    if length(element.A) == 0
         nnodes = size(element, 2)
-        D = zeros(nnodes, nnodes)
-        M = zeros(nnodes, nnodes)
+        De = zeros(nnodes, nnodes)
+        Me = zeros(nnodes, nnodes)
         for ip in get_integration_points(element, Val{3})
             w = ip.weight
             J = get_jacobian(element, ip, time)
@@ -207,8 +207,8 @@ function get_dualbasis(element::Element, time::Real)
             De += w*diagm(vec(N))
             Me += w*N'*N
         end
-        element.D = D
-        element.M = M
+        element.D = De
+        element.M = Me
         element.A = De*inv(Me)
     end
     return element.D, element.M, element.A
