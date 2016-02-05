@@ -12,13 +12,6 @@ end
 
 typealias SparseMatrixIJV SparseMatrixCOO
 
-#=
-function SparseMatrixIJV()
-    warn("use SparseMatrixCOO to construct sparse matrix.""")
-    SparseMatrixCOO([], [], [])
-end
-=#
-
 function SparseMatrixCOO()
     SparseMatrixCOO([], [], [])
 end
@@ -27,8 +20,17 @@ function Base.convert(::Type{SparseMatrixCOO}, A::SparseMatrixCSC)
     return SparseMatrixCOO(findnz(A)...)
 end
 
-function Base.sparse(A::SparseMatrixIJV, args...)
-    return sparse(A.I, A.J, A.V, args...)
+""" Convert from COO format to CSC.
+
+Parameters
+----------
+tol
+    used to drop near zero values less than tol.
+"""
+function Base.sparse(A::SparseMatrixIJV, args...; tol=1.0e-12)
+    B = sparse(A.I, A.J, A.V, args...)
+    SparseMatrix.droptol!(B, tol)
+    return B
 end
 
 function Base.push!(A::SparseMatrixIJV, I::Int, J::Int, V::Float64)
@@ -119,10 +121,22 @@ function add!(A::SparseMatrixCOO, dofs::Vector{Int}, data::Array{Float64}, dim::
     append!(A.V, vec(data))
 end
 
+""" Combine (I,J,V) values is possible. """
 function optimize!(A::SparseMatrixIJV)
-#   dim1 = length(A.I)
     I, J, V = findnz(sparse(A))
-#   dim2 = length(I)
     A = SparseMatrixCOO(I, J, V)
     gc()
 end
+
+""" Find all nonzero rows from sparse matrix.
+
+Returns
+-------
+
+Ordered list of row indices.
+"""
+function get_nonzero_rows(A::SparseMatrixCOO)
+    # FIXME: This is probably a very inefficient way to do this.
+    return sort(unique(rowvals(A)))
+end
+
