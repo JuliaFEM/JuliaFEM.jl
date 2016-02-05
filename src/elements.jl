@@ -319,28 +319,96 @@ function calculate_normal_tangential_coordinates!{E}(element::Element{E}, time::
     element["normals"] = normals
 end
 
+""" Return list of nodes / connectivity points from a set of elements.
+"""
+function get_nodes(elements::Vector)
+    nodes = Set{Int64}()
+    for element in elements
+        push!(nodes, get_connectivity(element)...)
+    end
+    nodes = sort(collect(nodes))
+    return nodes
+end
+
 """ Calculate normal-tangential coordinates for a set of elements. 
 
 Notes
 -----
 Average normals so that normals are unique in nodes.
 """
+
 function calculate_normal_tangential_coordinates!(elements::Vector, time::Real)
-    for element in elements
-        calculate_normal_tangential_coordinates!(element, time)
+    if size(elements[1], 1) == 1
+        return calculate_normal_tangential_coordinates!(elements, time, Val{2})
+    else
+        return calculate_normal_tangential_coordinates!(elements, time, Val{3})
     end
-    n = calculate_nodal_vector("normals", 2, elements, time)
-    n = reshape(n, 2, round(Int, length(n)/2))
+end
+
+""" Calculate normal-tangential coordinates for 2d case.
+
+Notes
+-----
+n = (e₃×∂X/∂ξ) / || e₃×∂X/∂ξ || and e₃ = [0 0 1]
+"""
+function calculate_normal_tangential_coordinates!(elements::Vector, time::Real, ::Type{Val{2}})
+    nodes = get_nodes(elements)
+    n = zeros(2, maximum(nodes))
+    Q = [0 -1; 1 0]
+    for element in elements
+        gdofs = get_gdofs(element, 1)
+        for ip in get_integration_points(element, Val{3})
+            J = get_jacobian(element, ip, time)
+            N = element(ip, time)
+            n[:, gdofs] += ip.weight*Q*J'*N
+        end
+    end
     t = zeros(n)
-    for node_id=1:size(n,2)
-        n[:,node_id] = n[:,node_id] / norm(n[:,node_id])
-        t[:,node_id] = [-n[2,node_id], n[1,node_id]]
+    for i=1:size(n,2)
+        n[:,i] = n[:,i] / norm(n[:,i])
+        t[:,i] = [-n[2,i], n[1,i]]
     end
     for element in elements
         node_ids = get_connectivity(element)
-        Q = Matrix{Float64}[ [n[:,node_id] t[:,node_id]] for node_id in node_ids]
+        R = Matrix{Float64}[ [n[:,i] t[:,i]] for i in node_ids]
+        element["normal-tangential coordinates"] = R
+        element["normals"] = Vector{Float64}[n[:,i] for i in node_ids]
+    end
+end
+
+""" Calculate normal-tangential coordinates for 3d case.
+"""
+function calculate_normal_tangential_coordinates!(elements::Vector, time::Real, ::Type{Val{3}})
+    nodes = get_nodes(elements)
+    n = zeros(3, maximum(nodes))
+    for element in elements
+        gdofs = get_gdofs(element, 1)
+        for ip in get_integration_points(element, Val{3})
+            J = transpose(get_jacobian(element, ip, time))
+            N = element(ip, time)
+            c = reshape(cross(J[:,1], J[:,2]), 3, 1)
+            n[:, gdofs] += ip.weight*c*N
+        end
+    end
+    t1 = zeros(n)
+    t2 = zeros(n)
+    for i=1:size(n,2)
+        i in nodes || continue
+        n[:,i] = n[:,i] / norm(n[:,i])
+        u1 = n[:,i]
+        j = indmax(abs(n[:,i]))
+        v2 = zeros(3)
+        v2[mod(j,3)+1] = 1.0
+        u2 = v2 - dot(u1, v2) / dot(v2, v2) * v2
+        u3 = cross(u1, u2)
+        t1[:,i] = u2/norm(u2)
+        t2[:,i] = u3/norm(u3)
+    end
+    for element in elements
+        node_ids = get_connectivity(element)
+        Q = Matrix{Float64}[ [n[:,i] t1[:,i] t2[:,i]] for i in node_ids]
         element["normal-tangential coordinates"] = Q
-        element["normals"] = Vector{Float64}[n[:,node_id] for node_id in node_ids]
+        element["normals"] = Vector{Float64}[n[:,i] for i in node_ids]
     end
 end
 
