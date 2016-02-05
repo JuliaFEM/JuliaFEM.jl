@@ -23,27 +23,19 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Ele
     field_name = get_parent_field_name(problem)
     gdofs = get_gdofs(element, field_dim)
 
-    # calculate bi-orthogonal basis transformation matrix Ae
-    nnodes = size(element, 2)
-    De = zeros(nnodes, nnodes)
-    Me = zeros(nnodes, nnodes)
-    for ip in get_integration_points(element, Val{2})
-        w = ip.weight
-        J = get_jacobian(element, ip, time)
-        JT = transpose(J)
-        if size(JT, 2) == 1  # plane problem
-            w *= norm(JT)
-        else
-            w *= norm(cross(JT[:,1], JT[:,2]))
-        end
-        N = element(ip, time)
-        De += w*diagm(vec(N))
-        Me += w*N'*N
-    end
-    Ae = De*inv(Me)
+    De, Me, Ae = get_dualbasis(element, time)
 
-    # do the actual integration
-    for ip in get_integration_points(element, Val{2})
+    # left hand side
+    for i=1:field_dim
+        ldofs = gdofs[i:field_dim:end]
+        if haskey(element, field_name*" $i") || haskey(element, field_name)
+            add!(assembly.C1, ldofs, ldofs, De)
+            add!(assembly.C2, ldofs, ldofs, De)
+        end
+    end
+
+    # right hand side
+    for ip in get_integration_points(element, Val{3})
         w = ip.weight
         J = get_jacobian(element, ip, time)
         JT = transpose(J)
@@ -54,15 +46,11 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Ele
         end
         N = element(ip, time)
         Phi = (Ae*N')'
-        A = w*Phi'*N
-        A[abs(A) .< 1.0e-12] = 0
 
         if haskey(element, field_name)
             for i=1:field_dim
                 g = element(field_name, ip, time)
                 ldofs = gdofs[i:field_dim:end]
-                add!(assembly.C1, ldofs, ldofs, A)
-                add!(assembly.C2, ldofs, ldofs, A)
                 add!(assembly.g, ldofs, w*g*Phi')
             end
         else
@@ -70,13 +58,12 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Ele
                 ldofs = gdofs[i:field_dim:end]
                 if haskey(element, field_name*" $i")
                     g = element(field_name*" $i", ip, time)
-                    add!(assembly.C1, ldofs, ldofs, A)
-                    add!(assembly.C2, ldofs, ldofs, A)
                     add!(assembly.g, ldofs, w*g*Phi')
                 end
             end
         end
     end
+
 end
 
 #=

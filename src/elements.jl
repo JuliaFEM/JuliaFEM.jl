@@ -6,7 +6,10 @@ abstract AbstractElement
 type Element{E}
     connectivity :: Vector{Int}
     fields :: Dict{ASCIIString, Field}
-    dualbasis :: Matrix{Float64} # coefficients to construct dual basis
+    # matrices to construct dual basis
+    D :: Matrix{Float64}
+    M :: Matrix{Float64}
+    A :: Matrix{Float64}
 end
 
 function Base.size{E}(::Element{E})
@@ -18,8 +21,7 @@ function Base.size{E}(::Element{E}, i::Int64)
 end
 
 function convert{E}(::Type{Element{E}}, connectivity::Vector{Int})
-#   return Element{E}(connectivity, get_integration_points(E), Dict())
-    return Element{E}(connectivity, Dict(), Matrix())
+    return Element{E}(connectivity, Dict(), Matrix(), Matrix(), Matrix())
 end
 
 function get_integration_points{E}(element::Element{E}, args...)
@@ -184,22 +186,38 @@ function call{E}(element::Element{E}, xi::VecOrIP, time::Float64=0.0)
     return get_basis(element, xi)
 end
 
-function call(element::Element, xi::VecOrIP, time::Real, ::Type{Val{:dualbasis}})
+""" Return dual basis transformation matrix Ae. """
+function get_dualbasis(element::Element, time::Real)
     if length(element.dualbasis) == 0
         nnodes = size(element, 2)
-        De = zeros(nnodes, nnodes)
-        Me = zeros(nnodes, nnodes)
+        D = zeros(nnodes, nnodes)
+        M = zeros(nnodes, nnodes)
         for ip in get_integration_points(element, Val{3})
+            w = ip.weight
             J = get_jacobian(element, ip, time)
-            w = ip.weight*norm(J)
+            JT = transpose(J)
+            if size(JT, 2) == 1  # plane problem
+                # || ∂X/∂ξ ||
+                w *= norm(JT)
+            else
+                # || ∂X/∂ξ₁ × ∂X/∂ξ₂ ||
+                w *= norm(cross(JT[:,1], JT[:,2]))
+            end
             N = element(ip, time)
             De += w*diagm(vec(N))
             Me += w*N'*N
         end
-        element.dualbasis = De*inv(Me)
+        element.D = D
+        element.M = M
+        element.A = De*inv(Me)
     end
+    return element.D, element.M, element.A
+end
+
+function call(element::Element, xi::VecOrIP, time::Real, ::Type{Val{:dualbasis}})
+    De, Me, Ae = get_dualbasis(element, time)
     N = get_basis(element, xi)
-    Phi = element.dualbasis*N'
+    Phi = Ae*N'
     return Phi'
 end
 
