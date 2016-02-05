@@ -138,11 +138,12 @@ end
 # Tuple{Symbol,Any,Any} or Function
 
 type Solver
-    name :: ASCIIString
-    time :: Real
-    iteration :: Int
+    name :: ASCIIString # some descriptive name for problem
+    time :: Real        # current time
+    iteration :: Int    # iteration counter
+    ndofs :: Int        # total dimension of global stiffness matrix, i.e., dim*nnodes
     problems :: Vector{Problem}
-    is_linear_system :: Bool
+    is_linear_system :: Bool # setting this to true makes assumption of one step convergence
     nonlinear_system_max_iterations :: Int64
     nonlinear_system_convergence_tolerance :: Float64
     linear_system_solver :: Symbol
@@ -150,11 +151,12 @@ end
 
 function Solver(name::ASCIIString="default solver", time::Real=0.0)
     return Solver(
-        name,  # name
-        time,  # time
-        0,     # iteration counter
+        name,
+        time,
+        0,     # iteration #
+        0,     # ndofs
         [],    # array of problems
-        false, # is this a linear system which can be solved in a single iteration?
+        false, # is_linear_system
         10,    # max nonlinear iterations
         5.0e-5, # nonlinear iteration convergence tolerance
         :DirectLinearSolver # linear system solution method
@@ -210,6 +212,7 @@ function get_mortar_problems(solver::Solver)
     filter(is_mortar_problem, solver.problems)
 end
 
+
 """Return one combined field assembly for a set of field problems.
 
 Parameters
@@ -218,7 +221,7 @@ solver :: Solver
 
 Returns
 -------
-K, f :: SparseMatrixCOO
+K, f :: SparseMatrixCSC
 
 Notes
 -----
@@ -227,41 +230,64 @@ problems must have unique node ids.
 
 """
 function get_field_assembly(solver::Solver)
-    return get_field_assembly(get_field_problems(solver))
-end
-function get_field_assembly(problems::Vector{Problem})
+    problems = get_field_problems(solver)
     K = SparseMatrixCOO()
     f = SparseMatrixCOO()
     for problem in problems
         append!(K, problem.assembly.K)
         append!(f, problem.assembly.f)
     end
+    K = sparse(K)
+    solver.ndofs = size(K, 1)
+    f = sparse(f, solver.ndofs, 1)
     return K, f
 end
+
 
 """ Return one combined boundary assembly for a set of boundary problems.
 
 Returns
 -------
-C1, C2, D, g :: SparseMatrixCOO
+C1, C2, D, g :: SparseMatrixCSC
+
+Notes
+-----
+When some dof is constrained by multiple boundary problems an algorithm is
+launched what tries to do it's best to solve issue. It's far from perfect
+but is able to handle some basic situations occurring in corner nodes and
+crosspoints.
 
 """
 function get_boundary_assembly(solver::Solver)
-    return get_boundary_assembly(get_boundary_problems(solver))
-end
-function get_boundary_assembly(problems::Vector{Problem})
-    C1 = SparseMatrixCOO()
-    C2 = SparseMatrixCOO()
-    D = SparseMatrixCOO()
-    g = SparseMatrixCOO()
-    for problem in problems
-        append!(C1, problem.assembly.C1)
-        append!(C2, problem.assembly.C2)
-        append!(D, problem.assembly.D)
-        append!(g, problem.assembly.g)
+    ndofs = solver.ndofs
+    @assert ndofs != 0
+    C1 = spzeros(ndofs, ndofs)
+    C2 = spzeros(ndofs, ndofs)
+    D = spzeros(ndofs, ndofs)
+    g = spzeros(ndofs, 1)
+    for problem in get_boundary_problems(solver)
+        assembly = problem.assembly
+        C1_ = sparse(assembly.C1, ndofs, ndofs)
+        C2_ = sparse(assembly.C2, ndofs, ndofs)
+        D_ = sparse(assembly.D, ndofs, ndofs)
+        g_ = sparse(assembly.g, ndofs, 1)
+        already_constrained = get_nonzero_rows(C2)
+        new_constraints = get_nonzero_rows(C2_)
+        overconstrained_dofs = intersect(already_constrained, new_constraints)
+        if length(overconstrained_dofs) != 0
+            overconstrained_dofs = sort(overconstrained_dofs)
+            overconstrained_nodes = find_nodes_by_dofs(problem, overconstrained_dofs)
+            handle_overconstraint_error!(problem, overconstrained_nodes,
+                overconstrained_dofs, C1, C1_, C2, C2_, D, D_, g, g_)
+        end
+        C1 += C1_
+        C2 += C2_
+        D += D_
+        g += g_
     end
     return C1, C2, D, g
 end
+
 
 """ Solve linear system using LU factorization (UMFPACK).
 """
@@ -271,30 +297,25 @@ function solve_linear_system(solver::Solver, ::Type{Val{:DirectLinearSolver}})
 
     # assemble field problems
     K, f = get_field_assembly(solver)
-    K = sparse(K)
-    dim = size(K, 1)
-    f = sparse(f, dim, 1)
 
     # assemble boundary problems
     C1, C2, D, g = get_boundary_assembly(solver)
-    C1 = sparse(C1, dim, dim)
-    C2 = sparse(C2, dim, dim)
-    D = sparse(D, dim, dim)
-    g = sparse(g, dim, 1)
 
     # construct global system Ax=b and solve using lu factorization
     A = [K C1'; C2 D]
     b = [f; g]
-    nz1 = sort(unique(rowvals(A)))
-    nz2 = sort(unique(rowvals(A')))
-    x = zeros(length(b))
-    x[nz1] = lufact(A[nz1,nz2]) \ full(b[nz1])
 
-    u = x[1:dim]
-    la = x[dim+1:end]
+    nz = get_nonzero_rows(A)
+    x = zeros(length(b))
+    x[nz] = lufact(A[nz,nz]) \ full(b[nz])
+
+    ndofs = solver.ndofs
+    u = x[1:ndofs]
+    la = x[ndofs+1:end]
     info("UMFPACK: solved in ", time()-t0, " seconds. norm = ", norm(u))
     return u, la
 end
+
 
 """ Check convergence of problems.
 

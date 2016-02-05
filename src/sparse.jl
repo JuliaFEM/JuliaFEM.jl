@@ -135,7 +135,7 @@ Returns
 
 Ordered list of row indices.
 """
-function get_nonzero_rows(A::SparseMatrixCOO)
+function get_nonzero_rows(A::SparseMatrixCSC)
     # FIXME: This is probably a very inefficient way to do this.
     return sort(unique(rowvals(A)))
 end

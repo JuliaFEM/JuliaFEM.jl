@@ -1,7 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-subscript(i) = map(repr(i)) do c
+function subscript(i)
+    map(repr(i)) do c
         c   ==  '1' ? '\u2081' :
         c   ==  '2' ? '\u2082' :
         c   ==  '3' ? '\u2083' :
@@ -12,8 +13,9 @@ subscript(i) = map(repr(i)) do c
         c   ==  '8' ? '\u2088' :
         c   ==  '9' ? '\u2089' :
         c   ==  '0' ? '\u2080' :
-        error("Unexpected Chatacter")
+        error("Unexpected character")
     end
+end
 
 function pretty_print_constraint_equation(a, b, g; char1="u", char2="λ")
     s = ""
@@ -95,17 +97,17 @@ function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2
     """
     function action1(node_id, dofs)
         dofs_ = get_related_dofs(intersect(dofs, all_dofs))
+        # this will fail with dofs > 2 for some yet unknown reason
+        length(dofs_) > 2 && return dofs_, false
+
         any(has_lagrange_coefficients(dofs_)) && return dofs_, false
         C = full([C2[dofs_, :]; C2_[dofs_, :]])
         d = full([g[dofs_]; g_[dofs_]])
-        # this will fail with dofs > 2 for some yet unknown reason
-        length(dofs_) > 2 && return dofs_, false
         info("rank = $(rank(C)), dofs = $(length(dofs_))")
         rank(C) != length(dofs_) && return dofs_, false
         C2_[dofs_,:] = C2[dofs_,:] = 0
         g_[dofs_,:] = g[dofs_,:] = 0
         x = C \ d
-        x[abs(x) .< 1.0e-12] = 0
         C2[dofs_, dofs_] = eye(length(dofs_))
         g[dofs_] = x
         return dofs_, true

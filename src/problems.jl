@@ -271,6 +271,7 @@ end
 """ Find nodes corresponding to dofs. """
 function find_nodes_by_dofs(problem::Problem, dofs)
     dim = get_unknown_field_dimension(problem)
+    return find_nodes_by_dofs(dim, dofs)
 end
 function find_nodes_by_dofs(dim, dofs)
     nodes = Int64[]
