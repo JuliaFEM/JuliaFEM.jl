@@ -252,3 +252,33 @@ end
 function push!(problem::Problem, element)
     push!(problem.elements, element)
 end
+
+""" Find dofs corresponding to nodes. """
+function find_dofs_by_nodes(problem::Problem, nodes)
+    dim = get_unknown_field_dimension(problem)
+    return find_dofs_by_nodes(dim, nodes)
+end
+function find_dofs_by_nodes(dim::Int, nodes)
+    dofs = Int64[]
+    for node in nodes
+        for j=1:dim
+            push!(dofs, dim*(node-1)+j)
+        end
+    end
+    return dofs
+end
+
+""" Find nodes corresponding to dofs. """
+function find_nodes_by_dofs(problem::Problem, dofs)
+    dim = get_unknown_field_dimension(problem)
+end
+function find_nodes_by_dofs(dim, dofs)
+    nodes = Int64[]
+    for dof in dofs
+        j = Int(ceil(dof/dim))
+        j in nodes && continue
+        push!(nodes, j)
+    end
+    return nodes
+end
+
