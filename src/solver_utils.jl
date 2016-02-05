@@ -120,10 +120,10 @@ function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2
         dofs_ = intersect(dofs, all_dofs)
         length(dofs_) == 1 || return dofs_, false
         any(has_lagrange_coefficients(dofs_)) && return dofs_, false
-        if is_spc(C1, dofs_) && !is_spc(C1_, dofs_)
+        if is_spc(C2, dofs_) && !is_spc(C2_, dofs_)
             C1[dofs_,:] = C2[dofs_,:] = g[dofs_,:] = 0
             return dofs_, true
-        elseif is_spc(C1_, dofs_) && !is_spc(C1, dofs_)
+        elseif is_spc(C2_, dofs_) && !is_spc(C2, dofs_)
             C1_[dofs_,:] = C2_[dofs_,:] = g_[dofs_,:] = 0
             return dofs_, true
         else

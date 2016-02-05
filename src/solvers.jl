@@ -212,6 +212,9 @@ function get_mortar_problems(solver::Solver)
     filter(is_mortar_problem, solver.problems)
 end
 
+""" Posthook for field assembly. By default, do nothing. """
+function field_assembly_posthook!
+end
 
 """Return one combined field assembly for a set of field problems.
 
@@ -234,15 +237,26 @@ function get_field_assembly(solver::Solver)
     K = SparseMatrixCOO()
     f = SparseMatrixCOO()
     for problem in problems
-        append!(K, problem.assembly.K)
-        append!(f, problem.assembly.f)
+        assembly = problem.assembly
+        append!(K, assembly.K)
+        append!(f, assembly.f)
     end
     K = sparse(K)
     solver.ndofs = size(K, 1)
     f = sparse(f, solver.ndofs, 1)
+
+    # run any posthook for assembly if defined
+    args = Tuple{Solver, SparseMatrixCSC, SparseMatrixCSC}
+    if method_exists(field_assembly_posthook!, args)
+        field_assembly_posthook!(solver, K, f)
+    end
+
     return K, f
 end
 
+""" Posthook for boundary assembly. By default, do nothing. """
+function boundary_assembly_posthook!
+end
 
 """ Return one combined boundary assembly for a set of boundary problems.
 
@@ -271,6 +285,17 @@ function get_boundary_assembly(solver::Solver)
         C2_ = sparse(assembly.C2, ndofs, ndofs)
         D_ = sparse(assembly.D, ndofs, ndofs)
         g_ = sparse(assembly.g, ndofs, 1)
+
+        # boundary assembly posthook: if boundary assembly needs some further
+        # manipulations before adding it to global constraint matrix, i.e.,
+        # remove some constraints based on some conditions etc. do it here
+        args = Tuple{Solver, typeof(problem), SparseMatrixCSC, SparseMatrixCSC,
+                     SparseMatrixCSC, SparseMatrixCSC}
+        if method_exists(boundary_assembly_posthook!, args)
+            boundary_assembly_posthook!(solver, problem, C1_, C2_, D_, g_)
+        end
+
+        # check for overconstraint situation and handle it if possible
         already_constrained = get_nonzero_rows(C2)
         new_constraints = get_nonzero_rows(C2_)
         overconstrained_dofs = intersect(already_constrained, new_constraints)
