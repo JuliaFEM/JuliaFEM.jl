@@ -126,6 +126,23 @@ function get_integration_points(::Type{Quad4}, ::Type{Val{3}})
     return pts
 end
 
+function get_integration_points(::Type{Quad4}, ::Type{Val{5}})
+    p = [
+        -1/3*sqrt(5 + 2*sqrt(10/7)),
+        -1/3*sqrt(5 - 2*sqrt(10/7)),
+         0.0,
+         1/3*sqrt(5 - 2*sqrt(10/7)),
+         1/3*sqrt(5 + 2*sqrt(10/7))]
+    w = [
+        (322-13*sqrt(70))/900,
+        (322+13*sqrt(70))/900,
+         128/225,
+        (322+13*sqrt(70))/900,
+        (322-13*sqrt(70))/900]
+    pts = vec([IntegrationPoint([p[i], p[j]], w[i]*w[j]) for i=1:5, j=1:5])
+    return pts
+end
+
 function get_integration_points(::Type{Quad4})
     return get_integration_points(Quad4, Val{2})
 end

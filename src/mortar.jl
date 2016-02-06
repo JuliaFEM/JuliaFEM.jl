@@ -729,9 +729,32 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
 
             X1 = slave_element("geometry", xi_gauss, time)
             X2 = master_element("geometry", xi_projected, time)
-            g = norm(X2-X1)
-            gh = w*Phi*g
-            add!(assembly.g, slave_dofs[1:field_dim:end], gh)
+
+            x1 = copy(X1)
+            x2 = copy(X2)
+            if haskey(slave_element, "displacement")
+                u1 = slave_element("displacement", xi_gauss, time)
+                x1 = x1 + u1
+            end
+            if haskey(master_element, "displacement")
+                u2 = slave_element("displacement", xi_projected, time)
+                x2 = x2 + u2
+            end
+
+            n = Q[:,1]
+            Gn = -dot(n, X1-X2)
+            Gh = w*Phi*Gn
+            if haskey(slave_element, "reaction force")
+                gn = -dot(n, x1-x2)
+                #gh = w*Phi*gn
+                la = slave_element("reaction force", xi_gauss, time)
+                lan = dot(n, la)
+                c = w*Phi*(-lan + gn)
+                #info("lambda(n) = $lan, wug(n) = $Gh, wdg(n) = $gh, c=$c")
+                #info("c: $c")
+                add!(assembly.c, slave_dofs[1:field_dim:end], c)
+            end
+            add!(assembly.g, slave_dofs[1:field_dim:end], Gh)
         end
     end
 end

@@ -90,9 +90,12 @@ end
 """
 function get_rotation_matrix(elements, time)
     Q = Dict{Int64, Matrix{Float64}}()
+    ndim = 0
     for element in elements
         node_ids = get_connectivity(element)
         q = element("normal-tangential coordinates", time).data
+        ndim == 0 && (ndim = size(q, 1))
+        ndim != size(q, 1) && error("2d and 3d rotation matrices in one element set?")
         for (qi, node_id) in zip(q, node_ids)
             if haskey(Q, node_id)
                 @assert isapprox(Q[node_id], qi)
@@ -103,7 +106,7 @@ function get_rotation_matrix(elements, time)
     end
     R = SparseMatrixCOO()
     for (k, q) in Q
-        dofs = [(k-1)*2+1, (k-1)*2+2]
+        dofs = Int[ndim*(k-1)+j for j=1:ndim]
         add!(R, dofs, dofs, q)
     end
     return R

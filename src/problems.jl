@@ -21,6 +21,7 @@ type Assembly
     C2 :: SparseMatrixCOO
     D :: SparseMatrixCOO
     g :: SparseMatrixCOO
+    c :: SparseMatrixCOO
 
     u :: Vector{Float64}  # solution vector u
     u_prev :: Vector{Float64}  # previous solution vector u
@@ -44,6 +45,7 @@ function Assembly()
         SparseMatrixCOO(),
         SparseMatrixCOO(),
         SparseMatrixCOO(),
+        SparseMatrixCOO(),
         [], [], Inf,
         [], [], Inf,
         [], [], true)
@@ -57,6 +59,7 @@ function Base.empty!(assembly::Assembly)
     empty!(assembly.C2)
     empty!(assembly.D)
     empty!(assembly.g)
+    empty!(assembly.c)
     assembly.changed = true
 end
 
