@@ -143,10 +143,10 @@ function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::El
             L = w*T*N*norm(cross(JT[:,1], JT[:,2]))
             add!(assembly.f, gdofs, vec(L))
         end
-        for dim in 1:problem.dim
+        for dim in 1:get_unknown_field_dimension(problem)
             if haskey(element, "displacement traction force $dim")
                 T = element("displacement traction force $dim", ip, time)
-                ldofs = gdofs[dim:problem.dim:end]
+                ldofs = gdofs[dim:unknown_field_dimension(problem):end]
                 JT = transpose(J)
                 L = w*T*N*norm(cross(JT[:,1], JT[:,2]))
                 add!(assembly.f, ldofs, vec(L))

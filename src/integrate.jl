@@ -136,7 +136,7 @@ end
 function get_integration_points(::Type{Hex8}, ::Type{Val{2}})
     p = 1.0/sqrt(3.0)*[-1.0, 1.0]
     w = [1.0, 1.0]
-    return vec([IntegrationPoint([p[i], p[j], p[k]], w) for i=1:2, j=1:2, k=1:2])
+    return vec([IntegrationPoint([p[i], p[j], p[k]], w[i]*w[j]) for i=1:2, j=1:2, k=1:2])
 end
 
 function get_integration_points(::Type{Hex8})

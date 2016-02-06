@@ -921,14 +921,44 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::Problem{Mor
 
                 Sm = ip.weight*N1'*N1*wC
                 Mm = ip.weight*N1'*N2*wC
-                for k=1:field_dim
-                    sd = slave_dofs[k:field_dim:end]
-                    md = master_dofs[k:field_dim:end]
-                    add!(assembly.C1, sd, sd, Sm)
-                    add!(assembly.C1, sd, md, -Mm)
-                    add!(assembly.C2, sd, sd, Sm)
-                    add!(assembly.C2, sd, md, -Mm)
+                @assert length(slave_dofs) == length(master_dofs)
+                S3 = zeros(length(slave_dofs), length(slave_dofs))
+                M3 = zeros(length(master_dofs), length(master_dofs))
+                Q = slave_element("normal-tangential coordinates", xi_slave, time)
+                Z = zeros(3, 3)
+                Q3 = [Q Z Z Z; Z Q Z Z; Z Z Q Z; Z Z Z Q]
+                #info("N1 = $N1")
+                #info("N2 = $N2")
+                #info("size S3 = $(size(S3))")
+                #info("size M3 = $(size(M3))")
+                #info("size Sm = $(size(Sm))")
+                #info("size Mm = $(size(Mm))")
+                for k=1:field_dim                  
+                    S3[k:field_dim:end,k:field_dim:end] += Sm
+                    M3[k:field_dim:end,k:field_dim:end] += Mm
                 end
+                add!(assembly.C1, slave_dofs, slave_dofs, S3)
+                add!(assembly.C1, slave_dofs, master_dofs, -M3)
+                S3 = Q3'*S3
+                M3 = Q3'*M3
+                add!(assembly.C2, slave_dofs, slave_dofs, S3)
+                add!(assembly.C2, slave_dofs, master_dofs, -M3)
+                X1 = slave_element("geometry", xi_slave, time)
+                X2 = master_element("geometry", xi_master, time)
+                g = norm(X2-X1)
+                #T = transpose(get_jacobian(slave_element, xi_slave, time))
+                #W = ip.weight*
+                #info("hard gap = $g, wS = $wS, wM = $wM, wC = $wC")
+                gh = ip.weight*N1*g*wC
+                add!(assembly.g, slave_dofs[1:field_dim:end], gh)
+                #for k=1:field_dim
+                #    sd = slave_dofs[k:field_dim:end]
+                #    md = master_dofs[k:field_dim:end]
+                #    add!(assembly.C1, sd, sd, Sm)
+                #    add!(assembly.C1, sd, md, -Mm)
+                #    add!(assembly.C2, sd, sd, Sm)
+                #    add!(assembly.C2, sd, md, -Mm)
+                #end
             end
 #           info("breaking on first")
 #           break
