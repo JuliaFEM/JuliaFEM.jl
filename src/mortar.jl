@@ -797,6 +797,28 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::Problem{Mor
             X = hcat(xvec, yvec)'
             cell = Field(Vector{Float64}[X[:,j] for j=1:size(X,2)])
 
+            # construct dual basis
+            Ae = eye(4)
+            if problem.properties.basis == :Dual # Construct dual basis
+                nnodes = size(slave_element, 2)
+                De = zeros(nnodes, nnodes)
+                Me = zeros(nnodes, nnodes)
+                for ip in get_integration_points(Tri3, Val{5})
+                    N = get_basis(Tri3, ip.xi)
+                    xi = vec(N*cell)
+                    theta = project_point_from_plane_to_surface(xi, x0, Q, slave_element, time)
+                    xi_slave = theta[2:3]
+                    N1 = slave_element(xi_slave, time)
+                    # jacobian determinant on integration cell
+                    dNC = get_dbasis(Tri3, ip.xi)
+                    JC = sum([kron(dNC[:,j], cell[j]') for j=1:length(cell)])
+                    wC = ip.weight*det(JC)
+                    De += wC*diagm(vec(N1))
+                    Me += wC*N1'*N1
+                end
+                Ae = De*inv(Me)
+            end
+
             for ip in get_integration_points(Tri3, Val{5})
                 # gauss point in auxiliary plane
                 #N = get_basis(E, ip.xi)
@@ -820,8 +842,8 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::Problem{Mor
 
                 # extend matrices according to the problem dimension (3)
                 @assert length(slave_dofs) == length(master_dofs)
-                Sm = wC*N1'*N1
-                Mm = wC*N1'*N2
+                Sm = wC*Ae*N1'*N1
+                Mm = wC*Ae*N1'*N2
                 S3 = zeros(length(slave_dofs), length(slave_dofs))
                 M3 = zeros(length(master_dofs), length(master_dofs))
                 for k=1:field_dim                  
@@ -844,7 +866,7 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::Problem{Mor
                 X1 = slave_element("geometry", xi_slave, time)
                 X2 = master_element("geometry", xi_master, time)
                 g = norm(X2-X1)
-                gh = wC*N1*g
+                gh = wC*(Ae*N1')'*g
                 add!(assembly.g, slave_dofs[1:field_dim:end], gh)
             end
         end
