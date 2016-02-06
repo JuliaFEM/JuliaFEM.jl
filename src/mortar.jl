@@ -644,10 +644,11 @@ end
 
 type Mortar <: BoundaryProblem
     formulation :: Symbol
+    basis :: Symbol
 end
 
 function Mortar()
-    Mortar(:Equality)
+    Mortar(:Equality, :Dual)
 end
 
 function get_unknown_field_name(::Type{Mortar})
@@ -676,20 +677,21 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         l = 1/2*(xi1[2]-xi1[1])
         abs(l) > 1.0e-9 || continue # no contribution
 
-        # Construct dual basis
-        nnodes = size(slave_element, 2)
-        De = zeros(nnodes, nnodes)
-        Me = zeros(nnodes, nnodes)
-        for ip in get_integration_points(slave_element, Val{5})
-            J = get_jacobian(slave_element, ip, time)
-            w = ip.weight*norm(J)*l
-            xi = 1/2*(1-ip.xi)*xi1[1] + 1/2*(1+ip.xi)*xi1[2]
-            N = slave_element(xi, time)
-            De += w*diagm(vec(N))
-            Me += w*N'*N
+        Ae = eye(2)
+        if problem.properties.basis == :Dual # Construct dual basis
+            nnodes = size(slave_element, 2)
+            De = zeros(nnodes, nnodes)
+            Me = zeros(nnodes, nnodes)
+            for ip in get_integration_points(slave_element, Val{5})
+                J = get_jacobian(slave_element, ip, time)
+                w = ip.weight*norm(J)*l
+                xi = 1/2*(1-ip.xi)*xi1[1] + 1/2*(1+ip.xi)*xi1[2]
+                N = slave_element(xi, time)
+                De += w*diagm(vec(N))
+                Me += w*N'*N
+            end
+            Ae = De*inv(Me)
         end
-#       info("Dual basis: De = \n$De")
-        Ae = De*inv(Me)
 
         for ip in get_integration_points(slave_element, Val{5})
             J = get_jacobian(slave_element, ip, time)
@@ -728,88 +730,45 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
             X1 = slave_element("geometry", xi_gauss, time)
             X2 = master_element("geometry", xi_projected, time)
             g = norm(X2-X1)
-            gh1 = w*Phi*g
-            add!(assembly.g, slave_dofs[1:field_dim:end], gh1)
+            gh = w*Phi*g
+            add!(assembly.g, slave_dofs[1:field_dim:end], gh)
         end
     end
 end
 
 typealias MortarElements3D Union{Tri3, Quad4}
 
-""" Find master elements from list of potential master elements. """
-function find_master_elements(slave_element::Element, time::Real)
-    x0, Q = create_auxiliary_plane(slave_element, time)
-    Sl = Vector{Float64}[]
-    for p in slave_element("geometry", time)
-        push!(Sl, project_point_to_auxiliary_plane(p, x0, Q))
-    end
-    S = hcat(Sl...)
-    master_elements = Element[]
-
-    for master_element in slave_element["master elements"]
-        M = Vector{Float64}[]
-        for p in master_element("geometry", time)
-            push!(M, project_point_to_auxiliary_plane(p, x0, Q))
-        end
-        M = hcat(M...)
-        P, neighbours = clip_polygon(S, M)
-        isa(P, Void) && continue # no clipping
-        size(P, 2) < 3 && continue # shared edge, no contribution
-        push!(master_elements, master_element)
-    end
-
-    return master_elements
-end
-
 function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::Problem{Mortar},
                                         slave_element::Element{E}, time::Real)
-    field_dim = problem.dimension
-    field_name = problem.parent_field_name
+    haskey(slave_element, "master elements") || return
+    field_dim = get_unknown_field_dimension(problem)
+    field_name = get_parent_field_name(problem)
     slave_dofs = get_gdofs(slave_element, field_dim)
-#   info("Slave dofs: $slave_dofs")
-#   info("Field dim: $field_dim")
 
     # create auxiliary plane and project slave nodes to it
     # x0 = origo, Q = local basis
     x0, Q = create_auxiliary_plane(slave_element, time)
+
+    # 1. project slave nodes to auxiliary plane
     Sl = Vector{Float64}[]
     for p in slave_element("geometry", time)
         push!(Sl, project_point_to_auxiliary_plane(p, x0, Q))
     end
-
-    #=
-    Sl = reverse(Sl)
-    slave_dofs = reverse(slave_dofs)
-    =#
-
-    @debug begin
-        info("auxiliary plane coords and basis: origo = $x0")
-        info("basis:")
-        dump(round(Q, 3))
-    end
-    #S = reshape([S...;], 2, size(slave_element)[2])
     S = hcat(Sl...)
-    slave_geom = Field(Vector{Float64}[S[:,j] for j=1:size(S,2)])
 
     for master_element in slave_element["master elements"]
         master_dofs = get_gdofs(master_element, field_dim)
-        # project master nodes to auxiliary plane and create polygon clipping
+
+        # 2. project master nodes to auxiliary plane
         M = Vector{Float64}[]
         for p in master_element("geometry", time)
             push!(M, project_point_to_auxiliary_plane(p, x0, Q))
         end
-        #M = reshape([M...;], 2, size(master_element)[2])
         M = hcat(M...)
-        master_geom = Field(Vector{Float64}[M[:,j] for j=1:size(M,2)])
 
+        # 3. create polygon clipping on auxiliary plane
         P = nothing
         neighbours = nothing
-        @debug begin
-            info("applying polygon clip algorithm, S & M = ")
-            dump(round(S, 3))
-            dump(round(M, 3))
-        end
-
         try
             P, neighbours = clip_polygon(S, M)
         catch
@@ -823,145 +782,72 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::Problem{Mor
             error("cannot continue")
         end
         isa(P, Void) && continue # no clipping
-        @debug begin
-            info("polygon coords on auxilyary plane: ")
-            dump(round(P, 3))
-        end
 
-        if size(P, 2) < 3
-            # shared edge but no shared volume. skipping
-            continue
-            info("this is not polygon at all.")
-            info("clipping S")
-            dump(S)
-            info("clipping M")
-            dump(M)
-            error("size(P, 2) < 3")
-        end
+        # shared edge but no shared volume. skipping
+        size(P, 2) < 3 && continue
+
         C = calculate_polygon_centerpoint(P)
         npts = size(P, 2) # number of vertices in polygon
 
-        @debug begin
-            info("clip polygon info")
-            theta = project_point_from_plane_to_surface(C, x0, Q, slave_element, time)
-            CC = slave_element("geometry", theta[2:3], time)
-            info("center point on slave: $CC")
-            info("number of vectices in polygon: $npts")
-            on_slave = zeros(3, 0)
-            on_master = zeros(3, 0)
-            for i=1:size(P, 2)
-                theta = project_point_from_plane_to_surface(P[:,i], x0, Q, slave_element, time)
-                on_slave = [on_slave slave_element("geometry", theta[2:3], time)]
-                theta = project_point_from_plane_to_surface(P[:,i], x0, Q, master_element, time)
-                on_master = [on_master master_element("geometry", theta[2:3], time)]
-            end
-            info("polygon coords projected to slave element")
-            dump(round(on_slave, 3))
-            info("polygon coords projected to master element")
-            dump(round(on_master, 3))
-        end
-
-        for i=1:npts # loop vertices and create temporary integrate cells
+        # loop vertices and create temporary integrate cells
+        # TODO: basically when npts == 3 or npts == 4 we could integrate without splitting to cells.
+        for i=1:npts
             xvec = [C[1], P[1, i], P[1, mod(i, npts)+1]]
             yvec = [C[2], P[2, i], P[2, mod(i, npts)+1]]
             X = hcat(xvec, yvec)'
-
-            @debug begin
-                on_slave = zeros(3, 0)
-                on_master = zeros(3, 0)
-                for j=1:size(X, 2)
-                    theta = project_point_from_plane_to_surface(X[:,j], x0, Q, slave_element, time)
-                    on_slave = [on_slave slave_element("geometry", theta[2:3], time)]
-                    theta = project_point_from_plane_to_surface(X[:,j], x0, Q, master_element, time)
-                    on_master = [on_master master_element("geometry", theta[2:3], time)]
-                end
-                info("cell $i coords projected to slave element")
-                dump(round(on_slave, 3))
-                info("cell $i coords projected to master element")
-                dump(round(on_master, 3))
-            end
-
-            # integration cell geometry, i.e., Tri3
             cell = Field(Vector{Float64}[X[:,j] for j=1:size(X,2)])
-            # info("geom = $geom")
+
             for ip in get_integration_points(Tri3, Val{5})
                 # gauss point in auxiliary plane
                 #N = get_basis(E, ip.xi)
                 N = get_basis(Tri3, ip.xi)
                 xi = vec(N*cell)  # xi defined in auxilary plane
-                #xi = ip.xi
-                # info("x = $x")
+
                 # find projection of gauss point to master and slave elements
                 theta1 = project_point_from_plane_to_surface(xi, x0, Q, slave_element, time)
                 theta2 = project_point_from_plane_to_surface(xi, x0, Q, master_element, time)
                 xi_slave = theta1[2:3]
                 xi_master = theta2[2:3]
-                @debug begin
-                    X_slave = slave_element("geometry", xi_slave, time)
-                    X_master = master_element("geometry", xi_master, time)
-                    info("integration point on slave: $xi_slave => $X_slave")
-                    info("integration point on master: $xi_master => $X_master")
-                end
+
                 # evaluate shape functions values in gauss point and add contribution to matrices
                 N1 = slave_element(xi_slave, time)
-                #N1 = reshape(reverse(vec(N1)), size(N1))
                 N2 = master_element(xi_master, time)
 
-                # calculate determiant of jacobian
+                # jacobian determinant on integration cell
                 dNC = get_dbasis(Tri3, ip.xi)
-                dNS = get_dbasis(Quad4, xi_slave)
-                dNM = get_dbasis(Quad4, xi_master)
                 JC = sum([kron(dNC[:,j], cell[j]') for j=1:length(cell)])
-                JN = sum([kron(dNS[:,j], slave_geom[j]') for j=1:length(slave_geom)])
-                JM = sum([kron(dNM[:,j], master_geom[j]') for j=1:length(master_geom)])
-                wS = det(JN)
-                wM = det(JM)
-                wC = det(JC)
-                @debug info("weight S = $wS, weight M = $wM, weight C = $wC")
+                wC = ip.weight*det(JC)
 
-                Sm = ip.weight*N1'*N1*wC
-                Mm = ip.weight*N1'*N2*wC
+                # extend matrices according to the problem dimension (3)
                 @assert length(slave_dofs) == length(master_dofs)
+                Sm = wC*N1'*N1
+                Mm = wC*N1'*N2
                 S3 = zeros(length(slave_dofs), length(slave_dofs))
                 M3 = zeros(length(master_dofs), length(master_dofs))
-                Q = slave_element("normal-tangential coordinates", xi_slave, time)
-                Z = zeros(3, 3)
-                Q3 = [Q Z Z Z; Z Q Z Z; Z Z Q Z; Z Z Z Q]
-                #info("N1 = $N1")
-                #info("N2 = $N2")
-                #info("size S3 = $(size(S3))")
-                #info("size M3 = $(size(M3))")
-                #info("size Sm = $(size(Sm))")
-                #info("size Mm = $(size(Mm))")
                 for k=1:field_dim                  
                     S3[k:field_dim:end,k:field_dim:end] += Sm
                     M3[k:field_dim:end,k:field_dim:end] += Mm
                 end
+
+                # add contributions to C1
                 add!(assembly.C1, slave_dofs, slave_dofs, S3)
                 add!(assembly.C1, slave_dofs, master_dofs, -M3)
-                S3 = Q3'*S3
-                M3 = Q3'*M3
-                add!(assembly.C2, slave_dofs, slave_dofs, S3)
-                add!(assembly.C2, slave_dofs, master_dofs, -M3)
+
+                # rotate and add contributions to C2
+                Q = slave_element("normal-tangential coordinates", xi_slave, time)
+                Z = zeros(3, 3)
+                Q3 = [Q Z Z Z; Z Q Z Z; Z Z Q Z; Z Z Z Q]
+                add!(assembly.C2, slave_dofs, slave_dofs, Q3'*S3)
+                add!(assembly.C2, slave_dofs, master_dofs, -Q3'*M3)
+
+                # calculate weighted gap
                 X1 = slave_element("geometry", xi_slave, time)
                 X2 = master_element("geometry", xi_master, time)
                 g = norm(X2-X1)
-                #T = transpose(get_jacobian(slave_element, xi_slave, time))
-                #W = ip.weight*
-                #info("hard gap = $g, wS = $wS, wM = $wM, wC = $wC")
-                gh = ip.weight*N1*g*wC
+                gh = wC*N1*g
                 add!(assembly.g, slave_dofs[1:field_dim:end], gh)
-                #for k=1:field_dim
-                #    sd = slave_dofs[k:field_dim:end]
-                #    md = master_dofs[k:field_dim:end]
-                #    add!(assembly.C1, sd, sd, Sm)
-                #    add!(assembly.C1, sd, md, -Mm)
-                #    add!(assembly.C2, sd, sd, Sm)
-                #    add!(assembly.C2, sd, md, -Mm)
-                #end
             end
-#           info("breaking on first")
-#           break
         end
     end
 end
+
