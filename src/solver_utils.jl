@@ -131,7 +131,23 @@ function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2
         end
     end
 
-    actions = [action1, action2]
+    function action3(node_id, dofs)
+        """ Another option is to obey single point constraints
+        """
+        dofs_ = intersect(dofs, all_dofs)
+        any(has_lagrange_coefficients(dofs_)) && return dofs_, false
+        if !is_spc(C2, dofs_) && is_spc(C2_, dofs_)
+            C1[dofs_,:] = C2[dofs_,:] = g[dofs_,:] = 0
+            return dofs_, true
+        elseif !is_spc(C2_, dofs_) && is_spc(C2, dofs_)
+            C1_[dofs_,:] = C2_[dofs_,:] = g_[dofs_,:] = 0
+            return dofs_, true
+        else
+            return dofs_, false
+        end
+    end
+
+    actions = [action1, action3]
 
     function show_lambda_coefficients(dofs, C1)
         for dof in dofs

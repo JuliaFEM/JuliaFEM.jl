@@ -1,9 +1,36 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM
-
 using HDF5
+using JuliaFEM
+using JuliaFEM.Core: Element, Quad4, Tri3, Seg2, Hex8, update!
+
+
+# TODO: this should be elsewhere
+function aster_create_elements(mesh, element_set, element_type=nothing)
+    elements = Element[]
+    mapping = Dict(:QU4 => Quad4, :TR3 => Tri3, :SE2 => Seg2, :HE8 => Hex8)
+    for (elid, (eltype, elset, elcon)) in mesh["connectivity"]
+        if !haskey(mapping, eltype)
+            error("aster_create_elements: unknown element mapping $eltype")
+        end
+        elset == element_set || continue
+        if !isa(element_type, Void)
+            if isa(element_type, Tuple)
+                if !(eltype in element_type)
+                    continue
+                end
+            elseif eltype != element_type
+                continue
+            end
+        end
+        element = mapping[eltype](elcon)
+        push!(elements, element)
+    end
+    update!(elements, "geometry", mesh["nodes"])
+    return elements
+end
+
 
 function aster_parse_nodes(section::ASCIIString; strip_characters=true)
     nodes = Dict{Any, Vector{Float64}}()
@@ -70,6 +97,26 @@ function aster_renumber_nodes_!(mesh, node_numbering)
     end
 end
 
+function aster_renumber_nodes(mesh)
+    nodemap = Dict{Int64,Int64}()
+    for (i, nid) in enumerate(keys(mesh["nodes"]))
+        nodemap[nid] = i
+    end
+    new_nodes = Dict{Int64, Vector{Float64}}()
+    for (nid, ncoords) in mesh["nodes"]
+        new_nodes[nodemap[nid]] = ncoords
+    end
+    function change_node_ids(old_ids::Vector{Int64})
+        return Int[nodemap[nid] for nid in old_ids]
+    end
+    new_elements = Dict{Int64, Tuple{Symbol, Symbol, Vector{Int64}}}()
+    for (elid, (eltype, elset, elcon)) in mesh["connectivity"]
+        new_elements[elid] = (eltype, elset, change_node_ids(elcon))
+    end
+    mesh["nodes"] = new_nodes
+    mesh["elements"] = new_elements
+    return mesh
+end
 
 function aster_renumber_nodes!(mesh1, mesh2)
 
