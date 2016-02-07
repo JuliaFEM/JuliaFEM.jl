@@ -643,13 +643,13 @@ end
 # Mortar assembly 2d
 
 type Mortar <: BoundaryProblem
-    formulation :: Symbol
-    basis :: Symbol
-    tangent_condition :: Symbol
+    formulation :: Symbol # Dual or Standard
+    normal_condition :: Symbol # Tie or Contact
+    tangent_condition :: Symbol # Stick or Slip
 end
 
 function Mortar()
-    Mortar(:Equality, :Dual, :Stick)
+    Mortar(:Dual, :Tie, :Stick)
 end
 
 function get_unknown_field_name(::Type{Mortar})
@@ -663,6 +663,12 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
 
     # slave element must have a set of master elements
     haskey(slave_element, "master elements") || return
+
+    # standard formulation for contact is not working at the moment
+    props = problem.properties
+    if props.formulation == :Standard && props.normal_condition == :Contact
+        error("for contact choose Dual formulation.""")
+    end
 
     # get dimension and name of PARENT field
     field_dim = problem.dimension
@@ -678,11 +684,12 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         l = 1/2*(xi1[2]-xi1[1])
         abs(l) > 1.0e-9 || continue # no contribution
 
-        Ae = eye(2)
-        if problem.properties.basis == :Dual # Construct dual basis
-            nnodes = size(slave_element, 2)
-            De = zeros(nnodes, nnodes)
-            Me = zeros(nnodes, nnodes)
+        # Calculate slave side projection matrix D
+        nnodes = size(slave_element, 2)
+        Ae = zeros(nnodes, nnodes)
+        De = zeros(nnodes, nnodes)
+        Me = zeros(nnodes, nnodes)
+        if problem.properties.formulation == :Dual # Construct dual basis
             for ip in get_integration_points(slave_element, Val{5})
                 J = get_jacobian(slave_element, ip, time)
                 w = ip.weight*norm(J)*l
@@ -692,114 +699,90 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
                 Me += w*N'*N
             end
             Ae = De*inv(Me)
+        else
+            for ip in get_integration_points(slave_element, Val{5})
+                J = get_jacobian(slave_element, ip, time)
+                w = ip.weight*norm(J)*l
+                xi = 1/2*(1-ip.xi)*xi1[1] + 1/2*(1+ip.xi)*xi1[2]
+                N = slave_element(xi, time)
+                De += w*N'*N
+            end
+            Ae = eye(nnodes)
         end
 
+        C1S2 = zeros(4, 4)
+        C1M2 = zeros(4, 4)
+
+        # Slave side already done; it's De
+        for i=1:field_dim
+            C1S2[i:field_dim:end,i:field_dim:end] += De
+        end
+
+        # Calculate master side projection matrix M
         for ip in get_integration_points(slave_element, Val{5})
             J = get_jacobian(slave_element, ip, time)
             w = ip.weight*norm(J)*l
-
             # integration point on slave side segment
-            xi_gauss = 1/2*(1-ip.xi)*xi1[1] + 1/2*(1+ip.xi)*xi1[2]
-            # projected integration point
-            xi_projected = project_from_slave_to_master(slave_element, master_element, xi_gauss)
-
-            N1 = slave_element(xi_gauss, time)
-            Phi = (Ae*N1')'
-            N2 = master_element(xi_projected, time)
-
-            S = w*kron(Phi', N1)
-            M = w*kron(Phi', N2)
-
-            X1 = slave_element("geometry", xi_gauss, time)
-            X2 = master_element("geometry", xi_projected, time)
-            x1 = copy(X1)
-            x2 = copy(X2)
-            if haskey(slave_element, "displacement")
-                u1 = slave_element("displacement", xi_gauss, time)
-                x1 = x1 + u1
-            end
-            if haskey(master_element, "displacement")
-                u2 = master_element("displacement", xi_projected, time)
-                x2 = x2 + u2
-            end
-
-            Q = slave_element("normal-tangential coordinates", xi_gauss, time)
-            n = Q[:,1]
-            Gn = -dot(n, X1-X2)
-            Gh = vec(w*Phi*Gn)
-            gn = -dot(n, x1-x2)
-            gh = vec(w*Phi*gn)
-
-            c = zeros(2)
-            if haskey(slave_element, "reaction force")
-                la = slave_element("reaction force", xi_gauss, time)
-                lan = dot(n, la)
-                c = vec(w*Phi*(lan - gn))
-                add!(assembly.c, slave_dofs[1:field_dim:end], c)
-            end
-
-            S2 = zeros(4, 4)
-            M2 = zeros(4, 4)
+            xi_slave = 1/2*(1-ip.xi)*xi1[1] + 1/2*(1+ip.xi)*xi1[2]
+            # projected integration point to master side element
+            xi_master = project_from_slave_to_master(slave_element, master_element, xi_slave)
+            N1 = slave_element(xi_slave, time)
+            N2 = master_element(xi_master, time)
+            M = w*kron(Ae*N1', N2)
             for i=1:field_dim
-                S2[i:field_dim:end,i:field_dim:end] += S
-                M2[i:field_dim:end,i:field_dim:end] += M
+                C1M2[i:field_dim:end,i:field_dim:end] += M
             end
-
-            if problem.properties.formulation == :Contact
-                inactive_nodes = find(c .<= 0)
-                for j in inactive_nodes
-                    dofs = [2*(j-1)+1, 2*(j-1)+2]
-                    Gh[inactive_nodes] = 0
-                    S2[dofs,:] = 0
-                    M2[dofs,:] = 0
-                end
-            end
-
-            add!(assembly.g, slave_dofs[1:field_dim:end], Gh)
-            add!(assembly.C1, slave_dofs, slave_dofs, S2)
-            add!(assembly.C1, slave_dofs, master_dofs, -M2)
-
-            Z = zeros(2, 2)
-            Q2 = [Q Z; Z Q]
-            S2 = Q2'*S2
-            M2 = Q2'*M2
-
-            if problem.properties.tangent_condition == :Stick
-                add!(assembly.C2, slave_dofs, slave_dofs, S2)
-                add!(assembly.C2, slave_dofs, master_dofs, -M2)
-            elseif problem.properties.tangent_condition == :Slip
-                T2 = copy(S2)
-                T2[1:field_dim:end, :] = 0
-                S2[2:field_dim:end, :] = 0
-                M2[2:field_dim:end, :] = 0
-                add!(assembly.C2, slave_dofs, slave_dofs, S2)
-                add!(assembly.C2, slave_dofs, master_dofs, -M2)
-                add!(assembly.D, slave_dofs, slave_dofs, T2)
-            else
-                error("tangent condition: give :Stick or :Slip")
-            end
-
         end
 
-
-#= this is working too.
+        # Calculate normal-tangential constraints and initial weighted gap
         X1 = vec(slave_element("geometry", time))
         X2 = vec(master_element("geometry", time))
-        u1 = zeros(4)
-        u2 = zeros(4)
-        haskey(slave_element, "displacement") && (u1 = vec(slave_element("displacement", time)))
-        haskey(master_element, "displacement") && (u2 = vec(master_element("displacement", time)))
-        la = vec(slave_element("reaction force", time))
         Q_ = slave_element("normal-tangential coordinates", time)
         Z = zeros(2, 2)
         Q = [Q_[1] Z; Z Q_[2]]
+        D = zeros(4, 4)
+        C2S2 = Q'*C1S2
+        C2M2 = Q'*C1M2
+        G = -(C2S2*X1 - C2M2*X2)
+
+        # Calculate ``complementarity condition``
+        u1 = haskey(slave_element, "displacement") ? vec(slave_element("displacement", time)): zeros(4)
+        u2 = haskey(master_element, "displacement") ? vec(master_element("displacement", time)) : zeros(4)
+        la = haskey(slave_element, "reaction force") ? vec(slave_element("reaction force", time)) : zeros(4)
         x1 = X1 + u1
         x2 = X2 + u2
-        g_ = -Q'*(C1S2_*X1 - C1M2_*X2)
-        c_ = Q'*la + Q'*(C1S2_*x1 - C1M2_*x2)
-=#
+        g = -(C2S2*x1 - C2M2*x2)
+        c = Q'*la - g
 
+        # normal constraint: if contact, remove inactive nodes
+        if problem.properties.normal_condition == :Contact
+            inactive_nodes = find(c[1:field_dim:end] .<= 0)
+            for j in inactive_nodes
+                dofs = [2*(j-1)+1, 2*(j-1)+2]
+                G[dofs] = 0
+                C1S2[dofs,:] = 0
+                C1M2[dofs,:] = 0
+                C2S2[dofs,:] = 0
+                C2M2[dofs,:] = 0
+            end
+        end
+        
+        # tangential constraint: stick or slip
+        if problem.properties.tangent_condition == :Slip
+            D = copy(C2S2)
+            D[1:field_dim:end, :] = 0
+            C2S2[2:field_dim:end, :] = 0
+            C2M2[2:field_dim:end, :] = 0
+        end
 
+        # Add contributions
+        add!(assembly.C1, slave_dofs, slave_dofs, C1S2)
+        add!(assembly.C1, slave_dofs, master_dofs, -C1M2)
+        add!(assembly.C2, slave_dofs, slave_dofs, C2S2)
+        add!(assembly.C2, slave_dofs, master_dofs, -C2M2)
+        add!(assembly.D, slave_dofs, slave_dofs, D)
+        add!(assembly.c, slave_dofs, c)
+        add!(assembly.g, slave_dofs, G)
     end
 end
 
