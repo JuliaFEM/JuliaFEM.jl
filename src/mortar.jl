@@ -14,17 +14,14 @@ end
 master element corresponding to the xi1.
 """
 function project_from_slave_to_master{S,M}(slave::Element{S}, master::Element{M}, xi1::Vector, time::Float64=0.0; max_iterations=5, tol=1.0e-9)
-#   slave_basis = get_basis(slave)
 
     # slave side geometry and normal direction at xi1
     X1 = slave("geometry", xi1, time)
     N1 = slave("normal-tangential coordinates", xi1, time)[:,1]
 
     # master side geometry at xi2
-    #master_basis = master.basis.data.basis
-    #master_dbasis = master.basis.data.dbasis
-    master_basis(xi) = get_basis(M, [xi])
-    master_dbasis(xi) = get_dbasis(M, [xi])
+    master_basis(xi2) = get_basis(M, [xi2])
+    master_dbasis(xi2) = get_dbasis(M, [xi2])
     master_geometry = master("geometry")(time)
 
     function X2(xi2)
@@ -37,16 +34,11 @@ function project_from_slave_to_master{S,M}(slave::Element{S}, master::Element{M}
         return sum([dN[i]*master_geometry[i] for i=1:length(dN)])
     end
 
-#    master_basis = get_basis(master)
-#    X2(xi2) = master_basis("geometry", [xi2], time)
-#    dX2(xi2) = dmaster_basis("geometry", xi2, time)
-
     # equation to solve
     R(xi2) = det([X2(xi2)-X1  N1]')
     dR(xi2) = det([dX2(xi2) N1]')
-#   dR = ForwardDiff.derivative(R)
 
-    # go!
+    # solve using Newton iterations
     xi2 = 0.0
     for i=1:max_iterations
         dxi2 = -R(xi2) / dR(xi2)
@@ -55,6 +47,11 @@ function project_from_slave_to_master{S,M}(slave::Element{S}, master::Element{M}
             return Float64[xi2]
         end
     end
+
+    println("slave element geometry")
+    dump(slave("geometry", time).data)
+    println("master element geometry")
+    dump(master("geometry", time).data)
     error("find projection from slave to master: did not converge")
 end
 
@@ -128,6 +125,11 @@ function project_from_master_to_slave{S,M}(slave::Element{S}, master::Element{M}
             return Float64[xi1]
         end
     end
+
+    println("slave element geometry")
+    dump(slave("geometry", time).data)
+    println("master element geometry")
+    dump(master("geometry", time).data)
     error("find projection from master to slave: did not converge")
 end
 
@@ -642,21 +644,42 @@ end
 # abstract MortarProblem{T} <: AbstractProblem
 # Mortar assembly 2d
 
+"""
+Currently two strategies exists:
+
+a) Remove inactive inequality constraints in element level. This is done in
+   assemble! if normal_condition is set to :Contact. For some reason this
+   leads to convergence issues.
+b) Remove inactive inequality constraints in assembly level. This is done in
+   posthook algorithm if inequality_constraints is set to true. This gives
+   more robust behavior.
+
+   Either use inequality_constraints=True OR :Contact + :Slip, but do not mix.
+
+   minimum_distance can be used to roughly skip integration of mortar
+   projections for elements that are "far enough" from each other. Increases
+   performance.
+
+"""
 type Mortar <: BoundaryProblem
     formulation :: Symbol # Dual or Standard
+    inequality_constraints :: Bool # Launch PDASS to solve inequality constraints
     normal_condition :: Symbol # Tie or Contact
-    tangent_condition :: Symbol # Stick or Slip
+    tangential_condition :: Symbol # Stick or Slip
+    minimum_distance :: Float64 # don't check for a contact if elements are far enough
+    store_debug_info :: Bool # for making debugging easier
 end
 
 function Mortar()
-    Mortar(:Dual, :Tie, :Stick)
+    Mortar(:Dual, false, :Tie, :Stick, Inf, false)
 end
 
 function get_unknown_field_name(::Type{Mortar})
     return "reaction force"
 end
 
-typealias MortarElements2D Union{Seg2, Seg3}
+# quadratic not tested yet
+typealias MortarElements2D Union{Seg2}
 
 function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mortar},
                                         slave_element::Element{E}, time::Real)
@@ -677,12 +700,22 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
     slave_dofs = get_gdofs(slave_element, field_dim)
 
     for master_element in slave_element["master elements"]
+
+        # if distance between elements is "far enough" cannot expect contact
+        if (props.normal_condition == :Contact) || props.inequality_constraints
+            slave_midpoint = slave_element("geometry", [0.0], time)
+            master_midpoint = master_element("geometry", [0.0], time)
+            if norm(slave_midpoint - master_midpoint) > props.minimum_distance
+                continue
+            end
+        end
+
         master_dofs = get_gdofs(master_element, field_dim)
         xi1a = project_from_master_to_slave(slave_element, master_element, [-1.0])
         xi1b = project_from_master_to_slave(slave_element, master_element, [ 1.0])
         xi1 = clamp([xi1a xi1b], -1.0, 1.0)
-        l = 1/2*(xi1[2]-xi1[1])
-        abs(l) > 1.0e-9 || continue # no contribution
+        l = 1/2*abs(xi1[2]-xi1[1])
+        l > 1.0e-9 || continue # no contribution
 
         # Calculate slave side projection matrix D
         nnodes = size(slave_element, 2)
@@ -710,8 +743,8 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
             Ae = eye(nnodes)
         end
 
-        C1S2 = zeros(4, 4)
-        C1M2 = zeros(4, 4)
+        C1S2 = zeros(2*nnodes, 2*nnodes)
+        C1M2 = zeros(2*nnodes, 2*nnodes)
 
         # Slave side already done; it's De
         for i=1:field_dim
@@ -737,26 +770,49 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         # Calculate normal-tangential constraints and initial weighted gap
         X1 = vec(slave_element("geometry", time))
         X2 = vec(master_element("geometry", time))
-        Q_ = slave_element("normal-tangential coordinates", time)
-        Z = zeros(2, 2)
-        Q = [Q_[1] Z; Z Q_[2]]
-        D = zeros(4, 4)
-        C2S2 = Q'*C1S2
-        C2M2 = Q'*C1M2
+        Q = slave_element("normal-tangential coordinates", time)
+        Z = zeros(nnodes, nnodes)
+        if nnodes == 2
+            Q2 = [Q[1] Z; Z Q[2]]
+        elseif nnodes == 3
+            Q2 = [Q[1] Z Z; Z Q[2] Z; Z Z Q[3]]
+        end
+        D2 = zeros(2*nnodes, 2*nnodes)
+        C2S2 = Q2'*C1S2
+        C2M2 = Q2'*C1M2
         G = -(C2S2*X1 - C2M2*X2)
 
-        # Calculate ``complementarity condition``
-        u1 = haskey(slave_element, "displacement") ? vec(slave_element("displacement", time)): zeros(4)
-        u2 = haskey(master_element, "displacement") ? vec(master_element("displacement", time)) : zeros(4)
-        la = haskey(slave_element, "reaction force") ? vec(slave_element("reaction force", time)) : zeros(4)
+        # Calculate weighted gap in deformed configuration
+        if haskey(slave_element, "displacement")
+            u1 = vec(slave_element("displacement", time))
+        else
+            u1 = zeros(2*nnodes)
+        end
+        if haskey(master_element, "displacement")
+            u2 = vec(master_element("displacement", time))
+        else
+            u2 = zeros(2*nnodes)
+        end
         x1 = X1 + u1
         x2 = X2 + u2
         g = -(C2S2*x1 - C2M2*x2)
-        c = Q'*la - g
+
+        # Calculate "complementarity condition"
+        if  haskey(slave_element, "reaction force")
+            la = vec(slave_element("reaction force", time))
+        else
+            la = zeros(2*nnodes)
+        end
+        c = Q2'*la - g
+        active_nodes = find(c[1:field_dim:end] .> 0)
+        inactive_nodes = find(c[1:field_dim:end] .<= 0)
 
         # normal constraint: if contact, remove inactive nodes
         if problem.properties.normal_condition == :Contact
-            inactive_nodes = find(c[1:field_dim:end] .<= 0)
+            if length(active_nodes) == 0
+                # all nodes inactive, nothing to contribute
+                return
+            end
             for j in inactive_nodes
                 dofs = [2*(j-1)+1, 2*(j-1)+2]
                 G[dofs] = 0
@@ -768,9 +824,9 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         end
         
         # tangential constraint: stick or slip
-        if problem.properties.tangent_condition == :Slip
-            D = copy(C2S2)
-            D[1:field_dim:end, :] = 0
+        if problem.properties.tangential_condition == :Slip
+            D2 = copy(C2S2)
+            D2[1:field_dim:end, :] = 0
             C2S2[2:field_dim:end, :] = 0
             C2M2[2:field_dim:end, :] = 0
         end
@@ -780,10 +836,23 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         add!(assembly.C1, slave_dofs, master_dofs, -C1M2)
         add!(assembly.C2, slave_dofs, slave_dofs, C2S2)
         add!(assembly.C2, slave_dofs, master_dofs, -C2M2)
-        add!(assembly.D, slave_dofs, slave_dofs, D)
+        add!(assembly.D, slave_dofs, slave_dofs, D2)
         add!(assembly.c, slave_dofs, c)
         add!(assembly.g, slave_dofs, G)
+
+        if props.store_debug_info
+            slave_element["G"] = G
+            slave_element["g"] = g
+            slave_element["c"] = c
+            slave_element["C1S2"] = C1S2
+            slave_element["C1M2"] = C1M2
+            slave_element["C2S2"] = C2S2
+            slave_element["C2M2"] = C2M2
+            slave_element["D2"] = D2
+            slave_element["active nodes"] = active_nodes
+        end
     end
+
 end
 
 typealias MortarElements3D Union{Tri3, Quad4}
@@ -794,6 +863,11 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::Problem{Mor
     field_dim = get_unknown_field_dimension(problem)
     field_name = get_parent_field_name(problem)
     slave_dofs = get_gdofs(slave_element, field_dim)
+
+    props = problem.properties
+    if props.formulation == :Standard && props.normal_condition == :Contact
+        error("for contact choose Dual formulation.""")
+    end
 
     # create auxiliary plane and project slave nodes to it
     # x0 = origo, Q = local basis
@@ -807,6 +881,16 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::Problem{Mor
     S = hcat(Sl...)
 
     for master_element in slave_element["master elements"]
+
+        # if distance between elements is "far enough" cannot expect contact
+        if (props.normal_condition == :Contact) || props.inequality_constraints
+            slave_midpoint = slave_element("geometry", [0.0, 0.0], time)
+            master_midpoint = master_element("geometry", [0.0, 0.0], time)
+            if norm(slave_midpoint - master_midpoint) > props.minimum_distance
+                continue
+            end
+        end
+
         master_dofs = get_gdofs(master_element, field_dim)
 
         # 2. project master nodes to auxiliary plane
@@ -841,18 +925,19 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::Problem{Mor
 
         # loop vertices and create temporary integrate cells
         # TODO: basically when npts == 3 or npts == 4 we could integrate without splitting to cells.
-        for i=1:npts
-            xvec = [C[1], P[1, i], P[1, mod(i, npts)+1]]
-            yvec = [C[2], P[2, i], P[2, mod(i, npts)+1]]
-            X = hcat(xvec, yvec)'
-            cell = Field(Vector{Float64}[X[:,j] for j=1:size(X,2)])
+        nnodes = size(slave_element, 2)
+        C1S3 = zeros(3*nnodes, 3*nnodes)
+        C1M3 = zeros(3*nnodes, 3*nnodes)
 
+        for pnt=1:npts # integration of mortar matrices begin
+            cell = Field(Vector{Float64}[C, P[:,pnt], P[:,mod(pnt,npts)+1]])
+
+            # calculate slave side projection matrix D
             # construct dual basis
-            Ae = eye(4)
-            if problem.properties.basis == :Dual # Construct dual basis
-                nnodes = size(slave_element, 2)
-                De = zeros(nnodes, nnodes)
-                Me = zeros(nnodes, nnodes)
+            Ae = zeros(nnodes, nnodes)
+            De = zeros(nnodes, nnodes)
+            Me = zeros(nnodes, nnodes)
+            if problem.properties.formulation == :Dual # Construct dual basis
                 for ip in get_integration_points(Tri3, Val{5})
                     N = get_basis(Tri3, ip.xi)
                     xi = vec(N*cell)
@@ -868,7 +953,11 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::Problem{Mor
                 end
                 Ae = De*inv(Me)
             end
+            for i=1:field_dim
+                C1S3[i:field_dim:end,i:field_dim:end] += De
+            end
 
+            # Calculate master side projection matrix M
             for ip in get_integration_points(Tri3, Val{5})
                 # gauss point in auxiliary plane
                 #N = get_basis(E, ip.xi)
@@ -892,34 +981,128 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::Problem{Mor
 
                 # extend matrices according to the problem dimension (3)
                 @assert length(slave_dofs) == length(master_dofs)
-                Sm = wC*Ae*N1'*N1
-                Mm = wC*Ae*N1'*N2
-                S3 = zeros(length(slave_dofs), length(slave_dofs))
-                M3 = zeros(length(master_dofs), length(master_dofs))
+                Me = wC*Ae*N1'*N2
                 for k=1:field_dim                  
-                    S3[k:field_dim:end,k:field_dim:end] += Sm
-                    M3[k:field_dim:end,k:field_dim:end] += Mm
+                    C1M3[k:field_dim:end,k:field_dim:end] += Me
                 end
+            end
+        end  # integration of mortar matrices done.
+        
+        # constraints in normal-tangential direction and initial weighted gap
+        X1 = vec(slave_element("geometry", time))
+        X2 = vec(master_element("geometry", time))
+        Q_ = slave_element("normal-tangential coordinates", time)
+        Z = zeros(3, 3)
+        if nnodes == 3
+            Q3 = [Q Z Z; Z Q Z; Z Z Q]
+        elseif nnodes == 4
+            Q3 = [Q Z Z Z; Z Q Z Z; Z Z Q Z; Z Z Z Q]
+        end
+        D3 = zeros(3*nnodes, 3*nnodes)
+        C2S3 = Q3'*C1S3
+        C2M3 = Q3'*C1M3
+        G = -(C2S3*X1 - C2M3*X2)
 
-                # add contributions to C1
-                add!(assembly.C1, slave_dofs, slave_dofs, S3)
-                add!(assembly.C1, slave_dofs, master_dofs, -M3)
+        # complementarity condition
+        if haskey(slave_element, "displacement")
+            u1 = vec(slave_element("displacement", time))
+        else
+            u1 = zeros(3*nnodes)
+        end
+        if haskey(master_element, "displacement")
+            u2 = vec(master_element("displacement", time))
+        else
+            u2 = zeros(3*nnodes)
+        end
+        x1 = X1 + u1
+        x2 = X2 + u2
+        if  haskey(slave_element, "reaction force")
+            la = vec(slave_element("reaction force", time))
+        else
+            la = zeros(3*nnodes)
+        end
+        g = -(C2S3*x1 - C2M3*x2)
+        c = Q3'*la - g
+        inactive_nodes = find(c[1:field_dim:end] .<= 0)
+        active_nodes = find(c[1:field_dim:end] .> 0)
 
-                # rotate and add contributions to C2
-                Q = slave_element("normal-tangential coordinates", xi_slave, time)
-                Z = zeros(3, 3)
-                Q3 = [Q Z Z Z; Z Q Z Z; Z Z Q Z; Z Z Z Q]
-                add!(assembly.C2, slave_dofs, slave_dofs, Q3'*S3)
-                add!(assembly.C2, slave_dofs, master_dofs, -Q3'*M3)
-
-                # calculate weighted gap
-                X1 = slave_element("geometry", xi_slave, time)
-                X2 = master_element("geometry", xi_master, time)
-                g = norm(X2-X1)
-                gh = wC*(Ae*N1')'*g
-                add!(assembly.g, slave_dofs[1:field_dim:end], gh)
+        # normal constraint: remove inactive nodes if normal condition is set to contact
+        if problem.properties.normal_condition == :Contact
+            for j in inactive_nodes
+                dofs = [3*(j-1)+1, 3*(j-1)+2, 3*(j-1)+3]
+                G[dofs] = 0
+                C1S3[dofs,:] = 0
+                C1M3[dofs,:] = 0
+                C2S3[dofs,:] = 0
+                C2M3[dofs,:] = 0
             end
         end
+
+        # tangential constraint: stick or slip
+        if problem.properties.tangential_condition == :Slip
+            D3 = copy(C2S3)
+            D3[1:field_dim:end, :] = 0
+            C2S3[2:field_dim:end, :] = 0
+            C2M3[2:field_dim:end, :] = 0
+            C2S3[3:field_dim:end, :] = 0
+            C2M3[3:field_dim:end, :] = 0
+        end
+
+        # add contributions
+        add!(assembly.C1, slave_dofs, slave_dofs, C1S3)
+        add!(assembly.C1, slave_dofs, master_dofs, -C1M3)
+        add!(assembly.C2, slave_dofs, slave_dofs, C2S3)
+        add!(assembly.C2, slave_dofs, master_dofs, -C2M3)
+        add!(assembly.D, slave_dofs, slave_dofs, D3)
+        add!(assembly.c, slave_dofs, c)
+        add!(assembly.g, slave_dofs, G)
     end
+end
+
+
+""" Remove inactive inequality constraints by using primal-dual active set strategy. """
+function boundary_assembly_posthook!(solver::Solver, problem::Problem{Mortar}, C1, C2, D, g)
+    problem.properties.inequality_constraints || return
+    info("PDASS: Starting primal-dual active set strategy to determine active constraints")
+    S = Set{Int64}()
+    for element in get_elements(problem)
+        haskey(element, "master elements") || continue
+        push!(S, get_connectivity(element)...)
+    end
+    S = sort(collect(S))
+    dim = get_unknown_field_dimension(problem)
+    ndofs = solver.ndofs
+    nnodes = round(Int, ndofs/dim)
+
+    c = reshape(full(problem.assembly.c, ndofs, 1), dim, nnodes)
+    A = find(c[1,:] .> 0)
+    A = intersect(A, S)
+    I = setdiff(S, A)
+
+    info("PDASS: contact nodes: $(sort(collect(S)))")
+    info("PDASS: active nodes: $(sort(collect(A)))")
+    info("PDASS: inactive nodes: $(sort(collect(I)))")
+
+    # remove any inactive nodes
+    for j in I
+        dofs = [dim*(j-1)+i for i=1:dim]
+        C1[dofs,:] = 0
+        C2[dofs,:] = 0
+        D[dofs,:] = 0
+        g[dofs,:] = 0
+    end
+
+    # handle tangential condition for active nodes
+    if problem.properties.tangential_condition == :Slip
+        for j in A
+            dofs = [dim*(j-1)+i for i=1:dim]
+            tangential_dofs = dofs[2:end]
+            D[tangential_dofs,dofs] = C2[tangential_dofs,dofs]
+            C2[tangential_dofs,:] = 0
+            g[tangential_dofs,:] = 0
+        end
+    end
+
+    return
 end
 
