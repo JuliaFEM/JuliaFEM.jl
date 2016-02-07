@@ -645,10 +645,11 @@ end
 type Mortar <: BoundaryProblem
     formulation :: Symbol
     basis :: Symbol
+    tangent_condition :: Symbol
 end
 
 function Mortar()
-    Mortar(:Equality, :Dual)
+    Mortar(:Equality, :Dual, :Stick)
 end
 
 function get_unknown_field_name(::Type{Mortar})
@@ -702,34 +703,15 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
             # projected integration point
             xi_projected = project_from_slave_to_master(slave_element, master_element, xi_gauss)
 
-            # add contribution
             N1 = slave_element(xi_gauss, time)
             Phi = (Ae*N1')'
             N2 = master_element(xi_projected, time)
 
-            Q = slave_element("normal-tangential coordinates", xi_gauss, time)
-            Z = zeros(2, 2)
-            Q2 = [Q Z; Z Q]
-
             S = w*kron(Phi', N1)
             M = w*kron(Phi', N2)
-            S2 = zeros(4, 4)
-            M2 = zeros(4, 4)
-            for i=1:field_dim
-                S2[i:field_dim:end,i:field_dim:end] += S
-                M2[i:field_dim:end,i:field_dim:end] += M
-            end
-
-            add!(assembly.C1, slave_dofs, slave_dofs, S2)
-            add!(assembly.C1, slave_dofs, master_dofs, -M2)
-            S2 = Q2'*S2
-            M2 = Q2'*M2
-            add!(assembly.C2, slave_dofs, slave_dofs, S2)
-            add!(assembly.C2, slave_dofs, master_dofs, -M2)
 
             X1 = slave_element("geometry", xi_gauss, time)
             X2 = master_element("geometry", xi_projected, time)
-
             x1 = copy(X1)
             x2 = copy(X2)
             if haskey(slave_element, "displacement")
@@ -737,25 +719,87 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
                 x1 = x1 + u1
             end
             if haskey(master_element, "displacement")
-                u2 = slave_element("displacement", xi_projected, time)
+                u2 = master_element("displacement", xi_projected, time)
                 x2 = x2 + u2
             end
 
+            Q = slave_element("normal-tangential coordinates", xi_gauss, time)
             n = Q[:,1]
             Gn = -dot(n, X1-X2)
-            Gh = w*Phi*Gn
+            Gh = vec(w*Phi*Gn)
+            gn = -dot(n, x1-x2)
+            gh = vec(w*Phi*gn)
+
+            c = zeros(2)
             if haskey(slave_element, "reaction force")
-                gn = -dot(n, x1-x2)
-                #gh = w*Phi*gn
                 la = slave_element("reaction force", xi_gauss, time)
                 lan = dot(n, la)
-                c = w*Phi*(-lan + gn)
-                #info("lambda(n) = $lan, wug(n) = $Gh, wdg(n) = $gh, c=$c")
-                #info("c: $c")
+                c = vec(w*Phi*(lan - gn))
                 add!(assembly.c, slave_dofs[1:field_dim:end], c)
             end
+
+            S2 = zeros(4, 4)
+            M2 = zeros(4, 4)
+            for i=1:field_dim
+                S2[i:field_dim:end,i:field_dim:end] += S
+                M2[i:field_dim:end,i:field_dim:end] += M
+            end
+
+            if problem.properties.formulation == :Contact
+                inactive_nodes = find(c .<= 0)
+                for j in inactive_nodes
+                    dofs = [2*(j-1)+1, 2*(j-1)+2]
+                    Gh[inactive_nodes] = 0
+                    S2[dofs,:] = 0
+                    M2[dofs,:] = 0
+                end
+            end
+
             add!(assembly.g, slave_dofs[1:field_dim:end], Gh)
+            add!(assembly.C1, slave_dofs, slave_dofs, S2)
+            add!(assembly.C1, slave_dofs, master_dofs, -M2)
+
+            Z = zeros(2, 2)
+            Q2 = [Q Z; Z Q]
+            S2 = Q2'*S2
+            M2 = Q2'*M2
+
+            if problem.properties.tangent_condition == :Stick
+                add!(assembly.C2, slave_dofs, slave_dofs, S2)
+                add!(assembly.C2, slave_dofs, master_dofs, -M2)
+            elseif problem.properties.tangent_condition == :Slip
+                T2 = copy(S2)
+                T2[1:field_dim:end, :] = 0
+                S2[2:field_dim:end, :] = 0
+                M2[2:field_dim:end, :] = 0
+                add!(assembly.C2, slave_dofs, slave_dofs, S2)
+                add!(assembly.C2, slave_dofs, master_dofs, -M2)
+                add!(assembly.D, slave_dofs, slave_dofs, T2)
+            else
+                error("tangent condition: give :Stick or :Slip")
+            end
+
         end
+
+
+#= this is working too.
+        X1 = vec(slave_element("geometry", time))
+        X2 = vec(master_element("geometry", time))
+        u1 = zeros(4)
+        u2 = zeros(4)
+        haskey(slave_element, "displacement") && (u1 = vec(slave_element("displacement", time)))
+        haskey(master_element, "displacement") && (u2 = vec(master_element("displacement", time)))
+        la = vec(slave_element("reaction force", time))
+        Q_ = slave_element("normal-tangential coordinates", time)
+        Z = zeros(2, 2)
+        Q = [Q_[1] Z; Z Q_[2]]
+        x1 = X1 + u1
+        x2 = X2 + u2
+        g_ = -Q'*(C1S2_*X1 - C1M2_*X2)
+        c_ = Q'*la + Q'*(C1S2_*x1 - C1M2_*x2)
+=#
+
+
     end
 end
 
