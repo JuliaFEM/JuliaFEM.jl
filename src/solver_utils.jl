@@ -91,7 +91,15 @@ function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2
     function is_spc(dofs::Vector{Int})
         return map(is_spc, dofs)
     end
-    
+
+    function has_anything(dof::Int)
+        countnz(C1[dof,:]) != 0 && return true
+        countnz(C2[dof,:]) != 0 && return true
+        countnz(D[dof,:]) != 0 && return true
+        countnz(g[dof,:]) != 0 && return true
+        return false
+    end
+
     """ Algorithm 1. Calculate rank of overdetermined system and do LSQ if
         rank(C) equals to number of unique dofs.
     """
@@ -147,7 +155,39 @@ function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2
         end
     end
 
-    actions = [action1, action3]
+    function action4(node_id, dofs)
+        """ If symmetry line, one possibility is to apply both conditions and
+        eliminate lagrange multiplier. """
+        dofs_ = intersect(dofs, all_dofs)
+        length(dofs_) != 1 && return dofs_, false
+        related_dofs = get_related_dofs(dofs_)
+        for j in related_dofs
+            has_anything(j) && continue
+            # copy one constaint to this dof
+            C1[j,:] = C1[dofs_,:]
+            C2[j,:] = C2[dofs_,:]
+            D[j,:] = D[dofs_,:]
+            g[j,:] = g[dofs_,:]
+            # make room for new constraint
+            C1[dofs_,:] = 0
+            C2[dofs_,:] = 0
+            D[dofs_,:] = 0
+            g[dofs_,:] = 0
+            dofs_ = [dofs_; j]
+            break
+        end
+        for j in related_dofs
+            has_anything(j) && continue
+            # set lagrange multiplier to 1
+            D[j,dofs_[1]] = 1.0
+            C1[j,dofs_[1]] = 1.0
+            dofs_ = [dofs_; j]
+            break
+        end
+        return dofs_, true
+    end
+
+    actions = [action1, action2]
 
     function show_lambda_coefficients(dofs, C1)
         for dof in dofs
@@ -232,7 +272,7 @@ function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2
             info("fixed: new setting is")
             show_rows_in_constraint_matrix(dofs, C2, D; show_status=false)
             show_rows_in_constraint_matrix(dofs, C2_, D_; show_status=false)
-            show_related_equations(dofs, C2, C2_, D, D_)
+            #show_related_equations(dofs, C2, C2_, D, D_)
             info()
             continue
         end
