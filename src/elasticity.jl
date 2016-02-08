@@ -26,12 +26,18 @@ function get_unknown_field_name(::Type{Elasticity})
 end
 
 function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::Element, time::Real)
-    return assemble!(assembly, problem, element, time, Val{problem.properties.formulation})
+    f = problem.properties.formulation
+    if f == :continuum
+        return assemble!(assembly, problem, element, time, Val{:continuum})
+    elseif (f == :plane_stress) || (f == :plane_strain)
+        return assemble!(assembly, problem, element, time, Val{:plane})
+    end
 end
 
 """ Elasticity equations, plane stress formulation. """
-function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::Element, time::Real, ::Type{Val{:plane_stress}})
+function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::Element, time::Real, ::Type{Val{:plane}})
 
+    props = problem.properties
     gdofs = get_gdofs(problem, element)
     ndim, nnodes = size(element)
     B = zeros(3, 2*nnodes)
@@ -42,10 +48,20 @@ function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::El
         if haskey(element, "youngs modulus") && haskey(element, "poissons ratio")
             nu = element("poissons ratio", ip, time)
             E_ = element("youngs modulus", ip, time)
-            C = E_/(1.0 - nu^2) .* [
-                1.0  nu 0.0
-                nu  1.0 0.0
-                0.0 0.0 (1.0-nu)/2.0]
+            # Zienkiewicz, p. 91
+            if props.formulation == :plane_stress
+                C = E_/(1.0 - nu^2) .* [
+                    1.0  nu 0.0
+                    nu  1.0 0.0
+                    0.0 0.0 (1.0-nu)/2.0]
+            elseif props.formulation == :plane_strain
+                C = E_/((1+nu)*(1-2*nu)) .* [
+                    1-nu   nu 0
+                    nu   1-nu 0
+                    0    0    (1-2*nu)/2]
+            else
+                error("unknown plane formulation: $(props.formulation)")
+            end
             dN = element(ip, time, Val{:grad})
             fill!(B, 0.0)
             for i=1:size(dN, 2)
