@@ -668,10 +668,15 @@ type Mortar <: BoundaryProblem
     tangential_condition :: Symbol # Stick or Slip
     minimum_distance :: Float64 # don't check for a contact if elements are far enough
     store_debug_info :: Bool # for making debugging easier
+    always_in_contact :: Vector{Int64} # nodes in this list always in contact
+    always_in_stick :: Vector{Int64} # nodes in this list always in stick
+    always_in_slip :: Vector{Int64} # nodes in this list always in slip
+    contact :: Bool
+    friction :: Bool
 end
 
 function Mortar()
-    Mortar(:Dual, false, :Tie, :Stick, Inf, false)
+    Mortar(:Dual, false, :Tie, :Stick, Inf, false, [], [], [], false, false)
 end
 
 function get_unknown_field_name(::Type{Mortar})
@@ -699,6 +704,15 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
 
     slave_dofs = get_gdofs(slave_element, field_dim)
 
+    local_assembly = Assembly()
+
+    nnodes = size(slave_element, 2)
+    c = zeros(2*nnodes)
+    u = zeros(2*nnodes)
+    u1 = zeros(2*nnodes)
+    u2 = zeros(2*nnodes)
+    la = zeros(2*nnodes)
+
     for master_element in slave_element["master elements"]
 
         # if distance between elements is "far enough" cannot expect contact
@@ -715,10 +729,9 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         xi1b = project_from_master_to_slave(slave_element, master_element, [ 1.0])
         xi1 = clamp([xi1a xi1b], -1.0, 1.0)
         l = 1/2*abs(xi1[2]-xi1[1])
-        l > 1.0e-9 || continue # no contribution
+        isapprox(l, 0.0) && continue # no contribution
 
         # Calculate slave side projection matrix D
-        nnodes = size(slave_element, 2)
         Ae = zeros(nnodes, nnodes)
         De = zeros(nnodes, nnodes)
         Me = zeros(nnodes, nnodes)
@@ -767,7 +780,7 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
             end
         end
 
-        # Calculate normal-tangential constraints and initial weighted gap
+        # Calculate normal-tangential constraints
         X1 = vec(slave_element("geometry", time))
         X2 = vec(master_element("geometry", time))
         Q = slave_element("normal-tangential coordinates", time)
@@ -780,78 +793,132 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         D2 = zeros(2*nnodes, 2*nnodes)
         C2S2 = Q2'*C1S2
         C2M2 = Q2'*C1M2
+
+        # initial weighted gap
         G = -(C2S2*X1 - C2M2*X2)
 
-        # Calculate weighted gap in deformed configuration
         if haskey(slave_element, "displacement")
             u1 = vec(slave_element("displacement", time))
-        else
-            u1 = zeros(2*nnodes)
         end
         if haskey(master_element, "displacement")
             u2 = vec(master_element("displacement", time))
-        else
-            u2 = zeros(2*nnodes)
         end
-        x1 = X1 + u1
-        x2 = X2 + u2
-        g = -(C2S2*x1 - C2M2*x2)
+
+        # weighted gap change caused by deformation
+        u = -(C2S2*u1 - C2M2*u2)
+
+        # weighted gap in current configuration
+        #g = -(C2S2*x1 - C2M2*x2)
+        g = G + u
 
         # Calculate "complementarity condition"
-        if  haskey(slave_element, "reaction force")
+        if haskey(slave_element, "reaction force")
             la = vec(slave_element("reaction force", time))
-        else
-            la = zeros(2*nnodes)
         end
         c = Q2'*la - g
-        active_nodes = find(c[1:field_dim:end] .> 0)
-        inactive_nodes = find(c[1:field_dim:end] .<= 0)
-
-        # normal constraint: if contact, remove inactive nodes
-        if problem.properties.normal_condition == :Contact
-            if length(active_nodes) == 0
-                # all nodes inactive, nothing to contribute
-                return
-            end
-            for j in inactive_nodes
-                dofs = [2*(j-1)+1, 2*(j-1)+2]
-                G[dofs] = 0
-                C1S2[dofs,:] = 0
-                C1M2[dofs,:] = 0
-                C2S2[dofs,:] = 0
-                C2M2[dofs,:] = 0
-            end
-        end
-        
-        # tangential constraint: stick or slip
-        if problem.properties.tangential_condition == :Slip
-            D2 = copy(C2S2)
-            D2[1:field_dim:end, :] = 0
-            C2S2[2:field_dim:end, :] = 0
-            C2M2[2:field_dim:end, :] = 0
-        end
 
         # Add contributions
-        add!(assembly.C1, slave_dofs, slave_dofs, C1S2)
-        add!(assembly.C1, slave_dofs, master_dofs, -C1M2)
-        add!(assembly.C2, slave_dofs, slave_dofs, C2S2)
-        add!(assembly.C2, slave_dofs, master_dofs, -C2M2)
-        add!(assembly.D, slave_dofs, slave_dofs, D2)
-        add!(assembly.c, slave_dofs, c)
-        add!(assembly.g, slave_dofs, G)
+        add!(local_assembly.C1, slave_dofs, slave_dofs, C1S2)
+        add!(local_assembly.C1, slave_dofs, master_dofs, -C1M2)
+        add!(local_assembly.C2, slave_dofs, slave_dofs, C2S2)
+        add!(local_assembly.C2, slave_dofs, master_dofs, -C2M2)
+        add!(local_assembly.D, slave_dofs, slave_dofs, D2)
+        add!(local_assembly.c, slave_dofs, c)
+        add!(local_assembly.g, slave_dofs, G)
 
-        if props.store_debug_info
-            slave_element["G"] = G
-            slave_element["g"] = g
-            slave_element["c"] = c
-            slave_element["C1S2"] = C1S2
-            slave_element["C1M2"] = C1M2
-            slave_element["C2S2"] = C2S2
-            slave_element["C2M2"] = C2M2
-            slave_element["D2"] = D2
-            slave_element["active nodes"] = active_nodes
-        end
+    end # all master elements are done
+
+    # if only equality constraints, i.e., mesh tying problem, we're done for this element.
+    if !props.contact
+        append!(assembly, local_assembly)
+        return
     end
+
+    C1 = sparse(local_assembly.C1)
+    C2 = sparse(local_assembly.C2)
+    D = sparse(local_assembly.D)
+    g = sparse(local_assembly.g)
+    c = sparse(local_assembly.c)
+
+    # normal condition
+    cn = c[1:field_dim:end]
+    inactive_nodes = find(cn .<= 0)
+    active_nodes = find(cn .> 0)
+
+    # inactive element
+    if length(active_nodes) == 0
+        return
+    end
+
+    # normal constraint: remove inactive nodes
+    for j in inactive_nodes
+        if length(props.always_in_contact) != 0
+            j in props.always_in_contact && continue
+        end
+        dofs = [2*(j-1)+1, 2*(j-1)+2]
+        C1[dofs,:] = 0
+        C2[dofs,:] = 0
+        g[dofs] = 0
+    end
+
+    # frictionless contact
+    if !props.friction
+        for j in active_nodes
+            dofs = [2*(j-1)+1, 2*(j-1)+2]
+            D[dofs[2],dofs] = C2[dofs[2],dofs]
+            C2[dofs[2],:] = 0
+            g[dofs[2]] = 0
+        end
+        local_assembly.C1 = C1
+        local_assembly.C2 = C2
+        local_assembly.D = D
+        local_assembly.g = g
+        local_assembly.c = c
+        append!(assembly, local_assembly)
+        return
+    end
+
+    # frictional contact, see Gitterle2010
+    mu = 0.3
+    lat = la[2:field_dim:end]
+    ut = u[2:field_dim:end]
+    ct = lat + ut
+    println("cn, ct, lat")
+    println(cn)
+    println(ct)
+    println(lat)
+    println("full(cn)")
+    prinln(full(cn))
+    C = max(mu*cn, abs(ct))*lat - mu*max(0, cn)*ct
+    stick_nodes = find(abs(ct) - mu*cn .< 0)
+    slip_nodes = find(abs(ct) - mu*cn .>= 0)
+    stick_nodes = setdiff(stick_nodes, inactive_nodes)
+    slip_nodes = setdiff(slip_nodes, inactive_nodes)
+
+    for j in active_nodes
+         dofs = [2*(j-1)+1, 2*(j-1)+2]
+         D[dofs[2],dofs] = C2[dofs[2],dofs]
+         C2[dofs[2],:] = 0
+         g[dofs[2]] = C[dofs[2]]
+     end
+
+    if props.store_debug_info
+        slave_element["G"] = G
+        slave_element["g"] = g
+        slave_element["c"] = c
+        slave_element["C1"] = C1
+        slave_element["C2"] = C2
+        slave_element["D"] = D2
+        slave_element["active nodes"] = active_nodes
+    end
+
+    local_assembly.C1 = C1
+    local_assembly.C2 = C2
+    local_assembly.D = D
+    local_assembly.g = g
+    local_assembly.c = c
+
+    append!(assembly, local_assembly)
 
 end
 

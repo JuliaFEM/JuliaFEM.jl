@@ -27,6 +27,7 @@ function append!(assembly::Assembly, sub_assembly::Assembly)
     append!(assembly.C2, sub_assembly.C2)
     append!(assembly.D, sub_assembly.D)
     append!(assembly.g, sub_assembly.g)
+    append!(assembly.c, sub_assembly.c)
 end
 
 function assemble!(problem::Problem, time::Float64; empty_assembly::Bool=true)
