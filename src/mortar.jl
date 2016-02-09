@@ -703,22 +703,47 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
     field_name = problem.parent_field_name
 
     slave_dofs = get_gdofs(slave_element, field_dim)
+    nnodes = size(slave_element, 2)
+
+    # slave side quantities: rotation matrix, geometry, displacement, reaction force
+    Q = slave_element("normal-tangential coordinates", time)
+    Z = zeros(nnodes, nnodes)
+    if nnodes == 2
+        Q2 = [Q[1] Z; Z Q[2]]
+    elseif nnodes == 3
+        Q2 = [Q[1] Z Z; Z Q[2] Z; Z Z Q[3]]
+    end
+    X1 = vec(slave_element("geometry", time))
+    u1 = zeros(2*nnodes)
+    if haskey(slave_element, "displacement")
+        u1 = vec(slave_element("displacement", time))
+    end
+    x1 = X1 + u1
+    la = zeros(2*nnodes)
+    if haskey(slave_element, "reaction force")
+        la = vec(slave_element("reaction force", time))
+    end
+    la = Q2'*la
+    D2 = zeros(2*nnodes, 2*nnodes)
+
 
     local_assembly = Assembly()
 
-    nnodes = size(slave_element, 2)
-    c = zeros(2*nnodes)
-    u = zeros(2*nnodes)
-    u1 = zeros(2*nnodes)
-    u2 = zeros(2*nnodes)
-    la = zeros(2*nnodes)
-
     for master_element in slave_element["master elements"]
 
+        X2 = vec(master_element("geometry", time))
+        u2 = zeros(2*nnodes)
+        if haskey(master_element, "displacement")
+            u2 = vec(master_element("displacement", time))
+        end
+        x2 = X2 + u2
+
         # if distance between elements is "far enough" cannot expect contact
-        if (props.normal_condition == :Contact) || props.inequality_constraints
-            slave_midpoint = slave_element("geometry", [0.0], time)
-            master_midpoint = master_element("geometry", [0.0], time)
+        if props.contact && (props.minimum_distance < Inf)
+            #slave_midpoint = slave_element("geometry", [0.0], time)
+            #master_midpoint = master_element("geometry", [0.0], time)
+            slave_midpoint = Float64[mean(x1[1:field_dim:2]), mean(x1[2:field_dim:2])]
+            master_midpoint = Float64[mean(x2[1:field_dim:2]), mean(x2[2:field_dim:2])]
             if norm(slave_midpoint - master_midpoint) > props.minimum_distance
                 continue
             end
@@ -781,41 +806,15 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         end
 
         # Calculate normal-tangential constraints
-        X1 = vec(slave_element("geometry", time))
-        X2 = vec(master_element("geometry", time))
-        Q = slave_element("normal-tangential coordinates", time)
-        Z = zeros(nnodes, nnodes)
-        if nnodes == 2
-            Q2 = [Q[1] Z; Z Q[2]]
-        elseif nnodes == 3
-            Q2 = [Q[1] Z Z; Z Q[2] Z; Z Z Q[3]]
-        end
-        D2 = zeros(2*nnodes, 2*nnodes)
         C2S2 = Q2'*C1S2
         C2M2 = Q2'*C1M2
 
-        # initial weighted gap
+        # initial weighted gap (capital G for "undeformed")
         G = -(C2S2*X1 - C2M2*X2)
-
-        if haskey(slave_element, "displacement")
-            u1 = vec(slave_element("displacement", time))
-        end
-        if haskey(master_element, "displacement")
-            u2 = vec(master_element("displacement", time))
-        end
-
-        # weighted gap change caused by deformation
-        u = -(C2S2*u1 - C2M2*u2)
-
-        # weighted gap in current configuration
-        #g = -(C2S2*x1 - C2M2*x2)
-        g = G + u
-
-        # Calculate "complementarity condition"
-        if haskey(slave_element, "reaction force")
-            la = vec(slave_element("reaction force", time))
-        end
-        c = Q2'*la - g
+        # deformed weighted gap
+        g = -(C2S2*x1 - C2M2*x2)
+        # complementarity condition
+        c = la - g
 
         # Add contributions
         add!(local_assembly.C1, slave_dofs, slave_dofs, C1S2)
@@ -823,8 +822,8 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         add!(local_assembly.C2, slave_dofs, slave_dofs, C2S2)
         add!(local_assembly.C2, slave_dofs, master_dofs, -C2M2)
         add!(local_assembly.D, slave_dofs, slave_dofs, D2)
-        add!(local_assembly.c, slave_dofs, c)
         add!(local_assembly.g, slave_dofs, G)
+        add!(local_assembly.c, slave_dofs, c)
 
     end # all master elements are done
 
@@ -855,19 +854,19 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         if length(props.always_in_contact) != 0
             j in props.always_in_contact && continue
         end
-        dofs = [2*(j-1)+1, 2*(j-1)+2]
-        C1[dofs,:] = 0
-        C2[dofs,:] = 0
-        g[dofs] = 0
+        gdofs = [2*(j-1)+1, 2*(j-1)+2]
+        C1[gdofs,:] = 0
+        C2[gdofs,:] = 0
+        g[gdofs] = 0
     end
 
     # frictionless contact
     if !props.friction
         for j in active_nodes
-            dofs = [2*(j-1)+1, 2*(j-1)+2]
-            D[dofs[2],dofs] = C2[dofs[2],dofs]
-            C2[dofs[2],:] = 0
-            g[dofs[2]] = 0
+            gdofs = [2*(j-1)+1, 2*(j-1)+2]
+            D[gdofs[2],gdofs] = C2[gdofs[2],gdofs]
+            C2[gdofs[2],:] = 0
+            g[gdofs[2]] = 0
         end
         local_assembly.C1 = C1
         local_assembly.C2 = C2
@@ -883,23 +882,22 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
     lat = la[2:field_dim:end]
     ut = u[2:field_dim:end]
     ct = lat + ut
-    println("cn, ct, lat")
-    println(cn)
-    println(ct)
-    println(lat)
-    println("full(cn)")
-    prinln(full(cn))
-    C = max(mu*cn, abs(ct))*lat - mu*max(0, cn)*ct
+    #println("cn, ct, lat")
+    #println(cn)
+    #println(ct)
+    #println(lat)
+    C = max(mu*cn, abs(ct)).*lat - mu*max(0, cn).*ct
     stick_nodes = find(abs(ct) - mu*cn .< 0)
     slip_nodes = find(abs(ct) - mu*cn .>= 0)
     stick_nodes = setdiff(stick_nodes, inactive_nodes)
     slip_nodes = setdiff(slip_nodes, inactive_nodes)
 
-    for j in active_nodes
-         dofs = [2*(j-1)+1, 2*(j-1)+2]
-         D[dofs[2],dofs] = C2[dofs[2],dofs]
-         C2[dofs[2],:] = 0
-         g[dofs[2]] = C[dofs[2]]
+    for (i, j) in enumerate(node_ids[active_nodes])
+         ldofs = [2*(i-1)+1, 2*(i-1)+2]
+         gdofs = [2*(j-1)+1, 2*(j-1)+2]
+         D[gdofs[2],gdofs] = C2[gdofs[2],gdofs]
+         C2[gdofs[2],:] = 0
+         g[gdofs[2]] = C[i]
      end
 
     if props.store_debug_info
@@ -916,7 +914,7 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
     local_assembly.C2 = C2
     local_assembly.D = D
     local_assembly.g = g
-    local_assembly.c = c
+    #local_assembly.c = c
 
     append!(assembly, local_assembly)
 
