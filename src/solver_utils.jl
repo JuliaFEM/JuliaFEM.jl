@@ -48,6 +48,47 @@ end
 function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2, D_, D, g_, g)
     # old, new, old, new...
 
+#= herzian contact with symmetry boundary
+# INFO: SUMMARY for node id 555 with dofs 1109, 1110:
+# INFO: ----- Current constraint -----
+# INFO: lambda coefficients in C1 matrix are:
+# INFO: dof 1109: ⋯ + 0.15*λ₁₁₀₉ ⋯
+# INFO: rows in constraint matrix C2 & D
+# INFO: dof 1109: 0.15*u₁₁₀₉ = -0.0 <-- overconstrained dof
+# INFO: ----- New constraint -----
+# INFO: lambda coefficients in C1 matrix are:
+# INFO: dof 1109: ⋯ + 0.15*λ₁₁₀₉ ⋯
+# INFO: dof 1110: ⋯ + 0.15*λ₁₁₁₀ ⋯
+# INFO: rows in constraint matrix C2 & D
+# INFO: dof 1109: 0.0*u₁₅₃ - 0.0*u₁₅₄ - 0.0*u₁₅₅ + 0.15*u₁₅₆ + 0.0*u₁₁₀₉ - 0.15*u₁₁₁₀ = -0.0 <-- overconstrained dof
+# INFO: dof 1110: 0.15*λ₁₁₀₉ + 0.0*λ₁₁₁₀ = -0.0
+# INFO: ----- Related equations -----
+# INFO: dof 1110: 0.15*λ₁₁₀₉ + 0.0*λ₁₁₁₀ = -0.0
+# INFO: dof 155: 0.165*u₁₅₅ = 0.0
+# INFO: algorithm 1 solved issue? false
+# INFO: algorithm 2 solved issue? true
+# INFO: fixed: new setting is
+# INFO: dof 1109: 0.0*u₁₅₃ - 0.0*u₁₅₄ - 0.0*u₁₅₅ + 0.15*u₁₅₆ + 0.0*u₁₁₀₉ - 0.15*u₁₁₁₀ = -0.0
+
+    if 555 in nodes
+        info("overconstraint DIRTY HACK")
+        # It is possible to selectively remove mortar constraints and the associated
+        # Lagrange multiplier components in certain axis directions and replace them
+        # with the Dirichlet (symmetry) conditions.
+        # old configuration is dirichlet symmetry condition
+        # new configuration is mortar constraint
+        # 1. remove mortar constrains and associated Lagrange multiplier components
+        # in dof 1109, that is, x direction of node 555.
+        C1[1109,:] = 0
+        C2[1109,:] = 0
+        D[1109,:] = 0
+        g[1109,:] = 0
+#       D[1110,1110] = 0
+#       g[1110] = 0
+        return
+    end
+=#
+
     """ Return all other dofs which connects to overconstrained dofs. """
     function get_related_dofs(dofs)
         dofs_ = Set(dofs)
