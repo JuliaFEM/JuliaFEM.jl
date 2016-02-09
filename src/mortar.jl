@@ -682,7 +682,7 @@ end
 function get_unknown_field_name(::Type{Mortar})
     return "reaction force"
 end
-
+        
 # quadratic not tested yet
 typealias MortarElements2D Union{Seg2}
 
@@ -724,8 +724,10 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         la = vec(slave_element("reaction force", time))
     end
     la = Q2'*la
-    D2 = zeros(2*nnodes, 2*nnodes)
 
+    G = zeros(2*nnodes)
+    u = zeros(2*nnodes)
+    c = zeros(2*nnodes)
 
     local_assembly = Assembly()
 
@@ -810,22 +812,28 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         C2M2 = Q2'*C1M2
 
         # initial weighted gap (capital G for "undeformed")
-        G = -(C2S2*X1 - C2M2*X2)
-        # deformed weighted gap
-        g = -(C2S2*x1 - C2M2*x2)
+        G += -(C2S2*X1 - C2M2*X2)
+        # change in weighted gap caused by deformation
+        u += -(C2S2*u1 - C2M2*u2)
+#       g = G + u
         # complementarity condition
-        c = la - g
+#       c += la - (G + u)
 
         # Add contributions
         add!(local_assembly.C1, slave_dofs, slave_dofs, C1S2)
         add!(local_assembly.C1, slave_dofs, master_dofs, -C1M2)
         add!(local_assembly.C2, slave_dofs, slave_dofs, C2S2)
         add!(local_assembly.C2, slave_dofs, master_dofs, -C2M2)
-        add!(local_assembly.D, slave_dofs, slave_dofs, D2)
-        add!(local_assembly.g, slave_dofs, G)
-        add!(local_assembly.c, slave_dofs, c)
+#       add!(local_assembly.g, slave_dofs, G)
+#       add!(local_assembly.D, slave_dofs, slave_dofs, D2)
+#       add!(c_, slave_dofs, c)
+#       add!(u_, slave_dofs, u)
+#       add!(la_, slave_dofs, la)
+#       add!(g_, slave_dofs, g)
 
     end # all master elements are done
+
+    add!(local_assembly.g, slave_dofs, G)
 
     # if only equality constraints, i.e., mesh tying problem, we're done for this element.
     if !props.contact
@@ -835,9 +843,12 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
 
     C1 = sparse(local_assembly.C1)
     C2 = sparse(local_assembly.C2)
-    D = sparse(local_assembly.D)
+    D = spzeros(size(C2)...)#copy(C2)
     g = sparse(local_assembly.g)
-    c = sparse(local_assembly.c)
+
+    # complementarity condition
+#   g = G + u
+    c = la - (G + u)
 
     # normal condition
     cn = c[1:field_dim:end]
@@ -849,21 +860,26 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         return
     end
 
+    node_ids = get_connectivity(slave_element)
+
     # normal constraint: remove inactive nodes
-    for j in inactive_nodes
+    for j in node_ids[inactive_nodes]
         if length(props.always_in_contact) != 0
             j in props.always_in_contact && continue
         end
         gdofs = [2*(j-1)+1, 2*(j-1)+2]
         C1[gdofs,:] = 0
         C2[gdofs,:] = 0
+        D[gdofs,:] = 0
         g[gdofs] = 0
     end
 
     # frictionless contact
     if !props.friction
-        for j in active_nodes
+        for j in node_ids[active_nodes]
             gdofs = [2*(j-1)+1, 2*(j-1)+2]
+            #D[gdofs[1],:] = 0
+            #D[gdofs[2],:] = 0
             D[gdofs[2],gdofs] = C2[gdofs[2],gdofs]
             C2[gdofs[2],:] = 0
             g[gdofs[2]] = 0
@@ -872,28 +888,36 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         local_assembly.C2 = C2
         local_assembly.D = D
         local_assembly.g = g
-        local_assembly.c = c
         append!(assembly, local_assembly)
         return
     end
 
     # frictional contact, see Gitterle2010
     mu = 0.3
+    lan = la[1:field_dim:end]
     lat = la[2:field_dim:end]
-    ut = u[2:field_dim:end]
-    ct = lat + ut
+#   ut = c[2:field_dim:end]
+    ct = lat + c[2:field_dim:end]
     #println("cn, ct, lat")
     #println(cn)
     #println(ct)
     #println(lat)
+    @eval begin
+        global la = $la
+        global c = $c
+        global lat = $lat
+        global lan = $lan
+        global ct = $ct
+    end
     C = max(mu*cn, abs(ct)).*lat - mu*max(0, cn).*ct
     stick_nodes = find(abs(ct) - mu*cn .< 0)
     slip_nodes = find(abs(ct) - mu*cn .>= 0)
     stick_nodes = setdiff(stick_nodes, inactive_nodes)
     slip_nodes = setdiff(slip_nodes, inactive_nodes)
+    #println("C = ")
+    #println(C)
 
     for (i, j) in enumerate(node_ids[active_nodes])
-         ldofs = [2*(i-1)+1, 2*(i-1)+2]
          gdofs = [2*(j-1)+1, 2*(j-1)+2]
          D[gdofs[2],gdofs] = C2[gdofs[2],gdofs]
          C2[gdofs[2],:] = 0
