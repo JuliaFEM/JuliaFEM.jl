@@ -102,9 +102,24 @@ function Field{T}(data::Pair{Float64, Vector{T}}...)
     return DVTV([Increment{Vector{T}}(d[1], d[2]) for d in data])
 end
 
-function Base.convert{T}(::Type{DCTV}, data::Pair{Float64, Vector{T}}...)
+function Base.convert{T}(::Type{DCTV}, data::Pair{Real, Vector{T}}...)
     return DCTV([Increment{Vector{T}}(d[1], d[2]) for d in data])
 end
+
+""" Create new discrete, constant, time variant field.
+
+Examples
+--------
+julia> t0 = 0.0; t1=1.0; y0 = 0.0; y1 = 1.0
+julia> f = DCTV(t0 => y0, t1 => y1)
+
+"""
+function Base.convert{T,v<:Real}(::Type{DCTV}, data::Pair{v, T}...)
+    return DCTV([Increment(d[1],d[2]) for d in data])
+end
+#function Base.convert(::Type{DCTV}, data::Pair{Real, Any}...)
+#    return DCTV([Increment{Vector}(d[1], d[2]) for d in data])
+#end
 
 function Field(func::Function)
     if method_exists(func, Tuple{})
@@ -174,6 +189,14 @@ end
 
 function Base.length(field::DCTV)
     return length(field.data)
+end
+
+function Base.first(field::Union{DCTV, DVTV})
+    return field[1]
+end
+
+function Base.isapprox(f1::DCTI, f2::DCTI)
+    isapprox(f1.data, f2.data)
 end
 
 for op = (:+, :*, :/, :-)
@@ -263,27 +286,39 @@ function Base.call(field::CCTI, time::Float64)
     return field.data()
 end
 
-""" Interpolate time-variant field in time direction. """
-function Base.call(field::DCTV, time::Float64)
+""" Interpolate constant time-variant field in time direction. """
+function Base.call(field::DCTV, time::Real)
+    time < first(field).time && return DCTI(first(field).data)
+    time > last(field).time && return DCTI(last(field).data)
     for i=reverse(1:length(field))
-        if isapprox(field[i].time, time)
-            return DCTI(field[i].data)
+        isapprox(field[i].time, time) && return DCTI(field[i].data)
+    end
+    for i=reverse(2:length(field))
+        t0 = field[i-1].time
+        t1 = field[i].time
+        if t0 < time < t1
+            new_data = field[i-1].data + (time-t0)/(t1-t0)*field[i].data
+            return DCTI(new_data)
         end
     end
-    info(field.data)
-    info(time)
-    error("interpolate DCTV: not implemented yet")
+    error("interpolate DCTV: unknown failure when interpolating $(field.data) for time $time")
 end
 
-function Base.call(field::DVTV, time::Float64, time_extrapolation::Symbol=:linear)
+function Base.call(field::DVTV, time::Float64)
+    time < first(field).time && return DVTI(first(field).data)
+    time > last(field).time && return DVTI(last(field).data)
     for i=reverse(1:length(field))
-        if isapprox(field[i].time, time)
-            return DVTI(field[i].data)
+        isapprox(field[i].time, time) && return DVTI(field[i].data)
+    end
+    for i=reverse(2:length(field))
+        t0 = field[i-1].time
+        t1 = field[i].time
+        if t0 < time < t1
+            new_data = field[i-1].data + (time-t0)/(t1-t0)*field[i].data
+            return DVTI(new_data)
         end
     end
-    info(field.data)
-    info(time)
-    error("interpolate DVTV: not implemented yet")
+    error("interpolate DVTV: unknown failure when interpolating $(field.data) for time $time")
 end
 
 """ Interpolate constant field in spatial dimension. """

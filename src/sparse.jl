@@ -20,6 +20,14 @@ function Base.convert(::Type{SparseMatrixCOO}, A::SparseMatrixCSC)
     return SparseMatrixCOO(findnz(A)...)
 end
 
+function Base.convert(::Type{SparseMatrixCOO}, A::Matrix)
+    return SparseMatrixCOO(findnz(A)...)
+end
+
+function Base.convert(::Type{SparseMatrixCOO}, A::Vector)
+    return SparseMatrixCOO(findnz(sparse(A))...)
+end
+
 """ Convert from COO format to CSC.
 
 Parameters
