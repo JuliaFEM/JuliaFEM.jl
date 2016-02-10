@@ -742,8 +742,6 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
 
         # if distance between elements is "far enough" cannot expect contact
         if props.contact && (props.minimum_distance < Inf)
-            #slave_midpoint = slave_element("geometry", [0.0], time)
-            #master_midpoint = master_element("geometry", [0.0], time)
             slave_midpoint = Float64[mean(x1[1:field_dim:2]), mean(x1[2:field_dim:2])]
             master_midpoint = Float64[mean(x2[1:field_dim:2]), mean(x2[2:field_dim:2])]
             if norm(slave_midpoint - master_midpoint) > props.minimum_distance
@@ -772,7 +770,7 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
                 Me += w*N'*N
             end
             Ae = De*inv(Me)
-        else
+        else # Standard Lagrange basis
             for ip in get_integration_points(slave_element, Val{5})
                 J = get_jacobian(slave_element, ip, time)
                 w = ip.weight*norm(J)*l
@@ -815,21 +813,12 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         G += -(C2S2*X1 - C2M2*X2)
         # change in weighted gap caused by deformation
         u += -(C2S2*u1 - C2M2*u2)
-#       g = G + u
-        # complementarity condition
-#       c += la - (G + u)
 
         # Add contributions
         add!(local_assembly.C1, slave_dofs, slave_dofs, C1S2)
         add!(local_assembly.C1, slave_dofs, master_dofs, -C1M2)
         add!(local_assembly.C2, slave_dofs, slave_dofs, C2S2)
         add!(local_assembly.C2, slave_dofs, master_dofs, -C2M2)
-#       add!(local_assembly.g, slave_dofs, G)
-#       add!(local_assembly.D, slave_dofs, slave_dofs, D2)
-#       add!(c_, slave_dofs, c)
-#       add!(u_, slave_dofs, u)
-#       add!(la_, slave_dofs, la)
-#       add!(g_, slave_dofs, g)
 
     end # all master elements are done
 
@@ -843,17 +832,22 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
 
     C1 = sparse(local_assembly.C1)
     C2 = sparse(local_assembly.C2)
-    D = spzeros(size(C2)...)#copy(C2)
+    D = spzeros(size(C2)...)
     g = sparse(local_assembly.g)
 
     # complementarity condition
-#   g = G + u
-    c = la - (G + u)
+    lan = la[1:field_dim:end]
+    lat = la[2:field_dim:end]
+    Gn = G[1:field_dim:end]
+    un = u[1:field_dim:end]
+    cn = lan - (Gn + un)
+    #Cn = lan - max(0, lan - (Gn+un))
 
     # normal condition
-    cn = c[1:field_dim:end]
     inactive_nodes = find(cn .<= 0)
     active_nodes = find(cn .> 0)
+    #inactive_nodes = find(Cn .>= 0)
+    #active_nodes = find(Cn .== 0)
 
     # inactive element
     if length(active_nodes) == 0
@@ -874,55 +868,33 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         g[gdofs] = 0
     end
 
-    # frictionless contact
-    if !props.friction
-        for j in node_ids[active_nodes]
-            gdofs = [2*(j-1)+1, 2*(j-1)+2]
-            #D[gdofs[1],:] = 0
-            #D[gdofs[2],:] = 0
-            D[gdofs[2],gdofs] = C2[gdofs[2],gdofs]
-            C2[gdofs[2],:] = 0
-            g[gdofs[2]] = 0
-        end
-        local_assembly.C1 = C1
-        local_assembly.C2 = C2
-        local_assembly.D = D
-        local_assembly.g = g
-        append!(assembly, local_assembly)
-        return
-    end
-
     # frictional contact, see Gitterle2010
     mu = 0.3
-    lan = la[1:field_dim:end]
-    lat = la[2:field_dim:end]
-#   ut = c[2:field_dim:end]
     ct = lat + c[2:field_dim:end]
-    #println("cn, ct, lat")
-    #println(cn)
-    #println(ct)
-    #println(lat)
-    @eval begin
-        global la = $la
-        global c = $c
-        global lat = $lat
-        global lan = $lan
-        global ct = $ct
-    end
+
     C = max(mu*cn, abs(ct)).*lat - mu*max(0, cn).*ct
     stick_nodes = find(abs(ct) - mu*cn .< 0)
     slip_nodes = find(abs(ct) - mu*cn .>= 0)
     stick_nodes = setdiff(stick_nodes, inactive_nodes)
     slip_nodes = setdiff(slip_nodes, inactive_nodes)
-    #println("C = ")
-    #println(C)
 
     for (i, j) in enumerate(node_ids[active_nodes])
-         gdofs = [2*(j-1)+1, 2*(j-1)+2]
-         D[gdofs[2],gdofs] = C2[gdofs[2],gdofs]
-         C2[gdofs[2],:] = 0
-         g[gdofs[2]] = C[i]
-     end
+        gdofs = [2*(j-1)+1, 2*(j-1)+2]
+        #D[gdofs[2],gdofs] = C2[gdofs[2],gdofs]
+        D[gdofs[2],gdofs] = Q[i][:,2]'
+        C2[gdofs[2],:] = 0
+        if props.friction
+            g[gdofs[2]] = C[i]
+        else
+            g[gdofs[2]] = 0.0
+        end
+    end
+
+    local_assembly.C1 = C1
+    local_assembly.C2 = C2
+    local_assembly.D = D
+    local_assembly.g = g
+    append!(assembly, local_assembly)
 
     if props.store_debug_info
         slave_element["G"] = G
@@ -933,14 +905,6 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         slave_element["D"] = D2
         slave_element["active nodes"] = active_nodes
     end
-
-    local_assembly.C1 = C1
-    local_assembly.C2 = C2
-    local_assembly.D = D
-    local_assembly.g = g
-    #local_assembly.c = c
-
-    append!(assembly, local_assembly)
 
 end
 

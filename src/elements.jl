@@ -427,19 +427,19 @@ function update!(element::Element, field_name::ASCIIString, data::Dict)
     element[field_name] = [data[i] for i in get_connectivity(element)]
 end
 
-function update!(element::Element, field_name::ASCIIString, data::Union{Real, Vector, Pair})
+function update!(element::Element, field_name::ASCIIString, data::Union{Real, Vector, Pair}...)
     element[field_name] = data
 end
 
 """ Update values for several elements at once. """
 # FIXME: with or without {T} ?
-function update!{T}(elements::Vector{Element{T}}, field_name::ASCIIString, data)
+function update!{T}(elements::Vector{Element{T}}, field_name::ASCIIString, data...)
     for element in elements
-        update!(element, field_name, data)
+        update!(element, field_name, data...)
     end
 end
-function update!(elements::Vector{Element}, field_name::ASCIIString, data)
+function update!(elements::Vector{Element}, field_name::ASCIIString, data...)
     for element in elements
-        update!(element, field_name, data)
+        update!(element, field_name, data...)
     end
 end

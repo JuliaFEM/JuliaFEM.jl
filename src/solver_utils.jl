@@ -45,7 +45,7 @@ function pretty_print_C1_row(r)
     return s
 end
 
-function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2, D_, D, g_, g)
+function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2, D_, D, g_, g; show_info=false)
     # old, new, old, new...
 
 #= herzian contact with symmetry boundary
@@ -69,7 +69,7 @@ function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2
 # INFO: algorithm 2 solved issue? true
 # INFO: fixed: new setting is
 # INFO: dof 1109: 0.0*u₁₅₃ - 0.0*u₁₅₄ - 0.0*u₁₅₅ + 0.15*u₁₅₆ + 0.0*u₁₁₀₉ - 0.15*u₁₁₁₀ = -0.0
-
+=#
     if 555 in nodes
         info("overconstraint DIRTY HACK")
         # It is possible to selectively remove mortar constraints and the associated
@@ -79,15 +79,30 @@ function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2
         # new configuration is mortar constraint
         # 1. remove mortar constrains and associated Lagrange multiplier components
         # in dof 1109, that is, x direction of node 555.
-        C1[1109,:] = 0
-        C2[1109,:] = 0
-        D[1109,:] = 0
-        g[1109,:] = 0
-#       D[1110,1110] = 0
-#       g[1110] = 0
+
+        # works quite well
+#       C1_[1109,:] = 0
+#       C2_[1110,:] = C2_[1109,:]
+#       C2[1110,:] = 0
+#       D[1110,:] = 0
+
+        #C1_[1110,:] = C1_[1109,:]
+        C2_[1110,:] = C2_[1109,:]
+        #C1_[1109,:] = 0
+        C2_[1109,:] = 0
+
+        #C1[1110,:] = 0
+        #C2[1110,:] = 0
+        #C2[:,1109] = 0
+        D[1110,:] = 0
+        #D[:,1109] = 0
+        g[1110,:] = 0
+        #D[:,1109] = 0
+        #C2[:,1109] = 0
+        #C1[1109,:] = 0
+        #C1_[1110,:] = 0
         return
     end
-=#
 
     """ Return all other dofs which connects to overconstrained dofs. """
     function get_related_dofs(dofs)
@@ -297,7 +312,7 @@ function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2
     for node_id in nodes
         dofs = [2*(node_id-1)+1, 2*(node_id-1)+2]
 
-        print_summary(node_id, dofs)
+        show_info && print_summary(node_id, dofs)
 
         # try to resolve issue automatically
         resolved = false
@@ -311,16 +326,16 @@ function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2
 
         if resolved
             info("fixed: new setting is")
-            show_rows_in_constraint_matrix(dofs, C2, D; show_status=false)
-            show_rows_in_constraint_matrix(dofs, C2_, D_; show_status=false)
-            #show_related_equations(dofs, C2, C2_, D, D_)
-            info()
+            show_info && show_rows_in_constraint_matrix(dofs, C2, D; show_status=false)
+            show_info && show_rows_in_constraint_matrix(dofs, C2_, D_; show_status=false)
+            show_info && show_related_equations(dofs, C2, C2_, D, D_)
+            show_info && info()
             continue
         end
            
-        info("unable to resolve overconstrained situation, not continuing")
+        show_info && info("unable to resolve overconstrained situation, not continuing")
         throw("failed to resolve overconstraint situation")
-        info()
+        show_info && info()
     end
 end
 
