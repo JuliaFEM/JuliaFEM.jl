@@ -23,7 +23,7 @@ function get_unknown_field_name(::Type{Elasticity})
 end
 
 function get_formulation_type(problem::Problem{Elasticity})
-    info("INCREMENTAL FORMULATION")
+    # we are solving residual and add increment to previous solution vector
     return :incremental
 end
 
@@ -81,7 +81,7 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
                 nu   1-nu 0
                 0    0    (1-2*nu)/2]
         else
-            error("unknown plane formulation: $(props.formulation)")
+            error("unknown 2d formulation: $(props.formulation)")
         end
         S = D*[GL[1,1]; GL[2,2]; 2*GL[1,2]] # PK2 stress tensor in voigt notation
 
