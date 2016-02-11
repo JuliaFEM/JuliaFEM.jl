@@ -169,9 +169,11 @@ function update_assembly!(problem, u, la)
     assembly.u_prev = copy(assembly.u)
     assembly.la_prev = copy(assembly.la)
     if get_formulation_type(problem) == :incremental
+        info("incremental formulation, adding increment to solution vector")
         assembly.u += u
         assembly.la += la
     else
+        info("total formulation, replacing solution vector with new values")
         assembly.u = u
         assembly.la = la
     end
@@ -179,7 +181,8 @@ function update_assembly!(problem, u, la)
     # calculate change of norm
     assembly.u_norm_change = norm(assembly.u - assembly.u_prev)
     assembly.la_norm_change = norm(assembly.la - assembly.la_prev)
-    return assembly.u_norm_change, assembly.la_norm_change
+    #return assembly.u_norm_change, assembly.la_norm_change
+    return assembly.u, assembly.la
 end
 
 """ Update solutions to elements.

@@ -4,8 +4,7 @@
 using JuliaFEM.Test
 using JuliaFEM.Core: Node, update!, Quad4, Seg2, Problem, Elasticity, Solver, Dirichlet
 
-@testset "test 2d linear elasticity with surface load." begin
-
+function get_test_problem()
     nodes = Dict{Int64, Node}(
         1 => [0.0, 0.0],
         2 => [1.0, 0.0],
@@ -39,16 +38,25 @@ using JuliaFEM.Core: Node, update!, Quad4, Seg2, Problem, Elasticity, Solver, Di
     # type, name, dimension, unknown_field_name
     boundary_problem = Problem(Dirichlet, "symmetry boundaries", 2, "displacement")
     push!(boundary_problem, sym13, sym23)
+    return elasticity_problem, boundary_problem
+end
 
+@testset "test 2d linear with surface load." begin
+
+    E = 288.0
+    nu = 1.0/3.0
+    f = -E/10.0
+    expected = f/E*[-nu, 1]
+    elasticity_problem, boundary_problem = get_test_problem()
     solver = Solver("solve block problem")
+    #solver.is_linear_system = true
     push!(solver, elasticity_problem)
     push!(solver, boundary_problem)
-
     call(solver)
-
+    element1 = elasticity_problem.elements[1]
     u_disp = element1("displacement", [1.0, 1.0], 0.0)
     info("Displacement = $u_disp")
-
     @test isapprox(u_disp, expected)
+
 end
 
