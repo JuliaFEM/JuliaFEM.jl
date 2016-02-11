@@ -348,16 +348,24 @@ Notes
 -----
 Default convergence criteria is obtained by checking each sub-problem convergence.
 """
-function has_converged(solver::Solver)
+function has_converged(solver::Solver; check_convergence_for_boundary_problems=false)
     converged = true
     eps = solver.nonlinear_system_convergence_tolerance
     for problem in solver.problems
         has_converged = true
         if is_field_problem(problem)
             has_converged = problem.assembly.u_norm_change/norm(problem.assembly.u) < eps
+            info("Details for problem $(problem.name)")
+            info("Norm: $(norm(problem.assembly.u))")
+            info("Norm change: $(problem.assembly.u_norm_change)")
+            info("Has converged? $(has_converged)")
         end
-        if is_boundary_problem(problem)
+        if is_boundary_problem(problem) && check_convergence_for_boundary_problems
             has_converged = problem.assembly.la_norm_change/norm(problem.assembly.la) < eps
+            info("Details for problem $(problem.name)")
+            info("Norm: $(norm(problem.assembly.la))")
+            info("Norm change: $(problem.assembly.la_norm_change)")
+            info("Has converged? $(has_converged)")
         end
         converged &= has_converged
     end
@@ -394,7 +402,7 @@ function call(solver::Solver)
 
         # 2.3 update solution back to elements
         for problem in solver.problems
-            update_assembly!(problem, u, la)
+            u, la = update_assembly!(problem, u, la)
             update_elements!(problem, u, la)
         end
 
