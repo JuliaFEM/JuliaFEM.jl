@@ -5,13 +5,10 @@
 type Elasticity <: FieldProblem
     # these are found from problem.properties for type Problem{Elasticity}
     formulation :: Symbol
-    nonlinear_geometry :: Bool
 end
 function Elasticity()
-    Elasticity(
-        :continuum,   # formulations: :plane_stress, :continuum
-        false,        # geometrically nonlinear analysis
-    )
+    # formulations: plane_stress, plane_strain, continuum
+    return Elasticity(:continuum)
 end
 
 # in case of experimenting new things;
@@ -25,81 +22,143 @@ function get_unknown_field_name(::Type{Elasticity})
     return "displacement"
 end
 
+function get_formulation_type(problem::Problem{Elasticity})
+    info("INCREMENTAL FORMULATION")
+    return :incremental
+end
+
 function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::Element, time::Real)
-    f = problem.properties.formulation
-    if f == :continuum
+    props = problem.properties
+    if props.formulation == :continuum
         return assemble!(assembly, problem, element, time, Val{:continuum})
-    elseif (f == :plane_stress) || (f == :plane_strain)
-        return assemble!(assembly, problem, element, time, Val{:plane})
+    elseif (props.formulation == :plane_stress) || (props.formulation == :plane_strain)
+        gdofs = get_gdofs(problem, element)
+        Kt, f = assemble(problem, element, time, Val{:plane})
+        add!(assembly.K, gdofs, gdofs, Kt)
+        add!(assembly.f, gdofs, f)
     end
 end
 
-""" Elasticity equations, plane stress formulation. """
-function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::Element, time::Real, ::Type{Val{:plane}})
+
+""" Elasticity equations for 2d cases. """
+function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:plane}})
 
     props = problem.properties
-    gdofs = get_gdofs(problem, element)
-    ndim, nnodes = size(element)
-    B = zeros(3, 2*nnodes)
+    dim = get_unknown_field_dimension(problem)
+    nnodes = size(element, 2)
+    BL = zeros(3, dim*nnodes)
+    BNL = zeros(4, dim*nnodes)
+    Kt = zeros(dim*nnodes, dim*nnodes)
+    f = zeros(dim*nnodes)
+
     for ip in get_integration_points(element)
-        w = ip.weight
+
+        J = get_jacobian(element, ip, time)
+        w = ip.weight*det(J)
+        N = element(ip, time)
+        dN = element(ip, time, Val{:grad})
+
+        # kinematics; calculate deformation gradient and strain
+        F = eye(dim)
+        if haskey(element, "displacement")
+            gradu = element("displacement", ip, time, Val{:grad})
+            F += gradu
+        end
+        GL = 1/2*(F'*F - I) # green-lagrange strain
+
+        # constitutive equations; material model (isotropic linear material here)
+        # get_material(problem, element, ...)
+        E = element("youngs modulus", ip, time)
+        nu = element("poissons ratio", ip, time)
+        if props.formulation == :plane_stress
+            D = E/(1.0 - nu^2) .* [
+                1.0  nu 0.0
+                nu  1.0 0.0
+                0.0 0.0 (1.0-nu)/2.0]
+        elseif props.formulation == :plane_strain
+            D = E/((1+nu)*(1-2*nu)) .* [
+                1-nu   nu 0
+                nu   1-nu 0
+                0    0    (1-2*nu)/2]
+        else
+            error("unknown plane formulation: $(props.formulation)")
+        end
+        S = D*[GL[1,1]; GL[2,2]; 2*GL[1,2]] # PK2 stress tensor in voigt notation
+
+        # add contributions: material and geometric stiffness + internal forces
+        fill!(BL, 0.0)
+        for i=1:size(dN, 2)
+            BL[1, 2*(i-1)+1] = F[1,1]*dN[1,i]
+            BL[1, 2*(i-1)+2] = F[2,1]*dN[1,i]
+            BL[2, 2*(i-1)+1] = F[1,2]*dN[2,i]
+            BL[2, 2*(i-1)+2] = F[2,2]*dN[2,i]
+            BL[3, 2*(i-1)+1] = F[1,1]*dN[2,i] + F[1,2]*dN[1,i]
+            BL[3, 2*(i-1)+2] = F[2,1]*dN[2,i] + F[2,2]*dN[1,i]
+        end
+        fill!(BNL, 0.0)
+        for i=1:size(dN, 2)
+            BNL[1, 2*(i-1)+1] = dN[1,i]
+            BNL[2, 2*(i-1)+1] = dN[2,i]
+            BNL[3, 2*(i-1)+2] = dN[1,i]
+            BNL[4, 2*(i-1)+2] = dN[2,i]
+        end
+        S2 = zeros(2*dim, 2*dim)
+        S2[1,1] = S[1]
+        S2[2,2] = S[2]
+        S2[1,2] = S2[2,1] = S[3]
+        S2[3:4,3:4] = S2[1:2,1:2]
+
+        Kt += w*(BL'*D*BL + BNL'*S2*BNL)
+        f -= w*BL'*S
+
+        # volume load
+        if haskey(element, "displacement load")
+            T = element("displacement load", ip, time)
+            f += vec(w*T*N)
+        end
+
+    end
+
+    return Kt, f
+end
+
+function assemble{El<:Union{Seg2,Seg3}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:plane}})
+
+    props = problem.properties
+    dim = get_unknown_field_dimension(problem)
+    nnodes = size(element, 2)
+    Kt = zeros(dim*nnodes, dim*nnodes)
+    f = zeros(dim*nnodes)
+
+    for ip in get_integration_points(element)
+
         J = get_jacobian(element, ip, time)
         N = element(ip, time)
-        if haskey(element, "youngs modulus") && haskey(element, "poissons ratio")
-            nu = element("poissons ratio", ip, time)
-            E_ = element("youngs modulus", ip, time)
-            # Zienkiewicz, p. 91
-            if props.formulation == :plane_stress
-                C = E_/(1.0 - nu^2) .* [
-                    1.0  nu 0.0
-                    nu  1.0 0.0
-                    0.0 0.0 (1.0-nu)/2.0]
-            elseif props.formulation == :plane_strain
-                C = E_/((1+nu)*(1-2*nu)) .* [
-                    1-nu   nu 0
-                    nu   1-nu 0
-                    0    0    (1-2*nu)/2]
-            else
-                error("unknown plane formulation: $(props.formulation)")
-            end
-            dN = element(ip, time, Val{:grad})
-            fill!(B, 0.0)
-            for i=1:size(dN, 2)
-                B[1, 2*(i-1)+1] = dN[1,i]
-                B[2, 2*(i-1)+2] = dN[2,i]
-                B[3, 2*(i-1)+1] = dN[2,i]
-                B[3, 2*(i-1)+2] = dN[1,i]
-            end
-            Kt = w*B'*C*B*det(J)
-            add!(assembly.K, gdofs, gdofs, Kt)
-        end
-        if haskey(element, "displacement load")
-            b = element("displacement load", ip, time)
-            add!(assembly.f, gdofs, w*N'*b*det(J))
-        end
+        w = ip.weight*norm(J)
+
         if haskey(element, "displacement traction force")
             T = element("displacement traction force", ip, time)
-            L = w*T*N*norm(J)
-            add!(assembly.f, gdofs, vec(L))
+            f += vec(w*T*N)
         end
-        for dim in 1:get_unknown_field_dimension(problem)
-            if haskey(element, "displacement traction force $dim")
-                T = element("displacement traction force $dim", ip, time)
-                ldofs = gdofs[dim:get_unknown_field_dimension(problem):end]
-                L = w*T*N*norm(J)
-                add!(assembly.f, ldofs, vec(L))
+
+        for i=1:dim
+            # traction force for ith component
+            if haskey(element, "displacement traction force $i")
+                T = element("displacement traction force $i", ip, time)
+                f[i:dim:end] += vec(w*T*N)
             end
         end
-        if haskey(element, "displacement traction force N")
-            # surface pressure
-            p = zeros(2)
-            p[1] = element("displacement traction force N", ip, time)
-            R = element("normal-tangential coordinates", ip, time)
-            T = R'*p
-            L = w*T*N*norm(J)
-            add!(assembly.f, gdofs, vec(L))
+
+        if haskey(element, "nt displacement traction force")
+            # traction force given in normal-tangential direction
+            T = element("nt displacement traction force", ip, time)
+            Q = element("normal-tangential coordinates", ip, time)
+            f += vec(w*Q'*T*N)
         end
+
     end
+
+    return Kt, f
 end
 
 
