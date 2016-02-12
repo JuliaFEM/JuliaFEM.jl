@@ -30,13 +30,25 @@ function append!(assembly::Assembly, sub_assembly::Assembly)
     append!(assembly.c, sub_assembly.c)
 end
 
-function assemble!(problem::Problem, time::Float64; empty_assembly::Bool=true)
+function assemble_prehook!
+end
+
+function assemble_posthook!
+end
+
+function assemble!(problem::Problem, time::Real; empty_assembly::Bool=true)
+    if method_exists(assemble_prehook!, Tuple{typeof(problem), Real})
+        assemble_prehook!(problem, time)
+    end
     !problem.assembly.changed && return
     empty_assembly && empty!(problem.assembly)
     for element in get_elements(problem)
         assemble!(problem.assembly, problem, element, time)
     end
     problem.assembly.changed = true
+    if method_exists(assemble_posthook!, Tuple{typeof(problem), Real})
+        assemble_posthook!(problem, time)
+    end
     return problem.assembly
 end
 
