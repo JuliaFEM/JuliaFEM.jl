@@ -5,10 +5,11 @@
 type Elasticity <: FieldProblem
     # these are found from problem.properties for type Problem{Elasticity}
     formulation :: Symbol
+    finite_strain :: Bool
 end
 function Elasticity()
     # formulations: plane_stress, plane_strain, continuum
-    return Elasticity(:continuum)
+    return Elasticity(:continuum, true)
 end
 
 # in case of experimenting new things;
@@ -59,12 +60,17 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
         dN = element(ip, time, Val{:grad})
 
         # kinematics; calculate deformation gradient and strain
-        F = eye(dim)
+        gradu = zeros(dim, dim)
         if haskey(element, "displacement")
-            gradu = element("displacement", ip, time, Val{:grad})
-            F += gradu
+            gradu += element("displacement", ip, time, Val{:grad})
         end
-        GL = 1/2*(F'*F - I) # green-lagrange strain
+        strain = zeros(dim , dim)
+        strain += 1/2*(gradu' + gradu)
+        F = eye(dim)
+        if props.finite_strain
+            F += gradu
+            strain += 1/2*gradu'*gradu
+        end
 
         # constitutive equations; material model (isotropic linear material here)
         # get_material(problem, element, ...)
@@ -83,7 +89,9 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
         else
             error("unknown 2d formulation: $(props.formulation)")
         end
-        S = D*[GL[1,1]; GL[2,2]; 2*GL[1,2]] # PK2 stress tensor in voigt notation
+
+        # calculate stress
+        S = D*[strain[1,1]; strain[2,2]; 2*strain[1,2]]
 
         # add contributions: material and geometric stiffness + internal forces
         fill!(BL, 0.0)
@@ -108,8 +116,11 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
         S2[1,2] = S2[2,1] = S[3]
         S2[3:4,3:4] = S2[1:2,1:2]
 
-        Kt += w*(BL'*D*BL + BNL'*S2*BNL)
-        f -= w*BL'*S
+        Kt += w*BL'*D*BL # material stiffness
+        if props.finite_strain # add geometric stiffness
+            Kt += w*BNL'*S2*BNL # geometric stiffness
+        end
+        f -= w*BL'*S # internal force
 
         # volume load
         if haskey(element, "displacement load")
@@ -180,12 +191,17 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
         dN = element(ip, time, Val{:grad})
 
         # kinematics; calculate deformation gradient and strain
-        F = eye(dim)
+        gradu = zeros(dim, dim)
         if haskey(element, "displacement")
-            gradu = element("displacement", ip, time, Val{:grad})
-            F += gradu
+            gradu += element("displacement", ip, time, Val{:grad})
         end
-        GL = 1/2*(F'*F - I) # green-lagrange strain
+        strain = zeros(dim , dim)
+        strain += 1/2*(gradu' + gradu)
+        F = eye(dim)
+        if props.finite_strain
+            F += gradu
+            strain += 1/2*gradu'*gradu
+        end
 
         E = element("youngs modulus", ip, time)
         nu = element("poissons ratio", ip, time)
@@ -202,7 +218,7 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             0 0 0 0 0 b]
 
         # # PK2 stress tensor in voigt notation
-        S = D*[GL[1,1]; GL[2,2]; GL[3,3]; 2*GL[2,3]; 2*GL[1,3]; 2*GL[1,2]]
+        S = D*[strain[1,1]; strain[2,2]; strain[3,3]; 2*strain[2,3]; 2*strain[1,3]; 2*strain[1,2]]
 
         # add contributions: material and geometric stiffness + internal forces
         fill!(BL, 0.0)
@@ -247,7 +263,10 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
         S3[1,2] = S3[2,1] = S[6]
         S3[4:6,4:6] = S3[7:9,7:9] = S3[1:3,1:3]
 
-        Kt += w*(BL'*D*BL + BNL'*S3*BNL)
+        Kt += w*BL'*D*BL
+        if props.finite_strain
+            Kt += w*BNL'*S3*BNL
+        end
         f -= w*BL'*S
 
         # volume load
@@ -255,7 +274,6 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             T = element("displacement load", ip, time)
             f += vec(w*T*N)
         end
-
     end
 
     return Kt, f
