@@ -31,8 +31,6 @@ type Assembly
     la_prev :: Vector{Float64}  # previous solution vector u
     la_norm_change :: Real # change of norm in la
 
-    prehooks :: Vector{Tuple{Symbol,Any,Any}}  # assign possible prehooks before assembly
-    posthooks :: Vector{Tuple{Symbol,Any,Any}}  # assign possible posthooks after assembly
     changed :: Bool  # flag to control is reassembly needed
 end
 
@@ -48,7 +46,7 @@ function Assembly()
         SparseMatrixCOO(),
         [], [], Inf,
         [], [], Inf,
-        [], [], true)
+        true)
 end
 
 function Base.empty!(assembly::Assembly)
