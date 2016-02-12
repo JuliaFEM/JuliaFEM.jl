@@ -806,3 +806,16 @@ function boundary_assembly_posthook!(solver::Solver, problem::Problem{Mortar}, C
     return
 end
 
+function assemble_prehook!(problem::Problem{Mortar}, time::Real)
+    info("mortar assemble prehook at time $time")
+    slaves = Set{Element}()
+    for element in get_elements(problem)
+        haskey(element, "master elements") || continue
+        push!(slaves, element)
+    end
+    info("$(length(slaves)) slave elements")
+    length(slaves) != 0 || error("no slave elements found for problem (forget to add masters?).")
+    info("mortar: update normal-tangential system.")
+    calculate_normal_tangential_coordinates!(collect(slaves), time)
+    info("mortar assemble prehook done.")
+end
