@@ -285,16 +285,6 @@ function get_boundary_assembly(solver::Solver)
         C2_ = sparse(assembly.C2, ndofs, ndofs)
         D_ = sparse(assembly.D, ndofs, ndofs)
         g_ = sparse(assembly.g, ndofs, 1)
-
-        # boundary assembly posthook: if boundary assembly needs some further
-        # manipulations before adding it to global constraint matrix, i.e.,
-        # remove some constraints based on some conditions etc. do it here
-        args = Tuple{Solver, typeof(problem), SparseMatrixCSC, SparseMatrixCSC,
-                     SparseMatrixCSC, SparseMatrixCSC}
-        if method_exists(boundary_assembly_posthook!, args)
-            boundary_assembly_posthook!(solver, problem, C1_, C2_, D_, g_)
-        end
-
         # check for overconstraint situation and handle it if possible
         already_constrained = get_nonzero_rows(C2)
         new_constraints = get_nonzero_rows(C2_)
@@ -355,6 +345,9 @@ function has_converged(solver::Solver; check_convergence_for_boundary_problems=f
         has_converged = true
         if is_field_problem(problem)
             has_converged = problem.assembly.u_norm_change/norm(problem.assembly.u) < eps
+            if isapprox(norm(problem.assembly.u), 0.0)
+                has_converged = true
+            end
             info("Details for problem $(problem.name)")
             info("Norm: $(norm(problem.assembly.u))")
             info("Norm change: $(problem.assembly.u_norm_change)")
