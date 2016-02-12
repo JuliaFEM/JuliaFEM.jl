@@ -42,60 +42,6 @@ function update_gauss_fields!(element::Element, data::Vector{IntegrationPoint}, 
     end
 end
 
-"""
-Test routine for element. If this passes, element interface is properly
-defined.
-
-Parameters
-----------
-eltype::Type{Element}
-    Element to test
-
-Raises
-------
-This uses FactCheck and throws exceptions if element is not passing all tests.
-"""
-function test_element(element_type)
-    info("Testing element $element_type")
-    local element
-    dim = nothing
-    n = nothing
-    try
-        dim, n = size(element_type)
-    catch
-        error("Unable to determine element dimensions. Define Base.size(element::Type{$elementtype}) = (dim, nbasis) where dim is spatial dimension of element and nbasis is number of basis functions of element.")
-    end
-    info("element dimension: $dim x $n")
-
-    info("Initializing element")
-    try
-        element = Element{element_type}(collect(1:n))
-    catch
-        error("""
-        Unable to create element with default constructor define function
-        $eltype(connectivity) which initializes this element.""")
-        return false
-    end
-
-    # try to interpolate some scalar field
-    element["field1"] = range(1, n)
-    # TODO: how to parametrize this?
-    element["geometry"] = Vector{Float64}[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
-
-    # evaluate basis functions at middle point of element
-    mid = zeros(dim)
-    val1 = element(mid, 0.0)
-    info("basis at $mid: $val1")
-    val2 = element("field1", mid, 0.0)
-    info("field val at $mid: $val2")
-    val3 = element(mid, 0.0, Val{:grad})
-    info("derivative of basis at $mid:\n$val3")
-    #val4 = element("field1", mid, Val{:grad})
-    #info("field val at $mid: $val4")
-
-    info("Element $element_type passed tests.")
-end
-
 """ Get FieldSet from element. """
 function Base.getindex(element::Element, field_name)
     return element.fields[field_name]
@@ -255,27 +201,19 @@ function get_jacobian{E}(element::Element{E}, ip::IntegrationPoint, time::Real)
     return get_jacobian(element, ip.xi, time)
 end
 
-""" Return the determinant of jacobian. """
-function LinAlg.det{E<:AbstractElement}(element::Element{E}, xi::Vector{Float64}, time::Real)
-    J = get_jacobian(element, xi, time)
-    n, m = size(J)
-    if n == m
-        warn("det(element, ip, time) is ambiguous: use J = get_jacobian(element, ip, time); det(J) instead.")
-        return det(J)
+""" Return Jacobian of element in deformed state. """
+function get_jacobian{E}(element::Element{E}, xi::Vector{Float64}, time::Real, ::Type{Val{:deformed}})
+    x = element("geometry", time)
+    if haskey(element, "displacement")
+        x += element("displacement", time)
     end
-    JT = transpose(J)
-    if size(JT, 2) == 1
-        warn("det(element, ip, time) is ambiguous: use J = get_jacobian(element, ip, time); norm(J) instead.")
-        return norm(JT)
-    else
-        warn("det(element, ip, time) is ambiguous: use J = get_jacobian(element, ip, time); norm(cross(...)) instead.")
-        return norm(cross(JT[:,1], JT[:,2]))
-    end
+    dN = get_dbasis(E, xi)
+    j = sum([kron(dN[:,i], x[i]') for i=1:length(x)])
+    return j
 end
-function LinAlg.det{E<:AbstractElement}(element::Element{E}, ip::IntegrationPoint, time::Real)
-    return det(element, ip.xi, time)
+function get_jacobian{E}(element::Element{E}, ip::IntegrationPoint, time::Real, ::Type{Val{:deformed}})
+    return get_jacobian(element, ip.xi, time, Val{:deformed})
 end
-
 
 
 """ Check does field exist. """
@@ -337,11 +275,11 @@ Notes
 Average normals so that normals are unique in nodes.
 """
 
-function calculate_normal_tangential_coordinates!(elements::Vector, time::Real)
+function calculate_normal_tangential_coordinates!(elements::Vector, time::Real, configuration::Symbol=:deformed)
     if size(elements[1], 1) == 1
-        return calculate_normal_tangential_coordinates!(elements, time, Val{2})
+        return calculate_normal_tangential_coordinates!(elements, time, Val{2}, configuration)
     else
-        return calculate_normal_tangential_coordinates!(elements, time, Val{3})
+        return calculate_normal_tangential_coordinates!(elements, time, Val{3}, configuration)
     end
 end
 
@@ -351,14 +289,18 @@ Notes
 -----
 n = (e₃×∂X/∂ξ) / || e₃×∂X/∂ξ || and e₃ = [0 0 1]
 """
-function calculate_normal_tangential_coordinates!(elements::Vector, time::Real, ::Type{Val{2}})
+function calculate_normal_tangential_coordinates!(elements::Vector, time::Real, ::Type{Val{2}}, configuration::Symbol)
     nodes = get_nodes(elements)
     n = zeros(2, maximum(nodes))
     Q = [0 -1; 1 0]
     for element in elements
         gdofs = get_gdofs(element, 1)
         for ip in get_integration_points(element, Val{3})
-            J = get_jacobian(element, ip, time)
+            if configuration == :deformed
+                J = get_jacobian(element, ip, time, Val{:deformed})
+            else
+                J = get_jacobian(element, ip, time)
+            end
             N = element(ip, time)
             n[:, gdofs] += ip.weight*Q*J'*N
         end
@@ -370,8 +312,8 @@ function calculate_normal_tangential_coordinates!(elements::Vector, time::Real, 
     end
     for element in elements
         node_ids = get_connectivity(element)
-        R = Matrix{Float64}[ [n[:,i] t[:,i]] for i in node_ids]
-        element["normal-tangential coordinates"] = R
+        Q = Matrix{Float64}[ [n[:,i] t[:,i]] for i in node_ids]
+        element["normal-tangential coordinates"] = (time => Q)
         element["normals"] = Vector{Float64}[n[:,i] for i in node_ids]
     end
 end
@@ -384,7 +326,7 @@ function calculate_normal_tangential_coordinates!(elements::Vector, time::Real, 
     for element in elements
         gdofs = get_gdofs(element, 1)
         for ip in get_integration_points(element, Val{3})
-            J = transpose(get_jacobian(element, ip, time))
+            J = transpose(get_jacobian(element, ip, time, Val{:deformed}))
             N = element(ip, time)
             c = reshape(cross(J[:,1], J[:,2]), 3, 1)
             n[:, gdofs] += ip.weight*c*N
@@ -407,7 +349,7 @@ function calculate_normal_tangential_coordinates!(elements::Vector, time::Real, 
     for element in elements
         node_ids = get_connectivity(element)
         Q = Matrix{Float64}[ [n[:,i] t1[:,i] t2[:,i]] for i in node_ids]
-        element["normal-tangential coordinates"] = Q
+        element["normal-tangential coordinates"] = (time => Q)
         element["normals"] = Vector{Float64}[n[:,i] for i in node_ids]
     end
 end
