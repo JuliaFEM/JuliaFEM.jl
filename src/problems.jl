@@ -169,12 +169,11 @@ function update_assembly!(problem, u, la)
     if get_formulation_type(problem) == :incremental
         info("incremental formulation, adding increment to solution vector")
         assembly.u += u
-        assembly.la += la
     else
         info("total formulation, replacing solution vector with new values")
         assembly.u = u
-        assembly.la = la
     end
+    assembly.la = la
 
     # calculate change of norm
     assembly.u_norm_change = norm(assembly.u - assembly.u_prev)
