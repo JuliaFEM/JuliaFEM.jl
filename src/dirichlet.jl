@@ -1,17 +1,25 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+""" Here formulation is :total or :incremental meaning that we either give
+constraint for total quantity u or it's increment Δu. For elasticity we are
+using incremental formulation.
+"""
 type Dirichlet <: BoundaryProblem
     formulation :: Symbol
     dual_basis :: Bool
 end
 
 function Dirichlet()
-    Dirichlet(:Equality, true)
+    Dirichlet(:total, true)
 end
 
 function get_unknown_field_name(::Type{Dirichlet})
     return "reaction force"
+end
+
+function get_formulation_type(problem::Problem{Dirichlet})
+    return problem.properties.formulation
 end
 
 function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Element, time::Real)
@@ -28,7 +36,7 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Ele
     # left hand side
     for i=1:field_dim
         ldofs = gdofs[i:field_dim:end]
-        if haskey(element, field_name*" $i") || haskey(element, field_name)
+        if haskey(element, field_name*" $i")
             add!(assembly.C1, ldofs, ldofs, De)
             add!(assembly.C2, ldofs, ldofs, De)
         end
@@ -47,21 +55,20 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Ele
         N = element(ip, time)
         Phi = (Ae*N')'
 
-        if haskey(element, field_name)
-            for i=1:field_dim
-                g = element(field_name, ip, time)
-                ldofs = gdofs[i:field_dim:end]
+        g_prev = element(field_name, ip, time)
+        #info("g_prev = $g_prev")
+        for i=1:field_dim
+            ldofs = gdofs[i:field_dim:end]
+            if haskey(element, field_name*" $i")
+                g = element(field_name*" $i", ip, time)
+                if get_formulation_type(problem) == :incremental
+                    g = g - g_prev[i]
+                end
+                #info("g_new = $g")
                 add!(assembly.g, ldofs, w*g*Phi')
             end
-        else
-            for i=1:field_dim
-                ldofs = gdofs[i:field_dim:end]
-                if haskey(element, field_name*" $i")
-                    g = element(field_name*" $i", ip, time)
-                    add!(assembly.g, ldofs, w*g*Phi')
-                end
-            end
         end
+
     end
 
 end

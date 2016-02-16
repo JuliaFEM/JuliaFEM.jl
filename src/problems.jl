@@ -131,7 +131,7 @@ function initialize!(problem::Problem, time::Real)
     # if this is boundary problem and not dirichlet problem, initialize field
     # for primary variable too
     is_boundary_problem(problem) || return
-    is_dirichlet_problem(problem) && return
+    #is_dirichlet_problem(problem) && return
     field_name = get_parent_field_name(problem)
     for element in get_elements(problem)
         gdofs = get_gdofs(element, problem)
@@ -167,10 +167,12 @@ function update_assembly!(problem, u, la)
     assembly.u_prev = copy(assembly.u)
     assembly.la_prev = copy(assembly.la)
     if get_formulation_type(problem) == :incremental
-        info("incremental formulation, adding increment to solution vector")
+        info("$(problem.name): incremental formulation, adding increment to solution vector")
+        #info("solution vector:")
+        #dump(round(u, 3)')
         assembly.u += u
     else
-        info("total formulation, replacing solution vector with new values")
+        info("$(problem.name): total formulation, replacing solution vector with new values")
         assembly.u = u
     end
     assembly.la = la
@@ -212,7 +214,7 @@ function update_elements!{P<:BoundaryProblem}(problem::Problem{P}, u, la)
         last(element[field_name]).data = local_sol
     end
     # if boundary problem is not dirichlet, update also data of main problem
-    is_dirichlet_problem(problem) && return
+    # is_dirichlet_problem(problem) && return
     field_name = get_parent_field_name(problem)
     solution = reshape(u, field_dim, nnodes)
     for element in get_elements(problem)
@@ -285,4 +287,3 @@ function find_nodes_by_dofs(dim, dofs)
     end
     return nodes
 end
-

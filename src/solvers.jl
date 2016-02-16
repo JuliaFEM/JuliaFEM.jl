@@ -146,6 +146,7 @@ type Solver
     is_linear_system :: Bool # setting this to true makes assumption of one step convergence
     nonlinear_system_max_iterations :: Int64
     nonlinear_system_convergence_tolerance :: Float64
+    nonlinear_system_error_if_no_convergence :: Bool
     linear_system_solver :: Symbol
 end
 
@@ -159,6 +160,7 @@ function Solver(name::ASCIIString="default solver", time::Real=0.0)
         false, # is_linear_system
         10,    # max nonlinear iterations
         5.0e-5, # nonlinear iteration convergence tolerance
+        true,  # throw error if no convergence
         :DirectLinearSolver # linear system solution method
         )
 end
@@ -344,7 +346,7 @@ function has_converged(solver::Solver; check_convergence_for_boundary_problems=f
     for problem in solver.problems
         has_converged = true
         if is_field_problem(problem)
-            has_converged = problem.assembly.u_norm_change/norm(problem.assembly.u) < eps
+            has_converged = problem.assembly.u_norm_change < eps
             if isapprox(norm(problem.assembly.u), 0.0)
                 has_converged = true
             end
@@ -395,8 +397,8 @@ function call(solver::Solver)
 
         # 2.3 update solution back to elements
         for problem in solver.problems
-            u, la = update_assembly!(problem, u, la)
-            update_elements!(problem, u, la)
+            u_new, la_new = update_assembly!(problem, u, la)
+            update_elements!(problem, u_new, la_new)
         end
 
         # 2.4 check convergence
@@ -407,5 +409,7 @@ function call(solver::Solver)
     end
 
     # 3. did not converge
-    throw(NonlinearConvergenceError(solver))
+    if solver.nonlinear_system_error_if_no_convergence
+        throw(NonlinearConvergenceError(solver))
+    end
 end

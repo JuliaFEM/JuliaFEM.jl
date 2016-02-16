@@ -268,7 +268,7 @@ function get_nodes(elements::Vector)
     return nodes
 end
 
-""" Calculate normal-tangential coordinates for a set of elements. 
+""" Calculate normal-tangential coordinates for a set of elements.
 
 Notes
 -----
@@ -314,7 +314,7 @@ function calculate_normal_tangential_coordinates!(elements::Vector, time::Real, 
         node_ids = get_connectivity(element)
         Q = Matrix{Float64}[ [n[:,i] t[:,i]] for i in node_ids]
         element["normal-tangential coordinates"] = (time => Q)
-        element["normals"] = Vector{Float64}[n[:,i] for i in node_ids]
+        element["normals"] = (time => Vector{Float64}[n[:,i] for i in node_ids])
     end
 end
 
@@ -350,7 +350,7 @@ function calculate_normal_tangential_coordinates!(elements::Vector, time::Real, 
         node_ids = get_connectivity(element)
         Q = Matrix{Float64}[ [n[:,i] t1[:,i] t2[:,i]] for i in node_ids]
         element["normal-tangential coordinates"] = (time => Q)
-        element["normals"] = Vector{Float64}[n[:,i] for i in node_ids]
+        element["normals"] = (time => Vector{Float64}[n[:,i] for i in node_ids])
     end
 end
 
