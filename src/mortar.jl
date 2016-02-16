@@ -19,7 +19,8 @@ b) Remove inactive inequality constraints in assembly level. This is done in
 
 """
 type Mortar <: BoundaryProblem
-    formulation :: Symbol # Dual or Standard
+    formulation :: Symbol # :total or :incremental
+    dual_basis :: Bool
     inequality_constraints :: Bool # Launch PDASS to solve inequality constraints
     normal_condition :: Symbol # Tie or Contact
     tangential_condition :: Symbol # Stick or Slip
@@ -33,7 +34,7 @@ type Mortar <: BoundaryProblem
 end
 
 function Mortar()
-    Mortar(:Dual, false, :Tie, :Stick, Inf, false, [], [], [], false, false)
+    Mortar(:total, true, false, :Tie, :Stick, Inf, false, [], [], [], false, false)
 end
 
 function get_unknown_field_name(::Type{Mortar})
@@ -41,7 +42,7 @@ function get_unknown_field_name(::Type{Mortar})
 end
 
 function get_formulation_type(problem::Problem{Mortar})
-    return :incremental
+    return problem.properties.formulation
 end
 
 macro debug(msg)
@@ -686,12 +687,12 @@ function assemble!{E<:MortarElements3D}(assembly::Assembly, problem::Problem{Mor
                 # extend matrices according to the problem dimension (3)
                 @assert length(slave_dofs) == length(master_dofs)
                 Me = wC*Ae*N1'*N2
-                for k=1:field_dim                  
+                for k=1:field_dim
                     C1M3[k:field_dim:end,k:field_dim:end] += Me
                 end
             end
         end  # integration of mortar matrices done.
-        
+
         # constraints in normal-tangential direction and initial weighted gap
         X1 = vec(slave_element("geometry", time))
         X2 = vec(master_element("geometry", time))
