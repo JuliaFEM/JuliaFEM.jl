@@ -40,6 +40,10 @@ function get_unknown_field_name(::Type{Mortar})
     return "reaction force"
 end
 
+function get_formulation_type(problem::Problem{Mortar})
+    return :incremental
+end
+
 macro debug(msg)
     haskey(ENV, "DEBUG") || return
     return msg

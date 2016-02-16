@@ -58,13 +58,11 @@ include("equations.jl")
 include("dirichlet.jl")
 include("heat.jl")
 include("elasticity.jl")
-include("linear_elasticity.jl")
 
 ### ASSEMBLY + SOLVE ###
 include("assembly.jl")
 include("solver_utils.jl")
 include("solvers.jl")
-include("directsolver.jl") # parallel sparse direct solver for non-linear problems
 
 ### MORTAR STUFF ###
 include("mortar.jl")  # mortar projection
