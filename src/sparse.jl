@@ -4,17 +4,21 @@
 # Sparse utils to make assembly of local and global matrices easier.
 # Unoptimized but should do all necessary stuff for at start.
 
-type SparseMatrixCOO
+type SparseMatrixCOO{T<:Real}
     I :: Vector{Int}
     J :: Vector{Int}
-    V :: Vector{Float64}
+    V :: Vector{T}
 end
 
 typealias SparseMatrixIJV SparseMatrixCOO
 
 function SparseMatrixCOO()
-    SparseMatrixCOO([], [], [])
+    SparseMatrixCOO{Float64}([], [], [])
 end
+
+#function SparseMatrixCOO{T}()
+#    SparseMatrixCOO{T}([], [], [])
+#end
 
 function Base.convert(::Type{SparseMatrixCOO}, A::SparseMatrixCSC)
     return SparseMatrixCOO(findnz(A)...)
@@ -80,7 +84,7 @@ function Base.(:+)(A::SparseMatrixIJV, B::SparseMatrixIJV)
     return C
 end
 
-function Base.full(A::SparseMatrixIJV, args...)
+function Base.full(A::SparseMatrixCOO, args...)
     return full(sparse(A.I, A.J, A.V, args...))
 end
 
@@ -94,7 +98,7 @@ Example
 >>> S = [3, 4]
 >>> M = [6, 7, 8]
 >>> data = Float64[5 6 7; 8 9 10]
->>> A = SparseMatrixIJV()
+>>> A = SparseMatrixCOO()
 >>> add!(A, S, M, data)
 >>> full(A)
 4x8 Array{Float64,2}:
@@ -104,7 +108,7 @@ Example
  0.0  0.0  0.0  0.0  0.0  8.0  9.0  10.0
 
 """
-function add!(A::SparseMatrixIJV, dofs1::Vector{Int}, dofs2::Vector{Int}, data::Matrix{Float64})
+function add!(A::SparseMatrixCOO, dofs1::Vector{Int}, dofs2::Vector{Int}, data::Matrix)
     n, m = size(data)
     for j=1:m
         for i=1:n
@@ -112,9 +116,14 @@ function add!(A::SparseMatrixIJV, dofs1::Vector{Int}, dofs2::Vector{Int}, data::
             push!(A.J, dofs2[j])
         end
     end
-#   append!(A.I, repeat(dofs1, outer=[m]))
-#   append!(A.J, repeat(dofs2, inner=[n]))
     append!(A.V, vec(data))
+end
+
+""" Add sparse matrix of CSC to COO. """
+function add!(A::SparseMatrixCOO, B::SparseMatrixCSC)
+    I, J, V = findnz(B)
+    C = SparseMatrixCOO(I, J, V)
+    append!(A, C)
 end
 
 """ Add new data to COO Sparse vector. """

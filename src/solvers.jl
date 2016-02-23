@@ -141,9 +141,11 @@ type Solver
     name :: ASCIIString # some descriptive name for problem
     time :: Real        # current time
     iteration :: Int    # iteration counter
+    norms :: Vector{Tuple} # solution norms for convergence studies
     ndofs :: Int        # total dimension of global stiffness matrix, i.e., dim*nnodes
     problems :: Vector{Problem}
     is_linear_system :: Bool # setting this to true makes assumption of one step convergence
+    nonlinear_system_min_iterations :: Int64
     nonlinear_system_max_iterations :: Int64
     nonlinear_system_convergence_tolerance :: Float64
     nonlinear_system_error_if_no_convergence :: Bool
@@ -155,9 +157,11 @@ function Solver(name::ASCIIString="default solver", time::Real=0.0)
         name,
         time,
         0,     # iteration #
+        [],    # solution norms in (norm(u), norm(la)) tuples
         0,     # ndofs
         [],    # array of problems
         false, # is_linear_system
+        1,     # min nonlinear iterations
         10,    # max nonlinear iterations
         5.0e-5, # nonlinear iteration convergence tolerance
         true,  # throw error if no convergence
@@ -277,12 +281,14 @@ crosspoints.
 function get_boundary_assembly(solver::Solver)
     ndofs = solver.ndofs
     @assert ndofs != 0
+    Kc = spzeros(ndofs, ndofs)
     C1 = spzeros(ndofs, ndofs)
     C2 = spzeros(ndofs, ndofs)
     D = spzeros(ndofs, ndofs)
     g = spzeros(ndofs, 1)
     for problem in get_boundary_problems(solver)
         assembly = problem.assembly
+        Kc_ = sparse(assembly.K, ndofs, ndofs)
         C1_ = sparse(assembly.C1, ndofs, ndofs)
         C2_ = sparse(assembly.C2, ndofs, ndofs)
         D_ = sparse(assembly.D, ndofs, ndofs)
@@ -297,12 +303,13 @@ function get_boundary_assembly(solver::Solver)
             handle_overconstraint_error!(problem, overconstrained_nodes,
                 overconstrained_dofs, C1, C1_, C2, C2_, D, D_, g, g_)
         end
+        Kc += Kc_
         C1 += C1_
         C2 += C2_
         D += D_
         g += g_
     end
-    return C1, C2, D, g
+    return Kc, C1, C2, D, g
 end
 
 
@@ -316,10 +323,10 @@ function solve_linear_system(solver::Solver, ::Type{Val{:DirectLinearSolver}})
     K, f = get_field_assembly(solver)
 
     # assemble boundary problems
-    C1, C2, D, g = get_boundary_assembly(solver)
+    Kc, C1, C2, D, g = get_boundary_assembly(solver)
 
     # construct global system Ax=b and solve using lu factorization
-    A = [K C1'; C2 D]
+    A = [K+Kc C1'; C2 D]
     b = [f; g]
 
     nz = get_nonzero_rows(A)
@@ -379,6 +386,7 @@ end
 """ Main solver loop.
 """
 function call(solver::Solver)
+
     # 1. initialize each problem so that we can start nonlinear iterations
     for problem in solver.problems
         initialize!(problem, solver.time)
@@ -394,6 +402,7 @@ function call(solver::Solver)
 
         # 2.2 call solver for linearized system (default: direct lu factorization)
         u, la = solve_linear_system(solver, Val{solver.linear_system_solver})
+        push!(solver.norms, (norm(u), norm(la)))
 
         # 2.3 update solution back to elements
         for problem in solver.problems
@@ -404,7 +413,11 @@ function call(solver::Solver)
         # 2.4 check convergence
         if has_converged(solver)
             info("Converged in $(solver.iteration) iterations.")
-            return true
+            if solver.iteration < solver.nonlinear_system_min_iterations
+                info("Converged but continuing")
+            else
+                return true
+            end
         end
     end
 

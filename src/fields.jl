@@ -216,6 +216,15 @@ function Base.(:*){T<:Real}(c::T, field::DVTI)
     return DVTI(c*field.data)
 end
 
+""" Multiply DVTI field with another vector T. Vector length
+must match to the field length and this can be used mainly
+for interpolation purposes, i.e., u = ∑ Nᵢuᵢ
+"""
+function Base.(:*)(T::Vector, f::DVTI)
+    @assert length(T) == length(f)
+    return sum([T[i]*f[i] for i=1:length(f)])
+end
+
 function Base.vec(field::DVTI)
     return [field.data...;]
 end

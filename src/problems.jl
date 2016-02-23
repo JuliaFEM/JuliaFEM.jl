@@ -166,16 +166,22 @@ function update_assembly!(problem, u, la)
     # copy current solutions to previous ones and add/replace new solution
     assembly.u_prev = copy(assembly.u)
     assembly.la_prev = copy(assembly.la)
-    if get_formulation_type(problem) == :incremental
-        info("$(problem.name): incremental formulation, adding increment to solution vector")
-        #info("solution vector:")
-        #dump(round(u, 3)')
-        assembly.u += u
-    else
+    if get_formulation_type(problem) == :total
         info("$(problem.name): total formulation, replacing solution vector with new values")
         assembly.u = u
+        assembly.la = la
+    elseif get_formulation_type(problem) == :incremental
+        info("$(problem.name): incremental formulation, adding increment to solution vector")
+        assembly.u += u
+        assembly.la = la
+    elseif get_formulation_type(problem) == :forwarddiff
+        info("$(problem.name): forwarddiff formulation, adding increment to solution vector")
+        assembly.u += u
+        assembly.la += la
+    else
+        info("$(problem.name): unknown formulation type, don't know what to do with results")
+        error("serious failure with problem formulation: $(get_formulation_type(problem))")
     end
-    assembly.la = la
 
     # calculate change of norm
     assembly.u_norm_change = norm(assembly.u - assembly.u_prev)

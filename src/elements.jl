@@ -132,6 +132,35 @@ function call{E}(element::Element{E}, xi::VecOrIP, time::Float64=0.0)
     return get_basis(element, xi)
 end
 
+""" Given a list of elementa and nodes, find a subset of elements
+containing nodes.
+"""
+function find_elements(elements, nodes)
+    s = Set{Element}()
+    for element in elements
+        conn = get_connectivity(element)
+        for j in nodes
+            if j in conn
+                push!(s, element)
+                break
+            end
+        end
+    end
+    return collect(s)
+end
+
+function get_gdofs(element::Element)
+    return get_gdofs(element, 1)
+end
+
+function get_dbasis{E}(element::Element{E}, ip::IntegrationPoint)
+    return get_dbasis(E, ip.xi)
+end
+
+function get_basis{E, T<:Real}(element::Element{E}, xi::T)
+    return get_basis(E, xi)
+end
+
 """ Return dual basis transformation matrix Ae. """
 function get_dualbasis(element::Element, time::Real)
     if length(element.A) == 0
