@@ -164,6 +164,9 @@ function update_assembly!(problem, u, la)
     end
 
     # copy current solutions to previous ones and add/replace new solution
+    # TODO: here we have couple of options and they needs to be clarified
+    # for total formulation we are solving total quantity Ku=f while in
+    # incremental formulation we solve KΔu = f and u = u + Δu
     assembly.u_prev = copy(assembly.u)
     assembly.la_prev = copy(assembly.la)
     if get_formulation_type(problem) == :total
@@ -173,11 +176,11 @@ function update_assembly!(problem, u, la)
     elseif get_formulation_type(problem) == :incremental
         info("$(problem.name): incremental formulation, adding increment to solution vector")
         assembly.u += u
-        assembly.la = la
+        assembly.la += la
     elseif get_formulation_type(problem) == :forwarddiff
         info("$(problem.name): forwarddiff formulation, adding increment to solution vector")
         assembly.u += u
-        assembly.la = la
+        assembly.la += la
     else
         info("$(problem.name): unknown formulation type, don't know what to do with results")
         error("serious failure with problem formulation: $(get_formulation_type(problem))")

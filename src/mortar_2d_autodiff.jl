@@ -2,38 +2,33 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 """ Find segment from slave element corresponding to master element nodes.
-x1_, n1_
-slave element geometry and normal direction
 
-x2_ master element nodes to project onto slave
+Parameters
+----------
+x1_, n1_
+    slave element geometry and normal direction
+x2
+    master element node to project onto slave
+
+Returns
+-------
+xi
+    dimensionless coordinate on slave corresponding to
+    projected master
+ 
 """
 function project_from_master_to_slave{E<:MortarElements2D}(
     slave_element::Element{E}, x1_::DVTI, n1_::DVTI, x2::Vector;
     tol=1.0e-10, max_iterations=20)
 
-    function x1(xi1)
-        N = get_basis(E, xi1)
-        return vec(N)*x1_
-    end
-
-    function dx1(xi1)
-        dN = get_dbasis(E, xi1)
-        return vec(dN)*x1_
-    end
-
-    function n1(xi1)
-        N = get_basis(E, xi1)
-        return vec(N)*n1_
-    end
-
-    function dn1(xi1)
-        dN = get_dbasis(E, xi1)
-        return vec(dN)*n1_
-    end
-
+    x1(xi1) = vec(get_basis(E, xi1))*x1_
+    dx1(xi1) = vec(get_dbasis(E, xi1))*x1_
+    n1(xi1) = vec(get_basis(E, xi1))*n1_
+    dn1(xi1) = vec(get_dbasis(E, xi1))*n1_
     cross2(a, b) = cross([a; 0], [b; 0])[3]
     R(xi1) = cross2(x1(xi1)-x2, n1(xi1))
     dR(xi1) = cross2(dx1(xi1), n1(xi1)) + cross2(x1(xi1)-x2, dn1(xi1))
+
     xi1 = 0.0
     dxi1 = 0.0
     for i=1:max_iterations
@@ -58,19 +53,12 @@ function project_from_slave_to_master{E<:MortarElements2D}(
     master_element::Element{E}, x1::Vector, n1::Vector, x2_::DVTI;
     tol=1.0e-10, max_iterations=20)
 
-    function x2(xi2)
-        N = get_basis(E, xi2)
-        return vec(N)*x2_
-    end
-
-    function dx2(xi2)
-        dN = get_dbasis(E, xi2)
-        return vec(dN)*x2_
-    end
-
+    x2(xi2) = vec(get_basis(E, xi2))*x2_
+    dx2(xi2) = vec(get_dbasis(E, xi2))*x2_
     cross2(a, b) = cross([a; 0], [b; 0])[3]
     R(xi2) = cross2(x2(xi2)-x1, n1)
     dR(xi2) = cross2(dx2(xi2), n1)
+
     xi2 = 0.0
     dxi2 = 0.0
     for i=1:max_iterations
@@ -127,8 +115,7 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly,
             end
         end
         # --> slave side normals in deformed state
-        n1 = Field(Vector[ForwardDiff.get_value(normals[:,i]/norm(normals[:,i])) for i in slave_element_nodes])
-
+        n1 = Field(Vector[normals[:,i]/norm(normals[:,i]) for i in slave_element_nodes])
 
         nnodes = size(slave_element, 2)
         lan_tot = zeros(nnodes) # normal pressure
@@ -206,19 +193,16 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly,
             n = n1[i]
             t = Q'*n
             R = [n t]
-            la_nt = R*la[:,j]
-            info("node $j, n=$(ForwardDiff.get_value(n)) lan = $(ForwardDiff.get_value(la_nt[1])) gap = $(ForwardDiff.get_value(gap_tot[i]))")
+            la_nt = R'*la[:,j]
+#           info("node $j, n=$(ForwardDiff.get_value(n)) lan = $(ForwardDiff.get_value(la_nt[1])) gap = $(ForwardDiff.get_value(gap_tot[i]))")
 
-#           if -lan_tot[i] + gap_tot[i] < 0
-            if -la_nt[1] + gap_tot[i] < 0
+            if la_nt[1] - gap_tot[i] > 0
                 info("set node $j active")
                 C[1,j] += gap_tot[i]
-#               C[1,j] += la_nt[1] - max(0, la_nt[1] - gap_tot[i])
                 C[2,j] += la_nt[2]
             else
                 info("set node $j inactive")
-                C[1,j] += la1[i][1]
-                C[2,j] += la1[i][2]
+                C[:,j] = la[:,j]
             end
         end
 
