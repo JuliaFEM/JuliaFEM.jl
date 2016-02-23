@@ -217,7 +217,6 @@ function project_from_master_to_slave{S,M}(slave::Element{S}, master::Element{M}
     error("find projection from master to slave: did not converge")
 end
 
-
 # Mortar assembly 2d
 
 # quadratic not tested yet
@@ -546,8 +545,8 @@ function assemble!{E<:MortarElements2D}(assembly::Assembly, problem::Problem{Mor
         # Calculate normal-tangential constraints and weighted gap
         C2S2 = Q2'*C1S2
         C2M2 = Q2'*C1M2
-        G += -(C2S2*X1 - C2M2*X2)
-        g += -(C2S2*x1 - C2M2*x2)
+        G += props.gap_sign*(C2S2*X1 - C2M2*X2)
+        g += props.gap_sign*(C2S2*x1 - C2M2*x2)
 
         # Add contributions
         add!(local_assembly.C1, slave_dofs, slave_dofs, C1S2)

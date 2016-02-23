@@ -73,11 +73,11 @@ function xdmf_new_grid(temporal_collection; time=0)
     return grid
 end
 
-function xdmf_new_mesh!(grid, nodes, elements)
+function xdmf_new_mesh!(grid, nodes, elements; datatype="XYZ")
 
     # 1. write nodes
     geometry = new_child(grid, "Geometry")
-    set_attribute(geometry, "Type", "XYZ")
+    set_attribute(geometry, "Type", datatype)
     dataitem = new_child(geometry, "DataItem")
     set_attribute(dataitem, "DataType", "Float")
     ndim = sum([length(node) for node in nodes])
