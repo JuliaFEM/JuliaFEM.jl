@@ -306,7 +306,10 @@ function Base.call(field::DCTV, time::Real)
         t0 = field[i-1].time
         t1 = field[i].time
         if t0 < time < t1
-            new_data = field[i-1].data + (time-t0)/(t1-t0)*field[i].data
+            y0 = field[i-1].data
+            y1 = field[i].data
+            dt = t1-t0
+            new_data = y0*(1-(time-t0)/dt) + y1*(1-(t1-time)/dt)
             return DCTI(new_data)
         end
     end
@@ -323,7 +326,10 @@ function Base.call(field::DVTV, time::Float64)
         t0 = field[i-1].time
         t1 = field[i].time
         if t0 < time < t1
-            new_data = field[i-1].data + (time-t0)/(t1-t0)*field[i].data
+            y0 = field[i-1].data
+            y1 = field[i].data
+            dt = t1-t0
+            new_data = y0*(1-(time-t0)/dt) + y1*(1-(t1-time)/dt)
             return DVTI(new_data)
         end
     end

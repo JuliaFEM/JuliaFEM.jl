@@ -16,4 +16,11 @@ using JuliaFEM.Core: DCTV, DCTI
     @test isapprox(f( 0.9), DCTI(0.9))
     @test isapprox(f( 1.0), DCTI(1.0))
     @test isapprox(f( 1.5), DCTI(1.0))
+
+    f2 = DCTV(0.0 => 0.0, 0.25 => -0.1, 0.50 => -0.1)
+    @test isapprox(f2(0.0), DCTI(0.0))
+    @test isapprox(f2(0.25), DCTI(-0.1))
+    @test isapprox(f2(0.50), DCTI(-0.1))
+    @test isapprox(f2(0.35), DCTI(-0.1))
 end
+

@@ -53,19 +53,19 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Ele
             w *= norm(cross(JT[:,1], JT[:,2]))
         end
         N = element(ip, time)
-        Phi = (Ae*N')'
 
-        g_prev = element(field_name, ip, time)
-        #info("g_prev = $g_prev")
         for i=1:field_dim
             ldofs = gdofs[i:field_dim:end]
             if haskey(element, field_name*" $i")
                 g = element(field_name*" $i", ip, time)
                 if get_formulation_type(problem) == :incremental
-                    g = g - g_prev[i]
+                    # if having incremental formulation need to add previous
+                    # displacement to rhs (solving increment Δu !
+                    haskey(element, "displacement") || continue
+                    g_prev = element(field_name, ip, time)
+                    g -= g_prev[i]
                 end
-                #info("g_new = $g")
-                add!(assembly.g, ldofs, w*g*Phi')
+                add!(assembly.g, ldofs, w*g*Ae*N')
             end
         end
 

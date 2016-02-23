@@ -1,55 +1,6 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-"""
-Solve field equations for a single problem with some dofs fixed. This can be used
-to test nonlinear element formulations. Dirichlet boundary is assumed to be homogeneous
-and degrees of freedom are eliminated. So if boundary condition is known in nodal
-points and everything is zero this should be quite good.
-"""
-function solve!(problem::Problem, free_dofs::Vector{Int}, time::Float64; max_iterations::Int=10, tolerance::Float64=1.0e-12, dump_matrices::Bool=false, callback=nothing)
-    info("start solver")
-    assembly = Assembly()
-#   x = zeros(ga.ndofs)
-#   dx = fill!(similar(x), 0.0)
-#   FIXME: better.
-    x = nothing
-    dx = nothing
-    field_name = get_unknown_field_name(problem)
-    dim = get_unknown_field_dimension(problem)
-    for i=1:max_iterations
-        assemble!(assembly, problem, time)
-        A = sparse(assembly.stiffness_matrix)
-        b = sparse(assembly.force_vector)
-        if dump_matrices
-            dump(full(A))
-            dump(full(b)')
-        end
-        if isa(dx, Void)
-            x = zeros(length(b))
-            dx = zeros(length(b))
-        end
-        dx[free_dofs] = lufact(A[free_dofs,free_dofs]) \ full(b)[free_dofs]
-        info("Difference in solution norm: $(norm(dx))")
-        x += dx
-        if !(isa(callback, Void))
-            callback(x)
-        end
-        for element in get_elements(problem)
-            gdofs = get_gdofs(element, problem.dim)
-            data = full(x[gdofs])
-            if length(data) != length(element)
-                data = reshape(data, problem.dim, length(element))
-                data = [data[:,i] for i=1:size(data,2)]
-            end
-            push!(element[field_name], time => data)
-        end
-        norm(dx) < tolerance && return
-    end
-    error("Did not converge in $max_iterations iterations")
-end
-
-
 """ Simple linear solver for educational purposes. """
 type LinearSolver
     name :: ASCIIString
@@ -281,17 +232,19 @@ crosspoints.
 function get_boundary_assembly(solver::Solver)
     ndofs = solver.ndofs
     @assert ndofs != 0
-    Kc = spzeros(ndofs, ndofs)
+    K = spzeros(ndofs, ndofs)
     C1 = spzeros(ndofs, ndofs)
     C2 = spzeros(ndofs, ndofs)
     D = spzeros(ndofs, ndofs)
+    f = spzeros(ndofs, 1)
     g = spzeros(ndofs, 1)
     for problem in get_boundary_problems(solver)
         assembly = problem.assembly
-        Kc_ = sparse(assembly.K, ndofs, ndofs)
+        K_ = sparse(assembly.K, ndofs, ndofs)
         C1_ = sparse(assembly.C1, ndofs, ndofs)
         C2_ = sparse(assembly.C2, ndofs, ndofs)
         D_ = sparse(assembly.D, ndofs, ndofs)
+        f_ = sparse(assembly.f, ndofs, 1)
         g_ = sparse(assembly.g, ndofs, 1)
         # check for overconstraint situation and handle it if possible
         already_constrained = get_nonzero_rows(C2)
@@ -303,13 +256,14 @@ function get_boundary_assembly(solver::Solver)
             handle_overconstraint_error!(problem, overconstrained_nodes,
                 overconstrained_dofs, C1, C1_, C2, C2_, D, D_, g, g_)
         end
-        Kc += Kc_
+        K += K_
         C1 += C1_
         C2 += C2_
         D += D_
+        f += f_
         g += g_
     end
-    return Kc, C1, C2, D, g
+    return K, C1, C2, D, f, g
 end
 
 
@@ -323,11 +277,11 @@ function solve_linear_system(solver::Solver, ::Type{Val{:DirectLinearSolver}})
     K, f = get_field_assembly(solver)
 
     # assemble boundary problems
-    Kc, C1, C2, D, g = get_boundary_assembly(solver)
+    Kb, C1, C2, D, fb, g = get_boundary_assembly(solver)
 
     # construct global system Ax=b and solve using lu factorization
-    A = [K+Kc C1'; C2 D]
-    b = [f; g]
+    A = [K+Kb C1'; C2 D]
+    b = [f+fb; g]
 
     nz = get_nonzero_rows(A)
     x = zeros(length(b))
@@ -394,6 +348,8 @@ function call(solver::Solver)
 
     # 2. start non-linear iterations
     for solver.iteration=1:solver.nonlinear_system_max_iterations
+        info("Starting nonlinear iteration #$(solver.iteration)")
+
         # 2.1 update linearized assemblies (if needed)
         for problem in solver.problems
             problem.assembly.changed = true  # force reassembly
@@ -426,3 +382,4 @@ function call(solver::Solver)
         throw(NonlinearConvergenceError(solver))
     end
 end
+
