@@ -6,10 +6,11 @@ type Elasticity <: FieldProblem
     # these are found from problem.properties for type Problem{Elasticity}
     formulation :: Symbol
     finite_strain :: Bool
+    use_forwarddiff :: Bool
 end
 function Elasticity()
     # formulations: plane_stress, plane_strain, continuum
-    return Elasticity(:continuum, true)
+    return Elasticity(:continuum, true, false)
 end
 
 # in case of experimenting new things;
@@ -31,7 +32,9 @@ end
 function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::Element, time::Real)
     props = problem.properties
     gdofs = get_gdofs(problem, element)
-    if props.formulation == :continuum
+    if props.use_forwarddiff
+        Kt, f = assemble(problem, element, time, Val{:forwarddiff})
+    elseif props.formulation == :continuum
         Kt, f = assemble(problem, element, time, Val{:continuum})
     elseif (props.formulation == :plane_stress) || (props.formulation == :plane_strain)
         Kt, f = assemble(problem, element, time, Val{:plane})
@@ -306,6 +309,111 @@ function assemble{El<:Union{Tri3, Tri6, Quad4}}(problem::Problem{Elasticity}, el
     return Kt, f
 end
 
+""" Elasticity equations using ForwardDiff
+
+Formulation
+-----------
+
+Field equation is:
+∂u/∂t = ∇⋅f - b
+
+Weak form is: find u∈U such that ∀v in V
+
+    δW := ∫ρ₀∂²u/∂t²⋅δu dV₀ + ∫S:δE dV₀ - ∫b₀⋅δu dV₀ - ∫t₀⋅δu dA₀ = 0
+
+where
+
+    ρ₀ = density
+    b₀ = displacement load
+    t₀ = displacement traction
+
+References
+----------
+
+https://en.wikipedia.org/wiki/Linear_elasticity
+https://en.wikipedia.org/wiki/Finite_strain_theory
+https://en.wikipedia.org/wiki/Stress_measures
+https://en.wikipedia.org/wiki/Mooney%E2%80%93Rivlin_solid
+https://en.wikipedia.org/wiki/Strain_energy_density_function
+https://en.wikipedia.org/wiki/Plane_stress
+https://en.wikipedia.org/wiki/Hooke's_law
+
+"""
+function assemble(problem::Problem{Elasticity}, element::Element, time::Real, ::Type{Val{:forwarddiff}})
+
+    dim = get_unknown_field_dimension(problem)
+    nnodes = size(element, 2)
+
+    function get_residual_vector(u::Vector)
+        u = reshape(u, dim, nnodes)
+        u = Field([u[:,i] for i=1:nnodes])
+        r = zeros(dim, nnodes)
+
+        for ip in get_integration_points(element)
+
+            JT = transpose(get_jacobian(element, ip, time))
+            n, m = size(JT)
+            if n == m
+                w = ip.weight*det(JT)
+            elseif m == 1
+                w = ip.weight*norm(JT)
+            elseif m == 2
+                w = ip.weight*norm(cross(JT[:,1], JT[:,2]))
+            else
+                error("jacobian $JT")
+            end
+
+            # calculate internal forces
+            if haskey(element, "youngs modulus") && haskey(element, "poissons ratio")
+                grad = element(ip, time, Val{:grad})
+                gradu = grad*u
+
+                # kinematics
+                F = I + gradu
+                E = 1/2*(F'*F - I)
+
+                # material
+                young = element("youngs modulus", ip, time)
+                poisson = element("poissons ratio", ip, time)
+                mu = young/(2*(1+poisson))
+                lambda = young*poisson/((1+poisson)*(1-2*poisson))
+                if problem.properties.formulation == :plane_stress
+                    lambda = 2*lambda*mu/(lambda + 2*mu)  # <- correction for plane stress
+                end
+
+                # stress
+                S = lambda*trace(E)*I + 2*mu*E
+
+                r += w*F*S*grad
+            end
+
+            # calculate external forces - volume load
+            if haskey(element, "displacement load")
+                basis = element(ip, time)
+                b = element("displacement load", ip, time)
+                r -= w*b*basis
+            end
+
+            # external forces - surface traction force
+            if haskey(element, "displacement traction force")
+                basis = element(ip, time)
+                T = element("displacement traction force", ip, time)
+                r -= w*T*basis
+            end
+
+        end
+
+        return vec(r)
+
+    end
+
+    field = element("displacement", time)
+    Kt, allresults = ForwardDiff.jacobian(get_residual_vector, vec(field),
+                     AllResults, cache=autodiffcache)
+    f = -ForwardDiff.value(allresults)
+    return Kt, f
+end
+
 
 ###############################
 #     Plastic material        #
@@ -376,84 +484,5 @@ function get_unknown_field_type{P<:ElasticityProblem}(::Type{P})
 end
 
 
-""" Elasticity equations.
-
-Formulation
------------
-
-Field equation is:
-∂u/∂t = ∇⋅f - b
-
-Weak form is: find u∈U such that ∀v in V
-
-    δW := ∫ρ₀∂²u/∂t²⋅δu dV₀ + ∫S:δE dV₀ - ∫b₀⋅δu dV₀ - ∫t₀⋅δu dA₀ = 0
-
-where
-
-    ρ₀ = density
-    b₀ = displacement load
-    t₀ = displacement traction
-
-References
-----------
-
-https://en.wikipedia.org/wiki/Linear_elasticity
-https://en.wikipedia.org/wiki/Finite_strain_theory
-https://en.wikipedia.org/wiki/Stress_measures
-https://en.wikipedia.org/wiki/Mooney%E2%80%93Rivlin_solid
-https://en.wikipedia.org/wiki/Strain_energy_density_function
-https://en.wikipedia.org/wiki/Plane_stress
-https://en.wikipedia.org/wiki/Hooke's_law
-
-"""
-function get_residual_vector{P<:ElasticityProblem}(problem::Problem{P}, element::Element, ip::IntegrationPoint, time::Number; variation=nothing)
-    r = zeros(Float64, problem.dim, length(element))
-
-    J = get_jacobian(element, ip, time)
-
-    # internal forces
-    if haskey(element, "youngs modulus") && haskey(element, "poissons ratio")
-        u = element("displacement", time, variation)
-        grad = element(ip, time, Val{:grad})
-        gradu = grad*u
-
-        # deformation gradient
-        F = I + gradu
-
-        # material
-        young = element("youngs modulus", ip, time)
-        poisson = element("poissons ratio", ip, time)
-        mu = young/(2*(1+poisson))
-        lambda = young*poisson/((1+poisson)*(1-2*poisson))
-        if problem.properties.formulation == :plane_stress
-            lambda = 2*lambda*mu/(lambda + 2*mu)  # <- correction for 2d problems
-        end
-
-        # strain
-        E = 1/2*(F'*F - I)
-        # stress
-        S = lambda*trace(E)*I + 2*mu*E
-
-        r += F*S*grad*det(J)
-    end
-
-    # external forces - volume load
-    if haskey(element, "displacement load")
-        basis = element(ip, time)
-        b = element("displacement load", ip, time)
-        r -= b*basis*det(J)
-    end
-
-    # external forces - surface traction force
-    if haskey(element, "displacement traction force")
-        basis = element(ip, time)
-        T = element("displacement traction force", ip, time)
-        JT = transpose(J)
-        s = size(JT, 2) == 1 ? JT : cross(JT[:,1], JT[:,2])
-        r -= T*basis*norm(s)
-    end
-
-    return vec(r)
-end
 
 =#

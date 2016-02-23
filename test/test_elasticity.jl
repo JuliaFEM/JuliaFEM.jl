@@ -1,46 +1,82 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-module ElasticityTests
-
 using JuliaFEM.Test
-using JuliaFEM
-using JuliaFEM.Core: Seg2, Quad4, Hex8,
-                     ElasticityProblem, PlaneStressElasticityProblem,
-                     solve!, get_connectivity, DirichletProblem
+using JuliaFEM.Core: Node, Seg2, Quad4, Elasticity, Dirichlet, Problem, Solver, update!
+using JuliaFEM.Core: assemble
 
-
-function test_elasticity_volume_load()
+@testset "test forwarddiff version + volume load." begin
+    nodes = Dict{Int64, Node}(
+        1 => [0.0, 0.0],
+        2 => [10.0, 0.0],
+        3 => [10.0, 1.0],
+        4 => [0.0, 1.0])
+    # constant volume load on nodes
+    load = Dict(
+        1 => [0.0, -10.0],
+        2 => [0.0, -10.0],
+        3 => [0.0, -10.0],
+        4 => [0.0, -10.0])
+    young = Dict(1 => 500.0, 2 => 500.0, 3 => 500.0, 4 => 500.0)
+    poisson = Dict(1 => 0.3, 2 => 0.3, 3 => 0.3, 4 => 0.3)
     element = Quad4([1, 2, 3, 4])
-    element["geometry"] = Vector[[0.0, 0.0], [10.0, 0.0], [10.0, 1.0], [0.0, 1.0]]
-    element["youngs modulus"] = 500.0
-    element["poissons ratio"] = 0.3
-    element["displacement load"] = Vector[[0.0, -10.0], [0.0, -10.0], [0.0, -10.0], [0.0, -10.0]]
-    element["displacement"] = (0.0 => Vector{Float64}[[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
-    problem = PlaneStressElasticityProblem()
-    push!(problem, element)
+    update!(element, "geometry", nodes)
+    update!(element, "youngs modulus", young)
+    update!(element, "poissons ratio", poisson)
+    update!(element, "displacement load", load)
+    boundary = Seg2([1, 4])
+    update!(boundary, "geometry", nodes)
+    update!(boundary, "displacement 1", 0.0)
+    update!(boundary, "displacement 2", 0.0)
 
-    free_dofs = [3, 4, 5, 6]
-    solve!(problem, free_dofs, 0.0; max_iterations=10)
+    body = Problem(Elasticity, "beam", 2)
+    body.properties.formulation = :plane_stress
+    body.properties.use_forwarddiff = true
+    push!(body, element)
+    bc = Problem(Dirichlet, "fixed left side", 2, "displacement")
+    #bc.properties.formulation = :incremental
+    push!(bc, boundary)
+
+    solver = Solver()
+    push!(solver, body, bc)
+    call(solver)
     disp = element("displacement", [1.0, 1.0], 0.0)
-    # function get_previous_ip(element::Element, current_ip::IntegrationPoint)
-    # end
-    # ipdata = element("integration points", time) => IntegrationPoint[ip1, ip2, ..., ipN]
-    # for some_ip in ipdata
-    #   if isapprox(some_ip.xi, ip.xi)
-    #       info("found")
-    #       last_value = some_ip("material parameter", time)
-    #       break
-    #   end
-    # end
-    #ip1 = last(element["integration points"])[1]
-    #ip2 = last(element["integration points"])[2]
-    # strain = ip1("gl strain")
     info("displacement at tip: $disp")
-    #info("strain in first ip: $strain. ip coord = $(ip1.xi) and weight = $(ip1.weight)")
     # verified using Code Aster, verification/2015-10-22-plane-stress/cplan_grot_gdep_volume_force.resu
     @test isapprox(disp[2], -8.77303119819776)
 end
-#test_elasticity_volume_load()
 
+@testset "test that stiffness matrix is same" begin
+    nodes = Dict{Int64, Node}(
+        1 => [0.0, 0.0],
+        2 => [10.0, 0.0],
+        3 => [10.0, 1.0],
+        4 => [0.0, 1.0])
+    displacement = Dict(
+        1 => [0.1, 0.2],
+        2 => [0.3, 0.4],
+        3 => [0.5, 0.6],
+        4 => [0.7, 0.8])
+    displacement = Dict(
+        1 => [0.0, 0.0],
+        2 => [0.0, 0.0],
+        3 => [0.0, 0.0],
+        4 => [0.0, 0.0])
+    load = Dict(
+        1 => [0.0, -10.0],
+        2 => [0.0, -10.0],
+        3 => [0.0, -10.0],
+        4 => [0.0, -10.0])
+    element = Quad4([1, 2, 3, 4])
+    update!(element, "geometry", nodes)
+    update!(element, "displacement", displacement)
+    update!(element, "youngs modulus", 288.0)
+    update!(element, "poissons ratio", 1/3)
+    update!(element, "displacement load", load)
+    body = Problem(Elasticity, "beam", 2)
+    body.properties.formulation = :plane_stress
+    K1, f1 = assemble(body, element, 0.0, Val{:forwarddiff})
+    K2, f2 = assemble(body, element, 0.0, Val{:plane})
+    @test isapprox(K1, K2)
+    @test isapprox(f1, f2)
 end
