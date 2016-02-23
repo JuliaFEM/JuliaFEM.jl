@@ -177,7 +177,7 @@ function update_assembly!(problem, u, la)
     elseif get_formulation_type(problem) == :forwarddiff
         info("$(problem.name): forwarddiff formulation, adding increment to solution vector")
         assembly.u += u
-        assembly.la += la
+        assembly.la = la
     else
         info("$(problem.name): unknown formulation type, don't know what to do with results")
         error("serious failure with problem formulation: $(get_formulation_type(problem))")
