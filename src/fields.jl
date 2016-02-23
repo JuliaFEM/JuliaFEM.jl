@@ -279,7 +279,7 @@ function Base.call(field::CCTV, time::Number)
     return field.data(time)
 end
 
-### Interpolation 
+### Interpolation
 
 """ Interpolate time-invariant field in time direction. """
 function Base.call(field::DVTI, time::Float64)
@@ -361,11 +361,10 @@ function Base.call(basis::CVTI, xi::Vector, time::Number)
     call(basis, xi)
 end
 
-function Base.(:*)(grad::Matrix{Float64}, field::DVTI)
+function Base.(:*)(grad::Matrix, field::DVTI)
     return sum([kron(grad[:,i], field[i]') for i=1:length(field)])'
 end
 
 ### FIELDSET ###
 
 typealias FieldSet Dict{ASCIIString, Field}
-
