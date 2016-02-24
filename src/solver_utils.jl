@@ -70,6 +70,7 @@ function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2
 # INFO: fixed: new setting is
 # INFO: dof 1109: 0.0*u₁₅₃ - 0.0*u₁₅₄ - 0.0*u₁₅₅ + 0.15*u₁₅₆ + 0.0*u₁₁₀₉ - 0.15*u₁₁₁₀ = -0.0
 =#
+#=
     if 555 in nodes
         info("overconstraint DIRTY HACK")
         # It is possible to selectively remove mortar constraints and the associated
@@ -103,6 +104,7 @@ function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2
         #C1_[1110,:] = 0
         return
     end
+=#
 
     """ Return all other dofs which connects to overconstrained dofs. """
     function get_related_dofs(dofs)
@@ -243,7 +245,7 @@ function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2
         return dofs_, true
     end
 
-    actions = [action1, action2]
+    actions = [action1, action2, action3, action4]
 
     function show_lambda_coefficients(dofs, C1)
         for dof in dofs
