@@ -24,18 +24,20 @@ type Mortar <: BoundaryProblem
     inequality_constraints :: Bool # Launch PDASS to solve inequality constraints
     normal_condition :: Symbol # Tie or Contact
     tangential_condition :: Symbol # Stick or Slip
-    minimum_distance :: Float64 # don't check for a contact if elements are far enough
+    maximum_distance :: Float64 # don't check for a contact if elements are far enough
     store_debug_info :: Bool # for making debugging easier
+    always_inactive :: Vector{Int64}
     always_in_contact :: Vector{Int64} # nodes in this list always in contact
     always_in_stick :: Vector{Int64} # nodes in this list always in stick
     always_in_slip :: Vector{Int64} # nodes in this list always in slip
     contact :: Bool
     friction :: Bool
     gap_sign :: Int # gap sign convention
+    rotate_normals :: Bool
 end
 
 function Mortar()
-    Mortar(:total, true, false, :Tie, :Stick, Inf, false, [], [], [], false, false, -1)
+    Mortar(:total, true, false, :Tie, :Stick, Inf, false, [], [], [], [], false, false, -1, false)
 end
 
 function get_unknown_field_name(::Type{Mortar})
