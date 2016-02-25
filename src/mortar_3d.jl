@@ -45,20 +45,24 @@ Notes
 [1](http://stackoverflow.com/questions/8942950/how-do-i-find-the-orthogonal-projection-of-a-point-onto-a-plane)
 
 """
-function project_point_to_auxiliary_plane(p::Vector, x0::Vector, Q::Matrix)
+function project_vertex_to_auxiliary_plane(p::Vector, x0::Vector, Q::Matrix)
     n = Q[:,1]
     ph = p - dot(p-x0, n)*n
     qproj = Q'*(ph-x0)
-    if !isapprox(qproj[1], 0.0; atol=1.0e-12)
-        info("project_point_to_auxiliary_plane(): point not projected correctly.")
-        info("p: $p")
-        info("x0: $x0")
-        info("Q: \n$Q")
-        info("qproj: $qproj")
-        error("Failed to project point to auxiliary plane.")
+    if abs(qproj[1]) > 1.0e-2
+        # we should have something very little for normal direction if projected
+        # properly
+        info("project_point_to_auxiliary_plane(): vertex not projected correctly.")
+        info("p: $(ForwardDiff.get_value(p))")
+        info("x0: $(ForwardDiff.get_value(x0))")
+        info("Q: \n$(ForwardDiff.get_value(Q))")
+        info("qproj: $(ForwardDiff.get_value(qproj))")
+        error("Failed to project vertex to auxiliary plane.")
     end
     return qproj[2:3]
 end
+
+project_point_to_auxiliary_plane = project_vertex_to_auxiliary_plane
 
 """
 Find edge intersections of two planar arbitrary shape polygons.
@@ -114,7 +118,7 @@ function get_edge_intersections(S::Matrix, M::Matrix)
         for j=1:nm
             b = M[:,j]-S[:,i]
             A = [S[:,mod(i,ns)+1]-S[:,i]  -M[:,mod(j,nm)+1]+M[:,j]]
-            if rank(A) == 2
+            if rank(ForwardDiff.get_value(A)) == 2
                 r = A\b
                 if (r[1]>=0) & (r[1]<=1) & (r[2]>=0) & (r[2]<=1)  # intersection found
                     k += 1
@@ -206,12 +210,12 @@ end
 """
 function uniquetol(P, dim::Int; args...)
     @assert dim == 2
-    items = Vector{Float64}[P[:,i] for i=1:size(P,dim)]
-    new_items = Vector{Float64}[]
+    items = Vector[P[:,i] for i=1:size(P,dim)]
+    new_items = Vector[]
     for item in items
         has_found = false
         for new_item in new_items
-            if isapprox(item, new_item; args...)
+            if isapprox(ForwardDiff.get_value(item), ForwardDiff.get_value(new_item); args...)
                 has_found = true
                 break
             end
@@ -317,7 +321,7 @@ function calculate_polygon_centerpoint(P::Matrix)
         Cx += 1/(6*A)*(P[1,i] + P[1,inext])*(P[1,i]*P[2,inext] - P[1,inext]*P[2,i])
         Cy += 1/(6*A)*(P[2,i] + P[2,inext])*(P[1,i]*P[2,inext] - P[1,inext]*P[2,i])
     end
-    return Float64[Cx, Cy]
+    return [Cx, Cy]
 end
 
 """
@@ -401,33 +405,58 @@ julia> xquad*basis(theta[2:3])
   1.0
 
 """
-function project_point_from_plane_to_surface{E}(p::Vector, x0::Vector, Q::Matrix, element::Element{E}, time::Real; max_iterations::Int=10, iter_tol::Float64=1.0e-9)
+function project_point_from_plane_to_surface{E}(p::Vector, x0::Vector, Q::Matrix,
+    element::Element{E}, time::Real; max_iterations::Int=10, iter_tol::Float64=1.0e-9)
+    x = element("geometry", time)
+    return project_point_from_plane_to_surface(p, x0, Q, element, x, time;
+            max_iterations=max_iterations, iter_tol=iter_tol)
+end
+function project_vertex_from_plane_to_surface{E}(p::Vector, x0::Vector, Q::Matrix,
+    element::Element{E}, x, time::Real; max_iterations::Int=10, iter_tol::Float64=1.0e-9)
     basis(xi) = get_basis(E, xi)
     dbasis(xi) = get_dbasis(E, xi)
-    x = element("geometry", time)
     ph = Q*[0; p] + x0
-    theta = Float64[0.0, 0.0, 0.0]
     n = Q[:,1]
+    b(theta) = ph + theta[1]*n - basis(theta[2:3])*x
+    J(theta) = [n -dbasis(theta[2:3])*x]
+    theta = zeros(3)
+    dtheta = zeros(3)
     for i=1:max_iterations
-        b = ph + theta[1]*n - basis(theta[2:3])*x
-        J = [n -dbasis(theta[2:3])*x]
-        dtheta = J \ -b
+        # FIXME: gives NaN if partials in J
+        dtheta = ForwardDiff.get_value(J(theta)) \ -b(theta)
+        theta += dtheta
+        if norm(ForwardDiff.get_value(dtheta)) < iter_tol
+            return theta
+        end
+    end
+    info("failed to project vertex from auxiliary plane back to surface")
+    info("element type: $E")
+    info("element connectivity: $(get_connectivity(element))")
+    info("auxiliary plane: x0 = $(ForwardDiff.get_value(x0)), Q = $(ForwardDiff.get_value(Q))")
+    info("point coordinates on plane: $(ForwardDiff.get_value(p))")
+    info("element geometry: $(ForwardDiff.get_value(x.data))")
+    info("ph: $(ForwardDiff.get_value(ph))")
+    info("normal direction: $(ForwardDiff.get_value(n))")
+    info("parameter vector before giving up: $(ForwardDiff.get_value(theta))")
+    info("increment in parameter vector before giving up: $(ForwardDiff.get_value(dtheta))")
+    info("b([0.0, 0.0, 0.0]) = $(ForwardDiff.get_value(b([0.0, 0.0, 0.0])))")
+    info("J([0.0, 0.0, 0.0]) = $(ForwardDiff.get_value(J([0.0, 0.0, 0.0])))")
+
+    info("iterations were")
+    theta = zeros(3)
+    dtheta = zeros(3)
+    for i=1:max_iterations
+        info("iter $i, theta = $(ForwardDiff.get_value(theta))")
+        info("b = $(ForwardDiff.get_value(b(theta)))")
+        info("J = $(ForwardDiff.get_value(J(theta)))")
+        dtheta = ForwardDiff.get_value(J(theta)) \ -b(theta)
+        info("dtheta = $(ForwardDiff.get_value(dtheta))")
         theta += dtheta
         if norm(dtheta) < iter_tol
             return theta
         end
     end
-    begin
-        info("projecting point from auxiliary plane back to surface didn't go very well.")
-        info("element type: $E")
-        info("element connectivity: $(get_connectivity(element))")
-        info("auxiliary plane: x0 = $x0, Q = $Q")
-        info("point coordinates on plane: $p")
-        info("element geometry: $x")
-        info("ph: $ph")
-        info("normal direction: $n")
-        info("parameter vector before giving up: $theta")
-    end
+
     error("project_point_to_surface: did not converge in $max_iterations iterations!")
 end
 

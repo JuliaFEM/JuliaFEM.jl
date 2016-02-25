@@ -53,9 +53,21 @@ macro debug(msg)
     return msg
 end
 
+function assemble!(problem::Problem{Mortar}, time::Real)
+    elements = get_elements(problem)
+    if length(elements) == 0
+        info("$(typeof(problem)) : forget to add elements?")
+        return
+    end
+    # returns 3 if eldim 2 (tri3, quad4, ...) for 3d problems etc.
+    eldim = size(elements[1], 1)+1
+    assemble!(problem, time, Val{eldim})
+end
+
 include("mortar_2d.jl")
 include("mortar_2d_autodiff.jl")
 include("mortar_3d.jl")
+include("mortar_3d_autodiff.jl")
 
 """ Remove inactive inequality constraints by using primal-dual active set strategy. """
 function boundary_assembly_posthook!(solver::Solver, problem::Problem{Mortar}, C1, C2, D, g)

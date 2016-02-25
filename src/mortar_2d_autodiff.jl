@@ -73,7 +73,8 @@ function project_from_slave_to_master{E<:MortarElements2D}(
 
 end
 
-function assemble!(problem::Problem{Mortar}, time::Real)
+""" Assemble Mortar problem for two-dimensional problems, i.e. for Seg2 and Seg3 elements. """
+function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}})
 
     props = problem.properties
     field_dim = get_unknown_field_dimension(problem)
@@ -99,7 +100,7 @@ function assemble!(problem::Problem{Mortar}, time::Real)
             push!(S, conn...)
             gdofs = get_gdofs(element, field_dim)
             X_el = element("geometry", time)
-            u_el = Field(Vector[u[:, i] for i in conn])
+            u_el = Field(Vector[u[:,i] for i in conn])
             x_el = X_el + u_el
             for ip in get_integration_points(element, Val{3})
                 dN = get_dbasis(element, ip)
@@ -111,6 +112,7 @@ function assemble!(problem::Problem{Mortar}, time::Real)
         for i in 1:size(normals,2)
             normals[:,i] /= norm(normals[:,i])
         end
+        # swap element normals in 2d if they point to inside of body
         if props.rotate_normals
             for i=1:size(normals,2)
                 normals[:,i] = -normals[:,i]
@@ -127,8 +129,8 @@ function assemble!(problem::Problem{Mortar}, time::Real)
             x1 = X1 + u1
             la1 = Field(Vector[la[:,i] for i in slave_element_nodes])
             n1 = Field(Vector[normals[:,i] for i in slave_element_nodes])
-
             nnodes = size(slave_element, 2)
+            update!(slave_element, "normals", time => ForwardDiff.get_value(n1))
 
             # 3. loop all master elements
             for master_element in slave_element["master elements"]
@@ -202,7 +204,7 @@ function assemble!(problem::Problem{Mortar}, time::Real)
                     gap[1,slave_element_nodes] += w*gn*Phi'
                     #gap[1,slave_element_nodes] += w*gn*N1'
 
-                end
+                end # done integrating segment
 
             end # master elements done
 
@@ -230,7 +232,6 @@ function assemble!(problem::Problem{Mortar}, time::Real)
                 C[1,j] += gap[1, j]
                 C[2,j] += lat
             else
-                #info("set node $j inactive")
                 C[:,j] = la[:,j]
             end
         end
