@@ -3,13 +3,13 @@
 
 using HDF5
 using JuliaFEM
-using JuliaFEM.Core: Element, Quad4, Tri3, Seg2, Hex8, update!
+using JuliaFEM.Core: Element, Quad4, Tri3, Tet4, Seg2, Hex8, update!
 
 
 # TODO: this should be elsewhere
 function aster_create_elements(mesh, element_set, element_type=nothing)
     elements = Element[]
-    mapping = Dict(:QU4 => Quad4, :TR3 => Tri3, :SE2 => Seg2, :HE8 => Hex8)
+    mapping = Dict(:QU4 => Quad4, :TR3 => Tri3, :SE2 => Seg2, :HE8 => Hex8, :TE4 => Tet4)
     for (elid, (eltype, elset, elcon)) in mesh["connectivity"]
         if !haskey(mapping, eltype)
             error("aster_create_elements: unknown element mapping $eltype")

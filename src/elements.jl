@@ -124,7 +124,7 @@ function get_basis{E}(::Type{Element{E}}, xi::Vector{Float64})
     return get_basis(E, xi)
 end
 
-function get_basis{E}(element::Element{E}, xi::Vector{Float64})
+function get_basis{E}(element::Element{E}, xi::Vector)
     return get_basis(E, xi)
 end
 
