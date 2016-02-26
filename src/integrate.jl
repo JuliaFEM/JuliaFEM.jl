@@ -78,6 +78,15 @@ function get_integration_points(::TriangularElement, ::Type{Val{2}})
     ]
 end
 
+function get_integration_points(::TriangularElement, ::Type{Val{3}})
+    [
+        IntegrationPoint([1/3, 1/3], 0.5*-0.5625),
+        IntegrationPoint([0.2, 0.2], 0.5*0.5208333333333333),
+        IntegrationPoint([0.2, 0.6], 0.5*0.5208333333333333),
+        IntegrationPoint([0.6, 0.2], 0.5*0.5208333333333333),
+    ]
+end
+
 function get_integration_points(::TriangularElement, ::Type{Val{4}})
     # http://math2.uncc.edu/~shaodeng/TEACHING/math5172/Lectures/Lect_15.PDF
     # FIXME: something wrong here with weights ..?

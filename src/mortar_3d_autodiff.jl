@@ -108,8 +108,6 @@ function calculate_centroid(P)
     P0 = P[1]
     areas = [norm(1/2*cross(P[i]-P0, P[mod(i,N)+1]-P0)) for i=2:N]
     centroids = [1/3*(P0+P[i]+P[mod(i,N)+1]) for i=2:N]
-    #info("areas: $areas")
-    #info("centroids: $centroids")
     C = 1/sum(areas)*sum(areas.*centroids)
     return C
 end
@@ -129,7 +127,7 @@ function get_polygon_clip(xs, xm, n)
     for i=1:ns
         vertex_inside_polygon(xs[i], xm) && push!(P, xs[i])
     end
-    
+
     for i=1:nm
         # 2. find possible intersection
         xm1 = xm[i]
@@ -153,7 +151,7 @@ function get_polygon_clip(xs, xm, n)
     return P
 end
 
-""" Divide polygon to triangle cells. """
+""" Divide polygon to cells. """
 function get_cells(P, C)
     N = length(P)
     cells = Vector[]
@@ -184,6 +182,25 @@ function get_cells(P, C)
     info("indices = $indices")
 end
 
+""" Check that polygon P is in CCW order for the direction n. Reorder if not. """
+function check_orientation!(P, n)
+    C = mean(P)
+    np = length(P)
+    s = [dot(n, cross(P[i]-C, P[mod(i+1,np)+1]-C)) for i=1:np]
+    all(s .< 0) && return
+    info("polygon not in ccw order, fixing")
+    # project points to new orthogonal basis Q and sort there
+    t1 = (P[1]-C)/norm(P[1]-C)
+    t2 = cross(n, t1)
+    Q = [n t1 t2]
+    sort!(P, lt=(A, B) -> begin
+        A_proj = Q'*(A-C)
+        B_proj = Q'*(B-C)
+        a = atan2(A_proj[3], A_proj[2])
+        b = atan2(B_proj[3], B_proj[2])
+        return a < b
+    end)
+end
 
 """ Assemble Mortar problem for three-dimensional problems, i.e. for Tri3, Tri6, Quad4, Quad8, Quad9 elements. """
 function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
@@ -200,7 +217,6 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
         la = reshape(x[ndofs+1:end], field_dim, nnodes)
         fc = zeros(u)
         gap = zeros(u)
-#       gap_added = zeros(size(u)...)
         C = zeros(la)
         all_slave_nodes = Set{Int64}()
         slave_surface_area = 0.0
@@ -223,7 +239,6 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
                 dN = get_dbasis(element, ip)
                 N = element(ip, time)
                 j = transpose(sum([kron(dN[:,i], x_el[i]') for i=1:length(x_el)]))
-                #info("size of j = $(size(j))")
                 n = reshape(cross(j[:,1], j[:,2]), 3, 1)
                 normal[:, conn] += ip.weight*n*N
             end
@@ -266,12 +281,10 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
             # create auxiliary plane (x0, Q)
             xi = get_reference_element_midpoint(slave_element)
             N = vec(get_basis(slave_element, xi))
-            #Q = [N*n1 N*t1 N*t2]
             x0 = N*x1
             n0 = N*n1
 
             # project slave nodes to auxiliary plane
-            #S = hcat([project_vertex_to_auxiliary_plane(p, x0, Q) for p in x1]...)
             S = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in x1]
 
             # 3. loop all master elements
@@ -288,116 +301,30 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
                 distance > props.maximum_distance && continue
 
                 # project master nodes to auxiliary plane
-                #M = hcat([project_vertex_to_auxiliary_plane(p, x0, Q) for p in x2]...)
                 M = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in x2]
 
                 # create polygon clipping on auxiliary plane
-#=
-                P = nothing
-                neighbours = nothing
-                try
-                catch
-                    info("polygon clipping failed")
-                    info("S = ")
-                    dump(ForwardDiff.get_value(S))
-                    info("M = ")
-                    dump(ForwardDiff.get_value(M))
-                    error("cannot continue")
-                end
-=#
-                #P, neighbours = clip_polygon(S, M)
-                #isa(P, Void) && continue # no clipping
-                #info("polygon clip found: S = $(ForwardDiff.get_value(S)), M = $(ForwardDiff.get_value(M)), P = $(ForwardDiff.get_value(P))")
-                # special case, shared edge but no shared volume
-                #size(P, 2) < 3 && continue
-                #gap_added += 1
                 P = get_polygon_clip(S, M, n0)
                 length(P) < 3 && continue # no clipping or shared edge (no volume)
-
-                # clip polygon centerpoint
-                #C0 = calculate_polygon_centerpoint(P)
-                #C0 = vec(mean(P, 2))
-                act = setdiff(collect(1:3), indmax(n0))
-                function comparator(A,B)
-                    A -= mean(P)
-                    B -= mean(P)
-                    atan2(A[act[1]], A[act[2]]) < atan2(B[act[1]], B[act[2]])
-                end
-                sort!(P, lt=comparator)
-                #sort!(P, lt=(A,B) -> dot(n0, cross(A-C0, B-C0)) > 0)
-                #npts = size(P, 2) # number of vertices in polygon
-                #for pnt=1:npts # loop integration cells
-                #    x_cell = Field(Vector[C0, P[:,pnt], P[:,mod(pnt,npts)+1]])
-                #info("integrating cell")
-                #info("P = $(ForwardDiff.get_value(P))")
-
-                for i=2:length(P)
-                    V = cross(P[i]-P[1], P[mod(i,length(P))+1]-P[1])
-                    slave_element_area += 1/2*dot(n0, V)
-                end
+                check_orientation!(P, n0)
                 C0 = calculate_centroid(P)
-                #=
-                for x_cell in get_cells(P, C0)
-                    V = cross(x_cell[2]-x_cell[1], x_cell[3]-x_cell[1])
-                    slave_element_area += 1/2*dot(n0, V)
-                end
-                =#
 
-                for x_cell_ in get_cells(P, C0)
-                    #info("cell : $(ForwardDiff.get_value(x_cell_))")
-                    x_cell = Field(x_cell_)
-                    V = cross(x_cell[2]-x_cell[1], x_cell[3]-x_cell[1])
-                    #info("V = $(ForwardDiff.get_value(V))")
-                    #slave_element_area += 1/2*dot(n0, V)
-#                   slave_surface_area_2 += 1/2*jC
-#                   slave_element_area += 1/2*jC
-#=
-                    try
-                    catch
-                        info("centerpoint: $(ForwardDiff.get_value(C0))")
-                        info("P1 = $(ForwardDiff.get_value(P[:,pnt]))")
-                        info("P2 = $(ForwardDiff.get_value(P[:,mod(pnt,npts)+1]))")
-                        data = Vector[C0, P[:,pnt], P[:,mod(pnt,npts)+1]]
-                        info("data = $(ForwardDiff.get_value(data))")
-                        rethrow()
-                    end
-=#
+                for cell in get_cells(P, C0)
+                    x_cell = Field(cell)
+
                     # create dual basis
                     De = zeros(nnodes, nnodes)
                     Me = zeros(nnodes, nnodes)
                     for ip in get_integration_points(Tri3, Val{5})
                         N = vec(get_basis(Tri3, ip.xi))
-                        x_g = N*x_cell
-#=
-                        theta = zeros(3)
-                        try
-                            theta = project_vertex_to_surface(x_g, x0, n0, slave_element, x1, time)
-                        catch
-                            info("creating dual basis did fail for finding projection back to slave surface.")
-                            info("cell coords in auxiliary plane are:")
-                            info(ForwardDiff.get_value(x_cell.data))
-                            info("interpolated value x_g is $(ForwardDiff.get_value(x_g))")
-                            info("clip polygon centerpoint is $(ForwardDiff.get_value(C0))")
-                            info("clip polygon is $(ForwardDiff.get_value(P))")
-                            info("slave side nodes projected onto a plane are $(ForwardDiff.get_value(S))")
-                            info("master side nodes projected onto a plane are $(ForwardDiff.get_value(M))")
-                            rethrow()
-                        end
-                        xi_slave = theta[2:3]
-=#
-                        xi_slave, alpha = project_vertex_to_surface(x_g, x0, n0, slave_element, x1, time)
+                        x_gauss = N*x_cell
+
+                        xi_slave, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, x1, time)
                         N1 = slave_element(xi_slave, time)
 
-                        # jacobian determinant on integration cell combined with integration weight
                         dNC = get_dbasis(Tri3, ip.xi)
                         JC = transpose(sum([kron(dNC[:,j], x_cell[j]') for j=1:length(x_cell)]))
-                        jC = norm(cross(JC[:,1], JC[:,2]))
-                        #info("dNC = $dNC")
-                        #info("x_cell = $(ForwardDiff.get_value(x_cell.data))")
-                        #info("JC = $(ForwardDiff.get_value(JC))")
-                        #det(JC)
-                        wC = ip.weight*jC
-
+                        wC = ip.weight*norm(cross(JC[:,1], JC[:,2]))
                         De += wC*diagm(vec(N1))
                         Me += wC*N1'*N1
                     end
@@ -406,10 +333,10 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
                     # loop integration points of cell
                     for ip in get_integration_points(Tri3, Val{5})
                         N = vec(get_basis(Tri3, ip.xi))
-                        x_g = N*x_cell
+                        x_gauss = N*x_cell
                         # project gauss point back to element surfaces
-                        xi_slave, alpha = project_vertex_to_surface(x_g, x0, n0, slave_element, x1, time)
-                        xi_master, alpha = project_vertex_to_surface(x_g, x0, n0, master_element, x2, time)
+                        xi_slave, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, x1, time)
+                        xi_master, alpha = project_vertex_to_surface(x_gauss, x0, n0, master_element, x2, time)
 
                         # evaluate shape functions, calculate contact force and gap
                         N1 = vec(get_basis(slave_element, xi_slave))
@@ -418,40 +345,21 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
 
                         dNC = get_dbasis(Tri3, ip.xi)
                         JC = transpose(sum([kron(dNC[:,j], x_cell[j]') for j=1:length(x_cell)]))
-                        jC = norm(cross(JC[:,1], JC[:,2]))
-                        #dNC = get_dbasis(Tri3, ip.xi)
-                        #JC = sum([kron(dNC[:,j], x_cell[j]') for j=1:length(x_cell)])
-                        #jC = det(JC)
-                        wC = ip.weight*jC
+                        wC = ip.weight*norm(cross(JC[:,1], JC[:,2]))
 
                         x_s = N1*x1
                         n_s = N1*n1
                         x_m = N2*x2
                         la_s = Phi*la1
-                        gn = props.gap_sign*dot(n_s, x_s - x_m)
-                        fc[:,slave_element_nodes] += -1*wC*la_s*N1'
-                        fc[:,master_element_nodes] -= -1*wC*la_s*N2'
-                        gap[1,slave_element_nodes] += wC*gn*Phi'
+                        g_s = x_s - x_m
+                        fc[:,slave_element_nodes] += wC*la_s*N1'
+                        fc[:,master_element_nodes] -= wC*la_s*N2'
+                        gap[:,slave_element_nodes] += wC*g_s*Phi'
+                        #gn = props.gap_sign*dot(n_s, x_s - x_m)
+                        #gap[1,slave_element_nodes] += wC*gn*Phi'
 
-                        wg = wC*gn*Phi'
-                        if any(isnan(wg))
-                            info("gap has NaNs!")
-                            info("wC = $(ForwardDiff.get_value(wC))")
-                            info("gn = $(ForwardDiff.get_value(gn))")
-                            info("Phi = $(ForwardDiff.get_value(Phi))")
-                            info("xi_slave = $(ForwardDiff.get_value(xi_slave))")
-                            info("N1 = $(ForwardDiff.get_value(N1))")
-                            info("Ae = $(ForwardDiff.get_value(Ae))")
-                            info("De = $(ForwardDiff.get_value(De))")
-                            info("Me = $(ForwardDiff.get_value(Me))")
-                            info("x_cell(data) = $(ForwardDiff.get_value(x_cell.data))")
-                            info("C0 = $(ForwardDiff.get_value(C0))")
-                            info("P = $(ForwardDiff.get_value(P))")
-                            error("fix this")
-                        end
-#                       gap_added[1,slave_element_nodes] += 1
                         slave_surface_area += wC
-                        #slave_element_area += wC
+                        slave_element_area += wC
                     end # done integrating cell
 
                 end # done for all cells in this segment
@@ -463,9 +371,10 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
 
         # like in 2d, check contact in nodes based on a complementarity condition
 
-        nzgap = sort(nonzeros(sparse(ForwardDiff.get_value(gap))))
         all_slave_nodes = sort(collect(all_slave_nodes))
+        nzgap = sort(nonzeros(sparse(ForwardDiff.get_value(gap))))
         info("gap: $nzgap")
+
         info("size of normal = $(size(normal))")
         info("size of la = $(size(la))")
         info("size of C = $(size(C))")
@@ -491,17 +400,19 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
             t1 = tangent1[:,j]
             t2 = tangent2[:,j]
             lan = dot(n, la[:,j])
+            gn = dot(n, gap[:,j])
 
-#           if lan - gap[1, j] > 0
+#           if lan - gn < 0
                 info("set node $j active, normal direction = $(ForwardDiff.get_value(n)), tangent plane = $(ForwardDiff.get_value(t1)) x $(ForwardDiff.get_value(t2))")
-                C[1,j] += gap[1, j]
-                C[2,j] += dot(t1, la[:,j])
-                C[3,j] += dot(t2, la[:,j])
+                C[1,j] = dot(n, gap[:,j])
+                C[2,j] = dot(t1, la[:,j])
+                C[3,j] = dot(t2, la[:,j])
 #           else
 #               C[:,j] = la[:,j]
 #           end
         end
 
+#=
         for (i, j) in enumerate(all_slave_nodes)
             Ci = ForwardDiff.get_value(C[:,j])
             gapi = ForwardDiff.get_value(gap[:,j])
@@ -509,9 +420,9 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
             lai = ForwardDiff.get_value(la[:,j])
             ui = ForwardDiff.get_value(u[:,j])
             ni = ForwardDiff.get_value(normal[:,j])
-#           gai = gap_added[:,j]
             info("$i/$j: C = $Ci, f = $fci, gap = $gapi, la = $lai, u = $ui, n = $ni")
         end
+=#
 
         return vec([fc C])
     end
@@ -558,4 +469,3 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
 
     return problem.assembly
 end
-
