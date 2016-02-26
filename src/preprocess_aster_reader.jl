@@ -7,7 +7,7 @@ using JuliaFEM.Core: Element, Quad4, Tri3, Tet4, Seg2, Hex8, update!
 
 
 # TODO: this should be elsewhere
-function aster_create_elements(mesh, element_set, element_type=nothing)
+function aster_create_elements(mesh, element_set, element_type=nothing; reverse_connectivity=false)
     elements = Element[]
     mapping = Dict(:QU4 => Quad4, :TR3 => Tri3, :SE2 => Seg2, :HE8 => Hex8, :TE4 => Tet4)
     for (elid, (eltype, elset, elcon)) in mesh["connectivity"]
@@ -23,6 +23,9 @@ function aster_create_elements(mesh, element_set, element_type=nothing)
             elseif eltype != element_type
                 continue
             end
+        end
+        if reverse_connectivity
+            elcon = reverse(elcon)
         end
         element = mapping[eltype](elcon)
         push!(elements, element)
@@ -358,4 +361,3 @@ function parse_aster_med_file(fn::ASCIIString, mesh_name=nothing)
     result["connectivity"] = conn
     return result
 end
-
