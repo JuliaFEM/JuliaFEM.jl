@@ -198,7 +198,7 @@ function check_orientation!(P, n)
         B_proj = Q'*(B-C)
         a = atan2(A_proj[3], A_proj[2])
         b = atan2(B_proj[3], B_proj[2])
-        return a < b
+        return a > b
     end)
 end
 
@@ -225,8 +225,6 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
 
         # 1. calculate and average node normals for slave element nodes
         normal = zeros(u)
-        tangent1 = zeros(u)
-        tangent2 = zeros(u)
         for element in get_elements(problem)
             haskey(element, "master elements") || continue
             conn = get_connectivity(element)
@@ -238,23 +236,20 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
             for ip in get_integration_points(element, Val{3})
                 dN = get_dbasis(element, ip)
                 N = element(ip, time)
-                j = transpose(sum([kron(dN[:,i], x_el[i]') for i=1:length(x_el)]))
-                n = reshape(cross(j[:,1], j[:,2]), 3, 1)
+                J = transpose(sum([kron(dN[:,i], x_el[i]') for i=1:length(x_el)]))
+                n = reshape(cross(J[:,1], J[:,2]), 3, 1)
                 normal[:, conn] += ip.weight*n*N
             end
         end
-        # calculate tangents
+
+        all_slave_nodes = sort(collect(all_slave_nodes))
+
+        # normalize to unit normal
         for i in all_slave_nodes
             normal[:,i] /= norm(normal[:,i])
-            U1 = normal[:,i]
-            j = indmax(abs(U1))
-            V2 = zeros(3)
-            V2[mod(j,3)+1] = 1.0
-            U2 = V2 - dot(U1,V2)/dot(V2,V2)*V2
-            U3 = cross(U1,U2)
-            tangent1[:,i] = U2/norm(U2)
-            tangent2[:,i] = U3/norm(U3)
         end
+        #normal = ForwardDiff.get_value(normal)
+
         if props.rotate_normals
             for i=1:size(normal, 2)
                 normal[:,i] = -normal[:,i]
@@ -270,21 +265,25 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
             slave_element_nodes = get_connectivity(slave_element)
             X1 = slave_element("geometry", time)
             u1 = Field(Vector[u[:,i] for i in slave_element_nodes])
+            if haskey(slave_element, "displacement")
+                u1 -= slave_element("displacement", time)
+            end
             x1 = X1 + u1
             la1 = Field(Vector[la[:,i] for i in slave_element_nodes])
+            #if haskey(slave_element, "reaction force")
+            #    la1 -= slave_element("reaction force", time)
+            #end
             n1 = Field(Vector[normal[:,i] for i in slave_element_nodes])
-            t1 = Field(Vector[tangent1[:,i] for i in slave_element_nodes])
-            t2 = Field(Vector[tangent2[:,i] for i in slave_element_nodes])
             nnodes = size(slave_element, 2)
             update!(slave_element, "normals", time => ForwardDiff.get_value(n1.data))
 
-            # create auxiliary plane (x0, Q)
+            # 2.1. create auxiliary plane (x0, Q)
             xi = get_reference_element_midpoint(slave_element)
             N = vec(get_basis(slave_element, xi))
             x0 = N*x1
             n0 = N*n1
 
-            # project slave nodes to auxiliary plane
+            # 2.2. project slave nodes to auxiliary plane
             S = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in x1]
 
             # 3. loop all master elements
@@ -293,35 +292,35 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
                 master_element_nodes = get_connectivity(master_element)
                 X2 = master_element("geometry", time)
                 u2 = Field(Vector[u[:,i] for i in master_element_nodes])
+                if haskey(master_element, "displacement")
+                    u2 -= master_element("displacement", time)
+                end
                 x2 = X2 + u2
 
-                x1_midpoint = mean(x1)
-                x2_midpoint = mean(x2)
-                distance = ForwardDiff.get_value(norm(x2_midpoint - x1_midpoint))
+                distance = norm(mean(x2) - mean(x1))
                 distance > props.maximum_distance && continue
 
-                # project master nodes to auxiliary plane
+                # 3.1. project master nodes to auxiliary plane
                 M = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in x2]
 
-                # create polygon clipping on auxiliary plane
+                # 3.2. create polygon clipping on auxiliary plane
                 P = get_polygon_clip(S, M, n0)
                 length(P) < 3 && continue # no clipping or shared edge (no volume)
                 check_orientation!(P, n0)
                 C0 = calculate_centroid(P)
 
+                # 3.3. loop integration cells one at time
                 for cell in get_cells(P, C0)
                     x_cell = Field(cell)
 
-                    # create dual basis
+                    # 3.3.1. create dual basis
                     De = zeros(nnodes, nnodes)
                     Me = zeros(nnodes, nnodes)
                     for ip in get_integration_points(Tri3, Val{5})
                         N = vec(get_basis(Tri3, ip.xi))
                         x_gauss = N*x_cell
-
                         xi_slave, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, x1, time)
                         N1 = slave_element(xi_slave, time)
-
                         dNC = get_dbasis(Tri3, ip.xi)
                         JC = transpose(sum([kron(dNC[:,j], x_cell[j]') for j=1:length(x_cell)]))
                         wC = ip.weight*norm(cross(JC[:,1], JC[:,2]))
@@ -330,10 +329,11 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
                     end
                     Ae = De*inv(Me)
 
-                    # loop integration points of cell
+                    # 3.3.2 loop integration points of cell and calculate fc and gap
                     for ip in get_integration_points(Tri3, Val{5})
                         N = vec(get_basis(Tri3, ip.xi))
                         x_gauss = N*x_cell
+
                         # project gauss point back to element surfaces
                         xi_slave, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, x1, time)
                         xi_master, alpha = project_vertex_to_surface(x_gauss, x0, n0, master_element, x2, time)
@@ -348,15 +348,24 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
                         wC = ip.weight*norm(cross(JC[:,1], JC[:,2]))
 
                         x_s = N1*x1
-                        n_s = N1*n1
                         x_m = N2*x2
+                        u_s = N1*u1
+                        u_m = N2*u2
+                        n_s = N1*n1
                         la_s = Phi*la1
-                        g_s = x_s - x_m
+                        la_n = dot(n_s, la_s)
+                        g_s = x_s-x_m
+                        #gn = -dot(n_s, g_s)
                         fc[:,slave_element_nodes] += wC*la_s*N1'
                         fc[:,master_element_nodes] -= wC*la_s*N2'
-                        gap[:,slave_element_nodes] += wC*g_s*Phi'
-                        #gn = props.gap_sign*dot(n_s, x_s - x_m)
+                        #gap[:,slave_element_nodes] += wC*g_s*N1'
+                        #gap[:,master_element_nodes] += wC*g_s*N2'
+                        gn = props.gap_sign*dot(n_s, g_s)
                         #gap[1,slave_element_nodes] += wC*gn*Phi'
+                        #gap[1,slave_element_nodes] += wC*gn*Phi'
+                        #C[:,master_element_nodes] -= wC*u_s*N2'
+                        gap[:,slave_element_nodes] = wC*props.gap_sign*g_s*Phi'
+                        #gap[:,master_element_nodes] -= wC*(u_s-u_m)*N2'
 
                         slave_surface_area += wC
                         slave_element_area += wC
@@ -371,7 +380,6 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
 
         # like in 2d, check contact in nodes based on a complementarity condition
 
-        all_slave_nodes = sort(collect(all_slave_nodes))
         nzgap = sort(nonzeros(sparse(ForwardDiff.get_value(gap))))
         info("gap: $nzgap")
 
@@ -397,30 +405,43 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
                 continue
             end
             n = normal[:,j]
-            t1 = tangent1[:,j]
-            t2 = tangent2[:,j]
-            lan = dot(n, la[:,j])
-            gn = dot(n, gap[:,j])
-
-#           if lan - gn < 0
+            I = eye(3)
+            k = indmax([norm(cross(n,I[:,k])) for k in 1:3])
+            t1 = cross(n, I[:,k])/norm(cross(n, I[:,k]))
+            t2 = cross(n, t1)
+            Q = [n t1 t2]
+            la_nt = Q'*la[:,j]
+            gap_nt = Q'*gap[:,j]
+            C[1,j] = gap_nt[1]
+            C[2:3,j] = la_nt[2:3]
+            #C[:,j] -= gap[:,j]
+#=
+            if lan - gn < 0
                 info("set node $j active, normal direction = $(ForwardDiff.get_value(n)), tangent plane = $(ForwardDiff.get_value(t1)) x $(ForwardDiff.get_value(t2))")
-                C[1,j] = dot(n, gap[:,j])
+                C[1,j] = gn
                 C[2,j] = dot(t1, la[:,j])
                 C[3,j] = dot(t2, la[:,j])
-#           else
-#               C[:,j] = la[:,j]
-#           end
+            else
+                C[:,j] = la[:,j]
+            end
+=#
+
         end
 
 #=
         for (i, j) in enumerate(all_slave_nodes)
-            Ci = ForwardDiff.get_value(C[:,j])
-            gapi = ForwardDiff.get_value(gap[:,j])
-            fci = ForwardDiff.get_value(fc[:,j])
-            lai = ForwardDiff.get_value(la[:,j])
-            ui = ForwardDiff.get_value(u[:,j])
-            ni = ForwardDiff.get_value(normal[:,j])
-            info("$i/$j: C = $Ci, f = $fci, gap = $gapi, la = $lai, u = $ui, n = $ni")
+            n = normal[:,j]
+            I = eye(3)
+            k = indmax([norm(cross(n,I[:,k])) for k in 1:3])
+            t1 = cross(n, I[:,k])/norm(cross(n, I[:,k]))
+            t2 = cross(n, t1)
+            Q = [n t1 t2]
+            Ci = ForwardDiff.get_value(Q'*C[:,j])
+            gapi = ForwardDiff.get_value(Q'*gap[:,j])
+            fci = ForwardDiff.get_value(Q'*fc[:,j])
+            lai = ForwardDiff.get_value(Q'*la[:,j])
+            ui = ForwardDiff.get_value(Q'*u[:,j])
+            info("$i/$j: \nC = $Ci, \nf = $fci, \ngap = $gapi, \nla = $lai, \nu = $ui")
         end
 =#
 
@@ -432,10 +453,13 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
     ndofs = round(Int, length(x)/2)
     A, allresults = ForwardDiff.jacobian(calculate_interface, x,
                             ForwardDiff.AllResults, cache=autodiffcache)
-    b = -ForwardDiff.value(allresults)
+    b = ForwardDiff.value(allresults)
 
+#   dump(round(A, 3))
+#   dump(round(b, 3)')
     A = sparse(A)
     b = sparse(b)
+  
     SparseMatrix.droptol!(A, 1.0e-12)
     SparseMatrix.droptol!(b, 1.0e-12)
 
@@ -446,6 +470,24 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{3}})
     f = b[1:ndofs]
     g = b[ndofs+1:end]
 
+    function joo(x)
+        nz1 = sort(unique(rowvals(x)))
+        nz2 = sort(unique(rowvals(x')))
+        info("nz1 = $nz1, nz2 = $nz2")
+        dump(round(full(x[nz1,nz2]), 3))
+    end
+    println("K")
+    joo(K)
+    println("C1")
+    joo(C1)
+    println("C2")
+    joo(C2)
+    println("D")
+    joo(D)
+    println("f")
+    joo(f)
+    println("g")
+    joo(g)
 #=
     slaves = [101,108,111,112,113,120,123,124,125,126,129,130,149,150,151,152]
     for j in slaves

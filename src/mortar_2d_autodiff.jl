@@ -130,7 +130,7 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}})
             la1 = Field(Vector[la[:,i] for i in slave_element_nodes])
             n1 = Field(Vector[normals[:,i] for i in slave_element_nodes])
             nnodes = size(slave_element, 2)
-            update!(slave_element, "normals", time => ForwardDiff.get_value(n1))
+            update!(slave_element, "normals", time => ForwardDiff.get_value(n1.data))
 
             # 3. loop all master elements
             for master_element in slave_element["master elements"]

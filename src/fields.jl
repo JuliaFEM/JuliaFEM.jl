@@ -211,6 +211,10 @@ function Base.(:+)(f1::DVTI, f2::DVTI)
     return DVTI(f1.data + f2.data)
 end
 
+function Base.(:-)(f1::DVTI, f2::DVTI)
+    return DVTI(f1.data - f2.data)
+end
+
 """ Multiply DCTI field with a constant ``c``. """
 function Base.(:*){T<:Real}(c::T, field::DVTI)
     return DVTI(c*field.data)
