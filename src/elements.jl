@@ -1,7 +1,101 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+import Base: getindex, setindex!, convert, size, length
+
 abstract AbstractElement
+
+type Element{E<:AbstractElement}
+    connectivity :: Vector{Int}
+    fields :: Dict{ASCIIString, Field}
+    properties :: E
+end
+
+function Element{E<:AbstractElement}(::Type{E}, connectivity=[], fields=Dict(), properties...)
+    Element{E}(connectivity, fields, E(properties...))
+end
+
+function get_basis(element::Element, xi::Vector, time=0.0)
+    get_basis(element.properties, xi, time)
+end
+
+function get_dbasis(element::Element, xi::Vector, time=0.0)
+    get_dbasis(element.properties, xi, time)
+end
+
+function getindex(element::Element, field_name::ASCIIString)
+    element.fields[field_name]
+end
+
+function setindex!(element::Element, data, field_name::ASCIIString)
+    element.fields[field_name] = Field(data)
+end
+
+function call(element::Element, xi::Vector, time=0.0)
+    get_basis(element.properties, xi, time)
+end
+
+function call(element::Element, field_name::ASCIIString, xi::Vector, time=0.0)
+    field = element[field_name](time)
+    isa(field, DCTI) && return field.data
+    basis = element(xi, time)
+    return basis*field
+end
+
+function call(element::Element, xi::Vector, time, ::Type{Val{:Jacobian}})
+    X = element["geometry"](time)
+    dN = get_dbasis(element, xi, time)
+    J = sum([kron(dN[:,i], X[i]') for i=1:length(X)])
+    return J
+end
+
+function get_jacobian{E}(element::Element{E}, xi::Vector, time=0.0)
+    element(xi, time, Val{:Jacobian})
+end
+
+function get_integration_points{E}(element::Element{E})
+    get_integration_points(element.properties)
+end
+
+function call(element::Element, xi::Vector, time, ::Type{Val{:Grad}})
+    J = get_jacobian(element, xi, time)
+    return inv(J)*get_dbasis(element, xi, time)
+end
+
+function call(element::Element, field_name, xi::Vector, time, ::Type{Val{:Grad}})
+    element(xi, time, Val{:Grad})*element[field_name](time)
+end
+
+function length{E}(element::Element{E})
+    length(element.properties)
+end
+
+function size{E}(element::Element{E})
+    size(element.properties)
+end
+
+""" Update element field based on a dictionary of nodal data and connectivity information.
+
+Examples
+--------
+julia> data = Dict(1 => [0.0, 0.0], 2 => [1.0, 2.0])
+julia> element = Seg2([1, 2])
+julia> update!(element, "geometry", data)
+
+As a result element now have time invariant (variable) vector field "geometry" with data ([0.0, 0.0], [1.0, 2.0]).
+
+"""
+function update!(element::Element, field_name::ASCIIString, data::Dict)
+    element[field_name] = [data[i] for i in get_connectivity(element)]
+end
+
+function update!(element::Element, field_name::ASCIIString, data::Union{Real, Vector, Pair}...)
+    element[field_name] = data
+end
+
+
+
+#=
 
 type Element{E}
     connectivity :: Vector{Int}
@@ -383,24 +477,6 @@ function calculate_normal_tangential_coordinates!(elements::Vector, time::Real, 
     end
 end
 
-""" Update element field based on a dictionary of nodal data and connectivity information.
-
-Examples
---------
-julia> data = Dict(1 => [0.0, 0.0], 2 => [1.0, 2.0])
-julia> element = Seg2([1, 2])
-julia> update!(element, "geometry", data)
-
-As a result element now have time invariant (variable) vector field "geometry" with data ([0.0, 0.0], [1.0, 2.0]).
-
-"""
-function update!(element::Element, field_name::ASCIIString, data::Dict)
-    element[field_name] = [data[i] for i in get_connectivity(element)]
-end
-
-function update!(element::Element, field_name::ASCIIString, data::Union{Real, Vector, Pair}...)
-    element[field_name] = data
-end
 
 """ Update values for several elements at once. """
 # FIXME: with or without {T} ?
@@ -414,3 +490,5 @@ function update!(elements::Vector{Element}, field_name::ASCIIString, data...)
         update!(element, field_name, data...)
     end
 end
+
+=#
