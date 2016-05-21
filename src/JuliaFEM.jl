@@ -23,9 +23,9 @@ export DCTI
 
 ### ELEMENTS ###
 include("elements.jl") # common element routines
-export Element
+export Element, update!
 include("lagrange_macro.jl") # Continuous Galerkin (Lagrange) elements generated using macro
-export Quad4
+export Seg2, Tri3, Quad4, Hex8, Tet4
 
 #include("hierarchical.jl") # P-elements
 #include("mortar_elements.jl") # Mortar elements
@@ -41,13 +41,18 @@ include("elasticity.jl") # elasticity equations
 export Elasticity
 
 include("dirichlet.jl")
+export Dirichlet
+
 include("heat.jl")
+export Heat
+
 export assemble
 
 ### ASSEMBLY + SOLVE ###
 include("assembly.jl")
 include("solver_utils.jl")
 include("solvers.jl")
+export Solver
 
 ### MORTAR STUFF ###
 include("mortar.jl")  # mortar projection
@@ -64,14 +69,9 @@ include("api.jl")
 end
 
 module Preprocess
-#=
-macro debug(msg)
-    haskey(ENV, "DEBUG") || return
-    return msg
-end
-=#
 include("abaqus_reader.jl")
 include("preprocess_aster_reader.jl")
+export aster_create_elements, parse_aster_med_file
 end
 
 module Postprocess

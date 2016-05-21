@@ -44,11 +44,15 @@ function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::El
 end
 
 function assemble(problem::Problem{Elasticity}, element::Element, time=0.0)
-    assemble(problem, element, time, Val{problem.properties.formulation})
+    problem.properties
+    if problem.properties.formulation in [:plane_stress, :plane_strain]
+        return assemble(problem, element, time, Val{:plane})
+    end
+    return assemble(problem, element, time, Val{problem.properties.formulation})
 end
 
 """ Elasticity equations for 2d cases. """
-function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, element::Element{El}, time, ::Type{Val{:plane_stress}})
+function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, element::Element{El}, time, ::Type{Val{:plane}})
 
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
@@ -82,10 +86,19 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
         # get_material(problem, element, ...)
         E = element("youngs modulus", xi, time)
         nu = element("poissons ratio", xi, time)
-        D = E/(1.0 - nu^2) .* [
-            1.0  nu 0.0
-            nu  1.0 0.0
-            0.0 0.0 (1.0-nu)/2.0]
+        if props.formulation == :plane_stress
+            D = E/(1.0 - nu^2) .* [
+                1.0  nu 0.0
+                nu  1.0 0.0
+                0.0 0.0 (1.0-nu)/2.0]
+        elseif props.formulation == :plane_strain
+            D = E/((1+nu)*(1-2*nu)) .* [
+                1-nu   nu 0
+                nu   1-nu 0
+                0    0    (1-2*nu)/2]
+        else
+            error("unknown plane formulation: $(props.formulation)")
+        end
 
         # calculate stress
         S = D*[strain[1,1]; strain[2,2]; 2*strain[1,2]]
@@ -138,30 +151,30 @@ function assemble{El<:Union{Seg2,Seg3}}(problem::Problem{Elasticity}, element::E
     Kt = zeros(dim*nnodes, dim*nnodes)
     f = zeros(dim*nnodes)
 
-    for ip in get_integration_points(element)
+    for (w, xi) in get_integration_points(element)
 
-        J = get_jacobian(element, ip, time)
-        N = element(ip, time)
-        w = ip.weight*norm(J)
+        J = element(xi, time, Val{:Jacobian})
+        detJ = norm(J)
+        N = element(xi, time)
 
         if haskey(element, "displacement traction force")
-            T = element("displacement traction force", ip, time)
-            f += vec(w*T*N)
+            T = element("displacement traction force", xi, time)
+            f += w*vec(T*N)*detJ
         end
 
         for i=1:dim
             # traction force for ith component
             if haskey(element, "displacement traction force $i")
-                T = element("displacement traction force $i", ip, time)
-                f[i:dim:end] += vec(w*T*N)
+                T = element("displacement traction force $i", xi, time)
+                f[i:dim:end] += w*vec(T*N)*detJ
             end
         end
 
         if haskey(element, "nt displacement traction force")
             # traction force given in normal-tangential direction
-            T = element("nt displacement traction force", ip, time)
-            Q = element("normal-tangential coordinates", ip, time)
-            f += vec(w*Q'*T*N)
+            T = element("nt displacement traction force", xi, time)
+            Q = element("normal-tangential coordinates", xi, time)
+            f += w*vec(Q'*T*N)*detJ
         end
 
     end

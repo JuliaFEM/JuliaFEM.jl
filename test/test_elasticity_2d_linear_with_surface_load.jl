@@ -1,10 +1,9 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+using JuliaFEM
+using JuliaFEM.Preprocess
 using JuliaFEM.Test
-
-using JuliaFEM.Preprocess: aster_create_elements, parse_aster_med_file
-using JuliaFEM.Core: Problem, Elasticity, Dirichlet, Solver, update!
 
 @testset "test 2d linear elasticity with surface load" begin
     meshfile = "/geometry/2d_block/BLOCK_1elem.med"
