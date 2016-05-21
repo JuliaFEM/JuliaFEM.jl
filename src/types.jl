@@ -3,12 +3,6 @@
 
 typealias Node Vector{Float64}
 
-function ForwardDiff.derivative{T}(f::Function, S::Matrix{T}, args...)
-    shape = size(S)
-    wrapper(S::Vector) = f(reshape(S, shape))
-    deriv = ForwardDiff.gradient(wrapper, vec(S), args...)
-    return reshape(deriv, shape)
-end
 
 """
 Integration point

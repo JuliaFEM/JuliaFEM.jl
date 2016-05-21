@@ -119,41 +119,60 @@ function get_integration_points(::Type{Tri3})
 end
 
 
-function get_integration_points(::Type{Quad4}, ::Type{Val{2}})
-    [
-        IntegrationPoint(1.0/sqrt(3.0)*[-1, -1], 1.0),
-        IntegrationPoint(1.0/sqrt(3.0)*[ 1, -1], 1.0),
-        IntegrationPoint(1.0/sqrt(3.0)*[ 1,  1], 1.0),
-        IntegrationPoint(1.0/sqrt(3.0)*[-1,  1], 1.0)
-    ]
+function get_integration_points(::Type{Val{1}})
+    return [2.0], [0.0]
 end
 
-function get_integration_points(::Type{Quad4}, ::Type{Val{3}})
-    p = [-sqrt(3/5), 0.0, sqrt(3/5)]
-    w = [5/9, 8/9, 5/9]
-    pts = vec([IntegrationPoint([p[i], p[j]], w[i]*w[j]) for i=1:3, j=1:3])
-    return pts
+function get_integration_points(::Type{Val{2}})
+    return [1.0, 1.0], sqrt(1.0/3.0)*[-1.0, 1.0]
 end
 
-function get_integration_points(::Type{Quad4}, ::Type{Val{5}})
-    p = [
-        -1/3*sqrt(5 + 2*sqrt(10/7)),
-        -1/3*sqrt(5 - 2*sqrt(10/7)),
+function get_integration_points(::Type{Val{3}})
+    return 1.0/9.0*[5.0, 8.0, 5.0], sqrt(3.0/5.0)*[-1.0, 0.0, 1.0]
+end
+
+function get_integration_points(::Type{Val{4}})
+    weights = 1.0/36.0*[
+        18.0+sqrt(30.0),
+        18.0+sqrt(30.0),
+        18.0-sqrt(30.0),
+        18.0-sqrt(30.0)]
+    points = [
+        sqrt( 3.0/7.0 - 2.0/7.0*sqrt(6.0/5.0)),
+        sqrt(-3.0/7.0 - 2.0/7.0*sqrt(6.0/5.0)),
+        sqrt( 3.0/7.0 + 2.0/7.0*sqrt(6.0/5.0)),
+        sqrt(-3.0/7.0 + 2.0/7.0*sqrt(6.0/5.0))]
+    return weights, points
+end
+
+function get_integration_points(::Type{Val{5}})
+    weights = [
+        1.0/900.0*(322.0-13.0*sqrt(70.0)),
+        1.0/900.0*(322.0+13.0*sqrt(70.0)),
+        128.0/225.0,
+        1.0/900.0*(322.0+13.0*sqrt(70.0)),
+        1.0/900.0*(322.0-13.0*sqrt(70.0))]
+    points = [
+        -1.0/3.0*sqrt(5.0 + 2.0*sqrt(10.0/7.0)),
+        -1.0/3.0*sqrt(5.0 - 2.0*sqrt(10.0/7.0)),
          0.0,
-         1/3*sqrt(5 - 2*sqrt(10/7)),
-         1/3*sqrt(5 + 2*sqrt(10/7))]
-    w = [
-        (322-13*sqrt(70))/900,
-        (322+13*sqrt(70))/900,
-         128/225,
-        (322+13*sqrt(70))/900,
-        (322-13*sqrt(70))/900]
-    pts = vec([IntegrationPoint([p[i], p[j]], w[i]*w[j]) for i=1:5, j=1:5])
-    return pts
+         1.0/3.0*sqrt(5.0 - 2.0*sqrt(10.0/7.0)),
+         1.0/3.0*sqrt(5.0 + 2.0*sqrt(10.0/7.0))]
+    return weights, points
 end
 
-function get_integration_points(::Type{Quad4})
-    return get_integration_points(Quad4, Val{2})
+function get_integration_points(element::Quad4)
+    return get_integration_points(element, Val{2})
+end
+
+function get_integration_points(element::Quad4, ::Type{Val{2}})
+    w, xi = get_integration_points(Val{2})
+    [ (w[i]*w[j], [xi[i], xi[j]]) for i=1:2, j=1:2 ]
+end
+
+function get_integration_points(element::Quad4, ::Type{Val{3}})
+    w, xi = get_integration_points(Val{3})
+    [ (w[i]*w[j], [xi[i], xi[j]]) for i=1:3, j=1:3 ]
 end
 
 ### 3d elements

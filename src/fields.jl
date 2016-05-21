@@ -220,6 +220,11 @@ function Base.(:*){T<:Real}(c::T, field::DVTI)
     return DVTI(c*field.data)
 end
 
+""" Interpolate with basis functions. """
+function Base.(:*)(N::Matrix, f::DCTI)
+    return f.data*N'
+end
+
 """ Multiply DVTI field with another vector T. Vector length
 must match to the field length and this can be used mainly
 for interpolation purposes, i.e., u = ∑ Nᵢuᵢ
