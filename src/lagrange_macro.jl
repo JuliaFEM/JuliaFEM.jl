@@ -1,9 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-# Lagrange (Continous Galerkin) finite elements
-
-abstract CG <: AbstractElement
+# Lagrange (Continous Galerkin) finite elements shape functions generated using macro.
 
 """
 Given polynomial P and coordinates of reference element, calculate
@@ -15,15 +13,6 @@ function calculate_lagrange_basis_coefficients(P, X)
     for i=1:nbasis
         A[i,:] = P(X[:, i])
     end
-#   invA = inv(A)'
-#   basis(xi) = (invA*P(xi))'
-#   dbasisdxi(xi) = (ForwardDiff.jacobian((xi) -> invA*P(xi), xi, cache=autodiffcache))'
-#   basis, dbasisdxi
-#   info(inv(A))
-#   info(P([0.0, 0.0]))
-#   invA = inv(A)'
-#   basis(xi) = invA*P(xi)
-#   return basis
     return inv(A)'
 end
 
@@ -41,21 +30,31 @@ Examples
 macro create_lagrange_element(element_name, element_description, X, P)
     eltype = esc(element_name)
     quote
-        global get_basis, get_dbasis,
+        global get_basis, length, size
+        #=
                get_reference_element_coordinates,
                get_reference_element_midpoint
+        =#
 
-        #basis, dbasis = calculate_lagrange_basis($P, $X)
+        type $eltype <: AbstractElement
+        end
+
         C = calculate_lagrange_basis_coefficients($P, $X)
         basis(xi) = C*$P(xi)
-#       dbasis = ForwardDiff.jacobian(basis)
 
-        abstract $eltype <: CG
-
-        function get_basis(::Type{$eltype}, xi::Vector)
+        function get_basis(element::$eltype, xi::Vector, time)
             return basis(xi)'
         end
 
+        function size(element::$eltype)
+            return size($X)
+        end
+
+        function length(element::$eltype)
+            return size($X, 2)
+        end
+
+        #=
         XX = refcoords($X)
         function get_reference_element_coordinates(::Type{$eltype})
             return XX
@@ -65,19 +64,12 @@ macro create_lagrange_element(element_name, element_description, X, P)
         function get_reference_element_midpoint(::Type{$eltype})
             return XXX
         end
-#=
-        function get_dbasis(::Type{$eltype}, xi::Vector{Float64})
-            return dbasis(xi)'
-        end
-=#
 
         function $eltype(args...)
             return Element{$eltype}(args...)
         end
 
-        function Base.size(::Type{$eltype})
-            return Base.size($X)
-        end
+        =#
 
     end
 end
@@ -96,10 +88,6 @@ end
     [0.0 1.0 0.0
      0.0 0.0 1.0],
     (xi) -> [1.0, xi[1], xi[2]])
-
-#function get_reference_element_midpoint(::Type{Tri3})
-#    return [1.0/3.0, 1.0/3.0]
-#end
 
 @create_lagrange_element(Tri6, "6 node quadratic triangle element",
     [0.0 1.0 0.0 0.5 0.5 0.0

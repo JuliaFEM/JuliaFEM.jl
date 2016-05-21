@@ -3,8 +3,6 @@
 
 using HDF5
 using JuliaFEM
-using JuliaFEM.Core: Element, Quad4, Tri3, Tet4, Seg2, Hex8, update!
-
 
 # TODO: this should be elsewhere
 function aster_create_elements(mesh, element_set, element_type=nothing; reverse_connectivity=false)

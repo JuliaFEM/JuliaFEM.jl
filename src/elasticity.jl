@@ -43,29 +43,32 @@ function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::El
     add!(assembly.f, gdofs, f)
 end
 
+function assemble(problem::Problem{Elasticity}, element::Element, time=0.0)
+    assemble(problem, element, time, Val{problem.properties.formulation})
+end
 
 """ Elasticity equations for 2d cases. """
-function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:plane}})
+function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, element::Element{El}, time, ::Type{Val{:plane_stress}})
 
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
-    nnodes = size(element, 2)
+    nnodes = length(element)
     BL = zeros(3, dim*nnodes)
     BNL = zeros(4, dim*nnodes)
     Kt = zeros(dim*nnodes, dim*nnodes)
     f = zeros(dim*nnodes)
 
-    for ip in get_integration_points(element)
+    for (w, xi) in get_integration_points(element)
 
-        J = get_jacobian(element, ip, time)
-        w = ip.weight*det(J)
-        N = element(ip, time)
-        dN = element(ip, time, Val{:grad})
+        J = element(xi, time, Val{:Jacobian})
+        w = w*det(J)
+        N = element(xi, time)
+        dN = element(xi, time, Val{:Grad})
 
         # kinematics; calculate deformation gradient and strain
         gradu = zeros(dim, dim)
         if haskey(element, "displacement")
-            gradu += element("displacement", ip, time, Val{:grad})
+            gradu += element("displacement", xi, time, Val{:Grad})
         end
         strain = zeros(dim , dim)
         strain += 1/2*(gradu' + gradu)
@@ -77,21 +80,12 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
 
         # constitutive equations; material model (isotropic linear material here)
         # get_material(problem, element, ...)
-        E = element("youngs modulus", ip, time)
-        nu = element("poissons ratio", ip, time)
-        if props.formulation == :plane_stress
-            D = E/(1.0 - nu^2) .* [
-                1.0  nu 0.0
-                nu  1.0 0.0
-                0.0 0.0 (1.0-nu)/2.0]
-        elseif props.formulation == :plane_strain
-            D = E/((1+nu)*(1-2*nu)) .* [
-                1-nu   nu 0
-                nu   1-nu 0
-                0    0    (1-2*nu)/2]
-        else
-            error("unknown 2d formulation: $(props.formulation)")
-        end
+        E = element("youngs modulus", xi, time)
+        nu = element("poissons ratio", xi, time)
+        D = E/(1.0 - nu^2) .* [
+            1.0  nu 0.0
+            nu  1.0 0.0
+            0.0 0.0 (1.0-nu)/2.0]
 
         # calculate stress
         S = D*[strain[1,1]; strain[2,2]; 2*strain[1,2]]
@@ -127,8 +121,8 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
 
         # volume load
         if haskey(element, "displacement load")
-            T = element("displacement load", ip, time)
-            f += vec(w*T*N)
+            b = element("displacement load", xi, time)
+            f += vec(w*N'*b)
         end
 
     end

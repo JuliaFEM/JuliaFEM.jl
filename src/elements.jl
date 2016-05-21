@@ -93,7 +93,16 @@ function update!(element::Element, field_name::ASCIIString, data::Union{Real, Ve
     element[field_name] = data
 end
 
+""" Evaluate partial derivatives of basis functions using ForwardDiff. """
+function get_dbasis(element::Element, xi::Vector, time)
+    basis(xi) = vec(get_basis(element, xi, time))
+    return ForwardDiff.jacobian(basis, xi, cache=autodiffcache)'
+end
 
+""" Check existence of field. """
+function haskey(element::Element, field_name)
+    haskey(element.fields, field_name)
+end
 
 #=
 
@@ -205,10 +214,6 @@ function call(element::Element, field_name::ASCIIString, time::Number)
     return element[field_name](time)
 end
 
-function get_dbasis{E<:AbstractElement}(::Type{E}, xi::Vector)
-    basis(xi) = vec(get_basis(E, xi))
-    return ForwardDiff.jacobian(basis, xi, cache=autodiffcache)'
-end
 
 function get_basis{E}(element::Element{E}, ip::IntegrationPoint)
     return get_basis(E, ip.xi)
@@ -339,10 +344,6 @@ function get_jacobian{E}(element::Element{E}, ip::IntegrationPoint, time::Real, 
 end
 
 
-""" Check does field exist. """
-function Base.haskey(element::Element, what)
-    haskey(element.fields, what)
-end
 
 """ Calculate local normal-tangential coordinates for element. """
 function calculate_normal_tangential_coordinates!{E}(element::Element{E}, time::Real)
