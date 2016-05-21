@@ -74,6 +74,10 @@ function size{E}(element::Element{E})
     size(element.properties)
 end
 
+function size(element::Element, dim::Int)
+    size(element)[dim]
+end
+
 """ Update element field based on a dictionary of nodal data and connectivity information.
 
 Examples
@@ -89,8 +93,14 @@ function update!(element::Element, field_name::ASCIIString, data::Dict)
     element[field_name] = [data[i] for i in get_connectivity(element)]
 end
 
-function update!(element::Element, field_name::ASCIIString, data::Union{Real, Vector, Pair}...)
+function update!(element::Element, field_name::ASCIIString, data::Union{Real, Vector, Pair})
     element[field_name] = data
+end
+
+function update!(elements::Vector, field_name::ASCIIString, data)
+    for element in elements
+        update!(element, field_name, data)
+    end
 end
 
 """ Evaluate partial derivatives of basis functions using ForwardDiff. """
@@ -102,6 +112,36 @@ end
 """ Check existence of field. """
 function haskey(element::Element, field_name)
     haskey(element.fields, field_name)
+end
+
+function get_connectivity(element::Element)
+    return element.connectivity
+end
+
+function get_gdofs(element::Element)
+    return get_gdofs(element, 1)
+end
+
+""" Return dual basis transformation matrix Ae. """
+function get_dualbasis(element::Element, time)
+    nnodes = length(element)
+    De = zeros(nnodes, nnodes)
+    Me = zeros(nnodes, nnodes)
+    for (w, xi) in get_integration_points(element, Val{3})
+        J = element(xi, time, Val{:Jacobian})
+        JT = transpose(J)
+        if size(JT, 2) == 1  # plane problem
+            # || ∂X/∂ξ ||
+            w *= norm(JT)
+        else
+            # || ∂X/∂ξ₁ × ∂X/∂ξ₂ ||
+            w *= norm(cross(JT[:,1], JT[:,2]))
+        end
+        N = element(xi, time)
+        De += w*diagm(vec(N))
+        Me += w*N'*N
+    end
+    return De, Me, De*inv(Me)
 end
 
 #=
@@ -172,9 +212,6 @@ function Base.setindex!(element::Element, data::Tuple, name::ASCIIString)
     element.fields[name] = Field(data...)
 end
 
-function get_connectivity(el::Element)
-    return el.connectivity
-end
 
 typealias VecOrIP Union{Vector, IntegrationPoint}
 
@@ -248,9 +285,6 @@ function find_elements(elements, nodes)
     return collect(s)
 end
 
-function get_gdofs(element::Element)
-    return get_gdofs(element, 1)
-end
 
 function get_dbasis{E}(element::Element{E}, ip::IntegrationPoint)
     return get_dbasis(E, ip.xi)
@@ -260,33 +294,6 @@ function get_basis{E, T<:Real}(element::Element{E}, xi::T)
     return get_basis(E, xi)
 end
 
-""" Return dual basis transformation matrix Ae. """
-function get_dualbasis(element::Element, time::Real)
-    if length(element.A) == 0
-        nnodes = size(element, 2)
-        De = zeros(nnodes, nnodes)
-        Me = zeros(nnodes, nnodes)
-        for ip in get_integration_points(element, Val{3})
-            w = ip.weight
-            J = get_jacobian(element, ip, time)
-            JT = transpose(J)
-            if size(JT, 2) == 1  # plane problem
-                # || ∂X/∂ξ ||
-                w *= norm(JT)
-            else
-                # || ∂X/∂ξ₁ × ∂X/∂ξ₂ ||
-                w *= norm(cross(JT[:,1], JT[:,2]))
-            end
-            N = element(ip, time)
-            De += w*diagm(vec(N))
-            Me += w*N'*N
-        end
-        element.D = De
-        element.M = Me
-        element.A = De*inv(Me)
-    end
-    return element.D, element.M, element.A
-end
 
 function call(element::Element, xi::VecOrIP, time::Real, ::Type{Val{:dualbasis}})
     De, Me, Ae = get_dualbasis(element, time)
@@ -482,11 +489,6 @@ end
 """ Update values for several elements at once. """
 # FIXME: with or without {T} ?
 function update!{T}(elements::Vector{Element{T}}, field_name::ASCIIString, data...)
-    for element in elements
-        update!(element, field_name, data...)
-    end
-end
-function update!(elements::Vector{Element}, field_name::ASCIIString, data...)
     for element in elements
         update!(element, field_name, data...)
     end

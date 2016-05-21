@@ -41,19 +41,6 @@ function has_residual_vector(problem::Problem, element::Element)
     return method_exists(get_residual_vector, default_args)
 end
 
-function get_gdofs(element::Element, dim::Int)
-    conn = get_connectivity(element)
-    gdofs = vec(vcat([dim*conn'-i for i=dim-1:-1:0]...))
-    return gdofs
-end
-
-function get_gdofs(element::Element, problem::Problem)
-    return get_gdofs(element, problem.dimension)
-end
-
-function get_gdofs(problem::Problem, element::Element)
-    return get_gdofs(element, problem.dimension)
-end
 
 """ Assemble element. """
 function assemble!(assembly::Assembly, problem::Problem, element::Element, time::Number)

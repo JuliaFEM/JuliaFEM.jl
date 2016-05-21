@@ -267,6 +267,20 @@ function push!(problem::Problem, element)
     push!(problem.elements, element)
 end
 
+function get_gdofs(element::Element, dim::Int)
+    conn = get_connectivity(element)
+    gdofs = vec(vcat([dim*conn'-i for i=dim-1:-1:0]...))
+    return gdofs
+end
+
+function get_gdofs(element::Element, problem::Problem)
+    return get_gdofs(element, problem.dimension)
+end
+
+function get_gdofs(problem::Problem, element::Element)
+    return get_gdofs(element, problem.dimension)
+end
+
 """ Find dofs corresponding to nodes. """
 function find_dofs_by_nodes(problem::Problem, nodes)
     dim = get_unknown_field_dimension(problem)

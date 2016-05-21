@@ -4,7 +4,6 @@
 using HDF5
 using JuliaFEM
 
-# TODO: this should be elsewhere
 function aster_create_elements(mesh, element_set, element_type=nothing; reverse_connectivity=false)
     elements = Element[]
     mapping = Dict(:QU4 => Quad4, :TR3 => Tri3, :SE2 => Seg2, :HE8 => Hex8, :TE4 => Tet4)
@@ -25,7 +24,7 @@ function aster_create_elements(mesh, element_set, element_type=nothing; reverse_
         if reverse_connectivity
             elcon = reverse(elcon)
         end
-        element = mapping[eltype](elcon)
+        element = Element(mapping[eltype], elcon)
         push!(elements, element)
     end
     update!(elements, "geometry", mesh["nodes"])

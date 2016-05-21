@@ -43,26 +43,25 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Ele
     end
 
     # right hand side
-    for ip in get_integration_points(element, Val{3})
-        w = ip.weight
-        J = get_jacobian(element, ip, time)
+    for (w, xi) in get_integration_points(element, Val{3})
+        J = element(xi, time, Val{:Jacobian})
         JT = transpose(J)
         if size(JT, 2) == 1  # plane problem
             w *= norm(JT)
         else
             w *= norm(cross(JT[:,1], JT[:,2]))
         end
-        N = element(ip, time)
+        N = element(xi, time)
 
         for i=1:field_dim
             ldofs = gdofs[i:field_dim:end]
             if haskey(element, field_name*" $i")
-                g = element(field_name*" $i", ip, time)
+                g = element(field_name*" $i", xi, time)
                 if get_formulation_type(problem) == :incremental
                     # if having incremental formulation need to add previous
                     # displacement to rhs (solving increment Δu !
                     haskey(element, "displacement") || continue
-                    g_prev = element(field_name, ip, time)
+                    g_prev = element(field_name, xi, time)
                     g -= g_prev[i]
                 end
                 add!(assembly.g, ldofs, w*g*Ae*N')
