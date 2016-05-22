@@ -4,9 +4,6 @@
 using JuliaFEM
 using JuliaFEM.Test
 
-using JuliaFEM.Core: Quad4, Hex8, Elasticity, Dirichlet, Problem, Node, Solver
-using JuliaFEM.Core: update!
-
 @testset "test simple continuum block with surface traction" begin
 
     nodes = Dict{Int64, Node}(
@@ -18,8 +15,8 @@ using JuliaFEM.Core: update!
         6 => [1.0, 0.0, 1.0],
         7 => [1.0, 1.0, 1.0],
         8 => [0.0, 1.0, 1.0])
-    element1 = Hex8([1, 2, 3, 4, 5, 6, 7, 8])
-    element2 = Quad4([5, 6, 7, 8])
+    element1 = Element(Hex8, [1, 2, 3, 4, 5, 6, 7, 8])
+    element2 = Element(Quad4, [5, 6, 7, 8])
     update!([element1, element2], "geometry", nodes)
     update!(element1, "youngs modulus", 900.0)
     update!(element1, "poissons ratio", 0.25)
@@ -56,11 +53,11 @@ using JuliaFEM.Core: update!
     dump(u)
 =#
 
-    dx = Quad4([1, 4, 8, 5])
+    dx = Element(Quad4, [1, 4, 8, 5])
     dx["displacement 1"] = 0.0
-    dy = Quad4([1, 5, 6, 2])
+    dy = Element(Quad4, [1, 5, 6, 2])
     dy["displacement 2"] = 0.0
-    dz = Quad4([1, 2, 3, 4])
+    dz = Element(Quad4, [1, 2, 3, 4])
     dz["displacement 3"] = 0.0
     bc = Problem(Dirichlet, "symmetries", 3, "displacement")
     update!([dx, dy, dz], "geometry", nodes)

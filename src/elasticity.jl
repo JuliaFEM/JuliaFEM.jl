@@ -64,8 +64,7 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
 
     for (w, xi) in get_integration_points(element)
 
-        J = element(xi, time, Val{:Jacobian})
-        w = w*det(J)
+        detJ = element(xi, time, Val{:detJ})
         N = element(xi, time)
         dN = element(xi, time, Val{:Grad})
 
@@ -126,16 +125,16 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
         S2[1,2] = S2[2,1] = S[3]
         S2[3:4,3:4] = S2[1:2,1:2]
 
-        Kt += w*BL'*D*BL # material stiffness
+        Kt += w*BL'*D*BL*detJ # material stiffness
         if props.finite_strain # add geometric stiffness
-            Kt += w*BNL'*S2*BNL # geometric stiffness
+            Kt += w*BNL'*S2*BNL*detJ # geometric stiffness
         end
-        f -= w*BL'*S # internal force
+        f -= w*BL'*S*detJ # internal force
 
         # volume load
         if haskey(element, "displacement load")
             b = element("displacement load", xi, time)
-            f += vec(w*N'*b)
+            f += w*vec(N'*b)*detJ
         end
 
     end
@@ -153,8 +152,7 @@ function assemble{El<:Union{Seg2,Seg3}}(problem::Problem{Elasticity}, element::E
 
     for (w, xi) in get_integration_points(element)
 
-        J = element(xi, time, Val{:Jacobian})
-        detJ = norm(J)
+        detJ = element(xi, time, Val{:detJ})
         N = element(xi, time)
 
         if haskey(element, "displacement traction force")
@@ -194,16 +192,15 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
     Kt = zeros(dim*nnodes, dim*nnodes)
     f = zeros(dim*nnodes)
 
-    for ip in get_integration_points(element)
-        J = get_jacobian(element, ip, time)
-        w = ip.weight*det(J)
-        N = element(ip, time)
-        dN = element(ip, time, Val{:grad})
+    for (w, xi) in get_integration_points(element)
+        detJ = element(xi, time, Val{:detJ})
+        N = element(xi, time)
+        dN = element(xi, time, Val{:Grad})
 
         # kinematics; calculate deformation gradient and strain
         gradu = zeros(dim, dim)
         if haskey(element, "displacement")
-            gradu += element("displacement", ip, time, Val{:grad})
+            gradu += element("displacement", xi, time, Val{:Grad})
         end
         strain = zeros(dim , dim)
         strain += 1/2*(gradu' + gradu)
@@ -213,8 +210,8 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             strain += 1/2*gradu'*gradu
         end
 
-        E = element("youngs modulus", ip, time)
-        nu = element("poissons ratio", ip, time)
+        E = element("youngs modulus", xi, time)
+        nu = element("poissons ratio", xi, time)
 
         a = 1 - nu
         b = 1 - 2*nu
@@ -273,16 +270,16 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
         S3[1,2] = S3[2,1] = S[6]
         S3[4:6,4:6] = S3[7:9,7:9] = S3[1:3,1:3]
 
-        Kt += w*BL'*D*BL
+        Kt += w*BL'*D*BL*detJ
         if props.finite_strain
-            Kt += w*BNL'*S3*BNL
+            Kt += w*BNL'*S3*BNL*detJ
         end
-        f -= w*BL'*S
+        f -= w*BL'*S*detJ
 
         # volume load
         if haskey(element, "displacement load")
             T = element("displacement load", ip, time)
-            f += vec(w*T*N)
+            f += w*vec(T*N)*detJ
         end
     end
 
@@ -298,18 +295,17 @@ function assemble{El<:Union{Tri3, Tri6, Quad4}}(problem::Problem{Elasticity}, el
     Kt = zeros(dim*nnodes, dim*nnodes)
     f = zeros(dim*nnodes)
 
-    for ip in get_integration_points(element)
-        JT = transpose(get_jacobian(element, ip, time))
-        N = element(ip, time)
-        w = ip.weight*norm(cross(JT[:,1], JT[:,2]))
+    for (w, xi) in get_integration_points(element)
+        detJ = element(xi, time, Val{:detJ})
+        N = element(xi, time)
         if haskey(element, "displacement traction force")
-            T = element("displacement traction force", ip, time)
-            f += vec(w*T*N)
+            T = element("displacement traction force", xi, time)
+            f += w*vec(T*N)*detJ
         end
         for i in 1:dim
             if haskey(element, "displacement traction force $i")
-                T = element("displacement traction force $i", ip, time)
-                f[i:dim:end] += vec(w*T*N)
+                T = element("displacement traction force $i", xi, time)
+                f[i:dim:end] += w*vec(T*N)*detJ
             end
         end
     end

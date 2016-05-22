@@ -1,8 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+using JuliaFEM
 using JuliaFEM.Test
-using JuliaFEM.Core: Node, update!, Quad4, Hex8, Problem, Elasticity, Solver, Dirichlet
 
 @testset "test continuum nonlinear elasticity with surface load" begin
 
@@ -16,8 +16,8 @@ using JuliaFEM.Core: Node, update!, Quad4, Hex8, Problem, Elasticity, Solver, Di
     7 => [1.0, 1.0, 1.0],
     8 => [0.0, 1.0, 1.0])
 
-    element1 = Hex8([1, 2, 3, 4, 5, 6, 7, 8])
-    element2 = Quad4([5, 6, 7, 8])
+    element1 = Element(Hex8, [1, 2, 3, 4, 5, 6, 7, 8])
+    element2 = Element(Quad4, [5, 6, 7, 8])
     update!([element1, element2], "geometry", nodes)
     update!([element1], "youngs modulus", 900.0)
     update!([element1], "poissons ratio", 0.25)
@@ -27,9 +27,9 @@ using JuliaFEM.Core: Node, update!, Quad4, Hex8, Problem, Elasticity, Solver, Di
     push!(elasticity_problem, element1)
     push!(elasticity_problem, element2)
 
-    symxy = Quad4([1, 2, 3, 4])
-    symxz = Quad4([1, 2, 6, 5])
-    symyz = Quad4([1, 4, 8, 5])
+    symxy = Element(Quad4, [1, 2, 3, 4])
+    symxz = Element(Quad4, [1, 2, 6, 5])
+    symyz = Element(Quad4, [1, 4, 8, 5])
     update!([symxy, symxz, symyz], "geometry", nodes)
     symxy["displacement 3"] = 0.0
     symxz["displacement 2"] = 0.0

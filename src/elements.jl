@@ -1,9 +1,9 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-import Base: getindex, setindex!, convert, size, length
-
 abstract AbstractElement
+
+typealias Node Vector{Float64}
 
 type Element{E<:AbstractElement}
     connectivity :: Vector{Int}
@@ -47,6 +47,20 @@ function call(element::Element, xi::Vector, time, ::Type{Val{:Jacobian}})
     dN = get_dbasis(element, xi, time)
     J = sum([kron(dN[:,i], X[i]') for i=1:length(X)])
     return J
+end
+
+function call(element::Element, xi::Vector, time, ::Type{Val{:detJ}})
+    J = element(xi, time, Val{:Jacobian})
+    n, m = size(J)
+    if n == m  # volume element
+        return det(J)
+    end
+    JT = transpose(J)
+    if size(JT, 2) == 1  # boundary of 2d problem, || ∂X/∂ξ ||
+        return norm(JT)
+    else # manifold on 3d problem, || ∂X/∂ξ₁ × ∂X/∂ξ₂ ||
+        return norm(cross(JT[:,1], JT[:,2]))
+    end
 end
 
 function get_jacobian{E}(element::Element{E}, xi::Vector, time=0.0)
@@ -128,18 +142,10 @@ function get_dualbasis(element::Element, time)
     De = zeros(nnodes, nnodes)
     Me = zeros(nnodes, nnodes)
     for (w, xi) in get_integration_points(element, Val{3})
-        J = element(xi, time, Val{:Jacobian})
-        JT = transpose(J)
-        if size(JT, 2) == 1  # plane problem
-            # || ∂X/∂ξ ||
-            w *= norm(JT)
-        else
-            # || ∂X/∂ξ₁ × ∂X/∂ξ₂ ||
-            w *= norm(cross(JT[:,1], JT[:,2]))
-        end
+        detJ = element(xi, time, Val{:detJ})
         N = element(xi, time)
-        De += w*diagm(vec(N))
-        Me += w*N'*N
+        De += w*diagm(vec(N))*detJ
+        Me += w*N'*N*detJ
     end
     return De, Me, De*inv(Me)
 end
