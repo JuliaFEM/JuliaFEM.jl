@@ -68,10 +68,12 @@ function get_integration_points(element::LineElement, ::Type{Val{3}})
     [ (w[i], [xi[i]]) for i=1:3 ]
 end
 
+#=
 function get_integration_points{E<:LineElement}(element::Element{E}, ::Type{Val{3}})
     w, xi = get_integration_points(Val{3})
     [ (w[i], [xi[i]]) for i=1:3 ]
 end
+=#
 
 function get_integration_points(element::Quad4, ::Type{Val{2}})
     w, xi = get_integration_points(Val{2})
@@ -104,6 +106,10 @@ end
 
 function get_integration_points(element::Hex8)
     get_integration_points(element, Val{2})
+end
+
+function get_integration_points{E}(element::Element{E}, ::Type{Val{3}})
+    get_integration_points(element.properties, Val{3})
 end
 
 ### triangular and tetrahedral elements

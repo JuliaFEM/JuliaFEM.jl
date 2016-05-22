@@ -13,7 +13,6 @@ autodiffcache = ForwardDiffCache()
 # export derivative, jacobian, hessian
 
 include("common.jl")
-typealias Node Vector{Float64}
 
 include("fields.jl")
 export DCTI
@@ -23,7 +22,7 @@ export DCTI
 
 ### ELEMENTS ###
 include("elements.jl") # common element routines
-export Element, update!
+export Node, Element, update!
 include("lagrange_macro.jl") # Continuous Galerkin (Lagrange) elements generated using macro
 export Seg2, Tri3, Quad4, Hex8, Tet4
 
