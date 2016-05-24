@@ -23,6 +23,10 @@ function setindex!(element::Element, data, field_name::ASCIIString)
     element.fields[field_name] = Field(data)
 end
 
+function call(element::Element, field_name::ASCIIString, time=0.0)
+    return element[field_name](time)
+end
+
 function call(element::Element, xi::Vector, time=0.0)
     get_basis(element, xi, time)
 end

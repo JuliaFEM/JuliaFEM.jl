@@ -22,7 +22,7 @@ export DCTI
 
 ### ELEMENTS ###
 include("elements.jl") # common element routines
-export Node, AbstractElement, Element, update!
+export Node, AbstractElement, Element, update!, get_connectivity
 include("lagrange_macro.jl") # Continuous Galerkin (Lagrange) elements generated using macro
 export Seg2, Tri3, Tri6, Quad4, Hex8, Tet4, Tet10
 
@@ -77,6 +77,9 @@ end
 
 module Postprocess
 include("xdmf.jl")
+export xdmf_new_temporal_collection, xdmf_new_grid,
+       xdmf_new_mesh!, xdmf_new_nodal_field!,
+       xdmf_save_model, xdmf_new_model
 end
 
 """ JuliaFEM testing routines. """
