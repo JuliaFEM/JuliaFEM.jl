@@ -51,102 +51,83 @@ end
 
 ### 1d elements
 
-typealias LineElement Union{Seg2, Seg3}
+typealias CartesianLineElement Union{Element{Seg2}, Element{Seg3}}
+typealias CartesianSurfaceElement Union{Element{Quad4}}
+typealias CartesianVolumeElement Union{Element{Hex8}}
 
-function get_integration_points(element::LineElement, ::Type{Val{1}})
+function get_integration_points(element::CartesianLineElement, ::Type{Val{1}})
     w, xi = get_integration_points(Val{1})
     [ (w[i], [xi[i]]) for i=1:1 ]
 end
-
-function get_integration_points(element::LineElement, ::Type{Val{2}})
+function get_integration_points(element::CartesianLineElement, ::Type{Val{2}})
     w, xi = get_integration_points(Val{2})
     [ (w[i], [xi[i]]) for i=1:2 ]
 end
-
-function get_integration_points(element::LineElement, ::Type{Val{3}})
+function get_integration_points(element::CartesianLineElement, ::Type{Val{3}})
     w, xi = get_integration_points(Val{3})
     [ (w[i], [xi[i]]) for i=1:3 ]
 end
 
-#=
-function get_integration_points{E<:LineElement}(element::Element{E}, ::Type{Val{3}})
-    w, xi = get_integration_points(Val{3})
-    [ (w[i], [xi[i]]) for i=1:3 ]
+function get_integration_points(element::CartesianSurfaceElement, ::Type{Val{1}})
+    w, xi = get_integration_points(Val{1})
+    [ (w[i]*w[j], [xi[i], xi[j]]) for i=1:1, j=1:1 ]
 end
-=#
-
-function get_integration_points(element::Quad4, ::Type{Val{2}})
+function get_integration_points(element::CartesianSurfaceElement, ::Type{Val{2}})
     w, xi = get_integration_points(Val{2})
     [ (w[i]*w[j], [xi[i], xi[j]]) for i=1:2, j=1:2 ]
 end
-
-function get_integration_points(element::Quad4, ::Type{Val{3}})
+function get_integration_points(element::CartesianSurfaceElement, ::Type{Val{3}})
     w, xi = get_integration_points(Val{3})
     [ (w[i]*w[j], [xi[i], xi[j]]) for i=1:3, j=1:3 ]
 end
 
-function get_integration_points(element::Hex8, ::Type{Val{2}})
+function get_integration_points(element::CartesianVolumeElement, ::Type{Val{1}})
+    w, xi = get_integration_points(Val{1})
+    [ (w[i]*w[j]*w[k], [xi[i], xi[j], xi[k]]) for i=1:1, j=1:1, k=1:1 ]
+end
+function get_integration_points(element::CartesianVolumeElement, ::Type{Val{2}})
     w, xi = get_integration_points(Val{2})
     [ (w[i]*w[j]*w[k], [xi[i], xi[j], xi[k]]) for i=1:2, j=1:2, k=1:2 ]
 end
-
-### default number of integration points for each element
-
-function get_integration_points(element::Seg2)
-    get_integration_points(element, Val{2})
+function get_integration_points(element::CartesianVolumeElement, ::Type{Val{3}})
+    w, xi = get_integration_points(Val{3})
+    [ (w[i]*w[j]*w[k], [xi[i], xi[j], xi[k]]) for i=1:3, j=1:3, k=1:3 ]
 end
 
-function get_integration_points(element::Seg3)
-    get_integration_points(element, Val{3})
-end
-
-function get_integration_points(element::Quad4)
-    get_integration_points(element, Val{2})
-end
-
-function get_integration_points(element::Hex8)
-    get_integration_points(element, Val{2})
-end
-
-function get_integration_points{E}(element::Element{E}, ::Type{Val{3}})
-    get_integration_points(element.properties, Val{3})
-end
 
 ### triangular and tetrahedral elements
 
 # http://math2.uncc.edu/~shaodeng/TEACHING/math5172/Lectures/Lect_15.PDF
+# http://libmesh.github.io/doxygen/quadrature__gauss__2D_8C_source.html
 
-typealias TriangularElement Union{Type{Tri3}, Type{Tri6}}
+typealias TriangularElement Union{Element{Tri3}, Element{Tri6}}
 
-function get_integration_points(::TriangularElement, ::Type{Val{1}})
-    # http://libmesh.github.io/doxygen/quadrature__gauss__2D_8C_source.html
+function get_integration_points(element::TriangularElement, ::Type{Val{1}})
     weights = [0.5]
     points = Vector{Float64}[1.0/3.0*[1.0, 1.0]]
-    return weights, points
+    return zip(weights, points)
 end
 
-function get_integration_points(::TriangularElement, ::Type{Val{2}})
-    # http://libmesh.github.io/doxygen/quadrature__gauss__2D_8C_source.html
+function get_integration_points(element::TriangularElement, ::Type{Val{2}})
     weights = 1.0/6.0*[1.0, 1.0, 1.0]
     points = Vector{Float64}[
         [2.0/3.0, 1.0/6.0],
         [1.0/6.0, 2.0/3.0],
         [1.0/6.0, 1.0/6.0]]
-    return weights, points
+    return zip(weights, points)
 end
 
-function get_integration_points(::TriangularElement, ::Type{Val{3}})
-    [
-        IntegrationPoint([1/3, 1/3], 0.5*-0.5625),
-        IntegrationPoint([0.2, 0.2], 0.5*0.5208333333333333),
-        IntegrationPoint([0.2, 0.6], 0.5*0.5208333333333333),
-        IntegrationPoint([0.6, 0.2], 0.5*0.5208333333333333),
-    ]
+function get_integration_points(element::TriangularElement, ::Type{Val{3}})
+    weights = 0.5*[-0.5625, 0.5208333333333333, 0.5208333333333333, 0.5208333333333333]
+    points = Vector{Float64}[
+        [1.0/3.0, 1.0/3.0],
+        [0.2, 0.2],
+        [0.2, 0.6],
+        [0.6, 0.2]]
+    return zip(weights, points)
 end
 
-function get_integration_points(::TriangularElement, ::Type{Val{4}})
-    # http://math2.uncc.edu/~shaodeng/TEACHING/math5172/Lectures/Lect_15.PDF
-    # FIXME: something wrong here with weights ..?
+function get_integration_points(element::TriangularElement, ::Type{Val{4}})
     [
         IntegrationPoint([0.44594849091597, 0.44594849091597], 0.5*0.22338158967801),
         IntegrationPoint([0.44594849091597, 0.10810301816807], 0.5*0.22338158967801),
@@ -157,9 +138,7 @@ function get_integration_points(::TriangularElement, ::Type{Val{4}})
     ]
 end
 
-function get_integration_points(::TriangularElement, ::Type{Val{5}})
-    # http://math2.uncc.edu/~shaodeng/TEACHING/math5172/Lectures/Lect_15.PDF
-    # FIXME: something wrong here with weights ..?
+function get_integration_points(element::TriangularElement, ::Type{Val{5}})
     [
         IntegrationPoint([0.33333333333333, 0.33333333333333], 0.5*0.22500000000000),
         IntegrationPoint([0.47014206410511, 0.47014206410511], 0.5*0.13239415278851),
@@ -171,28 +150,64 @@ function get_integration_points(::TriangularElement, ::Type{Val{5}})
     ]
 end
 
-function get_integration_points(::Type{Tri3})
-    return get_integration_points(Tri3, Val{1})
-end
-
 ### 3d elements
 
-function get_integration_points(::Type{Tet4})
-    # http://libmesh.github.io/doxygen/quadrature__gauss__3D_8C_source.html
-    [
-        IntegrationPoint([0.25, 0.25, 0.25], 1.0/6.0)
-    ]
+typealias TetrahedralElement Union{Element{Tet4}, Element{Tet10}}
+
+function get_integration_points(element::TetrahedralElement, ::Type{Val{1}})
+    weights = 1.0/6.0*[1.0]
+    points = Vector{Float64}[
+        1.0/4.0*[1.0, 1.0, 1.0]]
+    return zip(weights, points)
 end
 
-function get_integration_points(::Type{Tet10})
-    # http://libmesh.github.io/doxygen/quadrature__gauss__3D_8C_source.html
-    a = .585410196624969
-    b = .138196601125011
-    w = .041666666666667
-    [
-        IntegrationPoint([a, b, b], w),
-        IntegrationPoint([b, a, b], w),
-        IntegrationPoint([b, b, a], w),
-        IntegrationPoint([b, b, b], w)
-    ]
+function get_integration_points(element::TetrahedralElement, ::Type{Val{2}})
+    a = (5.0+3.0*sqrt(5.0))/20.0
+    b = (5.0-sqrt(5.0))/20.0
+    w = 1.0/24.0
+    weights = [w, w, w, w]
+    points = Vector{Float64}[
+        [a, b, b],
+        [b, a, b],
+        [b, b, a],
+        [b, b, b]]
+    return zip(weights, points)
 end
+
+function get_integration_points(element::TetrahedralElement, ::Type{Val{3}})
+    a = 1.0/4.0
+    b = 1.0/6.0
+    c = 1.0/2.0
+    weights = [-2.0/15.0, 3.0/40.0, 3.0/40.0, 3.0/40.0, 3.0/40.0]
+    points = Vector{Float64}[
+        [a, a, a],
+        [b, b, b],
+        [b, b, c],
+        [b, c, b],
+        [c, b, b]]
+    return zip(weights, points)
+end
+
+### default number of integration points for each element
+### 2 for linear elements, 3 for quadratic
+
+typealias LinearElement Union{
+    Element{Seg2},
+    Element{Tri3},
+    Element{Quad4},
+    Element{Tet4},
+    Element{Hex8}}
+
+typealias QuadraticElement Union{
+    Element{Seg3},
+    Element{Tri6},
+    Element{Tet10}}
+
+function get_integration_points(element::LinearElement; order=2)
+    get_integration_points(element, Val{order})
+end
+
+function get_integration_points(element::QuadraticElement; order=3)
+    get_integration_points(element, Val{order})
+end
+
