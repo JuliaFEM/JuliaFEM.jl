@@ -22,16 +22,28 @@ function get_formulation_type(problem::Problem{Dirichlet})
     return problem.properties.formulation
 end
 
-function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Element, time::Real)
-
-    @assert problem.properties.dual_basis
+function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Element, time)
 
     # get dimension and name of PARENT field
+    nnodes = length(element)
     field_dim = get_unknown_field_dimension(problem)
     field_name = get_parent_field_name(problem)
     gdofs = get_gdofs(element, field_dim)
 
-    De, Me, Ae = get_dualbasis(element, time)
+  
+#   if problem.properties.formulation == :dual_basis
+        De, Me, Ae = get_dualbasis(element, time)
+#   else
+#       Ae = eye(nnodes)
+#       De = zeros(nnodes, nnodes)
+#       for (w, xi) in get_integration_points(element, Val{3})
+#           N = element(xi, time)
+#           detJ = element(xi, time, Val{:detJ})
+#           De += w*N'*N*detJ
+#       end
+#   end
+  
+#   De = Ae = eye(nnodes)
 
     # left hand side
     for i=1:field_dim
@@ -44,27 +56,19 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Ele
 
     # right hand side
     for (w, xi) in get_integration_points(element, Val{3})
-        J = element(xi, time, Val{:Jacobian})
-        JT = transpose(J)
-        if size(JT, 2) == 1  # plane problem
-            w *= norm(JT)
-        else
-            w *= norm(cross(JT[:,1], JT[:,2]))
-        end
+        detJ = element(xi, time, Val{:detJ})
         N = element(xi, time)
 
         for i=1:field_dim
             ldofs = gdofs[i:field_dim:end]
             if haskey(element, field_name*" $i")
                 g = element(field_name*" $i", xi, time)
-                if get_formulation_type(problem) == :incremental
-                    # if having incremental formulation need to add previous
-                    # displacement to rhs (solving increment Δu !
+                if true
                     haskey(element, "displacement") || continue
                     g_prev = element(field_name, xi, time)
                     g -= g_prev[i]
                 end
-                add!(assembly.g, ldofs, w*g*Ae*N')
+                add!(assembly.g, ldofs, w*g*Ae*N'*detJ)
             end
         end
 

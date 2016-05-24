@@ -27,6 +27,7 @@ end
 function get_formulation_type(problem::Problem{Elasticity})
     # we are solving residual and add increment to previous solution vector
     return :incremental
+    #return :total
 end
 
 function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::Element, time::Real)
@@ -129,12 +130,21 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
         if props.finite_strain # add geometric stiffness
             Kt += w*BNL'*S2*BNL*detJ # geometric stiffness
         end
-        f -= w*BL'*S*detJ # internal force
+
+        if get_formulation_type(problem) == :incremental
+            f -= w*BL'*S*detJ # internal force
+        end
 
         # volume load
         if haskey(element, "displacement load")
             b = element("displacement load", xi, time)
             f += w*vec(N'*b)*detJ
+        end
+        for i=1:dim
+            if haskey(element, "displacement load $i")
+                b = element("displacement load $i", xi, time)
+                f[i:dim:end] += w*vec(b*N)*detJ
+            end
         end
 
     end
@@ -213,16 +223,13 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
         E = element("youngs modulus", xi, time)
         nu = element("poissons ratio", xi, time)
 
-        a = 1 - nu
-        b = 1 - 2*nu
-        c = 1 + nu
-        D = E/(b*c) .* [
-            a nu nu 0 0 0
-            nu a nu 0 0 0
-            nu nu a 0 0 0
-            0 0 0 b 0 0
-            0 0 0 0 b 0
-            0 0 0 0 0 b]
+        D = E/((1.0+nu)*(1.0-2.0*nu)) * [
+            1.0-nu nu nu 0.0 0.0 0.0
+            nu 1.0-nu nu 0.0 0.0 0.0
+            nu nu 1.0-nu 0.0 0.0 0.0
+            0.0 0.0 0.0 0.5-nu 0.0 0.0
+            0.0 0.0 0.0 0.0 0.5-nu 0.0
+            0.0 0.0 0.0 0.0 0.0 0.5-nu]
 
         # # PK2 stress tensor in voigt notation
         S = D*[strain[1,1]; strain[2,2]; strain[3,3]; 2*strain[2,3]; 2*strain[1,3]; 2*strain[1,2]]
@@ -249,6 +256,7 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             BL[6, 3*(i-1)+2] = F[2,3]*dN[1,i] + F[2,1]*dN[3,i]
             BL[6, 3*(i-1)+3] = F[3,3]*dN[1,i] + F[3,1]*dN[3,i]
         end
+
         fill!(BNL, 0.0)
         for i=1:size(dN, 2)
             BNL[1, 3*(i-1)+1] = dN[1,i]
@@ -274,12 +282,21 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
         if props.finite_strain
             Kt += w*BNL'*S3*BNL*detJ
         end
-        f -= w*BL'*S*detJ
+
+        if get_formulation_type(problem) == :incremental
+            f -= w*BL'*S*detJ
+        end
 
         # volume load
         if haskey(element, "displacement load")
             T = element("displacement load", ip, time)
             f += w*vec(T*N)*detJ
+        end
+        for i=1:dim
+            if haskey(element, "displacement load $i")
+                b = element("displacement load $i", xi, time)
+                f[i:dim:end] += w*vec(b*N)*detJ
+            end
         end
     end
 
