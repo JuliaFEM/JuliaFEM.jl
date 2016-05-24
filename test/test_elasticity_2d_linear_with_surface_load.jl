@@ -41,5 +41,6 @@ using JuliaFEM.Test
     nu = 1/3
     u3_expected = f/E*[-nu, 1] + g/(2*E)*[-nu, 1]
     u3 = reshape(block.assembly.u, 2, 4)[:,3]
+    info("u3 = $u3")
     @test isapprox(u3, u3_expected)
 end
