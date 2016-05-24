@@ -6,13 +6,14 @@ abstract AbstractElement
 typealias Node Vector{Float64}
 
 type Element{E<:AbstractElement}
+    id :: Int
     connectivity :: Vector{Int}
     fields :: Dict{ASCIIString, Field}
     properties :: E
 end
 
-function Element{E<:AbstractElement}(::Type{E}, connectivity=[], fields=Dict(), properties...)
-    Element{E}(connectivity, fields, E(properties...))
+function Element{E<:AbstractElement}(::Type{E}, connectivity=[], id=-1, fields=Dict(), properties...)
+    Element{E}(id, connectivity, fields, E(properties...))
 end
 
 function getindex(element::Element, field_name::ASCIIString)
@@ -59,12 +60,8 @@ function call(element::Element, xi::Vector, time, ::Type{Val{:detJ}})
     end
 end
 
-function get_jacobian{E}(element::Element{E}, xi::Vector, time=0.0)
-    element(xi, time, Val{:Jacobian})
-end
-
 function call(element::Element, xi::Vector, time, ::Type{Val{:Grad}})
-    J = get_jacobian(element, xi, time)
+    J = element(xi, time, Val{:Jacobian})
     return inv(J)*get_dbasis(element, xi, time)
 end
 
@@ -72,6 +69,9 @@ function call(element::Element, field_name, xi::Vector, time, ::Type{Val{:Grad}}
     element(xi, time, Val{:Grad})*element[field_name](time)
 end
 
+#function get_jacobian{E}(element::Element{E}, xi::Vector, time=0.0)
+#    element(xi, time, Val{:Jacobian})
+#end
 #function get_basis(element::Element, xi::Vector, time=0.0)
 #    get_basis(element.properties, xi, time)
 #end

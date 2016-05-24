@@ -2,6 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using LightXML
+using JuliaFEM
 
 # element codes: http://www.paraview.org/pipermail/paraview/2013-July/028859.html
 # > from  ./VTK/ThirdParty/xdmf2/vtkxdmf2/libsrc/XdmfTopology.h
@@ -122,5 +123,51 @@ end
 
 function xdmf_save_model(xdoc, filename)
   save_file(xdoc, filename)
+end
+
+function xdmf_dump(all_elements, eltype, elsym, time=0.0, filename="/tmp/xdmf_result.xmf")
+    info("$(length(all_elements)) elements.")
+    xdoc, xmodel = xdmf_new_model()
+    coll = xdmf_new_temporal_collection(xmodel)
+    grid = xdmf_new_grid(coll; time=time)
+
+    Xg = Dict{Int64, Vector{Float64}}()
+    ug = Dict{Int64, Vector{Float64}}()
+    nids = Dict{Int64, Int64}()
+    for element in all_elements
+        conn = get_connectivity(element)
+        for (i, c) in enumerate(conn)
+            nids[c] = c
+        end
+        X = element("geometry", time)
+        for (i, c) in enumerate(conn)
+            Xg[c] = X[i]
+        end
+        haskey(element, "displacement") || continue
+        u = element("displacement", time)
+        for (i, c) in enumerate(conn)
+            ug[c] = u[i]
+        end
+    end
+    perm = sort(collect(keys(Xg)))
+    nodes = Vector{Float64}[Xg[i] for i in perm]
+    disp = Vector{Float64}[ug[i] for i in perm]
+    nids = Int[nids[i] for i in perm]
+    inids = Dict{Int64, Int64}()
+    for (i, nid) in enumerate(nids)
+        inids[nid] = i
+    end
+    elements = []
+    for element in all_elements
+        isa(element, eltype) || continue
+        conn = get_connectivity(element)
+        nconn = [inids[i] for i in conn]
+        push!(elements, (elsym, nconn))
+    end
+
+    xdmf_new_mesh!(grid, nodes, elements)
+    xdmf_new_nodal_field!(grid, "displacement", disp)
+    xdmf_save_model(xdoc, filename)
+    info("model dumped to $filename")
 end
 

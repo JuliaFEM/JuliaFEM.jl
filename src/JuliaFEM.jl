@@ -15,7 +15,7 @@ autodiffcache = ForwardDiffCache()
 include("common.jl")
 
 include("fields.jl")
-export DCTI
+export DCTI, Field
 #include("basis.jl")  # interpolation of discrete fields
 #include("symbolic.jl") # a thin symbolic layer for fields
 #include("types.jl")  # type definitions
@@ -36,7 +36,8 @@ export get_integration_points
 include("sparse.jl")
 
 include("problems.jl") # common problem routines
-export Problem
+export Problem, AbstractProblem, FieldProblem, BoundaryProblem,
+       get_unknown_field_dimension
 
 include("elasticity.jl") # elasticity equations
 export Elasticity
@@ -79,7 +80,7 @@ module Postprocess
 include("xdmf.jl")
 export xdmf_new_temporal_collection, xdmf_new_grid,
        xdmf_new_mesh!, xdmf_new_nodal_field!,
-       xdmf_save_model, xdmf_new_model
+       xdmf_save_model, xdmf_new_model, xdmf_dump
 end
 
 """ JuliaFEM testing routines. """
