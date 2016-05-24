@@ -13,7 +13,7 @@ function calculate_lagrange_basis_coefficients(P, X)
     for i=1:nbasis
         A[i,:] = P(X[:, i])
     end
-    return inv(A)'
+    return inv(A)
 end
 
 function refcoords(X::Matrix)
@@ -39,18 +39,18 @@ macro create_lagrange_element(element_name, element_description, X, P)
         type $eltype <: AbstractElement
         end
 
-        C = calculate_lagrange_basis_coefficients($P, $X)
-        basis(xi) = C*$P(xi)
+        A = calculate_lagrange_basis_coefficients($P, $X)
+        #basis(xi) = C*$P(xi)
 
-        function get_basis(element::$eltype, xi::Vector, time)
-            return basis(xi)'
+        function get_basis(element::Element{$eltype}, xi::Vector, time)
+            return transpose($P(xi))*A
         end
 
-        function size(element::$eltype)
+        function size(element::Element{$eltype})
             return size($X)
         end
 
-        function length(element::$eltype)
+        function length(element::Element{$eltype})
             return size($X, 2)
         end
 
@@ -121,6 +121,14 @@ end
      0.0 0.0 0.0 1.0],
     (xi) -> [1.0, xi[1], xi[2], xi[3]])
 
+#=
+@create_lagrange_element(Tet4, "4 node tetrahedron",
+    [0.0 0.0 0.0 1.0
+     1.0 0.0 0.0 0.0
+     0.0 1.0 0.0 0.0],
+    (xi) -> [1.0, xi[1], xi[2], xi[3]])
+=#
+
 @create_lagrange_element(Tet10, "10 node quadratic tetrahedron",
     [0.0 1.0 0.0 0.0 0.5 0.5 0.0 0.0 0.5 0.0
      0.0 0.0 1.0 0.0 0.0 0.5 0.5 0.0 0.0 0.5
@@ -128,6 +136,14 @@ end
     (xi) -> [    1.0,   xi[1],       xi[2],       xi[3],     xi[1]^2,
              xi[2]^2, xi[3]^2, xi[1]*xi[2], xi[2]*xi[3], xi[3]*xi[1]])
 
+#=
+@create_lagrange_element(Tet10, "10 node quadratic tetrahedron",
+    [0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.5 0.5 0.5
+     1.0 0.0 0.0 0.0 0.5 0.0 0.5 0.5 0.0 0.0
+     0.0 1.0 0.0 0.0 0.5 0.5 0.0 0.0 0.5 0.0],
+    (xi) -> [    1.0,   xi[1],       xi[2],       xi[3],     xi[1]^2,
+             xi[2]^2, xi[3]^2, xi[1]*xi[2], xi[2]*xi[3], xi[3]*xi[1]])
+=#
 
 # some helpers to make accessing 1d basis functions more easy
 function get_basis{T<:Real, E<:Union{Seg2,Seg3}}(::Type{E}, xi::T)
