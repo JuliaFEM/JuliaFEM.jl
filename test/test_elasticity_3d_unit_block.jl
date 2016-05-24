@@ -3,11 +3,13 @@
 
 using JuliaFEM
 using JuliaFEM.Preprocess
+using JuliaFEM.Postprocess
 using JuliaFEM.Test
 
 function get_model(fn, vol, sur)
     meshfile = Pkg.dir("JuliaFEM")*"/geometry/3d_blocks/BLOCK.med"
     mesh = parse_aster_med_file(meshfile, fn)
+    info(mesh)
 
     block = Problem(Elasticity, fn, 3)
     block.properties.finite_strain = false
@@ -52,28 +54,54 @@ function calc_size(elements, dim)
     return A
 end
 
-#=
-@testset "test 3d block hex8" begin
-    block, bc = get_model("BLOCK_HEX8", :HE8, :QU4)
-    V = calc_size(block.elements, 3)
-    info("volume of block: $V")
-    A = calc_size(bc.elements, 2)
-    info("area of boundary condition: $A")
-    @test isapprox(V, 1.0)
-    @test isapprox(A, 3.0)
-    solver = Solver("solver block problem")
-    solver.is_linear_system = true
-    push!(solver, block, bc)
-    call(solver)
-    max_u = maximum(abs(block.assembly.u))
-    info("max |u| = $max_u")
-    @test isapprox(max_u, 2.0)
-end
-=#
+function xdmf_dump(all_elements, eltype, elsym, filename="/tmp/xdmf_result.xmf")
+    info("$(length(all_elements)) elements.")
+    xdoc, xmodel = xdmf_new_model()
+    coll = xdmf_new_temporal_collection(xmodel)
+    grid = xdmf_new_grid(coll; time=0.0)
 
-@testset "test 3d block TET4" begin
-    block, bc, elements, traction, symyz, symxz, symxy = get_model("BLOCK_TET4", :TE4, :TR3)
-#   block, bc = get_model("BLOCK_TET10", :T10, :TR6)
+    Xg = Dict{Int64, Vector{Float64}}()
+    ug = Dict{Int64, Vector{Float64}}()
+    nids = Dict{Int64, Int64}()
+    for element in all_elements
+        conn = get_connectivity(element)
+        for (i, c) in enumerate(conn)
+            nids[c] = c
+        end
+        X = element("geometry", 0.0)
+        for (i, c) in enumerate(conn)
+            Xg[c] = X[i]
+        end
+        haskey(element, "displacement") || continue
+        u = element("displacement", 0.0)
+        for (i, c) in enumerate(conn)
+            ug[c] = u[i]
+        end
+    end
+    perm = sort(collect(keys(Xg)))
+    nodes = Vector{Float64}[Xg[i] for i in perm]
+    disp = Vector{Float64}[ug[i] for i in perm]
+    nids = Int[nids[i] for i in perm]
+    inids = Dict{Int64, Int64}()
+    for (i, nid) in enumerate(nids)
+        inids[nid] = i
+    end
+    elements = []
+    for element in all_elements
+        isa(element, eltype) || continue
+        conn = get_connectivity(element)
+        nconn = [inids[i] for i in conn]
+        push!(elements, (elsym, nconn))
+    end
+
+    xdmf_new_mesh!(grid, nodes, elements)
+    xdmf_new_nodal_field!(grid, "displacement", disp)
+    xdmf_save_model(xdoc, filename)
+    info("model dumped to $filename")
+end
+
+function calc_model(model, volume_element, surface_element)
+    block, bc, elements, traction, symyz, symxz, symxy = get_model(model, volume_element, surface_element)
     V = calc_size(block.elements, 3)
     info("volume of block: $V")
     A = calc_size(bc.elements, 2)
@@ -94,6 +122,21 @@ end
     dump(round(u', 5))
     dump(round(f', 5))
     info("max |u| = $max_u")
-    @test isapprox(max_u, 2.0)
+    return block, u
 end
 
+@testset "test 3d block TET4" begin
+    block, u = calc_model("BLOCK_TET4", :TE4, :TR3)
+    @test isapprox(maximum(u), 2.1329516539440205)
+end
+
+@testset "test 3d block TET10" begin
+    block, u = calc_model("BLOCK_TET10", :T10, :TR6)
+    @test isapprox(maximum(u), 2.13656216413056)
+end
+
+@testset "test 3d block HEX8" begin
+    block, u = calc_model("BLOCK_HEX8", :HE8, :QU4)
+#   xdmf_dump(block.elements, Element{Hex8}, :Hex8, "/tmp/BLOCK_HEX8.xmf")
+    @test isapprox(maximum(u), 2.0)
+end

@@ -207,7 +207,7 @@ function get_integration_points(element::LinearElement; order=2)
     get_integration_points(element, Val{order})
 end
 
-function get_integration_points(element::QuadraticElement; order=3)
+function get_integration_points(element::QuadraticElement; order=2)
     get_integration_points(element, Val{order})
 end
 

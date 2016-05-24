@@ -6,11 +6,15 @@ using JuliaFEM
 
 function aster_create_elements(mesh, element_set, element_type=nothing; reverse_connectivity=false)
     elements = Element[]
-    mapping = Dict(:QU4 => Quad4, :TR3 => Tri3, :SE2 => Seg2, :HE8 => Hex8, :TE4 => Tet4)
+    mapping = Dict(
+        :SE2 => Seg2,
+        :TR3 => Tri3,
+        :TR6 => Tri6,
+        :QU4 => Quad4,
+        :HE8 => Hex8,
+        :TE4 => Tet4,
+        :T10 => Tet10)
     for (elid, (eltype, elset, elcon)) in mesh["connectivity"]
-        if !haskey(mapping, eltype)
-            error("aster_create_elements: unknown element mapping $eltype")
-        end
         elset == element_set || continue
         if !isa(element_type, Void)
             if isa(element_type, Tuple)
@@ -23,6 +27,9 @@ function aster_create_elements(mesh, element_set, element_type=nothing; reverse_
         end
         if reverse_connectivity
             elcon = reverse(elcon)
+        end
+        if !haskey(mapping, eltype)
+            error("aster_create_elements: unknown element mapping $eltype")
         end
         element = Element(mapping[eltype], elcon)
         push!(elements, element)
@@ -290,10 +297,16 @@ end
 # hex8 nodes rotating cw first in yz plane then x+1
 
 global const med_elmap = Dict{Symbol, Vector{Int}}(
-    :HE8 => [4, 8, 7, 3, 1, 5, 6, 2],
-    :TE4 => [2, 3, 4, 1],
+    :SE2 => [1, 2],
+    :SE3 => [1, 2, 3],
+    :TR3 => [1, 2, 3],
+    :TR6 => [1, 2, 3, 4, 5, 6],
     :QU4 => [1, 2, 3, 4],
-#    :SE2 => [2, 1]
+    :HE8 => [4, 8, 7, 3, 1, 5, 6, 2],  # ..?
+    :TE4 => [3, 2, 1, 4],
+    :T10 => [3, 2, 1, 4, 6, 5, 7, 10, 9, 8]
+#   :T10 => [3, 4, 1, 2, 10, 8, 7, 6, 9, 5]
+#   :T10 => [5, 9, 6, 7, 8, 10, 2, 1, 4, 3]
 )
 
 function get_connectivity(med::MEDFile, elsets, mesh_name)
@@ -318,8 +331,8 @@ function get_connectivity(med::MEDFile, elsets, mesh_name)
             if haskey(med_elmap, eltype)
                 elco = elco[med_elmap[eltype]]
             else
-                #warn("no element mapping info found for element type $eltype")
-                #warn("consider this as a warning: element may have french nodal ordering")
+                warn("no element mapping info found for element type $eltype")
+                warn("consider this as a warning: element may have french nodal ordering")
             end
             d[element_ids[i]] = (eltype, elset, elco)
         end
