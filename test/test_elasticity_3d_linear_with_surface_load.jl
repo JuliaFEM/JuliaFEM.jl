@@ -18,9 +18,10 @@ using JuliaFEM.Test
     element1 = Element(Hex8, [1, 2, 3, 4, 5, 6, 7, 8])
     element2 = Element(Quad4, [5, 6, 7, 8])
     update!([element1, element2], "geometry", nodes)
-    update!([element1], "youngs modulus", 900.0)
-    update!([element1], "poissons ratio", 0.25)
-    update!([element2], "displacement traction force", Vector{Float64}[[0.0, 0.0, -100.0] for i=1:4])
+    update!([element1], "youngs modulus", 288.0)
+    update!([element1], "poissons ratio", 1/3)
+    update!([element2], "displacement traction force 3", 288.0)
+    update!([element1], "displacement load 3", 576.0)
 
     elasticity_problem = Problem(Elasticity, "solve continuum block", 3)
     elasticity_problem.properties.finite_strain = false
@@ -31,9 +32,9 @@ using JuliaFEM.Test
     symxz = Element(Quad4, [1, 2, 6, 5])
     symyz = Element(Quad4, [1, 4, 8, 5])
     update!([symxy, symxz, symyz], "geometry", nodes)
-    symxy["displacement 3"] = 0.0
-    symxz["displacement 2"] = 0.0
     symyz["displacement 1"] = 0.0
+    symxz["displacement 2"] = 0.0
+    symxy["displacement 3"] = 0.0
     boundary_problem = Problem(Dirichlet, "symmetry boundary conditions", 3, "displacement")
     push!(boundary_problem, symxy, symxz, symyz)
 
@@ -44,6 +45,6 @@ using JuliaFEM.Test
 
     disp = element1("displacement", [1.0, 1.0, 1.0], 0.0)
     info("displacement at tip: $disp")
-    u_expected = -100.0/900.0 * [-0.25, -0.25, 1.0]
+    u_expected = 2.0 * [-1/3, -1/3, 1.0]
     @test isapprox(disp, u_expected)
 end
