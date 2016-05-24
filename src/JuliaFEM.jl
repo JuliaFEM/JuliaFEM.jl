@@ -22,15 +22,17 @@ export DCTI
 
 ### ELEMENTS ###
 include("elements.jl") # common element routines
-export Node, Element, update!
+export Node, AbstractElement, Element, update!
 include("lagrange_macro.jl") # Continuous Galerkin (Lagrange) elements generated using macro
-export Seg2, Tri3, Quad4, Hex8, Tet4
+export Seg2, Tri3, Tri6, Quad4, Hex8, Tet4, Tet10
 
 #include("hierarchical.jl") # P-elements
 #include("mortar_elements.jl") # Mortar elements
 #include("equations.jl")
 
 include("integrate.jl")  # default integration points for elements
+export get_integration_points
+
 include("sparse.jl")
 
 include("problems.jl") # common problem routines
