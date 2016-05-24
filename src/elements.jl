@@ -15,14 +15,6 @@ function Element{E<:AbstractElement}(::Type{E}, connectivity=[], fields=Dict(), 
     Element{E}(connectivity, fields, E(properties...))
 end
 
-function get_basis(element::Element, xi::Vector, time=0.0)
-    get_basis(element.properties, xi, time)
-end
-
-function get_dbasis(element::Element, xi::Vector, time=0.0)
-    get_dbasis(element.properties, xi, time)
-end
-
 function getindex(element::Element, field_name::ASCIIString)
     element.fields[field_name]
 end
@@ -32,7 +24,7 @@ function setindex!(element::Element, data, field_name::ASCIIString)
 end
 
 function call(element::Element, xi::Vector, time=0.0)
-    get_basis(element.properties, xi, time)
+    get_basis(element, xi, time)
 end
 
 function call(element::Element, field_name::ASCIIString, xi::Vector, time=0.0)
@@ -67,10 +59,6 @@ function get_jacobian{E}(element::Element{E}, xi::Vector, time=0.0)
     element(xi, time, Val{:Jacobian})
 end
 
-function get_integration_points{E}(element::Element{E})
-    get_integration_points(element.properties)
-end
-
 function call(element::Element, xi::Vector, time, ::Type{Val{:Grad}})
     J = get_jacobian(element, xi, time)
     return inv(J)*get_dbasis(element, xi, time)
@@ -80,13 +68,21 @@ function call(element::Element, field_name, xi::Vector, time, ::Type{Val{:Grad}}
     element(xi, time, Val{:Grad})*element[field_name](time)
 end
 
-function length{E}(element::Element{E})
-    length(element.properties)
-end
-
-function size{E}(element::Element{E})
-    size(element.properties)
-end
+#function get_basis(element::Element, xi::Vector, time=0.0)
+#    get_basis(element.properties, xi, time)
+#end
+#function get_dbasis(element::Element, xi::Vector, time=0.0)
+#    get_dbasis(element.properties, xi, time)
+#end
+#function get_integration_points{E}(element::Element{E})
+#    get_integration_points(element.properties)
+#end
+#function length{E}(element::Element{E})
+#    length(element.properties)
+#end
+#function size{E}(element::Element{E})
+#    size(element.properties)
+#end
 
 function size(element::Element, dim::Int)
     size(element)[dim]
