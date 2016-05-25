@@ -270,6 +270,35 @@ function Base.done(f::DVTI, s)
     return s > length(f.data)
 end
 
+""" Update time-dependent fields with new values.
+
+Examples
+--------
+
+julia> f = Field(0.0 => 1.0)
+julia> update!(f, 1.0 => 2.0)
+
+Now field has two (time, value) pairs: (0.0, 1.0) and (1.0, 2.0)
+
+Notes
+-----
+Time vector is assumed to be ordered t_i-1 < t_i < t_i+1. If updating
+field with already existing time the old value is replaced with new one.
+
+"""
+function update!{T}(field::Union{DCTV, DVTV}, val::Pair{Float64, T})
+    time, data = val
+    if isapprox(last(field).time, time)
+        last(field).data = data
+    else
+        push!(field.data, Increment(val...))
+    end
+end
+
+function update!{T}(field::Union{DCTI, DVTI}, val::T)
+    field.data = val
+end
+
 ### Accessing continuous fields
 
 function Base.call(field::CVTI, xi::Vector)

@@ -1,55 +1,40 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-""" Concrete Elasticity type. """
+""" Elasticity problem
+
+
+"""
 type Elasticity <: FieldProblem
     # these are found from problem.properties for type Problem{Elasticity}
     formulation :: Symbol
     finite_strain :: Bool
-    use_forwarddiff :: Bool
 end
 function Elasticity()
     # formulations: plane_stress, plane_strain, continuum
-    return Elasticity(:continuum, true, false)
+    return Elasticity(:continuum, true)
 end
 
-# in case of experimenting new things;
-# 1. import JuliaFEM.Core: assemble!
-# 2. copy/paste assemble! code to notebook
-# 3. change to last argument, i.e. ::Type{Val{:plane_stress}} to ::Type{Val{:my_formulation}}
-# 4. when running code: set problem.properties.formulation = :my_formulation
-# 5. let multiple dispatch do the magic for you
-
-function get_unknown_field_name(::Type{Elasticity})
+function get_unknown_field_name(problem::Problem{Elasticity})
     return "displacement"
 end
 
 function get_formulation_type(problem::Problem{Elasticity})
     # we are solving residual and add increment to previous solution vector
     return :incremental
-    #return :total
 end
 
-function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::Element, time::Real)
+function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::Element, time=0.0)
     props = problem.properties
     gdofs = get_gdofs(problem, element)
-    if props.use_forwarddiff
-        Kt, f = assemble(problem, element, time, Val{:forwarddiff})
-    elseif props.formulation == :continuum
-        Kt, f = assemble(problem, element, time, Val{:continuum})
-    elseif (props.formulation == :plane_stress) || (props.formulation == :plane_strain)
+    if problem.properties.formulation in [:plane_stress, :plane_strain]
         Kt, f = assemble(problem, element, time, Val{:plane})
+    else
+        Kt, f = assemble(problem, element, time, Val{problem.properties.formulation})
     end
     add!(assembly.K, gdofs, gdofs, Kt)
     add!(assembly.f, gdofs, f)
-end
-
-function assemble(problem::Problem{Elasticity}, element::Element, time=0.0)
-    problem.properties
-    if problem.properties.formulation in [:plane_stress, :plane_strain]
-        return assemble(problem, element, time, Val{:plane})
-    end
-    return assemble(problem, element, time, Val{problem.properties.formulation})
+    return Kt, f
 end
 
 """ Elasticity equations for 2d cases. """
@@ -63,16 +48,17 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
     Kt = zeros(dim*nnodes, dim*nnodes)
     f = zeros(dim*nnodes)
 
-    for (w, xi) in get_integration_points(element)
+    for ip in get_integration_points(element)
 
-        detJ = element(xi, time, Val{:detJ})
-        N = element(xi, time)
-        dN = element(xi, time, Val{:Grad})
+        detJ = element(ip, time, Val{:detJ})
+        w = ip.weight*detJ
+        N = element(ip, time)
+        dN = element(ip, time, Val{:Grad})
 
         # kinematics; calculate deformation gradient and strain
         gradu = zeros(dim, dim)
         if haskey(element, "displacement")
-            gradu += element("displacement", xi, time, Val{:Grad})
+            gradu += element("displacement", ip, time, Val{:Grad})
         end
         strain = zeros(dim , dim)
         strain += 1/2*(gradu' + gradu)
@@ -84,8 +70,8 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
 
         # constitutive equations; material model (isotropic linear material here)
         # get_material(problem, element, ...)
-        E = element("youngs modulus", xi, time)
-        nu = element("poissons ratio", xi, time)
+        E = element("youngs modulus", ip, time)
+        nu = element("poissons ratio", ip, time)
         if props.formulation == :plane_stress
             D = E/(1.0 - nu^2) .* [
                 1.0  nu 0.0
@@ -99,9 +85,15 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
         else
             error("unknown plane formulation: $(props.formulation)")
         end
-
         # calculate stress
-        S = D*[strain[1,1]; strain[2,2]; 2*strain[1,2]]
+        strain_vec = [strain[1,1]; strain[2,2]; 2*strain[1,2]]
+        stress_vec = D*strain_vec
+        stress = [stress_vec[1] stress_vec[3]; stress_vec[3] stress_vec[2]]
+        cauchy_stress = F'*stress*F/det(F)
+        cauchy_stress = [cauchy_stress[1,1]; cauchy_stress[2,2]; cauchy_stress[1,2]]
+
+        update!(ip, "strain", time => strain_vec)
+        update!(ip, "stress", time => cauchy_stress)
 
         # add contributions: material and geometric stiffness + internal forces
         fill!(BL, 0.0)
@@ -121,29 +113,29 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
             BNL[4, 2*(i-1)+2] = dN[2,i]
         end
         S2 = zeros(2*dim, 2*dim)
-        S2[1,1] = S[1]
-        S2[2,2] = S[2]
-        S2[1,2] = S2[2,1] = S[3]
+        S2[1,1] = stress_vec[1]
+        S2[2,2] = stress_vec[2]
+        S2[1,2] = S2[2,1] = stress_vec[3]
         S2[3:4,3:4] = S2[1:2,1:2]
 
-        Kt += w*BL'*D*BL*detJ # material stiffness
+        Kt += w*BL'*D*BL # material stiffness
         if props.finite_strain # add geometric stiffness
-            Kt += w*BNL'*S2*BNL*detJ # geometric stiffness
+            Kt += w*BNL'*S2*BNL # geometric stiffness
         end
 
         if get_formulation_type(problem) == :incremental
-            f -= w*BL'*S*detJ # internal force
+            f -= w*BL'*stress_vec # internal force
         end
 
         # volume load
         if haskey(element, "displacement load")
-            b = element("displacement load", xi, time)
-            f += w*vec(N'*b)*detJ
+            b = element("displacement load", ip, time)
+            f += w*vec(N'*b)
         end
         for i=1:dim
             if haskey(element, "displacement load $i")
-                b = element("displacement load $i", xi, time)
-                f[i:dim:end] += w*vec(b*N)*detJ
+                b = element("displacement load $i", ip, time)
+                f[i:dim:end] += w*vec(b*N)
             end
         end
 
@@ -160,29 +152,30 @@ function assemble{El<:Union{Seg2,Seg3}}(problem::Problem{Elasticity}, element::E
     Kt = zeros(dim*nnodes, dim*nnodes)
     f = zeros(dim*nnodes)
 
-    for (w, xi) in get_integration_points(element)
+    for ip in get_integration_points(element)
 
-        detJ = element(xi, time, Val{:detJ})
-        N = element(xi, time)
+        detJ = element(ip, time, Val{:detJ})
+        w = ip.weight*detJ
+        N = element(ip, time)
 
         if haskey(element, "displacement traction force")
-            T = element("displacement traction force", xi, time)
-            f += w*vec(T*N)*detJ
+            T = element("displacement traction force", ip, time)
+            f += w*vec(T*N)
         end
 
         for i=1:dim
             # traction force for ith component
             if haskey(element, "displacement traction force $i")
-                T = element("displacement traction force $i", xi, time)
-                f[i:dim:end] += w*vec(T*N)*detJ
+                T = element("displacement traction force $i", ip, time)
+                f[i:dim:end] += w*vec(T*N)
             end
         end
 
         if haskey(element, "nt displacement traction force")
             # traction force given in normal-tangential direction
-            T = element("nt displacement traction force", xi, time)
-            Q = element("normal-tangential coordinates", xi, time)
-            f += w*vec(Q'*T*N)*detJ
+            T = element("nt displacement traction force", ip, time)
+            Q = element("normal-tangential coordinates", ip, time)
+            f += w*vec(Q'*T*N)
         end
 
     end
