@@ -7,7 +7,7 @@ using JuliaFEM
 using JuliaFEM.Test
 
 @testset "test 2d linear elasticity local matrices" begin
-    element = Element(Quad4)
+    element = Element(Quad4, [1, 2, 3, 4])
     element["geometry"] = Vector{Float64}[
         [0.0, 0.0],
         [1.0, 0.0],
@@ -19,7 +19,7 @@ using JuliaFEM.Test
 
     problem = Problem(Elasticity, "[0x1] x [0x1] block", 2)
     problem.properties.formulation = :plane_stress
-    K, f = assemble(problem, element)
+    K, f = assemble!(problem, element)
 
     K_expected = [
         144  54 -90   0 -72 -54  18   0

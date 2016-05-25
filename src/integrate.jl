@@ -51,9 +51,9 @@ end
 
 ### 1d elements
 
-typealias CartesianLineElement Union{Element{Seg2}, Element{Seg3}}
-typealias CartesianSurfaceElement Union{Element{Quad4}}
-typealias CartesianVolumeElement Union{Element{Hex8}}
+typealias CartesianLineElement Union{Seg2, Seg3}
+typealias CartesianSurfaceElement Union{Quad4}
+typealias CartesianVolumeElement Union{Hex8}
 
 function get_integration_points(element::CartesianLineElement, ::Type{Val{1}})
     w, xi = get_integration_points(Val{1})
@@ -100,7 +100,7 @@ end
 # http://math2.uncc.edu/~shaodeng/TEACHING/math5172/Lectures/Lect_15.PDF
 # http://libmesh.github.io/doxygen/quadrature__gauss__2D_8C_source.html
 
-typealias TriangularElement Union{Element{Tri3}, Element{Tri6}}
+typealias TriangularElement Union{Tri3, Tri6}
 
 function get_integration_points(element::TriangularElement, ::Type{Val{1}})
     weights = [0.5]
@@ -152,7 +152,7 @@ end
 
 ### 3d elements
 
-typealias TetrahedralElement Union{Element{Tet4}, Element{Tet10}}
+typealias TetrahedralElement Union{Tet4, Tet10}
 
 function get_integration_points(element::TetrahedralElement, ::Type{Val{1}})
     weights = 1.0/6.0*[1.0]
@@ -191,23 +191,25 @@ end
 ### default number of integration points for each element
 ### 2 for linear elements, 3 for quadratic
 
-typealias LinearElement Union{
-    Element{Seg2},
-    Element{Tri3},
-    Element{Quad4},
-    Element{Tet4},
-    Element{Hex8}}
+typealias LinearElement Union{Seg2, Tri3, Quad4, Tet4, Hex8}
 
-typealias QuadraticElement Union{
-    Element{Seg3},
-    Element{Tri6},
-    Element{Tet10}}
+typealias QuadraticElement Union{Seg3, Tri6, Tet10}
 
-function get_integration_points(element::LinearElement; order=2)
+function get_integration_order(element::LinearElement)
+    return 2
+end
+
+function get_integration_order(element::QuadraticElement)
+    return 3
+end
+
+function get_integration_points(element::LinearElement)
+    order = get_integration_order(element)
     get_integration_points(element, Val{order})
 end
 
-function get_integration_points(element::QuadraticElement; order=2)
+function get_integration_points(element::QuadraticElement)
+    order= get_integration_order(element)
     get_integration_points(element, Val{order})
 end
 

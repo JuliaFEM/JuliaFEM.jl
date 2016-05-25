@@ -30,20 +30,17 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Ele
     field_name = get_parent_field_name(problem)
     gdofs = get_gdofs(element, field_dim)
 
-  
-#   if problem.properties.formulation == :dual_basis
+    if problem.properties.dual_basis
         De, Me, Ae = get_dualbasis(element, time)
-#   else
-#       Ae = eye(nnodes)
-#       De = zeros(nnodes, nnodes)
-#       for (w, xi) in get_integration_points(element, Val{3})
-#           N = element(xi, time)
-#           detJ = element(xi, time, Val{:detJ})
-#           De += w*N'*N*detJ
-#       end
-#   end
-  
-#   De = Ae = eye(nnodes)
+    else
+        Ae = eye(nnodes)
+        De = zeros(nnodes, nnodes)
+        for ip in get_integration_points(element)
+            N = element(ip, time)
+            detJ = element(ip, time, Val{:detJ})
+            De += ip.weight*N'*N*detJ
+        end
+    end
 
     # left hand side
     for i=1:field_dim
@@ -55,20 +52,21 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Ele
     end
 
     # right hand side
-    for (w, xi) in get_integration_points(element, Val{3})
-        detJ = element(xi, time, Val{:detJ})
-        N = element(xi, time)
+    for ip in get_integration_points(element)
+        detJ = element(ip, time, Val{:detJ})
+        w = ip.weight*detJ
+        N = element(ip, time)
 
         for i=1:field_dim
             ldofs = gdofs[i:field_dim:end]
             if haskey(element, field_name*" $i")
-                g = element(field_name*" $i", xi, time)
+                g = element(field_name*" $i", ip, time)
                 if true
                     haskey(element, "displacement") || continue
-                    g_prev = element(field_name, xi, time)
+                    g_prev = element(field_name, ip, time)
                     g -= g_prev[i]
                 end
-                add!(assembly.g, ldofs, w*g*Ae*N'*detJ)
+                add!(assembly.g, ldofs, w*g*Ae*N')
             end
         end
 

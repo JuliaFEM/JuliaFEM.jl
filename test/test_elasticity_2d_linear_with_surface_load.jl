@@ -35,6 +35,7 @@ using JuliaFEM.Test
     solver = Solver("solve block problem")
     push!(solver, block, bc_sym)
     call(solver)
+
     f = 288.0
     g = 576.0
     E = 288.0
@@ -43,4 +44,19 @@ using JuliaFEM.Test
     u3 = reshape(block.assembly.u, 2, 4)[:,3]
     info("u3 = $u3")
     @test isapprox(u3, u3_expected)
+
+    info("strain")
+    for ip in get_integration_points(elements[1])
+        eps = ip("strain")
+        @printf "%i | %8.3f %8.3f | %8.3f %8.3f %8.3f\n" ip.id ip.coords[1] ip.coords[2] eps[1] eps[2] eps[3]
+        @test isapprox(eps, [u3; 0.0])
+    end
+
+    info("stress")
+    for ip in get_integration_points(elements[1])
+        sig = ip("stress")
+        @printf "%i | %8.3f %8.3f | %8.3f %8.3f %8.3f\n" ip.id ip.coords[1] ip.coords[2] sig[1] sig[2] sig[3]
+        @test isapprox(sig, [0.0; g; 0.0])
+    end
+
 end

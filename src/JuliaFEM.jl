@@ -15,16 +15,17 @@ autodiffcache = ForwardDiffCache()
 include("common.jl")
 
 include("fields.jl")
-export DCTI, Field
+export Field, DCTI, DVTI, DCTV, DVTV
+include("types.jl")  # data types: Point, IntegrationPoint, ...
+export AbstractPoint, Point, IntegrationPoint, IP, Node
 #include("basis.jl")  # interpolation of discrete fields
 #include("symbolic.jl") # a thin symbolic layer for fields
-#include("types.jl")  # type definitions
 
 ### ELEMENTS ###
 include("elements.jl") # common element routines
 export Node, AbstractElement, Element, update!, get_connectivity
 include("lagrange_macro.jl") # Continuous Galerkin (Lagrange) elements generated using macro
-export Seg2, Tri3, Tri6, Quad4, Hex8, Tet4, Tet10
+export Seg2, Seg3, Tri3, Tri6, Quad4, Hex8, Tet4, Tet10
 
 #include("hierarchical.jl") # P-elements
 #include("mortar_elements.jl") # Mortar elements
@@ -48,7 +49,11 @@ export Dirichlet
 include("heat.jl")
 export Heat
 
-export assemble
+export assemble, assemble!
+
+function assemble!(problem::Problem, element::Element, time=0.0)
+    assemble!(problem.assembly, problem, element, time)
+end
 
 ### ASSEMBLY + SOLVE ###
 include("assembly.jl")

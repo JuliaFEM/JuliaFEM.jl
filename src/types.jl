@@ -3,77 +3,63 @@
 
 typealias Node Vector{Float64}
 
+abstract AbstractPoint
 
-"""
-Integration point
-
-xi
-    (dimensionless) coordinates of integration point
-weight
-    integration weight
-fields
-    FieldSet what can be used to store internal variables, stress, strain, ...
-"""
-immutable IntegrationPoint
-    xi :: Vector
+type Point{P<:AbstractPoint}
+    id :: Int
     weight :: Float64
+    coords :: Vector{Float64}
     fields :: Dict{ASCIIString, Field}
-    changed :: Bool
+    properties :: P
 end
 
-function IntegrationPoint(xi, weight)
-    return IntegrationPoint(xi, weight, FieldSet(), false)
+function setindex!{T}(point::Point, val::Pair{Float64, T}, field_name::ASCIIString)
+    point.fields[field_name] = Field(val)
 end
 
-function setindex!{T<:ForwardDiff.ForwardDiffNumber}(ip::IntegrationPoint, data::Array{T,2}, field_name::ASCIIString)
-    data = ForwardDiff.get_value(data)
-    setindex!(ip, data, field_name)
-end
-function setindex!(ip::IntegrationPoint, data, field_name)
-    ip.fields[field_name] = Field(data)
-    ip.changed = true
+function getindex(point::Point, field_name::ASCIIString)
+    return point.fields[field_name]
 end
 
-function getindex(ip::IntegrationPoint, field_name::ASCIIString)
-    ip.fields[field_name]
+function getindex(point::Point, idx::Int)
+    return point.coords[idx]
 end
 
-function convert(::Type{Number}, ip::IntegrationPoint)
-    return ip.xi
+function haskey(point::Point, field_name::ASCIIString)
+    return haskey(point.fields, field_name)
 end
 
-function call(field::CVTI, ip::IntegrationPoint)
-    return call(field, ip.xi)
+function call(point::Point, field_name::ASCIIString, time::Float64=0.0)
+    point.fields[field_name](time).data
 end
 
-function call(basis::CVTI, field::DCTI, ip::IntegrationPoint)
-    call(basis, field, ip.xi)
+function update!{T}(point::Point, field_name, val::Pair{Float64, T})
+    if haskey(point, field_name)
+        update!(point[field_name], val)
+    else
+        point[field_name] = val
+    end
 end
 
-function call(basis::CVTI, field::DVTI, ip::IntegrationPoint, ::Type{Val{:grad}})
-    call(basis, field, ip.xi, Val{:grad})
+#= TODO: in future
+type Node <: AbstractPoint
 end
 
-function call(basis::CVTI, field::DVTI, ip::IntegrationPoint)
-    call(basis, field, ip.xi)
+type MaterialPoint <: AbstractPoint
+end
+=#
+
+type IntegrationPoint <: AbstractPoint
 end
 
-function call(basis::CVTI, geometry::DVTI, field::Union{DCTI, DVTI}, ip::IntegrationPoint, ::Type{Val{:grad}})
-    call(basis, geometry, field, ip.xi, Val{:grad})
+typealias IP Point{IntegrationPoint}
+
+function IP(id, weight, coords)
+    return IP(id, weight, coords, Dict(), IntegrationPoint())
 end
 
-#function Base.call(basis::Basis, increment::Increment, ip::IntegrationPoint)
-#    return call(basis, increment, ip.xi)
-#end
-#function Base.call(basis::Basis, increment::Increment, ip::IntegrationPoint, ::Type{Val{:grad}})
-#    return call(basis, increment, ip.xi, Val{:grad})
-#end
-#function Base.call(basis::Basis, field::Field, ip::IntegrationPoint, ::Type{Val{:grad}})
-#    return call(basis, field, ip.xi, Val{:grad})
-#end
-#function Base.call(basis::Basis, geometry::Increment, field::Increment, ip::IntegrationPoint, ::Type{Val{:grad}})
-#    return call(basis, geometry, field, ip.xi, Val{:grad})
-#end
-#function Base.call(basis::Basis, field::Field, ip::IntegrationPoint)
-#    return call(basis, field, ip.xi)
-#end
+function convert(::Type{IP}, data::Tuple{Float64, Vector{Float64}})
+    weight, coords = data
+    return IP(-1, weight, coords)
+end
+

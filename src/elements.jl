@@ -3,17 +3,19 @@
 
 abstract AbstractElement
 
-typealias Node Vector{Float64}
-
 type Element{E<:AbstractElement}
     id :: Int
     connectivity :: Vector{Int}
+    integration_points :: Vector{IP}
     fields :: Dict{ASCIIString, Field}
     properties :: E
 end
 
 function Element{E<:AbstractElement}(::Type{E}, connectivity=[], id=-1, fields=Dict(), properties...)
-    Element{E}(id, connectivity, fields, E(properties...))
+    variant = E(properties...)
+    ips = get_integration_points(variant)
+    integration_points = [IP(i, w, xi) for (i, (w, xi)) in enumerate(ips)]
+    Element{E}(id, connectivity, integration_points, fields, variant)
 end
 
 function getindex(element::Element, field_name::ASCIIString)
@@ -28,26 +30,19 @@ function call(element::Element, field_name::ASCIIString, time=0.0)
     return element[field_name](time)
 end
 
-function call(element::Element, xi::Vector, time=0.0)
-    get_basis(element, xi, time)
+function call(element::Element, ip, time=0.0)
+    get_basis(element, ip, time)
 end
 
-function call(element::Element, field_name::ASCIIString, xi::Vector, time=0.0)
-    field = element[field_name](time)
-    isa(field, DCTI) && return field.data
-    basis = element(xi, time)
-    return basis*field
-end
-
-function call(element::Element, xi::Vector, time, ::Type{Val{:Jacobian}})
+function call(element::Element, ip, time, ::Type{Val{:Jacobian}})
     X = element["geometry"](time)
-    dN = get_dbasis(element, xi, time)
+    dN = get_dbasis(element, ip, time)
     J = sum([kron(dN[:,i], X[i]') for i=1:length(X)])
     return J
 end
 
-function call(element::Element, xi::Vector, time, ::Type{Val{:detJ}})
-    J = element(xi, time, Val{:Jacobian})
+function call(element::Element, ip, time, ::Type{Val{:detJ}})
+    J = element(ip, time, Val{:Jacobian})
     n, m = size(J)
     if n == m  # volume element
         return det(J)
@@ -60,13 +55,23 @@ function call(element::Element, xi::Vector, time, ::Type{Val{:detJ}})
     end
 end
 
-function call(element::Element, xi::Vector, time, ::Type{Val{:Grad}})
-    J = element(xi, time, Val{:Jacobian})
-    return inv(J)*get_dbasis(element, xi, time)
+function call(element::Element, ip, time, ::Type{Val{:Grad}})
+    J = element(ip, time, Val{:Jacobian})
+    return inv(J)*get_dbasis(element, ip, time)
 end
 
-function call(element::Element, field_name, xi::Vector, time, ::Type{Val{:Grad}})
-    element(xi, time, Val{:Grad})*element[field_name](time)
+function call(element::Element, field_name::ASCIIString, ip, time, ::Type{Val{:Grad}})
+    element(ip, time, Val{:Grad})*element[field_name](time)
+end
+
+function call(element::Element, field_name::ASCIIString, ip, time=0.0)
+    field = element[field_name](time)
+    isa(field, DCTI) && return field.data
+    basis = element(ip, time)
+    n = length(element)
+    m = length(field)
+    @assert n == m
+    return sum([field[i]*basis[i] for i=1:n])
 end
 
 #function get_jacobian{E}(element::Element{E}, xi::Vector, time=0.0)
@@ -122,6 +127,9 @@ function get_dbasis(element::Element, xi::Vector, time)
     basis(xi) = vec(get_basis(element, xi, time))
     return ForwardDiff.jacobian(basis, xi, cache=autodiffcache)'
 end
+function get_dbasis(element::Element, ip::IP, time)
+    get_dbasis(element, ip.coords, time)
+end
 
 """ Check existence of field. """
 function haskey(element::Element, field_name)
@@ -130,6 +138,20 @@ end
 
 function get_connectivity(element::Element)
     return element.connectivity
+end
+
+function get_integration_points(element::Element)
+    return element.integration_points
+end
+
+""" This is a special case, temporarily change order
+of integration scheme mainly for mass matrix.
+"""
+function get_integration_points(element::Element, change_order::Int)
+    order = get_integration_order(element.properties)
+    order += change_order
+    ips = get_integration_points(element.properties, Val{order})
+    return [IP(i, w, xi) for (i, (w, xi)) in enumerate(ips)]
 end
 
 function get_gdofs(element::Element)
@@ -141,11 +163,12 @@ function get_dualbasis(element::Element, time)
     nnodes = length(element)
     De = zeros(nnodes, nnodes)
     Me = zeros(nnodes, nnodes)
-    for (w, xi) in get_integration_points(element, Val{3})
-        detJ = element(xi, time, Val{:detJ})
-        N = element(xi, time)
-        De += w*diagm(vec(N))*detJ
-        Me += w*N'*N*detJ
+    for ip in get_integration_points(element)
+        detJ = element(ip, time, Val{:detJ})
+        w = ip.weight*detJ
+        N = element(ip, time)
+        De += w*diagm(vec(N))
+        Me += w*N'*N
     end
     return De, Me, De*inv(Me)
 end

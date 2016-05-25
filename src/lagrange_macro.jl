@@ -42,8 +42,8 @@ macro create_lagrange_element(element_name, element_description, X, P)
         A = calculate_lagrange_basis_coefficients($P, $X)
         #basis(xi) = C*$P(xi)
 
-        function get_basis(element::Element{$eltype}, xi::Vector, time)
-            return transpose($P(xi))*A
+        function get_basis(element::Element{$eltype}, ip, time)
+            return transpose($P(ip))*A
         end
 
         function size(element::Element{$eltype})
