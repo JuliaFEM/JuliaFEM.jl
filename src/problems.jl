@@ -176,7 +176,7 @@ function update_assembly!(problem, u, la)
     elseif get_formulation_type(problem) == :incremental
         info("$(problem.name): incremental formulation, adding increment to solution vector")
         assembly.u += u
-        assembly.la += la
+        assembly.la = la
     elseif get_formulation_type(problem) == :forwarddiff
         info("$(problem.name): forwarddiff formulation, adding increment to solution vector")
         assembly.u += u
