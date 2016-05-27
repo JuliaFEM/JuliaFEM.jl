@@ -11,11 +11,10 @@ type Element{E<:AbstractElement}
     properties :: E
 end
 
-function Element{E<:AbstractElement}(::Type{E}, connectivity=[], id=-1, fields=Dict(), properties...)
+function Element{E<:AbstractElement}(::Type{E}, connectivity=[], integration_points=[], id=-1, fields=Dict(), properties...)
     variant = E(properties...)
-    ips = get_integration_points(variant)
-    integration_points = [IP(i, w, xi) for (i, (w, xi)) in enumerate(ips)]
-    Element{E}(id, connectivity, integration_points, fields, variant)
+    element = Element{E}(id, connectivity, integration_points, fields, variant)
+    return element
 end
 
 function getindex(element::Element, field_name::ASCIIString)
@@ -26,11 +25,11 @@ function setindex!(element::Element, data, field_name::ASCIIString)
     element.fields[field_name] = Field(data)
 end
 
-function call(element::Element, field_name::ASCIIString, time=0.0)
+function call(element::Element, field_name::ASCIIString, time)
     return element[field_name](time)
 end
 
-function call(element::Element, ip, time=0.0)
+function call(element::Element, ip, time)
     get_basis(element, ip, time)
 end
 
@@ -64,8 +63,12 @@ function call(element::Element, field_name::ASCIIString, ip, time, ::Type{Val{:G
     element(ip, time, Val{:Grad})*element[field_name](time)
 end
 
-function call(element::Element, field_name::ASCIIString, ip, time=0.0)
-    field = element[field_name](time)
+function call(element::Element, field_name::ASCIIString, time)
+    return element[field_name](time)
+end
+
+function call(element::Element, field_name::ASCIIString, ip, time)
+    field = element(field_name, time)
     isa(field, DCTI) && return field.data
     basis = element(ip, time)
     n = length(element)
@@ -141,6 +144,11 @@ function get_connectivity(element::Element)
 end
 
 function get_integration_points(element::Element)
+    # first time initialize default integration points
+    if length(element.integration_points) == 0
+        ips = get_integration_points(element.properties)
+        element.integration_points = [IP(i, w, xi) for (i, (w, xi)) in enumerate(ips)]
+    end
     return element.integration_points
 end
 

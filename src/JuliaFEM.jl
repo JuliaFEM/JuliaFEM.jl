@@ -35,10 +35,11 @@ include("integrate.jl")  # default integration points for elements
 export get_integration_points
 
 include("sparse.jl")
+export add!
 
 include("problems.jl") # common problem routines
 export Problem, AbstractProblem, FieldProblem, BoundaryProblem,
-       get_unknown_field_dimension
+       get_unknown_field_dimension, get_gdofs
 
 include("elasticity.jl") # elasticity equations
 export Elasticity

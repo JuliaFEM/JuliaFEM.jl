@@ -7,11 +7,12 @@ using incremental formulation.
 """
 type Dirichlet <: BoundaryProblem
     formulation :: Symbol
+    variational :: Bool
     dual_basis :: Bool
 end
 
 function Dirichlet()
-    Dirichlet(:total, true)
+    Dirichlet(:incremental, true, false)
 end
 
 function get_unknown_field_name(::Type{Dirichlet})

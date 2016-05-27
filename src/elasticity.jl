@@ -86,7 +86,7 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
             error("unknown plane formulation: $(props.formulation)")
         end
         # calculate stress
-        strain_vec = [strain[1,1]; strain[2,2]; 2*strain[1,2]]
+        strain_vec = [strain[1,1]; strain[2,2]; 2.0*strain[1,2]]
         stress_vec = D*strain_vec
         stress = [stress_vec[1] stress_vec[3]; stress_vec[3] stress_vec[2]]
         cauchy_stress = F'*stress*F/det(F)
@@ -195,15 +195,16 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
     Kt = zeros(dim*nnodes, dim*nnodes)
     f = zeros(dim*nnodes)
 
-    for (w, xi) in get_integration_points(element)
-        detJ = element(xi, time, Val{:detJ})
-        N = element(xi, time)
-        dN = element(xi, time, Val{:Grad})
+    for ip in get_integration_points(element)
+        detJ = element(ip, time, Val{:detJ})
+        w = ip.weight*detJ
+        N = element(ip, time)
+        dN = element(ip, time, Val{:Grad})
 
         # kinematics; calculate deformation gradient and strain
         gradu = zeros(dim, dim)
         if haskey(element, "displacement")
-            gradu += element("displacement", xi, time, Val{:Grad})
+            gradu += element("displacement", ip, time, Val{:Grad})
         end
         strain = zeros(dim , dim)
         strain += 1/2*(gradu' + gradu)
@@ -213,8 +214,8 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             strain += 1/2*gradu'*gradu
         end
 
-        E = element("youngs modulus", xi, time)
-        nu = element("poissons ratio", xi, time)
+        E = element("youngs modulus", ip, time)
+        nu = element("poissons ratio", ip, time)
 
         D = E/((1.0+nu)*(1.0-2.0*nu)) * [
             1.0-nu nu nu 0.0 0.0 0.0
@@ -224,8 +225,11 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             0.0 0.0 0.0 0.0 0.5-nu 0.0
             0.0 0.0 0.0 0.0 0.0 0.5-nu]
 
-        # # PK2 stress tensor in voigt notation
-        S = D*[strain[1,1]; strain[2,2]; strain[3,3]; 2*strain[2,3]; 2*strain[1,3]; 2*strain[1,2]]
+        # PK2 stress tensor in voigt notation
+        # strain_vec = [strain[1,1]; strain[2,2]; strain[3,3]; 2*strain[2,3]; 2*strain[1,3]; 2*strain[1,2]]
+        # order 11, 22, 33, 12, 23, 13 is in many text books ..?
+        strain_vec = [strain[1,1]; strain[2,2]; strain[3,3]; 2*strain[1,2]; 2*strain[2,3]; 2*strain[1,3]]
+        stress_vec = D*strain_vec
 
         # add contributions: material and geometric stiffness + internal forces
         fill!(BL, 0.0)
@@ -263,35 +267,43 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             BNL[9, 3*(i-1)+3] = dN[3,i]
         end
         S3 = zeros(3*dim, 3*dim)
-        S3[1,1] = S[1]
-        S3[2,2] = S[2]
-        S3[3,3] = S[3]
-        S3[2,3] = S3[3,2] = S[4]
-        S3[1,3] = S3[3,1] = S[5]
-        S3[1,2] = S3[2,1] = S[6]
+        S3[1,1] = stress_vec[1]
+        S3[2,2] = stress_vec[2]
+        S3[3,3] = stress_vec[3]
+        S3[2,3] = S3[3,2] = stress_vec[4]
+        S3[1,3] = S3[3,1] = stress_vec[5]
+        S3[1,2] = S3[2,1] = stress_vec[6]
         S3[4:6,4:6] = S3[7:9,7:9] = S3[1:3,1:3]
 
-        Kt += w*BL'*D*BL*detJ
+        Kt += w*BL'*D*BL
         if props.finite_strain
-            Kt += w*BNL'*S3*BNL*detJ
+            Kt += w*BNL'*S3*BNL
         end
 
         if get_formulation_type(problem) == :incremental
-            f -= w*BL'*S*detJ
+            f -= w*BL'*stress_vec
         end
 
         # volume load
         if haskey(element, "displacement load")
             T = element("displacement load", ip, time)
-            f += w*vec(T*N)*detJ
+            f += w*vec(T*N)
         end
         for i=1:dim
             if haskey(element, "displacement load $i")
-                b = element("displacement load $i", xi, time)
-                f[i:dim:end] += w*vec(b*N)*detJ
+                b = element("displacement load $i", ip, time)
+                f[i:dim:end] += w*vec(b*N)
             end
         end
     end
+
+#=
+    if get_formulation_type(problem) == :incremental
+        if haskey(element, "displacement")
+            f -= Kt*vec(element["displacement"](time))
+        end
+    end
+=#
 
     return Kt, f
 end
@@ -305,17 +317,18 @@ function assemble{El<:Union{Tri3, Tri6, Quad4}}(problem::Problem{Elasticity}, el
     Kt = zeros(dim*nnodes, dim*nnodes)
     f = zeros(dim*nnodes)
 
-    for (w, xi) in get_integration_points(element)
-        detJ = element(xi, time, Val{:detJ})
-        N = element(xi, time)
+    for ip in get_integration_points(element)
+        detJ = element(ip, time, Val{:detJ})
+        w = ip.weight*detJ
+        N = element(ip, time)
         if haskey(element, "displacement traction force")
-            T = element("displacement traction force", xi, time)
-            f += w*vec(T*N)*detJ
+            T = element("displacement traction force", ip, time)
+            f += w*vec(T*N)
         end
         for i in 1:dim
             if haskey(element, "displacement traction force $i")
-                T = element("displacement traction force $i", xi, time)
-                f[i:dim:end] += w*vec(T*N)*detJ
+                T = element("displacement traction force $i", ip, time)
+                f[i:dim:end] += w*vec(T*N)
             end
         end
     end
