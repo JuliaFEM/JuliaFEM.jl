@@ -35,11 +35,11 @@ include("integrate.jl")  # default integration points for elements
 export get_integration_points
 
 include("sparse.jl")
-export add!
+export add!, SparseMatrixCOO, get_nonzero_rows
 
 include("problems.jl") # common problem routines
 export Problem, AbstractProblem, FieldProblem, BoundaryProblem,
-       get_unknown_field_dimension, get_gdofs
+       get_unknown_field_dimension, get_gdofs, Assembly
 
 include("elasticity.jl") # elasticity equations
 export Elasticity
@@ -83,10 +83,10 @@ export aster_create_elements, parse_aster_med_file
 end
 
 module Postprocess
-include("xdmf.jl")
-export xdmf_new_temporal_collection, xdmf_new_grid,
-       xdmf_new_mesh!, xdmf_new_nodal_field!,
-       xdmf_save_model, xdmf_new_model, xdmf_dump
+include("postprocess_utils.jl")
+export calc_nodal_values!
+include("postprocess_xdmf.jl")
+export XDMF, xdmf_new_result!, xdmf_save_field!, xdmf_save!
 end
 
 """ JuliaFEM testing routines. """

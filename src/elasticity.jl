@@ -12,7 +12,7 @@ type Elasticity <: FieldProblem
 end
 function Elasticity()
     # formulations: plane_stress, plane_strain, continuum
-    return Elasticity(:continuum, true)
+    return Elasticity(:continuum, false)
 end
 
 function get_unknown_field_name(problem::Problem{Elasticity})
@@ -93,7 +93,8 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
         cauchy_stress = [cauchy_stress[1,1]; cauchy_stress[2,2]; cauchy_stress[1,2]]
 
         update!(ip, "strain", time => strain_vec)
-        update!(ip, "stress", time => cauchy_stress)
+        update!(ip, "cauchy stress", time => cauchy_stress)
+        update!(ip, "pk2 stress", time => stress_vec)
 
         # add contributions: material and geometric stiffness + internal forces
         fill!(BL, 0.0)
@@ -225,11 +226,31 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             0.0 0.0 0.0 0.0 0.5-nu 0.0
             0.0 0.0 0.0 0.0 0.0 0.5-nu]
 
-        # PK2 stress tensor in voigt notation
-        # strain_vec = [strain[1,1]; strain[2,2]; strain[3,3]; 2*strain[2,3]; 2*strain[1,3]; 2*strain[1,2]]
-        # order 11, 22, 33, 12, 23, 13 is in many text books ..?
-        strain_vec = [strain[1,1]; strain[2,2]; strain[3,3]; 2*strain[1,2]; 2*strain[2,3]; 2*strain[1,3]]
-        stress_vec = D*strain_vec
+        # calculate stress
+        strain_vec = [strain[1,1]; strain[2,2]; strain[3,3]; strain[1,2]; strain[2,3]; strain[1,3]]
+        stress_vec = D * ([1.0, 1.0, 1.0, 2.0, 2.0, 2.0].*strain_vec)
+
+        stress = [
+            stress_vec[1] stress_vec[4] stress_vec[6]
+            stress_vec[4] stress_vec[2] stress_vec[5]
+            stress_vec[6] stress_vec[5] stress_vec[3]]
+        cauchy_stress = F'*stress*F/det(F)
+        cauchy_stress_vec = [
+            cauchy_stress[1,1];
+            cauchy_stress[2,2];
+            cauchy_stress[3,3];
+            cauchy_stress[1,2];
+            cauchy_stress[2,3];
+            cauchy_stress[1,3]]
+
+        s = cauchy_stress - 1.0/3.0*trace(cauchy_stress)*I
+        J2 = 1/2*trace(s*s')
+
+        # update values to integration point
+        update!(ip, "strain", time => strain_vec)
+        update!(ip, "stress", time => stress_vec)
+        update!(ip, "cauchy stress", time => cauchy_stress_vec)
+        update!(ip, "von mises stress", time => sqrt(3.0*J2))
 
         # add contributions: material and geometric stiffness + internal forces
         fill!(BL, 0.0)

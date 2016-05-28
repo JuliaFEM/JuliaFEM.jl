@@ -66,6 +66,7 @@ type Problem{P<:AbstractProblem}
     dimension :: Int                 # degrees of freedom per node
     parent_field_name :: ASCIIString # (optional) name of parent field e.g. "displacement"
     elements :: Vector{Element}
+    dofmap :: Dict{Element, Vector{Int64}} # connects element local dofs to global dofs
     assembly :: Assembly
     properties :: P
 end
@@ -79,8 +80,8 @@ Create vector-valued (dim=3) elasticity problem:
 julia> prob = Problem(Elasticity, "this is my problem", 3)
 
 """
-function Problem{P<:FieldProblem}(::Type{P}, name, dimension, elements=[])
-    Problem{P}(name, dimension, "none", elements, Assembly(), P())
+function Problem{P<:FieldProblem}(::Type{P}, name, dimension, elements=[], dofmap=Dict())
+    Problem{P}(name, dimension, "none", elements, dofmap, Assembly(), P())
 end
 
 """ Construct a new boundary problem.
@@ -92,8 +93,8 @@ Create Dirichlet boundary problem for vector-valued (dim=3) elasticity problem.
 julia> bc1 = Problem(Dirichlet, "support", 3, "displacement")
 
 """
-function Problem{P<:BoundaryProblem}(::Type{P}, name, dimension, parent_field_name, elements=[])
-    Problem{P}(name, dimension, parent_field_name, elements, Assembly(), P())
+function Problem{P<:BoundaryProblem}(::Type{P}, name, dimension, parent_field_name, elements=[], dofmap=Dict())
+    Problem{P}(name, dimension, parent_field_name, elements, dofmap, Assembly(), P())
 end
 
 function get_formulation_type{P<:FieldProblem}(problem::Problem{P})
@@ -116,7 +117,7 @@ function initialize!(problem::Problem, time::Real)
     field_name = get_unknown_field_name(problem)
     field_dim = get_unknown_field_dimension(problem)
     for element in get_elements(problem)
-        gdofs = get_gdofs(element, problem)
+        gdofs = get_gdofs(problem, element)
         if haskey(element, field_name)
             # if field is found, copy last known solution to new time as initial guess
             if !isapprox(last(element[field_name]).time, time)
@@ -134,7 +135,7 @@ function initialize!(problem::Problem, time::Real)
     #is_dirichlet_problem(problem) && return
     field_name = get_parent_field_name(problem)
     for element in get_elements(problem)
-        gdofs = get_gdofs(element, problem)
+        gdofs = get_gdofs(problem, element)
         if haskey(element, field_name)
             # if field is found, copy last known solution to new time as initial guess
             if !isapprox(last(element[field_name]).time, time)
@@ -269,16 +270,28 @@ end
 
 function get_gdofs(element::Element, dim::Int)
     conn = get_connectivity(element)
-    gdofs = vec(vcat([dim*conn'-i for i=dim-1:-1:0]...))
+    if length(conn) == 0
+        error("element connectivity not defined, cannot determine global dofs for element: $element")
+    end
+    gdofs = vec([dim*(i-1)+j for j=1:dim, i in conn])
     return gdofs
 end
 
-function get_gdofs(element::Element, problem::Problem)
-    return get_gdofs(element, problem.dimension)
-end
+""" Return global degrees of freedom for element.
 
+Notes
+-----
+First look dofs from problem.dofmap, it not found, update dofmap from
+element.element connectivity using formula gdofs = [dim*(nid-1)+j for j=1:dim]
+1. look element dofs from problem.dofmap
+2. if not found, use element.connectivity to update dofmap and 1.
+"""
 function get_gdofs(problem::Problem, element::Element)
-    return get_gdofs(element, problem.dimension)
+    if !haskey(element, problem.dofmap)
+        dim = get_unknown_field_dimension(problem)
+        problem.dofmap[element] = get_gdofs(element, dim)
+    end
+    return problem.dofmap[element]
 end
 
 """ Find dofs corresponding to nodes. """
