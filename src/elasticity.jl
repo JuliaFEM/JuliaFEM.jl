@@ -184,17 +184,16 @@ function assemble{El<:Union{Seg2,Seg3}}(problem::Problem{Elasticity}, element::E
     return Kt, f
 end
 
-
-""" Elasticity equations, continuum formulation. """
-function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum}})
+""" Elasticity equations, 3d, linear. """
+function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum_linear}})
 
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
-    nnodes = size(element, 2)
-    BL = zeros(6, dim*nnodes)
-    BNL = zeros(9, dim*nnodes)
-    Kt = zeros(dim*nnodes, dim*nnodes)
-    f = zeros(dim*nnodes)
+    nnodes = length(element)
+    ndofs = dim*nnodes
+    BL = zeros(6, ndofs)
+    Kt = zeros(ndofs, ndofs)
+    f = zeros(ndofs)
 
     for ip in get_integration_points(element)
         detJ = element(ip, time, Val{:detJ})
@@ -202,17 +201,17 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
         N = element(ip, time)
         dN = element(ip, time, Val{:Grad})
 
-        # kinematics; calculate deformation gradient and strain
-        gradu = zeros(dim, dim)
-        if haskey(element, "displacement")
-            gradu += element("displacement", ip, time, Val{:Grad})
-        end
-        strain = zeros(dim , dim)
-        strain += 1/2*(gradu' + gradu)
-        F = eye(dim)
-        if props.finite_strain
-            F += gradu
-            strain += 1/2*gradu'*gradu
+        fill!(BL, 0.0)
+        for i=1:nnodes
+            BL[1, 3*(i-1)+1] = dN[1,i]
+            BL[2, 3*(i-1)+2] = dN[2,i]
+            BL[3, 3*(i-1)+3] = dN[3,i]
+            BL[4, 3*(i-1)+1] = dN[2,i] + dN[1,i]
+            BL[4, 3*(i-1)+2] = dN[2,i] + dN[1,i]
+            BL[5, 3*(i-1)+2] = dN[3,i] + dN[2,i]
+            BL[5, 3*(i-1)+3] = dN[3,i] + dN[2,i]
+            BL[6, 3*(i-1)+1] = dN[1,i] + dN[3,i]
+            BL[6, 3*(i-1)+3] = dN[1,i] + dN[3,i]
         end
 
         E = element("youngs modulus", ip, time)
@@ -226,35 +225,142 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             0.0 0.0 0.0 0.0 0.5-nu 0.0
             0.0 0.0 0.0 0.0 0.0 0.5-nu]
 
-        # calculate stress
+        Kt += w*BL'*D*BL
+
+        if haskey(element, "displacement load")
+            T = element("displacement load", ip, time)
+            f += w*vec(T*N)
+        end
+        for i=1:dim
+            if haskey(element, "displacement load $i")
+                b = element("displacement load $i", ip, time)
+                f[i:dim:end] += w*vec(b*N)
+            end
+        end
+
+    end
+
+    if get_formulation_type(problem) == :incremental
+        if haskey(element, "displacement")
+            u = vec(element["displacement"](time))
+            f -= Kt*u
+        end
+    end
+
+    return Kt, f
+end
+
+""" Material and geometric stiffness for linear buckling analysis. """
+function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum_buckling}})
+
+    props = problem.properties
+    dim = get_unknown_field_dimension(problem)
+    nnodes = length(element)
+    ndofs = dim*nnodes
+    BL = zeros(6, ndofs)
+    BNL = zeros(9, ndofs)
+    Km = zeros(ndofs, ndofs)
+    Kg = zeros(ndofs, ndofs)
+
+    for ip in get_integration_points(element)
+        detJ = element(ip, time, Val{:detJ})
+        w = ip.weight*detJ
+        N = element(ip, time)
+        dN = element(ip, time, Val{:Grad})
+
+        gradu = element("displacement", ip, time, Val{:Grad})
+        strain = 1/2*(gradu' + gradu)
+
+        fill!(BL, 0.0)
+        for i=1:nnodes
+            BL[1, 3*(i-1)+1] = dN[1,i]
+            BL[2, 3*(i-1)+2] = dN[2,i]
+            BL[3, 3*(i-1)+3] = dN[3,i]
+            BL[4, 3*(i-1)+1] = dN[2,i] + dN[1,i]
+            BL[4, 3*(i-1)+2] = dN[2,i] + dN[1,i]
+            BL[5, 3*(i-1)+2] = dN[3,i] + dN[2,i]
+            BL[5, 3*(i-1)+3] = dN[3,i] + dN[2,i]
+            BL[6, 3*(i-1)+1] = dN[1,i] + dN[3,i]
+            BL[6, 3*(i-1)+3] = dN[1,i] + dN[3,i]
+        end
+
+        fill!(BNL, 0.0)
+        for i=1:size(dN, 2)
+            BNL[1, 3*(i-1)+1] = dN[1,i]
+            BNL[2, 3*(i-1)+1] = dN[2,i]
+            BNL[3, 3*(i-1)+1] = dN[3,i]
+            BNL[4, 3*(i-1)+2] = dN[1,i]
+            BNL[5, 3*(i-1)+2] = dN[2,i]
+            BNL[6, 3*(i-1)+2] = dN[3,i]
+            BNL[7, 3*(i-1)+3] = dN[1,i]
+            BNL[8, 3*(i-1)+3] = dN[2,i]
+            BNL[9, 3*(i-1)+3] = dN[3,i]
+        end
+
+        E = element("youngs modulus", ip, time)
+        nu = element("poissons ratio", ip, time)
+        D = E/((1.0+nu)*(1.0-2.0*nu)) * [
+            1.0-nu nu nu 0.0 0.0 0.0
+            nu 1.0-nu nu 0.0 0.0 0.0
+            nu nu 1.0-nu 0.0 0.0 0.0
+            0.0 0.0 0.0 0.5-nu 0.0 0.0
+            0.0 0.0 0.0 0.0 0.5-nu 0.0
+            0.0 0.0 0.0 0.0 0.0 0.5-nu]
+
         strain_vec = [strain[1,1]; strain[2,2]; strain[3,3]; strain[1,2]; strain[2,3]; strain[1,3]]
         stress_vec = D * ([1.0, 1.0, 1.0, 2.0, 2.0, 2.0].*strain_vec)
 
-        stress = [
-            stress_vec[1] stress_vec[4] stress_vec[6]
-            stress_vec[4] stress_vec[2] stress_vec[5]
-            stress_vec[6] stress_vec[5] stress_vec[3]]
-        cauchy_stress = F'*stress*F/det(F)
-        cauchy_stress_vec = [
-            cauchy_stress[1,1];
-            cauchy_stress[2,2];
-            cauchy_stress[3,3];
-            cauchy_stress[1,2];
-            cauchy_stress[2,3];
-            cauchy_stress[1,3]]
+        S3 = zeros(3*dim, 3*dim)
+        S3[1,1] = stress_vec[1]
+        S3[2,2] = stress_vec[2]
+        S3[3,3] = stress_vec[3]
+        S3[2,3] = S3[3,2] = stress_vec[4]
+        S3[1,3] = S3[3,1] = stress_vec[5]
+        S3[1,2] = S3[2,1] = stress_vec[6]
+        S3[4:6,4:6] = S3[7:9,7:9] = S3[1:3,1:3]
 
-        s = cauchy_stress - 1.0/3.0*trace(cauchy_stress)*I
-        J2 = 1/2*trace(s*s')
+        Km += w*BL'*D*BL
+        Kg += w*BNL'*S3*BNL
 
-        # update values to integration point
-        update!(ip, "strain", time => strain_vec)
-        update!(ip, "stress", time => stress_vec)
-        update!(ip, "cauchy stress", time => cauchy_stress_vec)
-        update!(ip, "von mises stress", time => sqrt(3.0*J2))
+    end
 
-        # add contributions: material and geometric stiffness + internal forces
+    return Km, Kg
+end
+
+""" Elasticity equations, 3d nonlinear. """
+function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum}})
+
+    props = problem.properties
+    dim = get_unknown_field_dimension(problem)
+    nnodes = length(element)
+    ndofs = dim*nnodes
+    BL = zeros(6, ndofs)
+    BNL = zeros(9, ndofs)
+    Kt = zeros(ndofs, ndofs)
+    f = zeros(ndofs)
+
+    for ip in get_integration_points(element)
+        detJ = element(ip, time, Val{:detJ})
+        w = ip.weight*detJ
+        N = element(ip, time)
+        dN = element(ip, time, Val{:Grad})
+
+        # kinematics; calculate deformation gradient and strain
+
+        gradu = zeros(dim, dim)
+        if haskey(element, "displacement")
+            gradu += element("displacement", ip, time, Val{:Grad})
+        end
+        strain = zeros(dim , dim)
+        strain += 1/2*(gradu' + gradu)
+        F = eye(dim)
+        if props.finite_strain
+            F += gradu
+            strain += 1/2*gradu'*gradu
+        end
+
         fill!(BL, 0.0)
-        for i=1:size(dN, 2)
+        for i=1:nnodes
             BL[1, 3*(i-1)+1] = F[1,1]*dN[1,i]
             BL[1, 3*(i-1)+2] = F[2,1]*dN[1,i]
             BL[1, 3*(i-1)+3] = F[3,1]*dN[1,i]
@@ -274,6 +380,37 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             BL[6, 3*(i-1)+2] = F[2,3]*dN[1,i] + F[2,1]*dN[3,i]
             BL[6, 3*(i-1)+3] = F[3,3]*dN[1,i] + F[3,1]*dN[3,i]
         end
+
+        # material stiffness start
+
+        E = element("youngs modulus", ip, time)
+        nu = element("poissons ratio", ip, time)
+
+        D = E/((1.0+nu)*(1.0-2.0*nu)) * [
+            1.0-nu nu nu 0.0 0.0 0.0
+            nu 1.0-nu nu 0.0 0.0 0.0
+            nu nu 1.0-nu 0.0 0.0 0.0
+            0.0 0.0 0.0 0.5-nu 0.0 0.0
+            0.0 0.0 0.0 0.0 0.5-nu 0.0
+            0.0 0.0 0.0 0.0 0.0 0.5-nu]
+
+        # calculate stress
+        strain_vec = [strain[1,1]; strain[2,2]; strain[3,3]; strain[1,2]; strain[2,3]; strain[1,3]]
+        stress_vec = D * ([1.0, 1.0, 1.0, 2.0, 2.0, 2.0].*strain_vec)
+
+        # update values to integration point
+        update!(ip, "strain", time => strain_vec)
+        update!(ip, "stress", time => stress_vec)
+
+        Kt += w*BL'*D*BL
+
+        if get_formulation_type(problem) == :incremental
+            f -= w*BL'*stress_vec
+        end
+
+        # material stiffness end
+
+        # geometric stiffness start
 
         fill!(BNL, 0.0)
         for i=1:size(dN, 2)
@@ -296,16 +433,14 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
         S3[1,2] = S3[2,1] = stress_vec[6]
         S3[4:6,4:6] = S3[7:9,7:9] = S3[1:3,1:3]
 
-        Kt += w*BL'*D*BL
         if props.finite_strain
             Kt += w*BNL'*S3*BNL
         end
 
-        if get_formulation_type(problem) == :incremental
-            f -= w*BL'*stress_vec
-        end
+        # geometric stiffness end
 
-        # volume load
+        # external load start
+
         if haskey(element, "displacement load")
             T = element("displacement load", ip, time)
             f += w*vec(T*N)
@@ -316,15 +451,10 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
                 f[i:dim:end] += w*vec(b*N)
             end
         end
-    end
 
-#=
-    if get_formulation_type(problem) == :incremental
-        if haskey(element, "displacement")
-            f -= Kt*vec(element["displacement"](time))
-        end
+        # external load end
+
     end
-=#
 
     return Kt, f
 end
@@ -354,6 +484,10 @@ function assemble{El<:Union{Tri3, Tri6, Quad4}}(problem::Problem{Elasticity}, el
         end
     end
     return Kt, f
+end
+
+function assemble{El<:Union{Tri3, Tri6, Quad4}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum_linear}})
+    return assemble(problem, element, time, Val{:continuum})
 end
 
 """ Elasticity equations using ForwardDiff
