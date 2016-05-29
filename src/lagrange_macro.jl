@@ -105,15 +105,7 @@ end
     [-1.0  1.0  1.0 -1.0 -1.0  1.0 1.0 -1.0
      -1.0 -1.0  1.0  1.0 -1.0 -1.0 1.0  1.0
      -1.0 -1.0 -1.0 -1.0  1.0  1.0 1.0  1.0],
-    (xi) -> [
-    1.0,
-    xi[1],
-    xi[2],
-    xi[1]*xi[2],
-    xi[3],
-    xi[1]*xi[3],
-    xi[2]*xi[3],
-    xi[1]*xi[2]*xi[3]])
+    (xi) -> [1.0, xi[1], xi[2], xi[1]*xi[2], xi[3], xi[1]*xi[3], xi[2]*xi[3], xi[1]*xi[2]*xi[3]])
 
 @create_lagrange_element(Tet4, "4 node tetrahedron",
     [0.0 1.0 0.0 0.0
@@ -121,38 +113,12 @@ end
      0.0 0.0 0.0 1.0],
     (xi) -> [1.0, xi[1], xi[2], xi[3]])
 
-#=
-@create_lagrange_element(Tet4, "4 node tetrahedron",
-    [0.0 0.0 0.0 1.0
-     1.0 0.0 0.0 0.0
-     0.0 1.0 0.0 0.0],
-    (xi) -> [1.0, xi[1], xi[2], xi[3]])
-=#
-
 @create_lagrange_element(Tet10, "10 node quadratic tetrahedron",
     [0.0 1.0 0.0 0.0 0.5 0.5 0.0 0.0 0.5 0.0
      0.0 0.0 1.0 0.0 0.0 0.5 0.5 0.0 0.0 0.5
      0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.5 0.5 0.5],
     (xi) -> [    1.0,   xi[1],       xi[2],       xi[3],     xi[1]^2,
              xi[2]^2, xi[3]^2, xi[1]*xi[2], xi[2]*xi[3], xi[3]*xi[1]])
-
-#=
-@create_lagrange_element(Tet10, "10 node quadratic tetrahedron",
-    [0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.5 0.5 0.5
-     1.0 0.0 0.0 0.0 0.5 0.0 0.5 0.5 0.0 0.0
-     0.0 1.0 0.0 0.0 0.5 0.5 0.0 0.0 0.5 0.0],
-    (xi) -> [    1.0,   xi[1],       xi[2],       xi[3],     xi[1]^2,
-             xi[2]^2, xi[3]^2, xi[1]*xi[2], xi[2]*xi[3], xi[3]*xi[1]])
-=#
-
-# some helpers to make accessing 1d basis functions more easy
-function get_basis{T<:Real, E<:Union{Seg2,Seg3}}(::Type{E}, xi::T)
-    get_basis(E, [xi])
-end
-
-function get_dbasis{T<:Real, E<:Union{Seg2,Seg3}}(::Type{E}, xi::T)
-    get_dbasis(E, [xi])
-end
 
 function get_reference_element_midpoint{E}(element::Element{E})
     get_reference_element_midpoint(E)

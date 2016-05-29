@@ -8,14 +8,16 @@ abstract MixedProblem <: AbstractProblem
 
 """
 General linearized problem to solve
-    K*u +   C1.T*la  = f
-    C2*u +  D*la    = g
+    (K₁+K₂)*Δu +   C1.T*λ = f₁+f₂
+         C2*Δu +      D*λ = g
 """
 type Assembly
     # for field assembly
     M :: SparseMatrixCOO  # mass matrix
     K :: SparseMatrixCOO  # stiffness matrix
+    Kg :: SparseMatrixCOO  # geometric stiffness matrix
     f :: SparseMatrixCOO  # force vector
+#   f2 :: SparseMatrixCOO
     # for boundary assembly
     C1 :: SparseMatrixCOO
     C2 :: SparseMatrixCOO
@@ -44,14 +46,16 @@ function Assembly()
         SparseMatrixCOO(),
         SparseMatrixCOO(),
         SparseMatrixCOO(),
+        SparseMatrixCOO(),
         [], [], Inf,
         [], [], Inf,
         true)
 end
 
-function Base.empty!(assembly::Assembly)
+function empty!(assembly::Assembly)
     empty!(assembly.M)
     empty!(assembly.K)
+    empty!(assembly.Kg)
     empty!(assembly.f)
     empty!(assembly.C1)
     empty!(assembly.C2)
@@ -287,7 +291,7 @@ element.element connectivity using formula gdofs = [dim*(nid-1)+j for j=1:dim]
 2. if not found, use element.connectivity to update dofmap and 1.
 """
 function get_gdofs(problem::Problem, element::Element)
-    if !haskey(element, problem.dofmap)
+    if !haskey(problem.dofmap, element)
         dim = get_unknown_field_dimension(problem)
         problem.dofmap[element] = get_gdofs(element, dim)
     end
