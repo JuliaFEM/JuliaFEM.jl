@@ -126,12 +126,10 @@ function update!(elements::Vector, field_name::ASCIIString, data)
 end
 
 """ Evaluate partial derivatives of basis functions using ForwardDiff. """
-function get_dbasis(element::Element, xi::Vector, time)
+function get_dbasis(element::Element, ip, time)
+    xi = isa(ip, IP) ? ip.coords : ip
     basis(xi) = vec(get_basis(element, xi, time))
     return ForwardDiff.jacobian(basis, xi, cache=autodiffcache)'
-end
-function get_dbasis(element::Element, ip::IP, time)
-    get_dbasis(element, ip.coords, time)
 end
 
 """ Check existence of field. """
