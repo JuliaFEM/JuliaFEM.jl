@@ -482,6 +482,13 @@ function assemble{El<:Union{Tri3, Tri6, Quad4}}(problem::Problem{Elasticity}, el
                 f[i:dim:end] += w*vec(T*N)
             end
         end
+        if haskey(element, "displacement traction force n")
+            J = element(ip, time, Val{:Jacobian})'
+            n = cross(J[:,1], J[:,2])
+            n /= norm(n)
+            p = element("displacement traction force n", ip, time)
+            f += w*p*vec(n*N)
+        end
     end
     return Kt, f
 end
