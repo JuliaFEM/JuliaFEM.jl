@@ -26,6 +26,8 @@ include("elements.jl") # common element routines
 export Node, AbstractElement, Element, update!, get_connectivity
 include("lagrange_macro.jl") # Continuous Galerkin (Lagrange) elements generated using macro
 export Seg2, Seg3, Tri3, Tri6, Quad4, Hex8, Tet4, Tet10
+include("nurbs.jl")
+export NSeg, NSurf, NSolid
 
 #include("hierarchical.jl") # P-elements
 #include("mortar_elements.jl") # Mortar elements
