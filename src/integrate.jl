@@ -19,15 +19,15 @@ end
 
 function get_integration_points(::Type{Val{4}})
     weights = 1.0/36.0*[
-        18.0+sqrt(30.0),
-        18.0+sqrt(30.0),
         18.0-sqrt(30.0),
+        18.0+sqrt(30.0),
+        18.0+sqrt(30.0),
         18.0-sqrt(30.0)]
     points = [
-        sqrt( 3.0/7.0 - 2.0/7.0*sqrt(6.0/5.0)),
-        sqrt(-3.0/7.0 - 2.0/7.0*sqrt(6.0/5.0)),
-        sqrt( 3.0/7.0 + 2.0/7.0*sqrt(6.0/5.0)),
-        sqrt(-3.0/7.0 + 2.0/7.0*sqrt(6.0/5.0))]
+        -sqrt(3.0/7.0 + 2.0/7.0*sqrt(6.0/5.0)),
+        -sqrt(3.0/7.0 - 2.0/7.0*sqrt(6.0/5.0)),
+         sqrt(3.0/7.0 - 2.0/7.0*sqrt(6.0/5.0)),
+         sqrt(3.0/7.0 + 2.0/7.0*sqrt(6.0/5.0))]
     return weights, points
 end
 
@@ -47,53 +47,37 @@ function get_integration_points(::Type{Val{5}})
     return weights, points
 end
 
+function get_integration_points(order::Int64)
+    if order <= 5
+        return get_integration_points(Val{order})
+    else
+        points, weights = Base.QuadGK.gauss(Float64, order)
+        return weights, points
+    end
+end
+
 ### "cartesian" elements, integration rules comes from tensor product
 
 ### 1d elements
 
-typealias CartesianLineElement Union{Seg2, Seg3}
-typealias CartesianSurfaceElement Union{Quad4}
-typealias CartesianVolumeElement Union{Hex8}
+typealias CartesianLineElement Union{Seg2, Seg3, NSeg}
+typealias CartesianSurfaceElement Union{Quad4, NSurf}
+typealias CartesianVolumeElement Union{Hex8, NSolid}
 
-function get_integration_points(element::CartesianLineElement, ::Type{Val{1}})
-    w, xi = get_integration_points(Val{1})
-    [ (w[i], [xi[i]]) for i=1:1 ]
-end
-function get_integration_points(element::CartesianLineElement, ::Type{Val{2}})
-    w, xi = get_integration_points(Val{2})
-    [ (w[i], [xi[i]]) for i=1:2 ]
-end
-function get_integration_points(element::CartesianLineElement, ::Type{Val{3}})
-    w, xi = get_integration_points(Val{3})
-    [ (w[i], [xi[i]]) for i=1:3 ]
+function get_integration_points(element::CartesianLineElement, order::Int64)
+    w, xi = get_integration_points(order)
+    [ (w[i], [xi[i]]) for i=1:order ]
 end
 
-function get_integration_points(element::CartesianSurfaceElement, ::Type{Val{1}})
-    w, xi = get_integration_points(Val{1})
-    [ (w[i]*w[j], [xi[i], xi[j]]) for i=1:1, j=1:1 ]
-end
-function get_integration_points(element::CartesianSurfaceElement, ::Type{Val{2}})
-    w, xi = get_integration_points(Val{2})
-    [ (w[i]*w[j], [xi[i], xi[j]]) for i=1:2, j=1:2 ]
-end
-function get_integration_points(element::CartesianSurfaceElement, ::Type{Val{3}})
-    w, xi = get_integration_points(Val{3})
-    [ (w[i]*w[j], [xi[i], xi[j]]) for i=1:3, j=1:3 ]
+function get_integration_points(element::CartesianSurfaceElement, order::Int64)
+    w, xi = get_integration_points(order)
+    [ (w[i]*w[j], [xi[i], xi[j]]) for i=1:order, j=1:order ]
 end
 
-function get_integration_points(element::CartesianVolumeElement, ::Type{Val{1}})
-    w, xi = get_integration_points(Val{1})
-    [ (w[i]*w[j]*w[k], [xi[i], xi[j], xi[k]]) for i=1:1, j=1:1, k=1:1 ]
+function get_integration_points(element::CartesianVolumeElement, order::Int64)
+    w, xi = get_integration_points(order)
+    [ (w[i]*w[j]*w[k], [xi[i], xi[j], xi[k]]) for i=1:order, j=1:order, k=1:order ]
 end
-function get_integration_points(element::CartesianVolumeElement, ::Type{Val{2}})
-    w, xi = get_integration_points(Val{2})
-    [ (w[i]*w[j]*w[k], [xi[i], xi[j], xi[k]]) for i=1:2, j=1:2, k=1:2 ]
-end
-function get_integration_points(element::CartesianVolumeElement, ::Type{Val{3}})
-    w, xi = get_integration_points(Val{3})
-    [ (w[i]*w[j]*w[k], [xi[i], xi[j], xi[k]]) for i=1:3, j=1:3, k=1:3 ]
-end
-
 
 ### triangular and tetrahedral elements
 
@@ -188,6 +172,10 @@ function get_integration_points(element::TetrahedralElement, ::Type{Val{3}})
     return zip(weights, points)
 end
 
+function get_integration_points(element::Union{TriangularElement, TetrahedralElement}, order::Int64)
+    return get_integration_points(element, Val{order})
+end
+
 ### default number of integration points for each element
 ### 2 for linear elements, 3 for quadratic
 
@@ -205,11 +193,11 @@ end
 
 function get_integration_points(element::LinearElement)
     order = get_integration_order(element)
-    get_integration_points(element, Val{order})
+    get_integration_points(element, order)
 end
 
 function get_integration_points(element::QuadraticElement)
     order= get_integration_order(element)
-    get_integration_points(element, Val{order})
+    get_integration_points(element, order)
 end
 

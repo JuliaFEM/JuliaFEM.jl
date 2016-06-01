@@ -156,7 +156,7 @@ of integration scheme mainly for mass matrix.
 function get_integration_points(element::Element, change_order::Int)
     order = get_integration_order(element.properties)
     order += change_order
-    ips = get_integration_points(element.properties, Val{order})
+    ips = get_integration_points(element.properties, order)
     return [IP(i, w, xi) for (i, (w, xi)) in enumerate(ips)]
 end
 
