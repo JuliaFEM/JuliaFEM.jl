@@ -1,61 +1,10 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-module ElementTests
-
+using JuliaFEM
 using JuliaFEM.Test
 
-using JuliaFEM.Core: AbstractElement, Element, Field, FieldSet, test_element
-using JuliaFEM.Core: Tri3, Quad4
-import JuliaFEM.Core: get_basis, get_dbasis, calculate_normal_tangential_coordinates!
-import Base: size
-
-""" Prototype element
-
-This should always pass test_element if everything is ok.
-"""
-abstract TestElement <: AbstractElement
-
-function get_basis(::Type{TestElement}, xi::Vector{Float64})
-    1/4*[
-        (1-xi[1])*(1-xi[2])
-        (1+xi[1])*(1-xi[2])
-        (1+xi[1])*(1+xi[2])
-        (1-xi[1])*(1+xi[2])]'
-end
-
-function get_dbasis(::Type{TestElement}, xi::Vector{Float64})
-    1/4*[
-        -(1-xi[2])    (1-xi[2])   (1+xi[2])  -(1+xi[2])
-        -(1-xi[1])   -(1+xi[1])   (1+xi[1])   (1-xi[1])]
-end
-
-function size(::Type{TestElement})
-    return (2, 4)
-end
-
-""" Return test element with some fields. """
-function get_element()
-    el = Element{TestElement}([1, 2, 3, 4])
-    el["geometry"] = Vector{Float64}[[0.0,0.0], [1.0,0.0], [1.0,1.0], [0.0,1.0]]
-    el["temperature"] = (
-        0.0 => [0.0, 0.0, 0.0, 0.0],
-        1.0 => [1.0, 2.0, 3.0, 4.0])
-    el["displacement"] = (
-        0.0 => Vector{Float64}[[0.0,0.0], [0.0, 0.0], [0.0,0.0], [0.0,0.0]],
-        1.0 => Vector{Float64}[[0.0,0.0], [1.0,-1.0], [2.0,3.0], [0.0,0.0]])
-    return el
-end
-
-function test_mock_element()
-    test_element(TestElement)
-end
-
-function test_add_fields_to_element()
-    el = get_element()
-    info(el.fields)
-end
-
+#=
 function test_interpolate()
     el = get_element()
     @test isapprox(el("geometry", [0.0, 0.0]), [0.5, 0.5])
@@ -89,7 +38,6 @@ function test_calculate_normal_tangential_coordinates()
     R = [n t1 t2]
     @test isapprox(el("normal-tangential coordinates", [0.0, 0.0], 0.0), R)
 end
-#test_calculate_normal_tangential_coordinates()
 
 function test_manifold_determinant()
     el = Quad4([1, 2, 3, 4])
@@ -100,6 +48,26 @@ function test_manifold_determinant()
     d_expected = 0.25
     @test d == d_expected
 end
-#test_manifold_determinant()
 
+@testset "add new discrete constant time-variant field and interpolate it" begin
+    element = Element(Quad4, [1, 2, 3, 4])
+    element["my field"] = (0.0 => 0.0, 1.0 => 1.0)
+    @test isapprox(element("my field", [0.0, 0.0], 0.5), 0.5)
+    update!(element, "my field 2", 0.0 => 0.0, 1.0 => 1.0)
+    @test isapprox(element("my field 2", [0.0, 0.0], 0.5), 0.5)
 end
+
+=#
+
+@testset "test add time dependent field to element" begin
+    el = Element(Seg2, [1, 2])
+    u1 = Vector{Float64}[[0.0, 0.0], [0.0, 0.0]]
+    u2 = Vector{Float64}[[1.0, 1.0], [1.0, 1.0]]
+    update!(el, "displacement", 0.0 => u1)
+    update!(el, "displacement", 1.0 => u2)
+    @test length(el["displacement"]) == 2
+    @test isapprox(el("displacement", [0.0], 0.0), [0.0, 0.0])
+    @test isapprox(el("displacement", [0.0], 0.5), [0.5, 0.5])
+    @test isapprox(el("displacement", [0.0], 1.0), [1.0, 1.0])
+end
+
