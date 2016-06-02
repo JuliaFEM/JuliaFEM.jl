@@ -1,3 +1,6 @@
+# This file is a part of JuliaFEM.
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+
 """ NURBS segment. """
 type NSeg <: AbstractElement
     order :: Int
@@ -62,7 +65,7 @@ function get_basis(element::Element{NSeg}, xi::Vector, time)
     w = element.properties.weights
     nu = length(tu)-pu-1
     u = xi[1]
-    N = [w[j]*NURBS(j,pu,u,tu) for j=1:nu]
+    N = vec([w[j]*NURBS(j,pu,u,tu) for j=1:nu])'
     return N/sum(N)
 end
 
@@ -75,7 +78,7 @@ function get_basis(element::Element{NSurf}, xi::Vector, time)
     nu = length(tu)-pu-1
     nv = length(tv)-pv-1
     u, v = xi
-    N = [w[i,j]*NURBS(i,pu,u,tu)*NURBS(j,pv,v,tv) for i=1:nu, j=1:nv]
+    N = vec([w[i,j]*NURBS(i,pu,u,tu)*NURBS(j,pv,v,tv) for i=1:nu, j=1:nv])'
     return N / sum(N)
 end
 
@@ -123,5 +126,13 @@ end
 
 function size(element::Element{NSolid})
     return (3, length(element))
+end
+
+function is_nurbs(element::Element)
+    return false
+end
+
+function is_nurbs{E<:Union{NSeg, NSurf, NSolid}}(element::Element{E})
+    return true
 end
 

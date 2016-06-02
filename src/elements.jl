@@ -116,7 +116,11 @@ function update!(element::Element, field_name::ASCIIString, data::Dict)
 end
 
 function update!(element::Element, field_name::ASCIIString, data::Union{Real, Vector, Pair})
-    element[field_name] = data
+    if haskey(element, field_name)
+        update!(element[field_name], data)
+    else
+        element[field_name] = data
+    end
 end
 
 function update!(elements::Vector, field_name::ASCIIString, data)

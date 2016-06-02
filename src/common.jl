@@ -46,6 +46,7 @@ function set_debug_off!()
     pop!(ENV, "DEBUG");
 end
 
+#=
 """ Simple linspace extension to arrays.
 
 Examples
@@ -60,6 +61,7 @@ Examples
 function linspace{T<:Array}(X1::T, X2::T, n)
     [1/2*(1-ti)*X1 + 1/2*(1+ti)*X2 for ti in linspace(-1, 1, n)]
 end
+=#
 
 function resize!(A::SparseMatrixCSC, m::Int64, n::Int64)
     (n == A.n) && (m == A.m) && return

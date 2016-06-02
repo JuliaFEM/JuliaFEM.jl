@@ -24,3 +24,4 @@ end
     update!(f, 2.0)
     @test f.data == 2.0
 end
+
