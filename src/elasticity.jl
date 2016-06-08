@@ -29,12 +29,20 @@ function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::El
     gdofs = get_gdofs(problem, element)
     if problem.properties.formulation in [:plane_stress, :plane_strain]
         Kt, f = assemble(problem, element, time, Val{:plane})
+        add!(assembly.K, gdofs, gdofs, Kt)
+        add!(assembly.f, gdofs, f)
+        return
+    elseif problem.properties.formulation in [:continuum_buckling]
+        Km, Kg = assemble(problem, element, time, Val{:continuum_buckling})
+        add!(assembly.K, gdofs, gdofs, Km)
+        add!(assembly.Kg, gdofs, gdofs, Kg)
+        return
     else
         Kt, f = assemble(problem, element, time, Val{problem.properties.formulation})
+        add!(assembly.K, gdofs, gdofs, Kt)
+        add!(assembly.f, gdofs, f)
+        return
     end
-    add!(assembly.K, gdofs, gdofs, Kt)
-    add!(assembly.f, gdofs, f)
-    return Kt, f
 end
 
 """ Elasticity equations for 2d cases. """
@@ -206,12 +214,12 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             BL[1, 3*(i-1)+1] = dN[1,i]
             BL[2, 3*(i-1)+2] = dN[2,i]
             BL[3, 3*(i-1)+3] = dN[3,i]
-            BL[4, 3*(i-1)+1] = dN[2,i] + dN[1,i]
-            BL[4, 3*(i-1)+2] = dN[2,i] + dN[1,i]
-            BL[5, 3*(i-1)+2] = dN[3,i] + dN[2,i]
-            BL[5, 3*(i-1)+3] = dN[3,i] + dN[2,i]
-            BL[6, 3*(i-1)+1] = dN[1,i] + dN[3,i]
-            BL[6, 3*(i-1)+3] = dN[1,i] + dN[3,i]
+            BL[4, 3*(i-1)+1] = dN[2,i]
+            BL[4, 3*(i-1)+2] = dN[1,i]
+            BL[5, 3*(i-1)+2] = dN[3,i]
+            BL[5, 3*(i-1)+3] = dN[2,i]
+            BL[6, 3*(i-1)+1] = dN[3,i]
+            BL[6, 3*(i-1)+3] = dN[1,i]
         end
 
         E = element("youngs modulus", ip, time)
@@ -276,12 +284,12 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             BL[1, 3*(i-1)+1] = dN[1,i]
             BL[2, 3*(i-1)+2] = dN[2,i]
             BL[3, 3*(i-1)+3] = dN[3,i]
-            BL[4, 3*(i-1)+1] = dN[2,i] + dN[1,i]
-            BL[4, 3*(i-1)+2] = dN[2,i] + dN[1,i]
-            BL[5, 3*(i-1)+2] = dN[3,i] + dN[2,i]
-            BL[5, 3*(i-1)+3] = dN[3,i] + dN[2,i]
-            BL[6, 3*(i-1)+1] = dN[1,i] + dN[3,i]
-            BL[6, 3*(i-1)+3] = dN[1,i] + dN[3,i]
+            BL[4, 3*(i-1)+1] = dN[2,i]
+            BL[4, 3*(i-1)+2] = dN[1,i]
+            BL[5, 3*(i-1)+2] = dN[3,i]
+            BL[5, 3*(i-1)+3] = dN[2,i]
+            BL[6, 3*(i-1)+1] = dN[3,i]
+            BL[6, 3*(i-1)+3] = dN[1,i]
         end
 
         fill!(BNL, 0.0)
@@ -314,9 +322,9 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
         S3[1,1] = stress_vec[1]
         S3[2,2] = stress_vec[2]
         S3[3,3] = stress_vec[3]
-        S3[2,3] = S3[3,2] = stress_vec[4]
-        S3[1,3] = S3[3,1] = stress_vec[5]
-        S3[1,2] = S3[2,1] = stress_vec[6]
+        S3[1,2] = S3[2,1] = stress_vec[4]
+        S3[2,3] = S3[3,2] = stress_vec[5]
+        S3[1,3] = S3[3,1] = stress_vec[6]
         S3[4:6,4:6] = S3[7:9,7:9] = S3[1:3,1:3]
 
         Km += w*BL'*D*BL
@@ -428,9 +436,9 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
         S3[1,1] = stress_vec[1]
         S3[2,2] = stress_vec[2]
         S3[3,3] = stress_vec[3]
-        S3[2,3] = S3[3,2] = stress_vec[4]
-        S3[1,3] = S3[3,1] = stress_vec[5]
-        S3[1,2] = S3[2,1] = stress_vec[6]
+        S3[1,2] = S3[2,1] = stress_vec[4]
+        S3[2,3] = S3[3,2] = stress_vec[5]
+        S3[1,3] = S3[3,1] = stress_vec[6]
         S3[4:6,4:6] = S3[7:9,7:9] = S3[1:3,1:3]
 
         if props.finite_strain

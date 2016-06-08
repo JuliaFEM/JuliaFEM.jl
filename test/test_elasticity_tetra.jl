@@ -64,3 +64,35 @@ end
     @test isapprox(u_4, u_expected)
 end
 
+@testset "test tet4 + buckling" begin
+    X = Dict{Int, Vector{Float64}}(
+        1 => [2.0, 3.0, 4.0],
+        2 => [6.0, 3.0, 2.0],
+        3 => [2.0, 5.0, 1.0],
+        4 => [4.0, 3.0, 6.0])
+    u = Dict{Int, Vector{Float64}}(
+        1 => [0.0, 0.0, 0.0],
+        2 => [0.0, 0.0, 0.0],
+        3 => [0.0, 0.0, 0.0],
+        4 => [-0.25, -0.25, -0.25])
+    e1 = Element(Tet4, [1, 2, 3, 4])
+    update!(e1, "geometry", X)
+    update!(e1, "displacement", u)
+    update!(e1, "youngs modulus", 96.0)
+    update!(e1, "poissons ratio", 1/3)
+    p1 = Problem(Elasticity, "tetra", 3)
+    p1.properties.formulation = :continuum_buckling
+    push!(p1, e1)
+    assemble!(p1, 0.0)
+    free_dofs = [10, 11, 12]
+    Km = sparse(p1.assembly.K)[free_dofs, free_dofs]
+    Kg = sparse(p1.assembly.Kg)[free_dofs, free_dofs]
+    dump(full(Km))
+    dump(full(Kg))
+    la = sort(eigs(Km, -Kg)[1])
+    la_expected = [1.0, 4.0]
+    info("la = $la")
+    info("la_expected = $(la_expected)")
+    @test isapprox(la, la_expected)
+end
+
