@@ -1,63 +1,60 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-# unit tests for heat equations
+using JuliaFEM
+using JuliaFEM.Test
 
-module HeatTests  # always wrap tests to module ending with "Tests"
 
-using JuliaFEM.Test  # always use JuliaFEM.Test, not Base.Test
+@testset "test one element heat problem" begin
 
-using JuliaFEM.Core: Seg2, Quad4, HeatProblem, assemble
-
-function test_one_element()  # always start test function with name test_
+    X = Dict{Int, Vector{Float64}}(
+        1 => [0.0,0.0],
+        2 => [1.0,0.0],
+        3 => [1.0,1.0],
+        4 => [0.0,1.0])
 
     # volume element
-    element = Quad4([1, 2, 3, 4])
+    element = Element(Quad4, [1, 2, 3, 4])
 
-    element["geometry"] = Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
-    element["temperature thermal conductivity"] = 6.0
-    element["temperature load"] = [12.0, 12.0, 12.0, 12.0]
-    element["density"] = 36.0
+    update!(element, "geometry", X)
+    update!(element, "temperature thermal conductivity", 6.0)
+    update!(element, "temperature load", [12.0, 12.0, 12.0, 12.0])
+    update!(element, "density", 36.0)
 
     # boundary element 
-    boundary_element = Seg2([1, 2])
-    boundary_element["geometry"] = Vector[[0.0, 0.0], [1.0, 0.0]]
+    boundary_element = Element(Seg2, [1, 2])
+    update!(boundary_element, "geometry", X)
     # linear ramp from 0 to 6 in time 0 to 1
-    boundary_element["temperature flux"] = (0.0 => 0.0, 1.0 => 6.0)
+    update!(boundary_element, "temperature flux", 0.0 => 0.0, 1.0 => 6.0)
 
-    problem = HeatProblem()
-    push!(problem, element)
-    push!(problem, boundary_element)
+    problem = Problem(Heat, "one element heat problem", 1)
+    push!(problem, element, boundary_element)
 
     # Set constant source f=12 with k=6. Accurate solution is
     # T=1 on free boundary, u(x,y) = -1/6*(1/2*f*x^2 - f*x)
-    assembly = assemble(problem, 0.0)
-    fdofs = [1, 2]
-    A = full(assembly.stiffness_matrix)
-    b = full(assembly.force_vector)
+    assemble!(problem, 0.0)
+    A = full(problem.assembly.K)
+    b = full(problem.assembly.f)
 
-    info("stiffness matrix = \n$(round(A, 3))")
-
-    @test isapprox(A, [
+    A_expected = [
          4.0 -1.0 -2.0 -1.0
         -1.0  4.0 -1.0 -2.0
         -2.0 -1.0  4.0 -1.0
-        -1.0 -2.0 -1.0  4.0
-    ])
+        -1.0 -2.0 -1.0  4.0]
 
-    @test isapprox(A[fdofs, fdofs] \ b[fdofs], [1.0, 1.0])
+    @test isapprox(A, A_expected)
+
+    free_dofs = [1, 2]
+    @test isapprox(A[free_dofs, free_dofs] \ b[free_dofs], [1.0, 1.0])
 
     # Set constant flux g=6 on boundary. Accurate solution is
     # u(x,y) = x which equals T=1 on boundary.
     # at time t=1.0 all loads should be on.
-    assembly = assemble(problem, 1.0)
-    A = full(assembly.stiffness_matrix)
-    b = full(assembly.force_vector)
-    T = A[fdofs, fdofs] \ b[fdofs]
-    info("T = $T")
+    empty!(problem.assembly)
+    assemble!(problem, 1.0)
+    A = full(problem.assembly.K)
+    b = full(problem.assembly.f)
+    T = A[free_dofs, free_dofs] \ b[free_dofs]
     @test isapprox(T, [2.0, 2.0])
-
-end
-
 end
 

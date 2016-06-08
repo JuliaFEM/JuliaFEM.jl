@@ -115,11 +115,13 @@ function update!(element::Element, field_name::ASCIIString, data::Dict)
     element[field_name] = [data[i] for i in get_connectivity(element)]
 end
 
-function update!(element::Element, field_name::ASCIIString, data::Union{Real, Vector, Pair})
-    if haskey(element, field_name)
-        update!(element[field_name], data)
-    else
-        element[field_name] = data
+function update!(element::Element, field_name::ASCIIString, datas::Union{Real, Vector, Pair}...)
+    for data in datas
+        if haskey(element, field_name)
+            update!(element[field_name], data)
+        else
+            element[field_name] = data
+        end
     end
 end
 

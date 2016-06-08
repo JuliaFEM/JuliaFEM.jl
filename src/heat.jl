@@ -3,18 +3,14 @@
 
 # Heat problems
 
-abstract HeatProblem <: AbstractProblem
-
-function HeatProblem(dim::Int=1, elements=[])
-    return Problem{HeatProblem}(dim, elements)
+type Heat <: FieldProblem
 end
 
-function get_unknown_field_name{P<:HeatProblem}(::Type{P})
+function get_unknown_field_name(problem::Problem{Heat})
     return "temperature"
 end
 
-function get_unknown_field_type{P<:HeatProblem}(::Type{P})
-    # scalar field
+function get_unknown_field_type(problem::Problem{Heat})
     return Float64
 end
 
@@ -42,29 +38,31 @@ References
 https://en.wikipedia.org/wiki/Heat_equation
 
 """
-function assemble!(assembly::Assembly, problem::Problem{HeatProblem}, element::Element, time::Number)
+function assemble!(assembly::Assembly, problem::Problem{Heat}, element::Element, time=0.0)
 
-    gdofs = get_gdofs(element, problem.dim)
+    gdofs = get_gdofs(problem, element)
+
     for ip in get_integration_points(element)
-        w = ip.weight
-        J = get_jacobian(element, ip, time)
+        detJ = element(ip, time, Val{:detJ})
+        w = ip.weight*detJ
+
         N = element(ip, time)
         if haskey(element, "density")
             rho = element("density", ip, time)
-            add!(assembly.mass_matrix, gdofs, gdofs, w*rho*N'*N*det(J))
+            add!(assembly.M, gdofs, gdofs, w*rho*N'*N)
         end
         if haskey(element, "temperature thermal conductivity")
-            dN = element(ip, time, Val{:grad})
+            dN = element(ip, time, Val{:Grad})
             k = element("temperature thermal conductivity", ip, time)
-            add!(assembly.stiffness_matrix, gdofs, gdofs, w*k*dN'*dN*det(J))
+            add!(assembly.K, gdofs, gdofs, w*k*dN'*dN)
         end
         if haskey(element, "temperature load")
             f = element("temperature load", ip, time)
-            add!(assembly.force_vector, gdofs, w*N'*f*det(J))
+            add!(assembly.f, gdofs, w*N'*f)
         end
         if haskey(element, "temperature flux")
             g = element("temperature flux", ip, time)
-            add!(assembly.force_vector, gdofs, w*N'*g*norm(J))
+            add!(assembly.f, gdofs, w*N'*g)
         end
     end
 end
