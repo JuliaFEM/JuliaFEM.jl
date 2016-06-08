@@ -107,9 +107,9 @@ function get_field_assembly(solver::Solver)
     K = SparseMatrixCOO()
     f = SparseMatrixCOO()
     for problem in problems
-        assembly = problem.assembly
-        append!(K, assembly.K)
-        append!(f, assembly.f)
+        append!(K, problem.assembly.K)
+        append!(f, problem.assembly.f)
+        empty!(problem.assembly)
     end
     K = sparse(K)
     solver.ndofs = size(K, 1)
@@ -175,6 +175,7 @@ function get_boundary_assembly(solver::Solver)
         D += D_
         f += f_
         g += g_
+        empty!(problem.assembly)
     end
     return K, C1, C2, D, f, g
 end
@@ -182,7 +183,7 @@ end
 
 """ Solve linear system using LU factorization (UMFPACK).
 """
-function solve_linear_system(solver::Solver, ::Type{Val{:DirectLinearSolver}})
+function solve_linear_system(solver::Solver, ::Type{Val{:DirectLinearSolver_UMFPACK}})
     info("solving linear system of $(length(solver.problems)) problems.")
     t0 = time()
 
@@ -207,6 +208,53 @@ function solve_linear_system(solver::Solver, ::Type{Val{:DirectLinearSolver}})
     return u, la
 end
 
+""" Solve linear system using LDLt factorization (SuiteSparse). """
+function solve_linear_system(solver::Solver, ::Type{Val{:DirectLinearSolver}})
+    info("solving linear system of $(length(solver.problems)) problems.")
+    t0 = time()
+
+    # assemble field problems
+    K, f = get_field_assembly(solver)
+
+    # assemble boundary problems
+    Kb, C1, C2, D, fb, g = get_boundary_assembly(solver)
+
+    K = K + Kb
+    f = f + fb
+    K = 1/2*(K + K')
+    u = zeros(solver.ndofs)
+    la = zeros(solver.ndofs)
+
+    # determine interior and boundary dofs
+    all_dofs = get_nonzero_rows(K)
+    boundary_dofs = get_nonzero_rows(C1)
+    boundary_dofs2 = get_nonzero_rows(C2)
+    interior_dofs = setdiff(all_dofs, boundary_dofs)
+    @assert length(boundary_dofs) == length(boundary_dofs2)
+    @assert setdiff(Set(boundary_dofs), Set(boundary_dofs2)) == Set()
+
+    # solve boundary
+    LUF = lufact(C1[boundary_dofs, boundary_dofs])
+    u[boundary_dofs] = LUF \ full(g[boundary_dofs])
+    normub = norm(u[boundary_dofs])
+    if isapprox(normub, 0.0)
+        info("CHOLMOD: homogeneous dirichlet boundary condition.")
+    end
+
+    # solver interior
+    CF = cholfact(K[interior_dofs, interior_dofs])
+    Kib = K[interior_dofs, boundary_dofs]
+    Kbb = K[boundary_dofs, boundary_dofs]
+    fi = f[interior_dofs]
+    u[interior_dofs] = CF \ (fi - Kib*u[boundary_dofs])
+
+    # solve lambda
+    # LUF2 = lufact(C2[boundary_dofs, boundary_dofs])
+    la[boundary_dofs] = LUF \ full(Kib' * u[interior_dofs] - Kbb*u[boundary_dofs])
+
+    info("CHOLMOD: solved in ", time()-t0, " seconds. norm = ", norm(u))
+    return u, la
+end
 
 """ Check convergence of problems.
 
