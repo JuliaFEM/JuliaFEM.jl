@@ -21,7 +21,7 @@ using JuliaFEM.Test
     x10 = 0.5*(x3+x4)
     el["geometry"] = Vector{Float64}[x1, x2, x3, x4, x5, x6, x7, x8, x9, x10]
     pr = Problem(Elasticity, "tet10", 3)
-    Kt, f = assemble(pr, el, 0.0)
+    Kt, f = assemble(pr, el, 0.0, Val{:continuum_linear})
     eigs = real(eigvals(Kt))
     eigs_expected = [8809.45, 4936.01, 2880.56, 2491.66, 2004.85,
                      1632.49, 1264.32, 1212.42, 817.905,

@@ -15,7 +15,7 @@ using JuliaFEM.Test
     x4 = [4.0, 3.0, 6.0]
     el["geometry"] = Vector{Float64}[x1, x2, x3, x4]
     pr = Problem(Elasticity, "tet4", 3)
-    Kt, f = assemble(pr, el, 0.0)
+    Kt, f = assemble(pr, el, 0.0, Val{:continuum_linear})
     Kt_expected = [
          149.0   108.0   24.0   -1.0    6.0   12.0  -54.0   -48.0    0.0  -94.0   -66.0  -36.0
          108.0   344.0   54.0  -24.0  104.0   42.0  -24.0  -216.0  -12.0  -60.0  -232.0  -84.0
@@ -29,5 +29,14 @@ using JuliaFEM.Test
          -94.0   -60.0  -24.0  -10.0    0.0    0.0   36.0    24.0    0.0   68.0    36.0   24.0
          -66.0  -232.0  -60.0   18.0  -76.0  -36.0   12.0   144.0   24.0   36.0   164.0   72.0
          -36.0   -84.0  -94.0   12.0  -36.0  -46.0    0.0    48.0   36.0   24.0    72.0  104.0]
+    if !isapprox(Kt, Kt_expected)
+        info("Test failed")
+        info("Kt_expected")
+        dump(Kt_expected)
+        info("Kt")
+        dump(Kt)
+    end
+    @test isapprox(Kt, Kt_expected)
+    Kt, f = assemble(pr, el, 0.0, Val{:continuum})
     @test isapprox(Kt, Kt_expected)
 end
