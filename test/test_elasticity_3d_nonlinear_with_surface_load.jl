@@ -24,6 +24,7 @@ using JuliaFEM.Test
     update!([element2], "displacement traction force", Vector{Float64}[[0.0, 0.0, -100.0] for i=1:4])
 
     elasticity_problem = Problem(Elasticity, "solve continuum block", 3)
+    elasticity_problem.properties.finite_strain = true
     push!(elasticity_problem, element1)
     push!(elasticity_problem, element2)
 
