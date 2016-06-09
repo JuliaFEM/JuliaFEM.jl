@@ -312,14 +312,22 @@ function call(solver::Solver)
         info("Starting nonlinear iteration #$(solver.iteration)")
 
         # 2.1 update linearized assemblies (if needed)
+        info("Assembling problems ...")
+        tic()
         for problem in solver.problems
             problem.assembly.changed = true  # force reassembly
             assemble!(problem, solver.time)
         end
+        t1 = round(toq(), 2)
+        info("Assembled in $t1 seconds.")
 
         # 2.2 call solver for linearized system (default: direct lu factorization)
+        info("Solve linear system ...")
+        tic()
         u, la = solve_linear_system(solver, Val{solver.linear_system_solver})
         push!(solver.norms, (norm(u), norm(la)))
+        t1 = round(toq(), 2)
+        info("Solved Ax = b in $t1 seconds.")
 
         # 2.3 update solution back to elements
         for problem in solver.problems
