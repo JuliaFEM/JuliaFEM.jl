@@ -91,12 +91,7 @@ function find_intersection{S<:Union{Seg2, Seg3, NSeg, NSurf}}(element::Element{S
     return theta[1], theta[2:end]
 end
 
-"""
-References
-----------
-[1] http://fp.optics.arizona.edu/optomech/Fall13/Notes/6%20Mirror%20matrices.pdf
-"""
-function calc_reflection{S<:Union{Seg2, Seg3, NSeg}}(element::Element{S}, xi, k, time; deformed=true)
+function calc_normal{S<:Union{Seg2, Seg3, NSeg}}(element::Element{S}, xi, time; deformed=true)
     x = element["geometry"](time)
     if deformed && haskey(element, "displacement")
         x += element["displacement"](time)
@@ -105,11 +100,10 @@ function calc_reflection{S<:Union{Seg2, Seg3, NSeg}}(element::Element{S}, xi, k,
     dN = get_dbasis(element, xi, time)
     n = Q*(dN*x)
     n /= norm(n)
-    k2 = k - 2*vecdot(k, n)*n
-    return k2
+    return n
 end
 
-function calc_reflection{S<:Union{Quad4, NSurf}}(element::Element{S}, xi, k, time; deformed=true)
+function calc_normal{S<:Union{Quad4, NSurf}}(element::Element{S}, xi, time; deformed=true)
     x = element["geometry"](time)
     if deformed && haskey(element, "displacement")
         x += element["displacement"](time)
@@ -118,6 +112,16 @@ function calc_reflection{S<:Union{Quad4, NSurf}}(element::Element{S}, xi, k, tim
     J = transpose(sum([kron(dN[:,i], x[i]') for i=1:length(x)]))
     n = cross(J[:,1], J[:,2])
     n /= norm(n)
+    return n
+end
+
+"""
+References
+----------
+[1] http://fp.optics.arizona.edu/optomech/Fall13/Notes/6%20Mirror%20matrices.pdf
+"""
+function calc_reflection(element::Element, xi, k, time; deformed=true)
+    n = calc_normal(element, xi, time; deformed=deformed)
     k2 = k - 2*vecdot(k, n)*n
     return k2
 end

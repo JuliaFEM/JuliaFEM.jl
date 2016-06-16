@@ -49,7 +49,28 @@ function assemble!(problem::Problem, time::Real; empty_assembly::Bool=true)
     if method_exists(assemble_posthook!, Tuple{typeof(problem), Real})
         assemble_posthook!(problem, time)
     end
-    return problem.assembly
+    return
+end
+
+function assemble!(problem::Problem, time::Real, ::Type{Val{:mass_matrix}})
+    !isempty(problem.assembly.M) && return # assembly mass matrix only once
+    dim = get_unknown_field_dimension(problem)
+    for element in get_elements(problem)
+        haskey(element, "density") || error("Failed to assemble mass matrix, density not defined!")
+        nnodes = length(element)
+        M = zeros(nnodes, nnodes)
+        for ip in get_integration_points(element, 1)
+            detJ = element(ip, time, Val{:detJ})
+            N = element(ip, time)
+            rho = element("density", ip, time)
+            M += ip.weight*rho*N'*N*detJ
+        end
+        gdofs = get_gdofs(problem, element)
+        for j=1:dim
+            ldofs = gdofs[j:dim:end]
+            add!(problem.assembly.M, ldofs, ldofs, M)
+        end
+    end
 end
 
 """ Calculate reduced stiffness matrix.

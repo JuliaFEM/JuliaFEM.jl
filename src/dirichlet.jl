@@ -62,8 +62,8 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Ele
             ldofs = gdofs[i:field_dim:end]
             if haskey(element, field_name*" $i")
                 g = element(field_name*" $i", ip, time)
-                if true
-                    haskey(element, "displacement") || continue
+                # u = u_prev + Δu ⇒ Δu = u - u_prev
+                if haskey(element, field_name)
                     g_prev = element(field_name, ip, time)
                     g -= g_prev[i]
                 end

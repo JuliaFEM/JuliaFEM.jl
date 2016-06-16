@@ -125,6 +125,16 @@ function update!(element::Element, field_name::ASCIIString, datas::Union{Real, V
     end
 end
 
+function update!(element::Element, datas::Pair...)
+    for (field_name, data) in datas
+        if haskey(element, field_name)
+            update!(element[field_name], data)
+        else
+            element[field_name] = data
+        end
+    end
+end
+
 function update!(elements::Vector, field_name::ASCIIString, data)
     for element in elements
         update!(element, field_name, data)

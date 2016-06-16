@@ -1,36 +1,56 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-type Solver
+abstract AbstractSolver
+
+type Solver{S<:AbstractSolver}
     name :: ASCIIString # some descriptive name for problem
     time :: Real        # current time
+    problems :: Vector{Problem}
+    ndofs :: Int        # total dimension of global stiffness matrix, i.e., dim*nnodes
+    properties :: S
+end
+
+type Nonlinear <: AbstractSolver
     iteration :: Int    # iteration counter
     norms :: Vector{Tuple} # solution norms for convergence studies
-    ndofs :: Int        # total dimension of global stiffness matrix, i.e., dim*nnodes
-    problems :: Vector{Problem}
+    min_iterations :: Int64
+    max_iterations :: Int64
+    convergence_tolerance :: Float64
+    error_if_no_convergence :: Bool
     is_linear_system :: Bool # setting this to true makes assumption of one step convergence
-    nonlinear_system_min_iterations :: Int64
-    nonlinear_system_max_iterations :: Int64
-    nonlinear_system_convergence_tolerance :: Float64
-    nonlinear_system_error_if_no_convergence :: Bool
     linear_system_solver :: Symbol
 end
 
-function Solver(name::ASCIIString="default solver", time::Real=0.0)
-    return Solver(
-        name,
-        time,
-        0,     # iteration #
+function Nonlinear()
+    solver = Nonlinear(
+        0,     # iteration number
         [],    # solution norms in (norm(u), norm(la)) tuples
-        0,     # ndofs
-        [],    # array of problems
-        false, # is_linear_system
         1,     # min nonlinear iterations
         10,    # max nonlinear iterations
         5.0e-5, # nonlinear iteration convergence tolerance
         true,  # throw error if no convergence
-        :DirectLinearSolver # linear system solution method
-        )
+        false, # is_linear_system
+        :DirectLinearSolver) # linear system solution method
+   return solver
+end
+
+function Solver{S<:AbstractSolver}(::Type{S}=Nonlinear,
+                                   name::ASCIIString="default solver",
+                                   time::Real=0.0, problems=[],
+                                   properties...)
+    variant = S(properties...)
+    solver = Solver{S}(name, time, problems, 0, variant)
+    return solver
+end
+
+""" For compatibility. """
+function Solver(name::ASCIIString="default solver",
+                time::Real=0.0, problems=[],
+                properties...)
+    variant = Nonlinear(properties...)
+    solver = Solver{Nonlinear}(name, time, problems, 0, variant)
+    return solver
 end
 
 function push!(solver::Solver, problem)
@@ -102,26 +122,41 @@ If several field problems exists, they are simply summed together, so
 problems must have unique node ids.
 
 """
-function get_field_assembly(solver::Solver)
+function get_field_assembly(solver::Solver; symmetric=true,
+                            with_mass_matrix=false,
+                            empty_after_append=true)
     problems = get_field_problems(solver)
+    M = SparseMatrixCOO()
     K = SparseMatrixCOO()
+    Kg = SparseMatrixCOO()
     f = SparseMatrixCOO()
     for problem in problems
         append!(K, problem.assembly.K)
+        append!(Kg, problem.assembly.Kg)
         append!(f, problem.assembly.f)
-        empty!(problem.assembly)
+        with_mass_matrix && append!(M, problem.assembly.M)
+        empty_after_append && empty!(problem.assembly)
     end
-    K = sparse(K)
-    solver.ndofs = size(K, 1)
+    if solver.ndofs == 0
+        solver.ndofs = size(K, 1)
+    end
+    K = sparse(K, solver.ndofs, solver.ndofs)
+    Kg = sparse(Kg, solver.ndofs, solver.ndofs)
+    M = sparse(M, solver.ndofs, solver.ndofs)
+    if symmetric
+        K = 1/2*(K + K')
+        Kg = 1/2*(Kg + Kg')
+        M = 1/2*(M + M')
+    end
     f = sparse(f, solver.ndofs, 1)
 
     # run any posthook for assembly if defined
-    args = Tuple{Solver, SparseMatrixCSC, SparseMatrixCSC}
+    args = Tuple{Solver, SparseMatrixCSC, SparseMatrixCSC, SparseMatrixCSC}
     if method_exists(field_assembly_posthook!, args)
-        field_assembly_posthook!(solver, K, f)
+        field_assembly_posthook!(solver, K, Kg, f)
     end
 
-    return K, f
+    return M, K, Kg, f
 end
 
 """ Posthook for boundary assembly. By default, do nothing. """
@@ -188,13 +223,15 @@ function solve_linear_system(solver::Solver, ::Type{Val{:DirectLinearSolver_UMFP
     t0 = time()
 
     # assemble field problems
-    K, f = get_field_assembly(solver)
+    M, K, Kg, f = get_field_assembly(solver)
 
     # assemble boundary problems
     Kb, C1, C2, D, fb, g = get_boundary_assembly(solver)
 
     # construct global system Ax=b and solve using lu factorization
-    A = [K+Kb C1'; C2 D]
+    A = [
+        K+Kg+Kb  C1'
+        C2       D]
     b = [f+fb; g]
 
     nz = get_nonzero_rows(A)
@@ -214,7 +251,7 @@ function solve_linear_system(solver::Solver, ::Type{Val{:DirectLinearSolver}})
     t0 = time()
 
     # assemble field problems
-    K, f = get_field_assembly(solver)
+    M, K, Kg, f = get_field_assembly(solver)
 
     # assemble boundary problems
     Kb, C1, C2, D, fb, g = get_boundary_assembly(solver)
@@ -262,9 +299,11 @@ Notes
 -----
 Default convergence criteria is obtained by checking each sub-problem convergence.
 """
-function has_converged(solver::Solver; check_convergence_for_boundary_problems=false)
+function has_converged(solver::Solver{Nonlinear};
+                       check_convergence_for_boundary_problems=false)
+    properties = solver.properties
     converged = true
-    eps = solver.nonlinear_system_convergence_tolerance
+    eps = properties.convergence_tolerance
     for problem in solver.problems
         has_converged = true
         if is_field_problem(problem)
@@ -286,7 +325,7 @@ function has_converged(solver::Solver; check_convergence_for_boundary_problems=f
         end
         converged &= has_converged
     end
-    return converged || solver.is_linear_system
+    return converged || properties.is_linear_system
 end
 
 type NonlinearConvergenceError <: Exception
@@ -294,13 +333,14 @@ type NonlinearConvergenceError <: Exception
 end
 
 function Base.showerror(io::IO, exception::NonlinearConvergenceError)
-    max_iters = exception.solver.nonlinear_system_max_iterations
+    max_iters = exception.solver.properties.max_iterations
     print(io, "nonlinear iteration did not converge in $max_iters iterations!")
 end
 
-""" Main solver loop.
-"""
-function call(solver::Solver)
+""" Default solver for quasistatic nonlinear problems. """
+function call(solver::Solver{Nonlinear})
+
+    properties = solver.properties
 
     # 1. initialize each problem so that we can start nonlinear iterations
     for problem in solver.problems
@@ -308,8 +348,8 @@ function call(solver::Solver)
     end
 
     # 2. start non-linear iterations
-    for solver.iteration=1:solver.nonlinear_system_max_iterations
-        info("Starting nonlinear iteration #$(solver.iteration)")
+    for properties.iteration=1:properties.max_iterations
+        info("Starting nonlinear iteration #$(properties.iteration)")
 
         # 2.1 update linearized assemblies (if needed)
         info("Assembling problems ...")
@@ -324,8 +364,8 @@ function call(solver::Solver)
         # 2.2 call solver for linearized system (default: direct lu factorization)
         info("Solve linear system ...")
         tic()
-        u, la = solve_linear_system(solver, Val{solver.linear_system_solver})
-        push!(solver.norms, (norm(u), norm(la)))
+        u, la = solve_linear_system(solver, Val{properties.linear_system_solver})
+        push!(properties.norms, (norm(u), norm(la)))
         t1 = round(toq(), 2)
         info("Solved Ax = b in $t1 seconds.")
 
@@ -337,8 +377,8 @@ function call(solver::Solver)
 
         # 2.4 check convergence
         if has_converged(solver)
-            info("Converged in $(solver.iteration) iterations.")
-            if solver.iteration < solver.nonlinear_system_min_iterations
+            info("Converged in $(properties.iteration) iterations.")
+            if properties.iteration < properties.min_iterations
                 info("Converged but continuing")
             else
                 return true
@@ -347,7 +387,7 @@ function call(solver::Solver)
     end
 
     # 3. did not converge
-    if solver.nonlinear_system_error_if_no_convergence
+    if properties.error_if_no_convergence
         throw(NonlinearConvergenceError(solver))
     end
 end
