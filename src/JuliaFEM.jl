@@ -41,7 +41,8 @@ export add!, SparseMatrixCOO, get_nonzero_rows
 
 include("problems.jl") # common problem routines
 export Problem, AbstractProblem, FieldProblem, BoundaryProblem,
-       get_unknown_field_dimension, get_gdofs, Assembly
+       get_unknown_field_dimension, get_gdofs, Assembly,
+       get_parent_field_name, get_elements
 
 include("elasticity.jl") # elasticity equations
 export Elasticity
@@ -62,10 +63,15 @@ end
 include("assembly.jl")
 include("solver_utils.jl")
 include("solvers.jl")
-export Solver
+export AbstractSolver, Solver, Nonlinear, 
+       get_unknown_field_name, get_formulation_type,
+       get_field_problems, get_boundary_problems,
+       get_field_assembly, get_boundary_assembly
+include("modal.jl")
+export Modal
 
 include("optics.jl")
-export find_intersection, calc_reflection
+export find_intersection, calc_reflection, calc_normal
 
 ### MORTAR STUFF ###
 include("mortar.jl")  # mortar projection

@@ -27,22 +27,14 @@ end
 function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::Element, time=0.0)
     props = problem.properties
     gdofs = get_gdofs(problem, element)
-    if problem.properties.formulation in [:plane_stress, :plane_strain]
-        Kt, f = assemble(problem, element, time, Val{:plane})
-        add!(assembly.K, gdofs, gdofs, Kt)
-        add!(assembly.f, gdofs, f)
-        return
-    elseif problem.properties.formulation in [:continuum_buckling]
-        Km, Kg = assemble(problem, element, time, Val{:continuum_buckling})
-        add!(assembly.K, gdofs, gdofs, Km)
-        add!(assembly.Kg, gdofs, gdofs, Kg)
-        return
-    else
-        Kt, f = assemble(problem, element, time, Val{problem.properties.formulation})
-        add!(assembly.K, gdofs, gdofs, Kt)
-        add!(assembly.f, gdofs, f)
-        return
+    formulation = props.formulation
+    if formulation in [:plane_stress, :plane_strain]
+        formulation = :plane
     end
+    Km, Kg, f = assemble(problem, element, time, Val{formulation})
+    add!(assembly.K, gdofs, gdofs, Km)
+    add!(assembly.Kg, gdofs, gdofs, Kg)
+    add!(assembly.f, gdofs, f)
 end
 
 """ Elasticity equations for 2d cases. """
@@ -53,7 +45,8 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
     nnodes = length(element)
     BL = zeros(3, dim*nnodes)
     BNL = zeros(4, dim*nnodes)
-    Kt = zeros(dim*nnodes, dim*nnodes)
+    Km = zeros(dim*nnodes, dim*nnodes)
+    Kg = zeros(dim*nnodes, dim*nnodes)
     f = zeros(dim*nnodes)
 
     for ip in get_integration_points(element)
@@ -127,9 +120,9 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
         S2[1,2] = S2[2,1] = stress_vec[3]
         S2[3:4,3:4] = S2[1:2,1:2]
 
-        Kt += w*BL'*D*BL # material stiffness
+        Km += w*BL'*D*BL # material stiffness
         if props.finite_strain # add geometric stiffness
-            Kt += w*BNL'*S2*BNL # geometric stiffness
+            Kg += w*BNL'*S2*BNL # geometric stiffness
         end
 
         if get_formulation_type(problem) == :incremental
@@ -150,7 +143,7 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
 
     end
 
-    return Kt, f
+    return Km, Kg, f
 end
 
 function assemble{El<:Union{Seg2,Seg3}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:plane}})
@@ -158,7 +151,8 @@ function assemble{El<:Union{Seg2,Seg3}}(problem::Problem{Elasticity}, element::E
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
     nnodes = size(element, 2)
-    Kt = zeros(dim*nnodes, dim*nnodes)
+    Km = zeros(dim*nnodes, dim*nnodes)
+    Kg = zeros(dim*nnodes, dim*nnodes)
     f = zeros(dim*nnodes)
 
     for ip in get_integration_points(element)
@@ -189,7 +183,7 @@ function assemble{El<:Union{Seg2,Seg3}}(problem::Problem{Elasticity}, element::E
 
     end
 
-    return Kt, f
+    return Km, Kg, f
 end
 
 """ Elasticity equations, 3d, linear. """
@@ -200,7 +194,8 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
     nnodes = length(element)
     ndofs = dim*nnodes
     BL = zeros(6, ndofs)
-    Kt = zeros(ndofs, ndofs)
+    Km = zeros(ndofs, ndofs)
+    Kg = zeros(ndofs, ndofs)
     f = zeros(ndofs)
 
     for ip in get_integration_points(element)
@@ -233,7 +228,7 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             0.0 0.0 0.0 0.0 0.5-nu 0.0
             0.0 0.0 0.0 0.0 0.0 0.5-nu]
 
-        Kt += w*BL'*D*BL
+        Km += w*BL'*D*BL
 
         if haskey(element, "displacement load")
             T = element("displacement load", ip, time)
@@ -255,7 +250,7 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
         end
     end
 
-    return Kt, f
+    return Km, Kg, f
 end
 
 """ Material and geometric stiffness for linear buckling analysis. """
@@ -269,6 +264,7 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
     BNL = zeros(9, ndofs)
     Km = zeros(ndofs, ndofs)
     Kg = zeros(ndofs, ndofs)
+    f = zeros(ndofs)
 
     for ip in get_integration_points(element)
         detJ = element(ip, time, Val{:detJ})
@@ -332,7 +328,7 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
 
     end
 
-    return Km, Kg
+    return Km, Kg, f
 end
 
 """ Elasticity equations, 3d nonlinear. """
@@ -344,7 +340,8 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
     ndofs = dim*nnodes
     BL = zeros(6, ndofs)
     BNL = zeros(9, ndofs)
-    Kt = zeros(ndofs, ndofs)
+    Km = zeros(ndofs, ndofs)
+    Kg = zeros(ndofs, ndofs)
     f = zeros(ndofs)
 
     for ip in get_integration_points(element)
@@ -410,7 +407,7 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
         update!(ip, "strain", time => strain_vec)
         update!(ip, "stress", time => stress_vec)
 
-        Kt += w*BL'*D*BL
+        Km += w*BL'*D*BL
 
         if get_formulation_type(problem) == :incremental
             f -= w*BL'*stress_vec
@@ -442,7 +439,7 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
         S3[4:6,4:6] = S3[7:9,7:9] = S3[1:3,1:3]
 
         if props.finite_strain
-            Kt += w*BNL'*S3*BNL
+            Kg += w*BNL'*S3*BNL
         end
 
         # geometric stiffness end
@@ -464,7 +461,7 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
 
     end
 
-    return Kt, f
+    return Km, Kg, f
 end
 
 """ Elasticity equations, surface traction for continuum formulation. """
@@ -473,7 +470,8 @@ function assemble{El<:Union{Tri3, Tri6, Quad4}}(problem::Problem{Elasticity}, el
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
     nnodes = size(element, 2)
-    Kt = zeros(dim*nnodes, dim*nnodes)
+    Km = zeros(dim*nnodes, dim*nnodes)
+    Kg = zeros(dim*nnodes, dim*nnodes)
     f = zeros(dim*nnodes)
 
     for ip in get_integration_points(element)
@@ -498,7 +496,7 @@ function assemble{El<:Union{Tri3, Tri6, Quad4}}(problem::Problem{Elasticity}, el
             f += w*p*vec(n*N)
         end
     end
-    return Kt, f
+    return Km, Kg, f
 end
 
 function assemble{El<:Union{Tri3, Tri6, Quad4}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum_linear}})
@@ -604,10 +602,11 @@ function assemble(problem::Problem{Elasticity}, element::Element, time::Real, ::
     end
 
     field = element("displacement", time)
-    Kt, allresults = ForwardDiff.jacobian(get_residual_vector, vec(field),
+    Km, allresults = ForwardDiff.jacobian(get_residual_vector, vec(field),
                      AllResults, cache=autodiffcache)
+    Kg = zeros(Km)
     f = -ForwardDiff.value(allresults)
-    return Kt, f
+    return Km, Kg, f
 end
 
 

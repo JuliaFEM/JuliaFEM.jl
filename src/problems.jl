@@ -84,8 +84,11 @@ Create vector-valued (dim=3) elasticity problem:
 julia> prob = Problem(Elasticity, "this is my problem", 3)
 
 """
-function Problem{P<:FieldProblem}(::Type{P}, name, dimension, elements=[], dofmap=Dict())
+function Problem{P<:FieldProblem}(::Type{P}, name::ASCIIString, dimension::Int64, elements=[], dofmap=Dict())
     Problem{P}(name, dimension, "none", elements, dofmap, Assembly(), P())
+end
+function Problem{P<:FieldProblem}(::Type{P}, dimension::Int64, elements=[], dofmap=Dict())
+    Problem{P}("$P problem", dimension, "none", elements, dofmap, Assembly(), P())
 end
 
 """ Construct a new boundary problem.
@@ -98,6 +101,12 @@ julia> bc1 = Problem(Dirichlet, "support", 3, "displacement")
 
 """
 function Problem{P<:BoundaryProblem}(::Type{P}, name, dimension, parent_field_name, elements=[], dofmap=Dict())
+    Problem{P}(name, dimension, parent_field_name, elements, dofmap, Assembly(), P())
+end
+function Problem{P<:BoundaryProblem}(::Type{P}, main_problem::Problem, elements=[], dofmap=Dict())
+    name = "$P problem"
+    dimension = get_unknown_field_dimension(main_problem)
+    parent_field_name = get_unknown_field_name(main_problem)
     Problem{P}(name, dimension, parent_field_name, elements, dofmap, Assembly(), P())
 end
 
@@ -170,7 +179,7 @@ function update_assembly!(problem, u, la)
 
     # copy current solutions to previous ones and add/replace new solution
     # TODO: here we have couple of options and they needs to be clarified
-    # for total formulation we are solving total quantity Ku=f while in
+    # for total formulation we are solving total quantity Ku = f while in
     # incremental formulation we solve KΔu = f and u = u + Δu
     assembly.u_prev = copy(assembly.u)
     assembly.la_prev = copy(assembly.la)

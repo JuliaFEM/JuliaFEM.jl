@@ -3,17 +3,6 @@
 
 # Heat problems
 
-type Heat <: FieldProblem
-end
-
-function get_unknown_field_name(problem::Problem{Heat})
-    return "temperature"
-end
-
-function get_unknown_field_type(problem::Problem{Heat})
-    return Float64
-end
-
 """ Heat equations.
 
 Formulation
@@ -29,15 +18,26 @@ Weak form is: find u∈U such that ∀v in V
 
 where
 
-    k = temperature thermal conductivity    defined on volume
-    f = temperature load                    defined on volume
-    g = temperature flux                    defined on boundary
+    k = temperature thermal conductivity    defined on volume elements
+    f = temperature load                    defined on volume elements
+    g = temperature flux                    defined on boundary elements
 
 References
 ----------
 https://en.wikipedia.org/wiki/Heat_equation
 
 """
+type Heat <: FieldProblem
+end
+
+function get_unknown_field_name(problem::Problem{Heat})
+    return "temperature"
+end
+
+function get_unknown_field_type(problem::Problem{Heat})
+    return Float64
+end
+
 function assemble!(assembly::Assembly, problem::Problem{Heat}, element::Element, time=0.0)
 
     gdofs = get_gdofs(problem, element)

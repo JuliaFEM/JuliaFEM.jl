@@ -10,25 +10,19 @@ type SparseMatrixCOO{T<:Real}
     V :: Vector{T}
 end
 
-typealias SparseMatrixIJV SparseMatrixCOO
-
 function SparseMatrixCOO()
     SparseMatrixCOO{Float64}([], [], [])
 end
 
-#function SparseMatrixCOO{T}()
-#    SparseMatrixCOO{T}([], [], [])
-#end
-
-function Base.convert(::Type{SparseMatrixCOO}, A::SparseMatrixCSC)
+function convert(::Type{SparseMatrixCOO}, A::SparseMatrixCSC)
     return SparseMatrixCOO(findnz(A)...)
 end
 
-function Base.convert(::Type{SparseMatrixCOO}, A::Matrix)
+function convert(::Type{SparseMatrixCOO}, A::Matrix)
     return SparseMatrixCOO(findnz(A)...)
 end
 
-function Base.convert(::Type{SparseMatrixCOO}, A::Vector)
+function convert(::Type{SparseMatrixCOO}, A::Vector)
     return SparseMatrixCOO(findnz(sparse(A))...)
 end
 
@@ -39,52 +33,52 @@ Parameters
 tol
     used to drop near zero values less than tol.
 """
-function Base.sparse(A::SparseMatrixIJV, args...; tol=1.0e-12)
+function sparse(A::SparseMatrixCOO, args...; tol=1.0e-12)
     B = sparse(A.I, A.J, A.V, args...)
     SparseMatrix.droptol!(B, tol)
     return B
 end
 
-function Base.push!(A::SparseMatrixIJV, I::Int, J::Int, V::Float64)
+function push!(A::SparseMatrixCOO, I::Int, J::Int, V::Float64)
     push!(A.I, I)
     push!(A.J, J)
     push!(A.V, V)
 end
 
-function Base.empty!(A::SparseMatrixIJV)
+function empty!(A::SparseMatrixCOO)
     empty!(A.I)
     empty!(A.J)
     empty!(A.V)
 end
 
-function Base.append!(A::SparseMatrixIJV, I::Vector{Int}, J::Vector{Int}, V::Vector{Float64})
+function append!(A::SparseMatrixCOO, I::Vector{Int}, J::Vector{Int}, V::Vector{Float64})
     append!(A.I, I)
     append!(A.J, J)
     append!(A.V, V)
 end
 
-function Base.append!(A::SparseMatrixIJV, B::SparseMatrixIJV)
+function append!(A::SparseMatrixCOO, B::SparseMatrixCOO)
     append!(A.I, B.I)
     append!(A.J, B.J)
     append!(A.V, B.V)
 end
 
-function Base.isempty(A::SparseMatrixIJV)
+function isempty(A::SparseMatrixCOO)
     return isempty(A.I) && isempty(A.J) && isempty(A.V)
 end
 
-function Base.(:+)(A::SparseMatrixIJV, B::SparseMatrixIJV)
+function Base.(:+)(A::SparseMatrixCOO, B::SparseMatrixCOO)
     if isempty(A)
         return B
     end
     if isempty(B)
         return A
     end
-    C = SparseMatrixIJV([A.I;B.I], [A.J;B.J], [A.V;B.V])
+    C = SparseMatrixCOO([A.I;B.I], [A.J;B.J], [A.V;B.V])
     return C
 end
 
-function Base.full(A::SparseMatrixCOO, args...)
+function full(A::SparseMatrixCOO, args...)
     return full(sparse(A.I, A.J, A.V, args...))
 end
 
@@ -139,7 +133,7 @@ function add!(A::SparseMatrixCOO, dofs::Vector{Int}, data::Array{Float64}, dim::
 end
 
 """ Combine (I,J,V) values is possible. """
-function optimize!(A::SparseMatrixIJV)
+function optimize!(A::SparseMatrixCOO)
     I, J, V = findnz(sparse(A))
     A = SparseMatrixCOO(I, J, V)
     gc()
@@ -155,5 +149,17 @@ Ordered list of row indices.
 function get_nonzero_rows(A::SparseMatrixCSC)
     # FIXME: This is probably a very inefficient way to do this.
     return sort(unique(rowvals(A)))
+end
+
+function get_nonzero_rows(A::SparseMatrixCOO)
+    return get_nonzero_rows(sparse(A))
+end
+
+function size(A::SparseMatrixCOO)
+    return maximum(A.I), maximum(A.J)
+end
+
+function size(A::SparseMatrixCOO, idx::Int)
+    return size(A)[idx]
 end
 

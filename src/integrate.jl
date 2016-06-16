@@ -172,6 +172,38 @@ function get_integration_points(element::TetrahedralElement, ::Type{Val{3}})
     return zip(weights, points)
 end
 
+function get_integration_points(element::TetrahedralElement, ::Type{Val{4}})
+    a = 0.25
+    b1 = 1.0/34.0*(7.0 + sqrt(15.0))
+    b2 = 1.0/34.0*(7.0 - sqrt(15.0))
+    c1 = 1.0/34.0*(13.0 - 3.0*sqrt(15.0))
+    c2 = 1.0/34.0*(13.0 + 3.0*sqrt(15.0))
+    d = 1.0/20.0*(5.0 - sqrt(15.0))
+    e = 1.0/20.0*(5.0 + sqrt(15.0))
+    w1 = 8.0/405.0
+    w2 = (2665.0 - 14.0*sqrt(15.0))/226800.0
+    w3 = (2665.0 + 14.0*sqrt(15.0))/226800.0
+    w4 = 5.0/567.0
+    weights = [w1, w2, w2, w2, w2, w3, w3, w3, w3, w4, w4, w4, w4, w4]
+    points = Vector{Float64}[
+        [a, a, a],
+        [b1, b1, b1],
+        [b1, b1, c1],
+        [b1, c1, b1],
+        [c1, b1, b1],
+        [b2, b2, b2],
+        [b2, b2, c2],
+        [b2, c2, b2],
+        [c2, b2, b2],
+        [d, d, e],
+        [d, e, d],
+        [e, d, d],
+        [d, e, e],
+        [e, d, e],
+        [e, e, d]]
+    return zip(weights, points)
+end
+
 function get_integration_points(element::Union{TriangularElement, TetrahedralElement}, order::Int64)
     return get_integration_points(element, Val{order})
 end
@@ -197,7 +229,7 @@ function get_integration_points(element::LinearElement)
 end
 
 function get_integration_points(element::QuadraticElement)
-    order= get_integration_order(element)
+    order = get_integration_order(element)
     get_integration_points(element, order)
 end
 
