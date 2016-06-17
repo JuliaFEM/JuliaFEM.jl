@@ -26,7 +26,7 @@ using JuliaFEM.Test
                 "displacement 2" => 0.0,
                 "displacement 3" => 0.0)
     p1 = Problem(Elasticity, 3)
-#   p1.properties.finite_strain = true
+    p1.properties.finite_strain = false
     p2 = Problem(Dirichlet, p1)
     push!(p1, e1)
     push!(p2, e2)
@@ -36,7 +36,9 @@ using JuliaFEM.Test
 
     call(s1; debug=true)
     @test isapprox(s1.properties.eigvals, [4/3, 1/3])
+
+    p1.properties.geometric_stiffness = true
     s1.properties.geometric_stiffness = true
-    call(s1)
+    call(s1; debug=true)
     @test isapprox(s1.properties.eigvals, [5/3, 2/3])
 end

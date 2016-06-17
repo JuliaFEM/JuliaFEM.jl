@@ -9,10 +9,11 @@ type Elasticity <: FieldProblem
     # these are found from problem.properties for type Problem{Elasticity}
     formulation :: Symbol
     finite_strain :: Bool
+    geometric_stiffness :: Bool
 end
 function Elasticity()
     # formulations: plane_stress, plane_strain, continuum
-    return Elasticity(:continuum, false)
+    return Elasticity(:continuum, false, false)
 end
 
 function get_unknown_field_name(problem::Problem{Elasticity})
@@ -356,13 +357,15 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
         if haskey(element, "displacement")
             gradu += element("displacement", ip, time, Val{:Grad})
         end
-        strain = zeros(dim , dim)
-        strain += 1/2*(gradu' + gradu)
+        strain = 1/2*(gradu' + gradu)
+
         F = eye(dim)
         if props.finite_strain
             F += gradu
             strain += 1/2*gradu'*gradu
         end
+
+        # material stiffness start
 
         fill!(BL, 0.0)
         for i=1:nnodes
@@ -386,11 +389,12 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             BL[6, 3*(i-1)+3] = F[3,3]*dN[1,i] + F[3,1]*dN[3,i]
         end
 
-        # material stiffness start
+        strain_vec = [strain[1,1]; strain[2,2]; strain[3,3]; strain[1,2]; strain[2,3]; strain[1,3]]
+        update!(ip, "strain", time => strain_vec)
 
+        # calculate stress
         E = element("youngs modulus", ip, time)
         nu = element("poissons ratio", ip, time)
-
         D = E/((1.0+nu)*(1.0-2.0*nu)) * [
             1.0-nu nu nu 0.0 0.0 0.0
             nu 1.0-nu nu 0.0 0.0 0.0
@@ -398,51 +402,41 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             0.0 0.0 0.0 0.5-nu 0.0 0.0
             0.0 0.0 0.0 0.0 0.5-nu 0.0
             0.0 0.0 0.0 0.0 0.0 0.5-nu]
-
-        # calculate stress
-        strain_vec = [strain[1,1]; strain[2,2]; strain[3,3]; strain[1,2]; strain[2,3]; strain[1,3]]
         stress_vec = D * ([1.0, 1.0, 1.0, 2.0, 2.0, 2.0].*strain_vec)
-
-        # update values to integration point
-        update!(ip, "strain", time => strain_vec)
         update!(ip, "stress", time => stress_vec)
 
         Km += w*BL'*D*BL
 
-        if get_formulation_type(problem) == :incremental
-            f -= w*BL'*stress_vec
-        end
-
         # material stiffness end
 
-        # geometric stiffness start
+        if props.geometric_stiffness # take geometric stiffness into account
 
-        fill!(BNL, 0.0)
-        for i=1:size(dN, 2)
-            BNL[1, 3*(i-1)+1] = dN[1,i]
-            BNL[2, 3*(i-1)+1] = dN[2,i]
-            BNL[3, 3*(i-1)+1] = dN[3,i]
-            BNL[4, 3*(i-1)+2] = dN[1,i]
-            BNL[5, 3*(i-1)+2] = dN[2,i]
-            BNL[6, 3*(i-1)+2] = dN[3,i]
-            BNL[7, 3*(i-1)+3] = dN[1,i]
-            BNL[8, 3*(i-1)+3] = dN[2,i]
-            BNL[9, 3*(i-1)+3] = dN[3,i]
-        end
-        S3 = zeros(3*dim, 3*dim)
-        S3[1,1] = stress_vec[1]
-        S3[2,2] = stress_vec[2]
-        S3[3,3] = stress_vec[3]
-        S3[1,2] = S3[2,1] = stress_vec[4]
-        S3[2,3] = S3[3,2] = stress_vec[5]
-        S3[1,3] = S3[3,1] = stress_vec[6]
-        S3[4:6,4:6] = S3[7:9,7:9] = S3[1:3,1:3]
+            fill!(BNL, 0.0)
 
-        if props.finite_strain
+            for i=1:size(dN, 2)
+                BNL[1, 3*(i-1)+1] = dN[1,i]
+                BNL[2, 3*(i-1)+1] = dN[2,i]
+                BNL[3, 3*(i-1)+1] = dN[3,i]
+                BNL[4, 3*(i-1)+2] = dN[1,i]
+                BNL[5, 3*(i-1)+2] = dN[2,i]
+                BNL[6, 3*(i-1)+2] = dN[3,i]
+                BNL[7, 3*(i-1)+3] = dN[1,i]
+                BNL[8, 3*(i-1)+3] = dN[2,i]
+                BNL[9, 3*(i-1)+3] = dN[3,i]
+            end
+
+            S3 = zeros(3*dim, 3*dim)
+            S3[1,1] = stress_vec[1]
+            S3[2,2] = stress_vec[2]
+            S3[3,3] = stress_vec[3]
+            S3[1,2] = S3[2,1] = stress_vec[4]
+            S3[2,3] = S3[3,2] = stress_vec[5]
+            S3[1,3] = S3[3,1] = stress_vec[6]
+            S3[4:6,4:6] = S3[7:9,7:9] = S3[1:3,1:3]
+
             Kg += w*BNL'*S3*BNL
-        end
 
-        # geometric stiffness end
+        end
 
         # external load start
 
@@ -450,6 +444,7 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             T = element("displacement load", ip, time)
             f += w*vec(T*N)
         end
+
         for i=1:dim
             if haskey(element, "displacement load $i")
                 b = element("displacement load $i", ip, time)
@@ -458,6 +453,10 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
         end
 
         # external load end
+
+        if get_formulation_type(problem) == :incremental
+            f -= w*BL'*stress_vec
+        end
 
     end
 
