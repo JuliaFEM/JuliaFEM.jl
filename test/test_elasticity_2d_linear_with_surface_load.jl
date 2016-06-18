@@ -7,27 +7,27 @@ using JuliaFEM.Test
 
 @testset "test 2d linear elasticity with surface load" begin
     meshfile = "/geometry/2d_block/BLOCK_1elem.med"
-    mesh = parse_aster_med_file(Pkg.dir("JuliaFEM")*meshfile)
+    mesh = aster_read_mesh(Pkg.dir("JuliaFEM")*meshfile)
 
     # field problem
     block = Problem(Elasticity, "BLOCK", 2)
     block.properties.formulation = :plane_stress
     block.properties.finite_strain = false
+    block.properties.geometric_stiffness = false
 
-    elements = aster_create_elements(mesh, :BLOCK, :QU4)
-    update!(elements, "youngs modulus", 288.0)
-    update!(elements, "poissons ratio", 1/3)
-    update!(elements, "displacement load 2", 576.0)
-    push!(block, elements...)
+    block.elements = create_elements(mesh, "BLOCK")
+    update!(block.elements, "youngs modulus", 288.0)
+    update!(block.elements, "poissons ratio", 1/3)
+    update!(block.elements, "displacement load 2", 576.0)
 
-    traction = aster_create_elements(mesh, :TOP, :SE2)
+    traction = create_elements(mesh, "TOP")
     update!(traction, "displacement traction force 2", 288.0)
     push!(block, traction...)
 
     # boundary conditions
     bc_sym = Problem(Dirichlet, "symmetry bc", 2, "displacement")
-    bc_elements_left = aster_create_elements(mesh, :LEFT, :SE2)
-    bc_elements_bottom = aster_create_elements(mesh, :BOTTOM, :SE2)
+    bc_elements_left = create_elements(mesh, "LEFT")
+    bc_elements_bottom = create_elements(mesh, "BOTTOM")
     update!(bc_elements_left, "displacement 1", 0.0)
     update!(bc_elements_bottom, "displacement 2", 0.0)
     push!(bc_sym, bc_elements_left..., bc_elements_bottom...)
@@ -46,7 +46,7 @@ using JuliaFEM.Test
     @test isapprox(u3, u3_expected)
 
     info("strain")
-    for ip in get_integration_points(elements[1])
+    for ip in get_integration_points(block.elements[1])
         eps = ip("strain")
         @printf "%i | %8.3f %8.3f | %8.3f %8.3f %8.3f\n" ip.id ip.coords[1] ip.coords[2] eps[1] eps[2] eps[3]
         @test isapprox(eps, [u3; 0.0])

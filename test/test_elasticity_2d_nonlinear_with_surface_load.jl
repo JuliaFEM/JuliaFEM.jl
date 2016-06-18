@@ -13,6 +13,7 @@ using JuliaFEM.Test
     block = Problem(Elasticity, "BLOCK", 2)
     block.properties.formulation = :plane_stress
     block.properties.finite_strain = true
+    block.properties.geometric_stiffness = true
 
     elements = aster_create_elements(mesh, :BLOCK, :QU4)
     update!(elements, "youngs modulus", 288.0)

@@ -76,8 +76,6 @@ export find_intersection, calc_reflection, calc_normal
 ### MORTAR STUFF ###
 include("mortar.jl")  # mortar projection
 
-include("abaqus_reader_old.jl")
-
 # rest of things
 include("utils.jl")
 include("core.jl")
@@ -88,9 +86,15 @@ include("api.jl")
 end
 
 module Preprocess
-include("abaqus_reader.jl")
+include("preprocess.jl")
+export create_elements
+include("preprocess_abaqus_reader.jl")
+include("preprocess_abaqus_reader_old.jl")
 include("preprocess_aster_reader.jl")
-export aster_create_elements, parse_aster_med_file
+export aster_create_elements, parse_aster_med_file, is_aster_mail_keyword,
+       parse_aster_header, aster_parse_nodes, aster_renumber_nodes!,
+       aster_renumber_elements!, aster_combine_meshes, aster_read_mesh,
+       filter_by_element_set, filter_by_element_id
 end
 
 module Postprocess

@@ -372,3 +372,25 @@ function parse_aster_med_file(fn::ASCIIString, mesh_name=nothing)
     result["connectivity"] = conn
     return result
 end
+
+function aster_read_mesh(fn::ASCIIString, mesh_name=nothing)
+    result = parse_aster_med_file(fn, mesh_name)
+    mesh = Mesh()
+    for (nid, ncoords) in result["nodes"]
+        add_node!(mesh, nid, ncoords)
+    end
+    mapping = Dict(
+        :SE2 => :Seg2,
+        :TR3 => :Tri3,
+        :TR6 => :Tri6,
+        :QU4 => :Quad4,
+        :HE8 => :Hex8,
+        :TE4 => :Tet4,
+        :T10 => :Tet10)
+    for (elid, (eltype, elset, elcon)) in result["connectivity"]
+        add_element!(mesh, elid, mapping[eltype], elcon)
+        add_element_to_element_set!(mesh, string(elset), elid)
+    end
+    return mesh
+end
+
