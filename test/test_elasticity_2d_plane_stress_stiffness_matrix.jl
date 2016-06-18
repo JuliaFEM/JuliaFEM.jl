@@ -8,18 +8,20 @@ using JuliaFEM.Test
 
 @testset "test 2d linear elasticity local matrices" begin
     element = Element(Quad4, [1, 2, 3, 4])
-    element["geometry"] = Vector{Float64}[
-        [0.0, 0.0],
-        [1.0, 0.0],
-        [1.0, 1.0],
-        [0.0, 1.0]]
-    element["youngs modulus"] = 288.0
-    element["poissons ratio"] = 1/3
+    X = Dict{Int64, Vector{Float64}}(
+        1 => [0.0, 0.0],
+        2 => [1.0, 0.0],
+        3 => [1.0, 1.0],
+        4 => [0.0, 1.0])
+    update!(element, "geometry", X)
+    update!(element, "youngs modulus" =>  288.0, "poissons ratio" => 1/3)
     element["displacement load"] = DCTI([4.0, 8.0])
 
     problem = Problem(Elasticity, "[0x1] x [0x1] block", 2)
     problem.properties.formulation = :plane_stress
-    K, f = assemble!(problem, element)
+    assemble!(problem, element)
+    K = full(problem.assembly.K)
+    f = full(problem.assembly.f)
 
     K_expected = [
         144  54 -90   0 -72 -54  18   0

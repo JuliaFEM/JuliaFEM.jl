@@ -1,17 +1,12 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-module AsterReaderTests
-
 using JuliaFEM
+using JuliaFEM.Preprocess
 using JuliaFEM.Test
 
-#using JuliaFEM: parse
-using JuliaFEM.Preprocess: aster_parse_nodes, aster_renumber_nodes!,
-                           aster_renumber_elements!, aster_combine_meshes
-
-function test_read_mesh()
-mesh = """
+@testset "read ascii mesh" begin
+    mesh = """
     COOR_2D
     N1          0.0 0.0
     N2          1.0 0.0
@@ -38,17 +33,15 @@ mesh = """
     FIN
     """
 
-    m = parse(mesh, Val{:CODE_ASTER_MAIL})
-    @test m["nodes"]["N1"] == [0.0, 0.0]
-    @test m["elements"]["E1"] == ["QUAD4", ["N1", "N2", "N3", "N4"]]
-    @test m["elements"]["E2"] == ["SEG2", ["N3", "N4"]]
-    @test m["elsets"]["BODY1"] == ["E1", "E2"]
-    @test m["nsets"]["NALL"] == ["N1", "N2"]
-
+#   m = parse(mesh, Val{:CODE_ASTER_MAIL})
+#   @test m["nodes"]["N1"] == [0.0, 0.0]
+#   @test m["elements"]["E1"] == ["QUAD4", ["N1", "N2", "N3", "N4"]]
+#   @test m["elements"]["E2"] == ["SEG2", ["N3", "N4"]]
+#   @test m["elsets"]["BODY1"] == ["E1", "E2"]
+#   @test m["nsets"]["NALL"] == ["N1", "N2"]
 end
-#test_read_mesh()
 
-function test_parse_nodes()
+@testset "parse nodes" begin
     section = """
     N9  2.0 3.0 4.0
     COOR_3D
@@ -70,7 +63,6 @@ function test_parse_nodes()
     @test nodes[8] == Float64[0.0, 1.0, 1.0]
     @test length(nodes) == 8
 end
-#test_parse_nodes()
 
 @testset "test combining meshes" begin
 
@@ -114,4 +106,12 @@ end
     @test mesh["connectivity"][2] == (:SE2, :GRP1, [3, 4])
 end
 
+@testset "test reading aster .med file" begin
+    fn = Pkg.dir("JuliaFEM")*"/geometry/2d_block/BLOCK_1elem.med"
+    mesh = aster_read_mesh(fn)
+    @test haskey(mesh.element_sets, "BLOCK")
+    @test length(mesh.elements) == 5
+    mesh2 = filter_by_element_set(mesh, "BLOCK")
+    @test haskey(mesh2.element_sets, "BLOCK")
+    @test length(mesh2.elements) == 1
 end
