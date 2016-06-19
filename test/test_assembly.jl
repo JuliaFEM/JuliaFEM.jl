@@ -1,13 +1,10 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-module AssemblyTests
-
+using JuliaFEM
 using JuliaFEM.Test
-using JuliaFEM.Core: Seg2, Quad4, HeatProblem, DirichletProblem, assemble
-using JuliaFEM.Core: condensate, reconstruct!
 
-function test_static_condensation()
+@testset "test static condensation" begin
     nodes = Vector[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
 
     el1 = Quad4([1, 2, 3, 4])
@@ -50,7 +47,5 @@ function test_static_condensation()
    info(x)
    @test isapprox(x[1], 1.0)
    @test isapprox(x[2], 1.0)
-end
-
 end
 

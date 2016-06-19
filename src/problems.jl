@@ -111,11 +111,11 @@ function Problem{P<:BoundaryProblem}(::Type{P}, main_problem::Problem, elements=
 end
 
 function get_formulation_type{P<:FieldProblem}(problem::Problem{P})
-    return :total
+    return :incremental
 end
 
 function get_formulation_type{P<:BoundaryProblem}(problem::Problem{P})
-    return :total
+    return :incremental
 end
 
 function get_assembly(problem)

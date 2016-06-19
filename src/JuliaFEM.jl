@@ -73,8 +73,16 @@ export Modal
 include("optics.jl")
 export find_intersection, calc_reflection, calc_normal
 
-### MORTAR STUFF ###
-include("mortar.jl")  # mortar projection
+### Mortar methods ###
+include("mortar.jl")
+export calculate_normals,
+       calculate_normals!,
+       project_from_slave_to_master,
+       project_from_master_to_slave,
+       Mortar
+
+### Contact mechanics ###
+#include("contact.jl")
 
 # rest of things
 include("utils.jl")

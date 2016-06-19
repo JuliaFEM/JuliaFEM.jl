@@ -1,18 +1,14 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-module APITests
-
+using JuliaFEM
+using JuliaFEM.Preprocess
+using JuliaFEM.API
+using JuliaFEM.Interfaces
 using JuliaFEM.Test
 
-using JuliaFEM.Preprocess: parse_abaqus
-using JuliaFEM.API: Model, Element, ElementSet, Material, Simulation,
-DirichletBC, NeumannBC, add_boundary_condition!, add_solver!, add_material!,
-add_node!, add_element!, add_element_set!, add_simulation!
-using JuliaFEM.Interfaces: solve!
+@testset "test basic workflow" begin
 
-
-function test_basic()
     # basic workflow, copied from test_solver.jl
     model = Model("Piston Calculation")
 
@@ -73,9 +69,8 @@ function test_basic()
     #@test isapprox(T, 200.0)
 end
 
-function test_piston_8789()
+@testset "test reading piston model using API" begin
     abaqus_input = open(parse_abaqus, "./geometry/piston/piston_8789_P1.inp")
-
     model = Model("Piston Calculation", abaqus_input)
     @test length(keys(model.elsets)) == 4
     @test length(keys(model.nsets)) == 1
@@ -97,6 +92,6 @@ end
 
 function slow_test_something_that_takes_long_time()
     info("This test is SLOW.")
+    test_piston_170168()
 end
 
-end
