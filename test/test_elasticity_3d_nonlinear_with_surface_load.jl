@@ -47,6 +47,6 @@ using JuliaFEM.Test
     info("displacement at tip: $disp")
     # verified using Code Aster.
     # 2015-12-12-continuum-elasticity/vim c3d_grot_gdep_traction_force.comm
-    @test isapprox(disp, [3.17431158889468E-02, 3.17431158889468E-02, -1.38591518927826E-01])
+    @test isapprox(disp, [3.17431158889468E-02, 3.17431158889468E-02, -1.38591518927826E-01]; rtol=1.0e-4)
 end
 

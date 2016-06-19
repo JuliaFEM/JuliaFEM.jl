@@ -155,6 +155,10 @@ function get_nonzero_rows(A::SparseMatrixCOO)
     return get_nonzero_rows(sparse(A))
 end
 
+function get_nonzero_rows(A::Matrix)
+    return get_nonzero_rows(sparse(A))
+end
+
 function size(A::SparseMatrixCOO)
     return maximum(A.I), maximum(A.J)
 end

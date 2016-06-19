@@ -12,6 +12,7 @@ function get_model(fn, vol, sur; with_volume_load=false)
 
     block = Problem(Elasticity, fn, 3)
     block.properties.finite_strain = false
+    block.properties.geometric_stiffness = false
 
     elements = aster_create_elements(mesh, :BLOCK, vol)
     update!(elements, "youngs modulus", 288.0)
@@ -42,9 +43,9 @@ function calc_size(elements, dim; debug_print=false)
     for element in elements
         Ael = 0.0
         size(element, 1) == dim || continue
-        for (w, xi) in get_integration_points(element)
-            detJ = element(xi, 0.0, Val{:detJ})
-            Ael += w*detJ
+        for ip in get_integration_points(element)
+            detJ = element(ip, 0.0, Val{:detJ})
+            Ael += ip.weight*detJ
         end
         if debug_print
             for (i, X) in enumerate(element["geometry"](0.0))
@@ -77,8 +78,8 @@ function calc_model(model, volume_element, surface_element; with_volume_load=fal
     max_u = maximum(block.assembly.u)
     nu = round(Int, length(block.assembly.u)/3)
     u = reshape(block.assembly.u, 3, nu)
-    f = reshape(full(block.assembly.f), 3, nu)
     if debug_print
+        f = reshape(full(block.assembly.f), 3, nu)
         dump(round(u', 5))
         dump(round(f', 5))
         info("max |u| = $max_u")

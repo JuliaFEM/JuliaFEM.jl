@@ -256,7 +256,7 @@ function solve_linear_system(solver::Solver, ::Type{Val{:DirectLinearSolver}})
     # assemble boundary problems
     Kb, C1, C2, D, fb, g = get_boundary_assembly(solver)
 
-    K = K + Kb
+    K = K + Kb + Kg
     f = f + fb
     K = 1/2*(K + K')
     u = zeros(solver.ndofs)
@@ -279,7 +279,7 @@ function solve_linear_system(solver::Solver, ::Type{Val{:DirectLinearSolver}})
     end
 
     # solver interior
-    CF = cholfact(K[interior_dofs, interior_dofs])
+    CF = ldltfact(K[interior_dofs, interior_dofs])
     Kib = K[interior_dofs, boundary_dofs]
     Kbb = K[boundary_dofs, boundary_dofs]
     fi = f[interior_dofs]
@@ -337,6 +337,19 @@ function Base.showerror(io::IO, exception::NonlinearConvergenceError)
     print(io, "nonlinear iteration did not converge in $max_iters iterations!")
 end
 
+function assemble!(solver::Solver; force_assembly=true)
+    info("Assembling problems ...")
+    tic()
+    for problem in solver.problems
+        if force_assembly # force reassembly
+            problem.assembly.changed = true
+        end
+        assemble!(problem, solver.time)
+    end
+    t1 = round(toq(), 2)
+    info("Assembled in $t1 seconds.")
+end
+
 """ Default solver for quasistatic nonlinear problems. """
 function call(solver::Solver{Nonlinear})
 
@@ -352,14 +365,7 @@ function call(solver::Solver{Nonlinear})
         info("Starting nonlinear iteration #$(properties.iteration)")
 
         # 2.1 update linearized assemblies (if needed)
-        info("Assembling problems ...")
-        tic()
-        for problem in solver.problems
-            problem.assembly.changed = true  # force reassembly
-            assemble!(problem, solver.time)
-        end
-        t1 = round(toq(), 2)
-        info("Assembled in $t1 seconds.")
+        assemble!(solver)
 
         # 2.2 call solver for linearized system (default: direct lu factorization)
         info("Solve linear system ...")

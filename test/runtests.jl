@@ -1,15 +1,23 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-# should this stuff be in package? see FactCheck docs.
-
-
 using JuliaFEM
 using JuliaFEM.Test
 
-#using FactCheck
-#using Logging
-#@Logging.configure(level=DEBUG)
+function run_tests(; quiet=false)
+
+    test_files = readdir(Pkg.dir("JuliaFEM")*"/test")
+    test_files = filter(f -> (startswith(f, "test_") & endswith(f, ".jl")), test_files)
+    for test_file in test_files
+        if !quiet
+            info("Running tests from file $test_file")
+        end
+        include(test_file)
+    end
+
+end
+
+run_tests()
 
 #=
 facts("Testing if somebody used print, println(), @sprint in src directory") do
@@ -99,30 +107,3 @@ end
 =#
 
 
-### NEW STYLE OF TESTING
-
-using JuliaFEM.Test
-
-function run_tests()
-
-    for test_file in readdir(Pkg.dir("JuliaFEM")*"/test")
-        info("checking is $test_file is real test file")
-        if (startswith(test_file, "test_")) & (endswith(test_file, ".jl"))
-            run_test(test_file)
-        end
-    end
-
-    passed, failed, errors, critical = print_test_statistics()
-
-    # at the very end throw error if something is failed
-    if failed + errors + critical > 0
-        error("Some tests has failed. Fix them. Now.")
-        exit(1)
-    else
-        info("""All tests has passed \o/ .""")
-        exit(0)
-    end
-
-end
-
-run_tests()

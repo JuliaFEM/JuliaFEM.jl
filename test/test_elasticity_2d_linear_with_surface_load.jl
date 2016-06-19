@@ -18,7 +18,7 @@ using JuliaFEM.Test
     block.elements = create_elements(mesh, "BLOCK")
     update!(block.elements, "youngs modulus", 288.0)
     update!(block.elements, "poissons ratio", 1/3)
-    update!(block.elements, "displacement load 2", 576.0)
+#   update!(block.elements, "displacement load 2", 576.0)
 
     traction = create_elements(mesh, "TOP")
     update!(traction, "displacement traction force 2", 288.0)
@@ -52,11 +52,11 @@ using JuliaFEM.Test
         @test isapprox(eps, [u3; 0.0])
     end
 
-#   info("stress")
-#   for ip in get_integration_points(elements[1])
-#       sig = ip("stress")
-#       @printf "%i | %8.3f %8.3f | %8.3f %8.3f %8.3f\n" ip.id ip.coords[1] ip.coords[2] sig[1] sig[2] sig[3]
-#       @test isapprox(sig, [0.0; g; 0.0])
-#   end
+    info("stress")
+    for ip in get_integration_points(block.elements[1])
+        sig = ip("stress")
+        @printf "%i | %8.3f %8.3f | %8.3f %8.3f %8.3f\n" ip.id ip.coords[1] ip.coords[2] sig[1] sig[2] sig[3]
+        @test isapprox(sig, [0.0; g; 0.0])
+    end
 
 end
