@@ -18,7 +18,7 @@ using JuliaFEM.Test
     block.elements = create_elements(mesh, "BLOCK")
     update!(block.elements, "youngs modulus", 288.0)
     update!(block.elements, "poissons ratio", 1/3)
-#   update!(block.elements, "displacement load 2", 576.0)
+    update!(block.elements, "displacement load 2", 576.0)
 
     traction = create_elements(mesh, "TOP")
     update!(traction, "displacement traction force 2", 288.0)

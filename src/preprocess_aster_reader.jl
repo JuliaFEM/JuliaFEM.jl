@@ -380,6 +380,7 @@ function aster_read_mesh(fn::ASCIIString, mesh_name=nothing)
         add_node!(mesh, nid, ncoords)
     end
     mapping = Dict(
+        :PO1 => :Poi1,
         :SE2 => :Seg2,
         :TR3 => :Tri3,
         :TR6 => :Tri6,
