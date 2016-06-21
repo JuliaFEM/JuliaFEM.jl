@@ -31,3 +31,22 @@ function calc_nodal_values!(elements, field_name, field_dim, time)
     end
     update!(elements, field_name, nodal_values)
 end
+
+"""
+Return node ids + vector of values 
+"""
+function get_nodal_vector(elements, field_name, time)
+    f = Dict{Int64, Vector{Float64}}()
+    for element in elements
+        for (c, v) in zip(get_connectivity(element), element[field_name](time))
+            if haskey(f, c)
+                @assert isapprox(f[c], v)
+            end
+            f[c] = v
+        end
+    end
+    node_ids = sort(collect(keys(f)))
+    field = [f[nid] for nid in node_ids]
+    return node_ids, field
+end
+

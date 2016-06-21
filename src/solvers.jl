@@ -216,80 +216,113 @@ function get_boundary_assembly(solver::Solver)
 end
 
 
-""" Solve linear system using LU factorization (UMFPACK).
 """
-function solve_linear_system(solver::Solver, ::Type{Val{:DirectLinearSolver_UMFPACK}})
-    info("solving linear system of $(length(solver.problems)) problems.")
-    t0 = time()
+Construct new basis such that u = P*uh + g
 
-    # assemble field problems
-    M, K, Kg, f = get_field_assembly(solver)
+Parameters
+----------
+S  set of linearly independent dofs.
+"""
+function create_projection(C::SparseMatrixCSC, g; S=nothing, tol=1.0e-12)
+    n, m = size(C)
+    @assert n == m
+    if S == nothing
+        S = get_nonzero_rows(C)
+    end
+    # FIXME: this creates dense matrices
+    # efficiency / memory usage is a question
+    P = sparse(C[S,:] \ full(C[S,:]))
+    h = sparse(C[S,:] \ full(g[S]))
+    resize!(P, n, m)
+    resize!(h, n, 1)
+    P = speye(n) - P
+    SparseMatrix.droptol!(P, tol)
+    return P, h
+end
 
-    # assemble boundary problems
-    Kb, C1, C2, D, fb, g = get_boundary_assembly(solver)
 
-    # construct global system Ax=b and solve using lu factorization
-    A = [
-        K+Kg+Kb  C1'
-        C2       D]
-    b = [f+fb; g]
+"""
+Solve linear system using LDLt factorization (SuiteSparse). This version
+requires that final system is symmetric and positive definite, so boundary
+conditions are first eliminated before solution.
+"""
+function solve!(K, C1, C2, D, f, g, u, la, ::Type{Val{1}}; debug=false)
 
+    nnz(D) == 0 || return false
+    nz = get_nonzero_rows(C2)
+    B = get_nonzero_rows(C2')
+    # C2^-1 exists or this doesn't work
+    length(nz) == length(B) || return false
+
+    A = get_nonzero_rows(K)
+    I = setdiff(A, B)
+
+    if debug
+        info("# nz = $(length(nz))")
+        info("# A = $(length(A))")
+        info("# B = $(length(B))")
+        info("# I = $(length(I))")
+    end
+
+    # solver boundary dofs
+    try
+        u[B] = lufact(C2[nz,B]) \ full(g[nz])
+    catch
+        info("solver #1 failed to solve boundary dofs (you should not see this message).")
+        return false
+    end
+
+    # solve interior domain using LDLt factorization
+    u[I] = ldltfact(K[I,I]) \ (f[I] - K[I,B]*u[B])
+    # solve lambda
+    la[B] = lufact(C1[B,nz]) \ full(f[B] - K[B,I]*u[I] - K[B,B]*u[B])
+
+    return true
+end
+
+"""
+Solve linear system using LU factorization (UMFPACK). This version solves
+directly the saddle point problem without elimination of boundary conditions.
+"""
+function solve!(K, C1, C2, D, f, g, u, la, ::Type{Val{2}})
+    # construct global system Ax = b and solve using lufact (UMFPACK)
+    A = [K C1'; C2  D]
+    b = [f; g]
     nz = get_nonzero_rows(A)
     x = zeros(length(b))
     x[nz] = lufact(A[nz,nz]) \ full(b[nz])
-
-    ndofs = solver.ndofs
-    u = x[1:ndofs]
-    la = x[ndofs+1:end]
-    info("UMFPACK: solved in ", time()-t0, " seconds. norm = ", norm(u))
-    return u, la
+    ndofs = size(K, 1)
+    u[:] = x[1:ndofs]
+    la[:] = x[ndofs+1:end]
+    return true
 end
 
-""" Solve linear system using LDLt factorization (SuiteSparse). """
-function solve_linear_system(solver::Solver, ::Type{Val{:DirectLinearSolver}})
+function solve_linear_system(solver::Solver)
     info("solving linear system of $(length(solver.problems)) problems.")
     t0 = time()
 
     # assemble field problems
     M, K, Kg, f = get_field_assembly(solver)
-
     # assemble boundary problems
     Kb, C1, C2, D, fb, g = get_boundary_assembly(solver)
-
-    K = K + Kb + Kg
-    f = f + fb
+    K = K + Kg + Kb
     K = 1/2*(K + K')
+    f = f + fb
+
     u = zeros(solver.ndofs)
     la = zeros(solver.ndofs)
 
-    # determine interior and boundary dofs
-    all_dofs = get_nonzero_rows(K)
-    boundary_dofs = get_nonzero_rows(C1)
-    boundary_dofs2 = get_nonzero_rows(C2)
-    interior_dofs = setdiff(all_dofs, boundary_dofs)
-    @assert length(boundary_dofs) == length(boundary_dofs2)
-    @assert setdiff(Set(boundary_dofs), Set(boundary_dofs2)) == Set()
-
-    # solve boundary
-    LUF = lufact(C1[boundary_dofs, boundary_dofs])
-    u[boundary_dofs] = LUF \ full(g[boundary_dofs])
-    normub = norm(u[boundary_dofs])
-    if isapprox(normub, 0.0)
-        info("CHOLMOD: homogeneous dirichlet boundary condition.")
+    status = false
+    for i in [1, 2]
+        status = solve!(K, C1, C2, D, f, g, u, la, Val{i})
+        if status
+            info("succesfully solved Ax = b using solver #$i")
+            break
+        end
     end
+    status || error("Failed to solve linear system!")
 
-    # solver interior
-    CF = ldltfact(K[interior_dofs, interior_dofs])
-    Kib = K[interior_dofs, boundary_dofs]
-    Kbb = K[boundary_dofs, boundary_dofs]
-    fi = f[interior_dofs]
-    u[interior_dofs] = CF \ (fi - Kib*u[boundary_dofs])
-
-    # solve lambda
-    # LUF2 = lufact(C2[boundary_dofs, boundary_dofs])
-    la[boundary_dofs] = LUF \ full(Kib' * u[interior_dofs] - Kbb*u[boundary_dofs])
-
-    info("CHOLMOD: solved in ", time()-t0, " seconds. norm = ", norm(u))
+    info("linear system solver: solved in ", time()-t0, " seconds. norm = ", norm(u))
     return u, la
 end
 
@@ -350,15 +383,19 @@ function assemble!(solver::Solver; force_assembly=true)
     info("Assembled in $t1 seconds.")
 end
 
+function initialize!(solver::Solver)
+    for problem in solver.problems
+        initialize!(problem, solver.time)
+    end
+end
+
 """ Default solver for quasistatic nonlinear problems. """
 function call(solver::Solver{Nonlinear})
 
     properties = solver.properties
 
     # 1. initialize each problem so that we can start nonlinear iterations
-    for problem in solver.problems
-        initialize!(problem, solver.time)
-    end
+    initialize!(solver)
 
     # 2. start non-linear iterations
     for properties.iteration=1:properties.max_iterations
@@ -370,7 +407,7 @@ function call(solver::Solver{Nonlinear})
         # 2.2 call solver for linearized system (default: direct lu factorization)
         info("Solve linear system ...")
         tic()
-        u, la = solve_linear_system(solver, Val{properties.linear_system_solver})
+        u, la = solve_linear_system(solver)
         push!(properties.norms, (norm(u), norm(la)))
         t1 = round(toq(), 2)
         info("Solved Ax = b in $t1 seconds.")

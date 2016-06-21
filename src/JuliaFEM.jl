@@ -66,7 +66,8 @@ include("solvers.jl")
 export AbstractSolver, Solver, Nonlinear, 
        get_unknown_field_name, get_formulation_type,
        get_field_problems, get_boundary_problems,
-       get_field_assembly, get_boundary_assembly
+       get_field_assembly, get_boundary_assembly,
+       initialize!, create_projection
 include("modal.jl")
 export Modal
 
@@ -107,7 +108,7 @@ end
 
 module Postprocess
 include("postprocess_utils.jl")
-export calc_nodal_values!
+export calc_nodal_values!, get_nodal_vector
 include("postprocess_xdmf.jl")
 export XDMF, xdmf_new_result!, xdmf_save_field!, xdmf_save!
 end

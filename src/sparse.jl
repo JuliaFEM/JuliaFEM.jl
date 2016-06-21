@@ -147,16 +147,19 @@ Returns
 Ordered list of row indices.
 """
 function get_nonzero_rows(A::SparseMatrixCSC)
-    # FIXME: This is probably a very inefficient way to do this.
     return sort(unique(rowvals(A)))
 end
 
-function get_nonzero_rows(A::SparseMatrixCOO)
+function get_nonzero_columns(A::SparseMatrixCSC)
+    return get_nonzero_rows(transpose(A))
+end
+
+function get_nonzero_rows(A::Union{SparseMatrixCOO, Matrix})
     return get_nonzero_rows(sparse(A))
 end
 
-function get_nonzero_rows(A::Matrix)
-    return get_nonzero_rows(sparse(A))
+function get_nonzero_columns(A::Union{SparseMatrixCOO, Matrix})
+    return get_nonzero_columns(sparse(A))
 end
 
 function size(A::SparseMatrixCOO)
