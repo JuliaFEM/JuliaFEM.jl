@@ -1,19 +1,23 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM
 using JuliaFEM.Test
 
 function run_tests(; quiet=false)
 
-    test_files = readdir(Pkg.dir("JuliaFEM")*"/test")
-    test_files = filter(f -> (startswith(f, "test_") & endswith(f, ".jl")), test_files)
-    for test_file in test_files
-        if !quiet
-            info("Running tests from file $test_file")
+    maybe_test_files = readdir(Pkg.dir("JuliaFEM")*"/test")
+    is_test_file(fn) = startswith(fn, "test_") & endswith(fn, ".jl")
+    test_files = filter(is_test_file, maybe_test_files)
+    #test_files = ["test_nodal_constraints.jl"]
+
+    body = quote
+        @testset "JuliaFEM" begin
+            for fn in $test_files
+                @testset "$fn" begin include(fn) end
+            end
         end
-        include(test_file)
     end
+    eval(body)
 
 end
 

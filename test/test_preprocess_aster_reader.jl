@@ -106,11 +106,46 @@ end
     @test mesh["connectivity"][2] == (:SE2, :GRP1, [3, 4])
 end
 
-@testset "test reading aster .med file" begin
-    fn = Pkg.dir("JuliaFEM")*"/geometry/2d_block/BLOCK_1elem.med"
+function JuliaFEM.get_mesh(::Type{Val{Symbol("block_2d_1elem_quad4")}})
+    fn = Pkg.dir("JuliaFEM") * "/test/testdata/block_2d_1elem_quad4.med"
     mesh = aster_read_mesh(fn)
-    @test haskey(mesh.element_sets, "BLOCK")
+    return mesh
+end
+
+@testset "test reading aster .med file" begin
+    mesh = get_mesh("block_2d_1elem_quad4")
+    info("nodes")
+    for (k, v) in mesh.nodes
+        info("$k => $v")
+    end
+    info("node sets")
+    for (k, v) in mesh.node_sets
+        info("$k => $v")
+    end
+    info("elements")
+    for (k, v) in mesh.elements
+        info("$k => $v, type = $(mesh.element_types[k])")
+    end
+    info("element sets")
+    for (k, v) in mesh.element_sets
+        info("$k => $v")
+    end
+    @test length(mesh.element_sets) == 5
+    @test length(mesh.node_sets) == 4
     @test length(mesh.elements) == 5
+    @test length(mesh.nodes) == 4
+    for elset in ["BLOCK", "TOP", "BOTTOM", "LEFT", "RIGHT"]
+        @test haskey(mesh.element_sets, elset)
+        @test length(mesh.element_sets[elset]) == 1
+    end
+    for nset in ["TOP_LEFT", "TOP_RIGHT", "BOTTOM_LEFT", "BOTTOM_RIGHT"]
+        @test haskey(mesh.node_sets, nset)
+        @test length(mesh.node_sets[nset]) == 1
+    end
+end
+
+@testset "test filter by element set" begin
+    mesh = get_mesh("block_2d_1elem_quad4")
     mesh2 = filter_by_element_set(mesh, "BLOCK")
     @test haskey(mesh2.element_sets, "BLOCK")
     @test length(mesh2.elements) == 1

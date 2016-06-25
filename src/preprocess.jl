@@ -21,9 +21,28 @@ function add_node!(mesh::Mesh, nid::Int, ncoords::Vector{Float64})
     mesh.nodes[nid] = ncoords
 end
 
+function add_nodes!(mesh::Mesh, nodes::Dict{Int64, Vector{Float64}})
+    for (nid, ncoords) in nodes
+        add_node!(mesh, nid, ncoords)
+    end
+end
+
+function add_node_to_node_set!(mesh::Mesh, set_name::ASCIIString, nids...)
+    if !haskey(mesh.node_sets, set_name)
+        mesh.node_sets[set_name] = Set{Int64}()
+    end
+    push!(mesh.node_sets[set_name], nids...)
+end
+
 function add_element!(mesh::Mesh, elid::Int, eltype::Symbol, connectivity::Vector{Int64})
     mesh.elements[elid] = connectivity
     mesh.element_types[elid] = eltype
+end
+
+function add_elements!(mesh::Mesh, elements::Dict{Int64, Tuple{Symbol, Vector{Int64}}})
+    for (elid, (eltype, elcon)) in elements
+        add_element!(mesh, elid, eltype, elcon)
+    end
 end
 
 function add_element_to_element_set!(mesh::Mesh, set_name::ASCIIString, elids...)
@@ -71,5 +90,17 @@ end
 
 function create_elements(mesh::Mesh, element_set::ASCIIString)
     return create_elements(filter_by_element_set(mesh, element_set))
+end
+
+""" find npts nearest nodes form mesh and return id numbers as list. """
+function find_nearest_nodes(mesh::Mesh, coords::Vector, npts=1)
+    dist = Dict{Int64, Float64}()
+    for (nid, c) in mesh.nodes
+        dist[nid] = norm(coords-c)
+    end
+    s = sort(collect(dist), by=x->x[2])
+    nd = s[1:npts] # [(id1, dist1), (id2, dist2), ..., (id_npts, dist_npts)]
+    node_ids = [n[1] for n in nd]
+    return node_ids
 end
 

@@ -121,6 +121,7 @@ function test_von_mises_3D_basic()
 
     info("Calculation finished")
     #PyPlot.plot(ee, ss)
+    #=
     plot3D(eig_vals[:, 1], eig_vals[:, 2], eig_vals[:, 3], color="red")
     PyPlot.title("Stress path and von Mises yield surface")
     PyPlot.xlabel("Eig Stress 1")
@@ -128,6 +129,7 @@ function test_von_mises_3D_basic()
     PyPlot.zlabel("Eig Stress 3")
     PyPlot.grid()
     PyPlot.show()
+    =#
 end
 
 function test_von_mises_planestress_basic()
@@ -228,10 +230,12 @@ function test_von_mises_planestress_basic()
         push!(x_vals, s11)
         push!(y_vals, s22)
     end
+    #=
     PyPlot.plot(x_vals, y_vals)
     PyPlot.plot(ee, ss)
     PyPlot.grid()
     PyPlot.show()
+    =#
 end
 
 # test_von_mises_3D_basic()

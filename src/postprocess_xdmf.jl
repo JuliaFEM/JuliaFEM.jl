@@ -134,7 +134,12 @@ function xdmf_save_field!(xdmf, elements, time, field_name; field_type="Scalar")
         g = element[field_name](time)
         conn = get_connectivity(element)
         for (i, c) in enumerate(conn)
-            f[c] = g[i]
+            gi = g[i]
+            if (field_type == "Vector") && (length(gi) < 3)
+                # paraview goes crazy if 2d model with 2d displacement vector
+                gi = [gi; 0.0]
+            end
+            f[c] = gi
         end
     end
 

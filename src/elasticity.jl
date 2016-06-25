@@ -157,11 +157,11 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
     return Km, Kg, f
 end
 
-function assemble{El<:Union{Seg2,Seg3}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:plane}})
+function assemble{El<:Union{Poi1,Seg2,Seg3}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:plane}})
 
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
-    nnodes = size(element, 2)
+    nnodes = length(element)
     Km = zeros(dim*nnodes, dim*nnodes)
     Kg = zeros(dim*nnodes, dim*nnodes)
     f = zeros(dim*nnodes)
