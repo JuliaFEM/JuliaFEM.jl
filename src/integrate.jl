@@ -58,6 +58,12 @@ end
 
 ### "cartesian" elements, integration rules comes from tensor product
 
+### 0d elements
+
+function get_integration_points(element::Poi1)
+    [ (1.0, [] ) ]
+end
+
 ### 1d elements
 
 typealias CartesianLineElement Union{Seg2, Seg3, NSeg}

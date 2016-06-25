@@ -335,9 +335,11 @@ function handle_overconstraint_error!(problem, nodes, all_dofs, C1_, C1, C2_, C2
             continue
         end
            
-        show_info && info("unable to resolve overconstrained situation, not continuing")
+        info("unable to resolve overconstrained situation, not continuing")
+        show_rows_in_constraint_matrix(dofs, C2, D; show_status=false)
+        show_rows_in_constraint_matrix(dofs, C2_, D_; show_status=false)
+        show_related_equations(dofs, C2, C2_, D, D_)
         throw("failed to resolve overconstraint situation")
-        show_info && info()
     end
 end
 

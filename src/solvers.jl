@@ -53,8 +53,21 @@ function Solver(name::ASCIIString="default solver",
     return solver
 end
 
+function get_problems(solver::Solver)
+    return solver.problems
+end
+
 function push!(solver::Solver, problem)
     push!(solver.problems, problem)
+end
+
+function getindex(solver::Solver, problem_name::ASCIIString)
+    for problem in get_problems(solver)
+        if problem.name == problem_name
+            return problem
+        end
+    end
+    throw(KeyError(problem_name))
 end
 
 # one-liner helpers to identify problem types
@@ -231,8 +244,11 @@ function create_projection(C::SparseMatrixCSC, g; S=nothing, tol=1.0e-12)
     end
     # FIXME: this creates dense matrices
     # efficiency / memory usage is a question
-    P = sparse(C[S,:] \ full(C[S,:]))
-    h = sparse(C[S,:] \ full(g[S]))
+    M = get_nonzero_columns(C)
+    F = qrfact(C[S,:])
+    P = spzeros(n,m)
+    P[:,M] = sparse(F \ full(C[S,M]))
+    h = sparse(F \ full(g[S]))
     resize!(P, n, m)
     resize!(h, n, 1)
     P = speye(n) - P

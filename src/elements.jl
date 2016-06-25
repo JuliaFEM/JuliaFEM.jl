@@ -67,7 +67,7 @@ function call(element::Element, field_name::ASCIIString, time)
     return element[field_name](time)
 end
 
-function call(element::Element, field_name::ASCIIString, ip, time)
+function call(element::Element, field_name::ASCIIString, ip, time::Real)
     field = element(field_name, time)
     isa(field, DCTI) && return field.data
     basis = element(ip, time)

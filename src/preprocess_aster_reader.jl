@@ -262,21 +262,36 @@ function get_mesh_names(med::MEDFile)
     return collect(keys(med.data["FAS"]))
 end
 
-function get_nodes(med::MEDFile, mesh_name)
+function get_nodes(med::MEDFile, nsets, mesh_name)
     increments = keys(med.data["ENS_MAA"][mesh_name])
     @assert length(increments) == 1
     increment = first(increments)
     nodes = med.data["ENS_MAA"][mesh_name][increment]["NOE"]
     node_ids = nodes["NUM"]
+    nset_ids = nodes["FAM"]
     nnodes = length(node_ids)
     node_coords = nodes["COO"]
     dim = round(Int, length(node_coords)/nnodes)
     node_coords = reshape(node_coords, nnodes, dim)'
-    d = Dict{Int64}{Vector{Float64}}()
+    d = Dict{Int64}{Tuple{Symbol, Vector{Float64}}}()
     for i=1:nnodes
-        d[node_ids[i]] = node_coords[:, i]
+        nset = Symbol(nsets[nset_ids[i]])
+        d[node_ids[i]] = (nset, node_coords[:, i])
     end
     return d
+end
+
+function get_node_sets(med::MEDFile, mesh_name)
+    ns = Dict{Int64, Symbol}(0 => :NALL)
+    haskey(med.data["FAS"][mesh_name], "NOEUD") || return ns
+    nsets = med.data["FAS"][mesh_name]["NOEUD"]
+    for nset in keys(nsets)
+        k = split(nset, "_")
+        nset_id = parse(Int, k[2])
+        nset_name = ascii(pointer(convert(Vector{UInt8}, nsets[nset]["GRO"]["NOM"][1])))
+        ns[nset_id] = Symbol(nset_name)
+    end
+    return ns
 end
 
 function get_element_sets(med::MEDFile, mesh_name)
@@ -304,7 +319,8 @@ global const med_elmap = Dict{Symbol, Vector{Int}}(
     :QU4 => [1, 2, 3, 4],
     :HE8 => [4, 8, 7, 3, 1, 5, 6, 2],  # ..?
     :TE4 => [3, 2, 1, 4],
-    :T10 => [3, 2, 1, 4, 6, 5, 7, 10, 9, 8]
+    :T10 => [3, 2, 1, 4, 6, 5, 7, 10, 9, 8],
+    :PO1 => [1]
 #   :T10 => [3, 4, 1, 2, 10, 8, 7, 6, 9, 5]
 #   :T10 => [5, 9, 6, 7, 8, 10, 2, 1, 4, 3]
 )
@@ -354,7 +370,7 @@ Returns
 Dict containing fields "nodes" and "connectivity".
 
 """
-function parse_aster_med_file(fn::ASCIIString, mesh_name=nothing)
+function parse_aster_med_file(fn::ASCIIString, mesh_name=nothing; debug=false)
     med = MEDFile(fn)
     if isa(mesh_name, Void)
         mesh_names = get_mesh_names(med::MEDFile)
@@ -362,10 +378,15 @@ function parse_aster_med_file(fn::ASCIIString, mesh_name=nothing)
         length(mesh_names) == 1 || error("several meshes found from med, pick one: $all_meshes")
         mesh_name = mesh_names[1]
     end
+    nsets = get_node_sets(med, mesh_name)
     elsets = get_element_sets(med, mesh_name)
-    elset_names = join(values(elsets), ", ")
-    info("Found $(length(elsets)) element sets: $elset_names")
-    nodes = get_nodes(med, mesh_name)
+    if debug
+        elset_names = join(values(elsets), ", ")
+        info("Code Aster .med reader: found $(length(elsets)) element sets: $elset_names")
+        nset_names = join(values(nsets), ", ")
+        info("Code ASter .med reader: found $(length(nsets)) node sets: $nset_names")
+    end
+    nodes = get_nodes(med, nsets, mesh_name)
     conn = get_connectivity(med, elsets, mesh_name)
     result = Dict{ASCIIString, Any}()
     result["nodes"] = nodes
@@ -373,25 +394,33 @@ function parse_aster_med_file(fn::ASCIIString, mesh_name=nothing)
     return result
 end
 
+global const mapping = Dict(
+    :PO1 => :Poi1,
+    :SE2 => :Seg2,
+    :SE3 => :Seg3,
+    :TR3 => :Tri3,
+    :TR6 => :Tri6,
+    :QU4 => :Quad4,
+    :QU8 => :Quad8,
+    :QU9 => :Quad9,
+    :HE8 => :Hex8,
+    :H20 => :Hex20,
+    :TE4 => :Tet4,
+    :T10 => :Tet10)
+
 function aster_read_mesh(fn::ASCIIString, mesh_name=nothing)
     result = parse_aster_med_file(fn, mesh_name)
     mesh = Mesh()
-    for (nid, ncoords) in result["nodes"]
+    for (nid, (nset, ncoords)) in result["nodes"]
         add_node!(mesh, nid, ncoords)
+        add_node_to_node_set!(mesh, string(nset), nid)
     end
-    mapping = Dict(
-        :PO1 => :Poi1,
-        :SE2 => :Seg2,
-        :TR3 => :Tri3,
-        :TR6 => :Tri6,
-        :QU4 => :Quad4,
-        :HE8 => :Hex8,
-        :TE4 => :Tet4,
-        :T10 => :Tet10)
     for (elid, (eltype, elset, elcon)) in result["connectivity"]
+        haskey(mapping, eltype) || error("Code Aster .med reader: element type $eltype not found from mapping")
         add_element!(mesh, elid, mapping[eltype], elcon)
         add_element_to_element_set!(mesh, string(elset), elid)
     end
     return mesh
 end
 
+# TODO: refactor and remove obsolete stuff.

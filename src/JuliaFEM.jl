@@ -25,7 +25,27 @@ export AbstractPoint, Point, IntegrationPoint, IP, Node
 include("elements.jl") # common element routines
 export Node, AbstractElement, Element, update!, get_connectivity, get_basis, get_dbasis
 include("lagrange_macro.jl") # Continuous Galerkin (Lagrange) elements generated using macro
-export Seg2, Seg3, Tri3, Tri6, Quad4, Hex8, Tet4, Tet10
+
+type Poi1 <: AbstractElement
+end
+
+function size(element::Element{Poi1})
+    return (0, 1)
+end
+
+function length(element::Element{Poi1})
+    return 1
+end
+
+function get_basis(element::Element{Poi1}, ip, time)
+    return [1]
+end
+
+function call(element::Element{Poi1}, ip, time, ::Type{Val{:detJ}})
+    return 1.0
+end
+
+export Poi1, Seg2, Seg3, Tri3, Tri6, Quad4, Hex8, Tet4, Tet10
 include("nurbs.jl")
 export NSeg, NSurf, NSolid, is_nurbs
 
@@ -80,10 +100,11 @@ export calculate_normals,
        calculate_normals!,
        project_from_slave_to_master,
        project_from_master_to_slave,
-       Mortar
+       Mortar, get_slave_elements
 
-### Contact mechanics ###
-#include("contact.jl")
+### Mortar methods, contact mechanics extension ###
+include("contact.jl")
+export Contact
 
 # rest of things
 include("utils.jl")
@@ -96,15 +117,30 @@ end
 
 module Preprocess
 include("preprocess.jl")
-export create_elements
+export create_elements, Mesh,
+       add_node!, add_nodes!,
+       add_element!, add_elements!,
+       add_element_to_element_set!,
+       add_node_to_node_set!,
+       find_nearest_nodes
 include("preprocess_abaqus_reader.jl")
 include("preprocess_abaqus_reader_old.jl")
 include("preprocess_aster_reader.jl")
 export aster_create_elements, parse_aster_med_file, is_aster_mail_keyword,
        parse_aster_header, aster_parse_nodes, aster_renumber_nodes!,
        aster_renumber_elements!, aster_combine_meshes, aster_read_mesh,
-       filter_by_element_set, filter_by_element_id
+       filter_by_element_set, filter_by_element_id, MEDFile
 end
+
+function get_mesh(mesh_name::ASCIIString, args...; kwargs...)
+    return get_mesh(Val{Symbol(mesh_name)}, args...; kwargs...)
+end
+
+function get_model(model_name::ASCIIString, args...; kwargs...)
+    return get_model(Val{Symbol(model_name)}, args...; kwargs...)
+end
+
+export get_mesh, get_model
 
 module Postprocess
 include("postprocess_utils.jl")
@@ -120,6 +156,7 @@ if VERSION >= v"0.5-"
 else
     using BaseTestNext
 end
+
 export @test, @testset, @test_throws
 #include("test.jl")
 end

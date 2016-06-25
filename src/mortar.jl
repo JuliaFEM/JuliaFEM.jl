@@ -6,13 +6,14 @@ type Mortar <: BoundaryProblem
     rotate_normals :: Bool
     adjust :: Bool
     tolerance :: Float64
+    dual_basis :: Bool
 end
 
 function Mortar()
-    return Mortar(-1, false, false, 0.0)
+    return Mortar(-1, false, false, 0.0, false)
 end
 
-function get_unknown_field_name(::Type{Mortar})
+function get_unknown_field_name(problem::Problem{Mortar})
     return "reaction force"
 end
 
@@ -38,7 +39,7 @@ function cross2(a, b)
     cross([a; 0], [b; 0])[3]
 end
 
-function get_slave_elements(problem::Problem{Mortar})
+function get_slave_elements(problem::Problem)
     filter(el -> haskey(el, "master elements"), get_elements(problem))
 end
 
@@ -109,8 +110,10 @@ function calculate_normals!(elements, time, ::Type{Val{1}}; rotate_normals=false
 end
 
 function assemble!(problem::Problem{Mortar}, time::Real)
-    if problem.dimension == -1
-        error("set interface dimension: problem.properties.dimension = 1 or 2")
+    if problem.properties.dimension == -1
+        problem.properties.dimension = dim = size(first(problem.elements), 1)
+        info("assuming dimension of mesh tie surface is $dim")
+        info("if this is wrong set is manually using problem.properties.dimension")
     end
     assemble!(problem, time, Val{problem.properties.dimension})
 end

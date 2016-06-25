@@ -247,19 +247,12 @@ function update_elements!{P<:BoundaryProblem}(problem::Problem{P}, u, la)
     end
 end
 
-#=
-function add_postprocessor!(problem::Union{FieldProblem, BoundaryProblem}, postprocessor_name::Symbol, args...; kwargs...)
-    push!(problem.postprocessors, (postprocessor_name, args, kwargs))
-end
-
-function add_preprocessor!(problem::Union{FieldProblem, BoundaryProblem}, preprocessor_name::Symbol, args...; kwargs...)
-    push!(problem.preprocessors, (preprocessor_name, args, kwargs))
-end
-
-=#
-
 function get_elements(problem)
     return problem.elements
+end
+
+function update!(problem::Problem, field_name::ASCIIString, field)
+    update!(problem.elements, field_name, field)
 end
 
 """ Return the dimension of the unknown field of this problem. """
