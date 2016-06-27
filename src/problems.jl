@@ -12,12 +12,15 @@ General linearized problem to solve
          C2*Δu +      D*λ = g
 """
 type Assembly
-    # for field assembly
+
     M :: SparseMatrixCOO  # mass matrix
-    K :: SparseMatrixCOO  # stiffness matrix
+
+    # for field assembly
+    K :: SparseMatrixCOO   # stiffness matrix
     Kg :: SparseMatrixCOO  # geometric stiffness matrix
-    f :: SparseMatrixCOO  # force vector
-#   f2 :: SparseMatrixCOO
+    f :: SparseMatrixCOO   # force vector
+    fg :: SparseMatrixCOO  # 
+
     # for boundary assembly
     C1 :: SparseMatrixCOO
     C2 :: SparseMatrixCOO
@@ -33,7 +36,6 @@ type Assembly
     la_prev :: Vector{Float64}  # previous solution vector u
     la_norm_change :: Real # change of norm in la
 
-    changed :: Bool  # flag to control is reassembly needed
 end
 
 function Assembly()
@@ -47,22 +49,38 @@ function Assembly()
         SparseMatrixCOO(),
         SparseMatrixCOO(),
         SparseMatrixCOO(),
+        SparseMatrixCOO(),
         [], [], Inf,
-        [], [], Inf,
-        true)
+        [], [], Inf)
 end
 
 function empty!(assembly::Assembly)
-    empty!(assembly.M)
     empty!(assembly.K)
     empty!(assembly.Kg)
     empty!(assembly.f)
+    empty!(assembly.fg)
     empty!(assembly.C1)
     empty!(assembly.C2)
     empty!(assembly.D)
     empty!(assembly.g)
     empty!(assembly.c)
-    assembly.changed = true
+end
+
+function isempty(assembly::Assembly)
+    T = isempty(assembly.K)
+    T &= isempty(assembly.Kg)
+    T &= isempty(assembly.f)
+    T &= isempty(assembly.fg)
+    T &= isempty(assembly.C1)
+    T &= isempty(assembly.C2)
+    T &= isempty(assembly.D)
+    T &= isempty(assembly.g)
+    T &= isempty(assembly.c)
+    return T
+end
+
+function get_dofs(assembly::Assembly)
+    return sort(unique(assembly.K.J))
 end
 
 type Problem{P<:AbstractProblem}
@@ -81,14 +99,15 @@ Examples
 --------
 Create vector-valued (dim=3) elasticity problem:
 
-julia> prob = Problem(Elasticity, "this is my problem", 3)
+julia> prob1 = Problem(Elasticity, "this is my problem", 3)
+julia> prob2 = Problem(Elasticity, 3)
 
 """
-function Problem{P<:FieldProblem}(::Type{P}, name::ASCIIString, dimension::Int64, elements=[], dofmap=Dict())
-    Problem{P}(name, dimension, "none", elements, dofmap, Assembly(), P())
+function Problem{P<:FieldProblem}(::Type{P}, name::ASCIIString, dimension::Int64)
+    Problem{P}(name, dimension, "none", [], Dict(), Assembly(), P())
 end
-function Problem{P<:FieldProblem}(::Type{P}, dimension::Int64, elements=[], dofmap=Dict())
-    Problem{P}("$P problem", dimension, "none", elements, dofmap, Assembly(), P())
+function Problem{P<:FieldProblem}(::Type{P}, dimension::Int64)
+    Problem{P}("$P problem", dimension, "none", [], Dict(), Assembly(), P())
 end
 
 """ Construct a new boundary problem.
@@ -100,14 +119,14 @@ Create Dirichlet boundary problem for vector-valued (dim=3) elasticity problem.
 julia> bc1 = Problem(Dirichlet, "support", 3, "displacement")
 
 """
-function Problem{P<:BoundaryProblem}(::Type{P}, name, dimension, parent_field_name, elements=[], dofmap=Dict())
-    Problem{P}(name, dimension, parent_field_name, elements, dofmap, Assembly(), P())
+function Problem{P<:BoundaryProblem}(::Type{P}, name, dimension, parent_field_name)
+    Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), P())
 end
-function Problem{P<:BoundaryProblem}(::Type{P}, main_problem::Problem, elements=[], dofmap=Dict())
+function Problem{P<:BoundaryProblem}(::Type{P}, main_problem::Problem)
     name = "$P problem"
     dimension = get_unknown_field_dimension(main_problem)
     parent_field_name = get_unknown_field_name(main_problem)
-    Problem{P}(name, dimension, parent_field_name, elements, dofmap, Assembly(), P())
+    Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), P())
 end
 
 function get_formulation_type{P<:FieldProblem}(problem::Problem{P})
@@ -281,6 +300,14 @@ function get_gdofs(element::Element, dim::Int)
     end
     gdofs = vec([dim*(i-1)+j for j=1:dim, i in conn])
     return gdofs
+end
+
+function get_dofs(problem::Problem)
+    return get_dofs(problem.assembly)
+end
+
+function empty!(problem::Problem)
+    empty!(problem.assembly)
 end
 
 """ Return global degrees of freedom for element.

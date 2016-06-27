@@ -10,10 +10,11 @@ type Elasticity <: FieldProblem
     formulation :: Symbol
     finite_strain :: Bool
     geometric_stiffness :: Bool
+    store_fields :: Vector{ASCIIString}
 end
 function Elasticity()
     # formulations: plane_stress, plane_strain, continuum
-    return Elasticity(:continuum, false, false)
+    return Elasticity(:continuum, false, false, [])
 end
 
 function get_unknown_field_name(problem::Problem{Elasticity})
@@ -84,7 +85,6 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
         end
 
         strain_vec = [strain[1,1]; strain[2,2]; strain[1,2]]
-        update!(ip, "strain", time => strain_vec)
 
         # calculate stress
         E = element("youngs modulus", ip, time)
@@ -104,7 +104,12 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
         end
         # calculate stress
         stress_vec = D * ([1.0, 1.0, 2.0] .* strain_vec)
-        update!(ip, "stress", time => stress_vec)
+
+        "strain" in props.store_fields && update!(ip, "strain", time => strain_vec)
+        "stress" in props.store_fields && update!(ip, "stress", time => stress_vec)
+        "stress 11" in props.store_fields && update!(ip, "stress 11", time => stress_vec[1])
+        "stress 22" in props.store_fields && update!(ip, "stress 22", time => stress_vec[2])
+        "stress 12" in props.store_fields && update!(ip, "stress 12", time => stress_vec[3])
 
         Km += w*BL'*D*BL
 
@@ -400,7 +405,6 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
         end
 
         strain_vec = [strain[1,1]; strain[2,2]; strain[3,3]; strain[1,2]; strain[2,3]; strain[1,3]]
-        update!(ip, "strain", time => strain_vec)
 
         # calculate stress
         E = element("youngs modulus", ip, time)
@@ -413,7 +417,15 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
             0.0 0.0 0.0 0.0 0.5-nu 0.0
             0.0 0.0 0.0 0.0 0.0 0.5-nu]
         stress_vec = D * ([1.0, 1.0, 1.0, 2.0, 2.0, 2.0].*strain_vec)
-        update!(ip, "stress", time => stress_vec)
+
+        "strain" in props.store_fields && update!(ip, "strain", time => strain_vec)
+        "stress" in props.store_fields && update!(ip, "stress", time => stress_vec)
+        "stress 11" in props.store_fields && update!(ip, "stress 11", time => stress_vec[1])
+        "stress 22" in props.store_fields && update!(ip, "stress 22", time => stress_vec[2])
+        "stress 33" in props.store_fields && update!(ip, "stress 33", time => stress_vec[3])
+        "stress 12" in props.store_fields && update!(ip, "stress 12", time => stress_vec[4])
+        "stress 23" in props.store_fields && update!(ip, "stress 23", time => stress_vec[5])
+        "stress 13" in props.store_fields && update!(ip, "stress 13", time => stress_vec[6])
 
         Km += w*BL'*D*BL
 

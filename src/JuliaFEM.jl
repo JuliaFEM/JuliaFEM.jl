@@ -83,7 +83,7 @@ end
 include("assembly.jl")
 include("solver_utils.jl")
 include("solvers.jl")
-export AbstractSolver, Solver, Nonlinear, 
+export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
        get_unknown_field_name, get_formulation_type,
        get_field_problems, get_boundary_problems,
        get_field_assembly, get_boundary_assembly,
@@ -144,7 +144,7 @@ export get_mesh, get_model
 
 module Postprocess
 include("postprocess_utils.jl")
-export calc_nodal_values!, get_nodal_vector
+export calc_nodal_values!, get_nodal_vector, copy_field!
 include("postprocess_xdmf.jl")
 export XDMF, xdmf_new_result!, xdmf_save_field!, xdmf_save!
 end

@@ -45,7 +45,6 @@ end
     p1, p2, p3, p4 = get_test_model()
     p1.properties.formulation = :plane_stress
     p2.properties.formulation = :plane_stress
-    p4.properties.dimension = 1
     p4.properties.adjust = true
     p4.properties.rotate_normals = false
     solver = Solver(Nonlinear)
@@ -82,7 +81,6 @@ end
     interface_master_elements = create_elements(mesh, "UPPER_BOTTOM")
     update!(interface_slave_elements, "master elements", interface_master_elements)
     interface.elements = [interface_master_elements; interface_slave_elements]
-    interface.properties.dimension = 1
 
     solver = Solver()
     push!(solver, upper, lower, bc_upper, bc_lower, interface)
@@ -186,7 +184,7 @@ end
 
 function JuliaFEM.get_model(::Type{Val{Symbol("mesh tie with curved 2d block")}};
             dy=0.0, adjust=false, tolerance=0.0, rotate_normals=false, swap=false,
-            dual_basis=false)
+            dual_basis=false, use_forwarddiff=false)
 
     mesh = get_mesh("curved 2d block splitted to upper and lower")
 
@@ -221,9 +219,10 @@ function JuliaFEM.get_model(::Type{Val{Symbol("mesh tie with curved 2d block")}}
     update!(interface_slave_elements, "master elements", interface_master_elements)
     interface.elements = [interface_master_elements; interface_slave_elements]
     interface.properties.adjust = adjust
-    interface.properties.tolerance = tolerance
+    interface.properties.distval = tolerance
     interface.properties.rotate_normals = rotate_normals
     interface.properties.dual_basis = dual_basis
+    interface.properties.use_forwarddiff = use_forwarddiff
 
     solver = Solver(Nonlinear)
     push!(solver, upper, lower, bc_upper, bc_lower, interface)
@@ -276,4 +275,3 @@ end
     @test solver.properties.iteration == 2
     @test isapprox(norm(interface.assembly.u), 0.34318800698017704)
 end
-

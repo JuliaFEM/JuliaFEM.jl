@@ -3,14 +3,17 @@
 
 using JuliaFEM
 using JuliaFEM.Preprocess
+using JuliaFEM.Postprocess
 using JuliaFEM.Test
+using JLD
 
-@testset "test 2d linear elasticity with surface load" begin
+function JuliaFEM.get_model(::Type{Val{Symbol("test 2d linear elasticity with surface + volume load")}})
     meshfile = "/geometry/2d_block/BLOCK_1elem.med"
     mesh = aster_read_mesh(Pkg.dir("JuliaFEM")*meshfile)
 
     # field problem
     block = Problem(Elasticity, "BLOCK", 2)
+    block.properties.store_fields = ["stress", "strain"]
     block.properties.formulation = :plane_stress
     block.properties.finite_strain = false
     block.properties.geometric_stiffness = false
@@ -34,6 +37,13 @@ using JuliaFEM.Test
 
     solver = Solver("solve block problem")
     push!(solver, block, bc_sym)
+    return solver
+end
+
+@testset "test 2d linear elasticity with surface + volume load" begin
+
+    solver = get_model("test 2d linear elasticity with surface + volume load")
+    block, bc_sym = solver.problems
     call(solver)
 
     f = 288.0
@@ -49,14 +59,39 @@ using JuliaFEM.Test
     for ip in get_integration_points(block.elements[1])
         eps = ip("strain")
         @printf "%i | %8.3f %8.3f | %8.3f %8.3f %8.3f\n" ip.id ip.coords[1] ip.coords[2] eps[1] eps[2] eps[3]
-        @test isapprox(eps, [u3; 0.0])
+        @test isapprox(eps, [u3[1], u3[2], 0.0])
     end
 
     info("stress")
     for ip in get_integration_points(block.elements[1])
         sig = ip("stress")
         @printf "%i | %8.3f %8.3f | %8.3f %8.3f %8.3f\n" ip.id ip.coords[1] ip.coords[2] sig[1] sig[2] sig[3]
-        @test isapprox(sig, [0.0; g; 0.0])
+        @test isapprox(sig, [0.0, g, 0.0])
     end
 
+    calc_nodal_values!(block.elements, "strain", 3, 0.0)
+    calc_nodal_values!(block.elements, "stress", 3, 0.0)
+    info(block.elements[1]["stress"](0.0))
+    node_ids, strain = get_nodal_vector(block.elements, "strain", 0.0)
+    node_ids, stress = get_nodal_vector(block.elements, "stress", 0.0)
+    @test isapprox(stress[1], [0.0, g, 0.0])
+    @test isapprox(strain[1], [u3[1], u3[2], 0.0])
 end
+
+@testset "test dump model to disk and read back before and after solution" begin
+    solver = get_model("test 2d linear elasticity with surface + volume load")
+    save("/tmp/model.jld", "linear_model", solver)
+    solver2 = load("/tmp/model.jld")["linear_model"]
+    call(solver2)
+    save("/tmp/model.jld", "results", solver2)
+    solver3 = load("/tmp/model.jld")["results"]
+    block = solver3["BLOCK"]
+    u3 = reshape(block.assembly.u, 2, 4)[:,3]
+    f = 288.0
+    g = 576.0
+    E = 288.0
+    nu = 1/3
+    u3_expected = f/E*[-nu, 1] + g/(2*E)*[-nu, 1]
+    @test isapprox(u3, u3_expected)
+end
+

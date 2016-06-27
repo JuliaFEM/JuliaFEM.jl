@@ -18,7 +18,11 @@ function Element{E<:AbstractElement}(::Type{E}, connectivity=[], integration_poi
 end
 
 function getindex(element::Element, field_name::ASCIIString)
-    element.fields[field_name]
+    return element.fields[field_name]
+end
+
+function setindex!(element::Element, data::Field, field_name::ASCIIString)
+    element.fields[field_name] = data
 end
 
 function setindex!(element::Element, data, field_name::ASCIIString)
@@ -30,7 +34,7 @@ function call(element::Element, field_name::ASCIIString, time)
 end
 
 function call(element::Element, ip, time)
-    get_basis(element, ip, time)
+    return get_basis(element, ip, time)
 end
 
 function call(element::Element, ip, time, ::Type{Val{:Jacobian}})
@@ -60,44 +64,37 @@ function call(element::Element, ip, time, ::Type{Val{:Grad}})
 end
 
 function call(element::Element, field_name::ASCIIString, ip, time, ::Type{Val{:Grad}})
-    element(ip, time, Val{:Grad})*element[field_name](time)
+    return element(ip, time, Val{:Grad})*element[field_name](time)
 end
 
 function call(element::Element, field_name::ASCIIString, time)
     return element[field_name](time)
 end
 
-function call(element::Element, field_name::ASCIIString, ip, time::Real)
-    field = element(field_name, time)
-    isa(field, DCTI) && return field.data
-    basis = element(ip, time)
-    n = length(element)
-    m = length(field)
-    @assert n == m
-    return sum([field[i]*basis[i] for i=1:n])
+function call(element::Element, field_name::ASCIIString, ip, time::Float64)
+    field = element[field_name]
+    return call(element, field, ip, time)
 end
 
-#function get_jacobian{E}(element::Element{E}, xi::Vector, time=0.0)
-#    element(xi, time, Val{:Jacobian})
-#end
-#function get_basis(element::Element, xi::Vector, time=0.0)
-#    get_basis(element.properties, xi, time)
-#end
-#function get_dbasis(element::Element, xi::Vector, time=0.0)
-#    get_dbasis(element.properties, xi, time)
-#end
-#function get_integration_points{E}(element::Element{E})
-#    get_integration_points(element.properties)
-#end
-#function length{E}(element::Element{E})
-#    length(element.properties)
-#end
-#function size{E}(element::Element{E})
-#    size(element.properties)
-#end
+function call(element::Element, field::DCTI, ip, time::Float64)
+    return field.data
+end
+
+function call(element::Element, field::CVTV, ip, time::Float64)
+    return field(ip, time)
+end
+
+function call(element::Element, field::Field, ip, time::Float64)
+    field_ = field(time)
+    basis = element(ip, time)
+    n = length(element)
+    m = length(field_)
+    @assert n == m
+    return sum([field_[i]*basis[i] for i=1:n])
+end
 
 function size(element::Element, dim::Int)
-    size(element)[dim]
+    return size(element)[dim]
 end
 
 """ Update element field based on a dictionary of nodal data and connectivity information.
@@ -115,10 +112,64 @@ function update!(element::Element, field_name::ASCIIString, data::Dict)
     element[field_name] = [data[i] for i in get_connectivity(element)]
 end
 
-function update!(element::Element, field_name::ASCIIString, datas::Union{Real, Vector, Pair}...)
+function update!{K,V}(element::Element, field_name::ASCIIString, data::Pair{Float64, Dict{K, V}})
+    time, field_data = data
+    element_data = V[field_data[i] for i in get_connectivity(element)]
+    update!(element, field_name, time => element_data)
+end
+
+function update!(element::Element, field_name::ASCIIString, datas::Union{Real, Vector, Pair{Float64, Union{Real, Vector{Any}}}}...)
     for data in datas
         if haskey(element, field_name)
             update!(element[field_name], data)
+        else
+            if length(data) != length(element)
+                update!(element, field_name, DCTI(data))
+            else
+                element[field_name] = data
+            end
+        end
+    end
+end
+
+function update!(element::Element, field_name::ASCIIString, data::Pair{Float64, Vector{Any}})
+    if haskey(element, field_name)
+        update!(element[field_name], data)
+    else
+        element[field_name] = data
+    end
+end
+
+function update!(element::Element, field_name::ASCIIString, data::Pair{Float64, Vector{Int64}})
+    if haskey(element, field_name)
+        update!(element[field_name], data)
+    else
+        element[field_name] = data
+    end
+end
+
+function update!(element::Element, field_name::ASCIIString, data::Pair{Float64, Vector{Vector{Float64}}})
+    if haskey(element, field_name)
+        update!(element[field_name], data)
+    else
+        element[field_name] = data
+    end
+end
+
+function update!(element::Element, field_name::ASCIIString, data::Pair{Float64, Float64})
+    if haskey(element, field_name)
+        update!(element[field_name], data)
+    else
+        element[field_name] = data
+    end
+end
+
+function update!(element::Element, field_name::ASCIIString, data::Union{Float64, Vector})
+    if haskey(element, field_name)
+        update!(element[field_name], data)
+    else
+        if length(data) != length(element)
+            update!(element, field_name, DCTI(data))
         else
             element[field_name] = data
         end
@@ -133,6 +184,14 @@ function update!(element::Element, datas::Pair...)
             element[field_name] = data
         end
     end
+end
+
+function update!(element::Element, field_name::ASCIIString, data::Function)
+    element[field_name] = data
+end
+
+function update!(element::Element, field_name::ASCIIString, field::Field)
+    element[field_name] = field
 end
 
 function update!(elements::Vector, field_name::ASCIIString, data)

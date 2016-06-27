@@ -1,8 +1,6 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-# https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/notebooks/2015-06-14-data-structures.ipynb
-
 abstract AbstractField
 
 abstract Discrete <: AbstractField
@@ -11,7 +9,6 @@ abstract Constant <: AbstractField
 abstract Variable <: AbstractField
 abstract TimeVariant <: AbstractField
 abstract TimeInvariant <: AbstractField
-
 
 type Field{A<:Union{Discrete,Continuous}, B<:Union{Constant,Variable}, C<:Union{TimeVariant,TimeInvariant}}
     data
@@ -49,11 +46,11 @@ type Basis
     dbasis :: Function
 end
 
-function Base.call(basis::Basis, xi::Vector)
+function call(basis::Basis, xi::Vector)
     basis.basis(xi)
 end
 
-function Base.call(basis::Basis, xi::Vector, ::Type{Val{:grad}})
+function call(basis::Basis, xi::Vector, ::Type{Val{:grad}})
     basis.dbasis(xi)
 end
 
@@ -102,7 +99,7 @@ function Field{T}(data::Pair{Float64, Vector{T}}...)
     return DVTV([Increment{Vector{T}}(d[1], d[2]) for d in data])
 end
 
-function Base.convert{T}(::Type{DCTV}, data::Pair{Real, Vector{T}}...)
+function convert{T}(::Type{DCTV}, data::Pair{Real, Vector{T}}...)
     return DCTV([Increment{Vector{T}}(d[1], d[2]) for d in data])
 end
 
@@ -114,7 +111,7 @@ julia> t0 = 0.0; t1=1.0; y0 = 0.0; y1 = 1.0
 julia> f = DCTV(t0 => y0, t1 => y1)
 
 """
-function Base.convert{T,v<:Real}(::Type{DCTV}, data::Pair{v, T}...)
+function convert{T,v<:Real}(::Type{DCTV}, data::Pair{v, T}...)
     return DCTV([Increment(d[1],d[2]) for d in data])
 end
 #function Base.convert(::Type{DCTV}, data::Pair{Real, Any}...)
@@ -234,16 +231,16 @@ function Base.(:*)(T::Vector, f::DVTI)
     return sum([T[i]*f[i] for i=1:length(f)])
 end
 
-function Base.vec(field::DVTI)
+function vec(field::DVTI)
     return [field.data...;]
 end
 
-function Base.vec(field::DCTV)
+function vec(field::DCTV)
     info("trying to vectorize $field")
     error("does not make sense")
 end
 
-function Base.endof(field::Field)
+function endof(field::Field)
     return endof(field.data)
 end
 
@@ -251,22 +248,22 @@ end
 #    return Increment(reshape(data, round(Int, length(data)/length(increment)), length(increment)))
 #end
 
-function Base.similar{T}(field::DVTI, data::Vector{T})
+function similar{T}(field::DVTI, data::Vector{T})
     n = length(field.data)
     data = reshape(data, round(Int, length(data)/n), n)
     newdata = Vector[data[:,i] for i=1:n]
     return typeof(field)(newdata)
 end
 
-function Base.start(::DVTI)
+function start(::DVTI)
     return 1
 end
 
-function Base.next(f::DVTI, state)
+function next(f::DVTI, state)
     return f.data[state], state+1
 end
 
-function Base.done(f::DVTI, s)
+function done(f::DVTI, s)
     return s > length(f.data)
 end
 
@@ -301,20 +298,24 @@ end
 
 ### Accessing continuous fields
 
-function Base.call(field::CVTI, xi::Vector)
-    field.data(xi)
+function call(field::CVTI, xi::Vector)
+    return field.data(xi)
 end
 
-function Base.call(field::CVTI, xi::Vector, ::Type{Val{:grad}})
-    field.data(xi, Val{:grad})
+function call(field::CVTV, xi, time::Float64)
+    return field.data(xi, time)
 end
 
-function Base.convert(::Type{Basis}, field::CVTI)
-    return field.data
+function call(field::CVTI, xi::Vector, ::Type{Val{:Grad}})
+    return field.data(xi, Val{:Grad})
 end
 
-function Base.call(field::CCTV, time::Number)
+function call(field::CCTV, time::Float64)
     return field.data(time)
+end
+
+function convert(::Type{Basis}, field::CVTI)
+    return field.data
 end
 
 ### Interpolation
