@@ -1,8 +1,6 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-module XDMFTests
-
 using JuliaFEM
 using JuliaFEM.Postprocess
 using JuliaFEM.Test
@@ -126,4 +124,31 @@ function test_write_to_xml()
     end
 end
 
+@testset "write simple xmf file" begin
+    X = Dict{Int64, Vector{Float64}}(
+        1 => [0.0, 0.0],
+        2 => [1.0, 0.0],
+        3 => [1.0, 1.0],
+        4 => [0.0, 1.0])
+    u = Dict{Int64, Vector{Float64}}(
+        1 => [0.0, 0.0],
+        2 => [0.0, 0.0],
+        3 => [0.5, 1.0],
+        4 => [0.0, 0.0])
+    n = Dict{Int64, Vector{Float64}}(
+        2 => [1.0, 0.0],
+        3 => [1.0, 0.0])
+    el1 = Element(Quad4, [1, 2, 3, 4])
+    el2 = Element(Seg2, [2, 3])
+    update!([el1, el2], "geometry", X)
+    update!([el1, el2], "displacement", u)
+    update!(el2, "normal", n)
+    xdmf = XDMF()
+    xdmf.dimension = 2
+    xdmf_new_result!(xdmf, [el1, el2], 0.0)
+    xdmf_save_field!(xdmf, [el1, el2], 0.0, "displacement"; field_type="Vector")
+    xdmf_save_field!(xdmf, [el1, el2], 0.0, "normal"; field_type="Vector")
+    xdmf_save!(xdmf, "/tmp/test.xmf")
+    # TODO: how to test?
 end
+

@@ -37,6 +37,9 @@ using JuliaFEM
 # > #define XDMF_3DRECTMESH     0x1101
 # > #define XDMF_3DCORECTMESH   0x1102
 
+get_xdmf_element_code(element::Element{Poi1})  = 0x0001
+get_xdmf_element_code(element::Element{Seg2})  = 0x0002
+get_xdmf_element_code(element::Element{Seg3})  = 0x0003
 get_xdmf_element_code(element::Element{Tri3})  = 0x0004
 get_xdmf_element_code(element::Element{Quad4}) = 0x0005
 get_xdmf_element_code(element::Element{Tet4})  = 0x0006
@@ -66,7 +69,7 @@ function XDMF()
     return XDMF(3, false, xdoc, domain, temporal_collection, Union{}, [])
 end
 
-function xdmf_new_result!(xdmf::XDMF, elements, time)
+function xdmf_new_result!(xdmf::XDMF, elements::Vector, time)
     grid = new_child(xdmf.temporal_collection, "Grid")
     set_attribute(grid, "Name", "Grid")
     time_ = new_child(grid, "Time")
@@ -128,9 +131,11 @@ function xdmf_new_result!(xdmf::XDMF, elements, time)
     add_text(dataitem, "\n"*join(s, "\n")*"\n")
 end
 
-function xdmf_save_field!(xdmf, elements, time, field_name; field_type="Scalar")
+function xdmf_save_field!(xdmf, elements::Vector, time, field_name; field_type="Scalar", debug=false)
     f = Dict()
+    field_dim = 0
     for element in elements
+        haskey(element, field_name) || continue
         g = element[field_name](time)
         conn = get_connectivity(element)
         for (i, c) in enumerate(conn)
@@ -139,8 +144,17 @@ function xdmf_save_field!(xdmf, elements, time, field_name; field_type="Scalar")
                 # paraview goes crazy if 2d model with 2d displacement vector
                 gi = [gi; 0.0]
             end
+            if field_dim == 0
+                field_dim = length(gi)
+            end
+            field_dim == length(gi) || error("several dimensions in field, dim = $field_dim.")
             f[c] = gi
         end
+    end
+
+    if length(f) == 0
+        warn("xdmf_save_field!(): field $field_name was not found from set of elements")
+        return
     end
 
     attribute = new_child(xdmf.current_grid, "Attribute")
@@ -151,14 +165,28 @@ function xdmf_save_field!(xdmf, elements, time, field_name; field_type="Scalar")
     set_attribute(dataitem, "DataType", "Float")
     set_attribute(dataitem, "Format", "XML")
     #set_attribute(dataitem, "Precision", 8)
+    debug && info("field dim = $field_dim")
+    debug && info(f)
     s = ASCIIString[]
     dim = 0
     for i in xdmf.permutation
-        push!(s, join(round(f[i], 5), " "))
-        dim += length(f[i])
+        gi = zeros(field_dim)
+        if haskey(f, i)
+            gi = f[i]
+        end
+        push!(s, join(round(gi, 5), " "))
+        dim += length(gi)
     end
     set_attribute(dataitem, "Dimensions", dim)
     add_text(dataitem, "\n"*join(s, "\n")*"\n")
+end
+
+function xdmf_save_field!(xdmf, problem::Problem, time, field_name; field_type="Scalar")
+    xdmf_save_field!(xdmf, problem.elements, time, field_name; field_type=field_type)
+end
+
+function xdmf_new_result!(xdmf, problem::Problem, time)
+    xdmf_new_result!(xdmf, problem.elements, time)
 end
 
 function xdmf_save!(xdmf, filename)

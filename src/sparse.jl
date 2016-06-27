@@ -132,11 +132,12 @@ function add!(A::SparseMatrixCOO, dofs::Vector{Int}, data::Array{Float64}, dim::
     append!(A.V, vec(data))
 end
 
-""" Combine (I,J,V) values is possible. """
+""" Combine (I,J,V) values is possible to reduce memory usage. """
 function optimize!(A::SparseMatrixCOO)
     I, J, V = findnz(sparse(A))
-    A = SparseMatrixCOO(I, J, V)
-    gc()
+    A.I = I
+    A.J = J
+    A.V = V
 end
 
 """ Find all nonzero rows from sparse matrix.
@@ -163,6 +164,7 @@ function get_nonzero_columns(A::Union{SparseMatrixCOO, Matrix})
 end
 
 function size(A::SparseMatrixCOO)
+    isempty(A) && return (0, 0)
     return maximum(A.I), maximum(A.J)
 end
 

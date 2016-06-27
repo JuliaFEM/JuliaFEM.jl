@@ -14,15 +14,23 @@ type CAssembly
 end
 
 function optimize!(assembly::Assembly)
-    optimize!(assembly.mass_matrix)
-    optimize!(assembly.stiffness_matrix)
-    optimize!(assembly.force_vector)
+    optimize!(assembly.K)
+    optimize!(assembly.Kg)
+    optimize!(assembly.f)
+    optimize!(assembly.fg)
+    optimize!(assembly.C1)
+    optimize!(assembly.C2)
+    optimize!(assembly.D)
+    optimize!(assembly.g)
+    optimize!(assembly.c)
 end
 
 function append!(assembly::Assembly, sub_assembly::Assembly)
     append!(assembly.M, sub_assembly.M)
     append!(assembly.K, sub_assembly.K)
+    append!(assembly.Kg, sub_assembly.Kg)
     append!(assembly.f, sub_assembly.f)
+    append!(assembly.fg, sub_assembly.fg)
     append!(assembly.C1, sub_assembly.C1)
     append!(assembly.C2, sub_assembly.C2)
     append!(assembly.D, sub_assembly.D)
@@ -36,33 +44,38 @@ end
 function assemble_posthook!
 end
 
-function assemble!(problem::Problem, time::Real; empty_assembly::Bool=true)
+function assemble!(problem::Problem, time::Real)
+    if !isempty(problem.assembly)
+        warn("problem.assembly is not empty and assembling, are you sure you know what are you doing?")
+    end
     if method_exists(assemble_prehook!, Tuple{typeof(problem), Real})
         assemble_prehook!(problem, time)
     end
-    !problem.assembly.changed && return
-    empty_assembly && empty!(problem.assembly)
     for element in get_elements(problem)
         assemble!(problem.assembly, problem, element, time)
     end
-    problem.assembly.changed = true
     if method_exists(assemble_posthook!, Tuple{typeof(problem), Real})
         assemble_posthook!(problem, time)
     end
-    return
 end
 
-function assemble!(problem::Problem, time::Real, ::Type{Val{:mass_matrix}})
-    !isempty(problem.assembly.M) && return # assembly mass matrix only once
-    dim = get_unknown_field_dimension(problem)
+function assemble!(problem::Problem, time::Real, ::Type{Val{:mass_matrix}}; density=0.0, dual_basis=false, dim=0)
+    if !isempty(problem.assembly.M)
+        warn("problem.assembly.M is not empty and assembling, are you sure you know what are you doing?")
+    end
+    if dim == 0
+        dim = get_unknown_field_dimension(problem)
+    end
     for element in get_elements(problem)
-        haskey(element, "density") || error("Failed to assemble mass matrix, density not defined!")
+        if !haskey(element, "density") && density == 0.0
+            error("Failed to assemble mass matrix, density not defined!")
+        end
         nnodes = length(element)
         M = zeros(nnodes, nnodes)
         for ip in get_integration_points(element, 1)
             detJ = element(ip, time, Val{:detJ})
             N = element(ip, time)
-            rho = element("density", ip, time)
+            rho = haskey(element, "density") ? element("density", ip, time) : density
             M += ip.weight*rho*N'*N*detJ
         end
         gdofs = get_gdofs(problem, element)

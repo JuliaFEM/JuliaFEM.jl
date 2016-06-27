@@ -59,7 +59,7 @@ end
 
 =#
 
-@testset "test add time dependent field to element" begin
+@testset "add time dependent field to element" begin
     el = Element(Seg2, [1, 2])
     u1 = Vector{Float64}[[0.0, 0.0], [0.0, 0.0]]
     u2 = Vector{Float64}[[1.0, 1.0], [1.0, 1.0]]
@@ -69,5 +69,34 @@ end
     @test isapprox(el("displacement", [0.0], 0.0), [0.0, 0.0])
     @test isapprox(el("displacement", [0.0], 0.5), [0.5, 0.5])
     @test isapprox(el("displacement", [0.0], 1.0), [1.0, 1.0])
+    el2 = Element(Poi1, [1])
+    update!(el2, "force 1", 0.0 => 1.0)
+end
+
+@testset "add CVTV field to element" begin
+    el = Element(Seg2, [1, 2])
+    f(xi, time) = xi[1]*time
+    update!(el, "my field", f)
+    v = el("my field", [1.0], 2.0)
+    @test isapprox(v, 2.0)
+end
+
+@testset "add DCTI to element" begin
+    el = Element(Quad4, [1, 2, 3, 4])
+    update!(el, "displacement load", DCTI([4.0, 8.0]))
+    @test isa(el["displacement load"], DCTI)
+    @test !isa(el["displacement load"].data, DCTI)
+    update!(el, "displacement load 2", [4.0, 8.0])
+    @test isa(el["displacement load 2"], DCTI)
+    update!(el, "temperature", [1.0, 2.0, 3.0, 4.0])
+    @test isa(el["temperature"], DVTI)
+end
+
+@testset "interpolate DCTI from element" begin
+    el = Element(Seg2, [1, 2])
+    update!(el, "foobar", 1.0)
+    fb = el("foobar", [0.0], 0.0)
+    @test isa(fb, Float64)
+    @test isapprox(fb, 1.0)
 end
 

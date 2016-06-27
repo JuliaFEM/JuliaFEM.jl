@@ -25,3 +25,9 @@ end
     @test f.data == 2.0
 end
 
+@testset "test field defined using function" begin
+    g(xi, t) = xi[1]*t
+    f = Field(g)
+    v = f([1.0], 2.0)
+    @test isapprox(v, 2.0)
+end

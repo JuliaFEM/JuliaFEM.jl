@@ -31,6 +31,7 @@ Matrix([
     p1 = Problem(Dirichlet, "test problem 1", 1, "temperature")
     p1.properties.dual_basis = false
     p2 = Problem(Dirichlet, "test problem 2", 1, "temperature")
+    p2.properties.dual_basis = true
     assemble!(p1, element)
     assemble!(p2, element)
     C1 = full(p1.assembly.C1)
@@ -48,6 +49,7 @@ Matrix([
     p1 = Problem(Dirichlet, "quadratic 1", 1, "temperature")
     p1.properties.dual_basis = false
     p2 = Problem(Dirichlet, "quadratic 1", 1, "temperature")
+    p2.properties.dual_basis = true
     assemble!(p1, element)
     assemble!(p2, element)
     C1 = full(p1.assembly.C1)
@@ -111,4 +113,34 @@ end
     @test isapprox(g, [0.0, 0.0, 0.0, 0.0])
 end
 =#
+
+@testset "test analytical boundary condition" begin
+    X = Dict{Int64, Vector{Float64}}(
+        1 => [0.0, 0.0],
+        2 => [1.0, 0.0])
+    element = Element(Seg2, [1, 2])
+    update!(element, "geometry", X)
+    update!(element, "displacement 1", 0.0)
+    f(xi, time) = begin
+        info("function call at xi = $xi, time = $time")
+        X = element("geometry", xi, time)
+        info("geometry at xi, X = $X")
+        val = X[1]*time
+        info("result for field at xi = $val")
+        return val
+    end
+    update!(element, "displacement 2", f)
+    p = Problem(Dirichlet, "test boundary", 2, "displacement")
+    push!(p, element)
+    assemble!(p, 0.0)
+    g1 = full(p.assembly.g, 4, 1)
+    @test isapprox(g1, [0.0, 0.0, 0.0, 0.0])
+    empty!(p.assembly)
+    assemble!(p, 1.0)
+    g2 = full(p.assembly.g, 4, 1)
+    C2 = full(p.assembly.C2, 4, 4)
+    u = C2 \ g2
+    info("u = $u")
+    @test isapprox(u, [0.0, 0.0, 0.0, 1.0])
+end
 
