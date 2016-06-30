@@ -309,21 +309,17 @@ function get_element_sets(med::MEDFile, mesh_name)
     return es
 end
 
-# hex8 nodes rotating cw first in yz plane then x+1
-
 global const med_elmap = Dict{Symbol, Vector{Int}}(
+    :PO1 => [1],
     :SE2 => [1, 2],
     :SE3 => [1, 2, 3],
     :TR3 => [1, 2, 3],
-    :TR6 => [1, 2, 3, 4, 5, 6],
     :QU4 => [1, 2, 3, 4],
-    :HE8 => [4, 8, 7, 3, 1, 5, 6, 2],  # ..?
     :TE4 => [3, 2, 1, 4],
-    :T10 => [3, 2, 1, 4, 6, 5, 7, 10, 9, 8],
-    :PO1 => [1]
-#   :T10 => [3, 4, 1, 2, 10, 8, 7, 6, 9, 5]
-#   :T10 => [5, 9, 6, 7, 8, 10, 2, 1, 4, 3]
-)
+    :TR6 => [1, 2, 3, 4, 5, 6],
+    :QU8 => [1, 2, 3, 4, 5, 6, 7, 8],
+    :HE8 => [4, 8, 7, 3, 1, 5, 6, 2],  # ..?
+    :T10 => [3, 2, 1, 4, 6, 5, 7, 10, 9, 8])
 
 function get_connectivity(med::MEDFile, elsets, mesh_name)
     elsets[0] = :OTHER

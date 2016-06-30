@@ -145,7 +145,7 @@ end
     take last known value and set it as a initial quess for next
     time increment.
 """
-function initialize!(problem::Problem, time::Real)
+function initialize!(problem::Problem, time=0.0)
     field_name = get_unknown_field_name(problem)
     field_dim = get_unknown_field_dimension(problem)
     for element in get_elements(problem)
@@ -289,8 +289,12 @@ function get_parent_field_name{P<:BoundaryProblem}(problem::Problem{P})
     return problem.parent_field_name
 end
 
-function push!(problem::Problem, element)
-    push!(problem.elements, element)
+function push!(problem::Problem, elements...)
+    push!(problem.elements, elements...)
+end
+
+function push!(problem::Problem, elements::Vector)
+    push!(problem.elements, elements...)
 end
 
 function get_gdofs(element::Element, dim::Int)

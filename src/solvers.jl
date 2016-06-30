@@ -511,11 +511,16 @@ function call(solver::Solver{Linear}; F=nothing, show_info=true, return_factoriz
 end
 
 """ Convenience function to call linear solver. """
-function LinearSolver(problems...)
+function LinearSolver(problems::Problem...)
     solver = Solver(Linear, "default linear solver")
     if length(problems) != 0
         push!(solver, problems...)
     end
+    return solver
+end
+function LinearSolver(name::ASCIIString, problems::Problem...)
+    solver = LinearSolver(problems...)
+    solver.name = name
     return solver
 end
 

@@ -44,17 +44,30 @@ end
 function assemble_posthook!
 end
 
-function assemble!(problem::Problem, time::Real)
+function assemble!(problem::Problem, time=0.0; auto_initialize=true)
     if !isempty(problem.assembly)
-        warn("problem.assembly is not empty and assembling, are you sure you know what are you doing?")
+        warn("Assemble problem $(problem.name): problem.assembly is not empty and assembling, are you sure you know what are you doing?")
     end
-    if method_exists(assemble_prehook!, Tuple{typeof(problem), Real})
+    if isempty(problem.elements)
+        warn("Assemble problem $(problem.name): problem.elements is empty, no elements in problem?")
+    else
+        first_element = first(problem.elements)
+        unknown_field_name = get_unknown_field_name(problem)
+        if !haskey(first_element, unknown_field_name)
+            warn("Assemble problem $(problem.name): seems that problem is uninitialized.")
+            if auto_initialize
+                info("Initializing problem $(problem.name) at time $time automatically.")
+                initialize!(problem, time)
+            end
+        end
+    end
+    if method_exists(assemble_prehook!, Tuple{typeof(problem), Float64})
         assemble_prehook!(problem, time)
     end
     for element in get_elements(problem)
         assemble!(problem.assembly, problem, element, time)
     end
-    if method_exists(assemble_posthook!, Tuple{typeof(problem), Real})
+    if method_exists(assemble_posthook!, Tuple{typeof(problem), Float64})
         assemble_posthook!(problem, time)
     end
 end

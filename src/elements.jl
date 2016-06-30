@@ -29,8 +29,16 @@ function setindex!(element::Element, data, field_name::ASCIIString)
     element.fields[field_name] = Field(data)
 end
 
+function call(element::Element, field_name::ASCIIString)
+    return element[field_name]
+end
+
 function call(element::Element, field_name::ASCIIString, time)
     return element[field_name](time)
+end
+
+function last(element::Element, field_name::ASCIIString)
+    return last(element[field_name])
 end
 
 function call(element::Element, ip, time)
@@ -80,6 +88,10 @@ function call(element::Element, field::DCTI, ip, time::Float64)
     return field.data
 end
 
+function call(element::Element, field::DCTV, ip, time::Float64)
+    return field(time).data
+end
+
 function call(element::Element, field::CVTV, ip, time::Float64)
     return field(ip, time)
 end
@@ -89,7 +101,9 @@ function call(element::Element, field::Field, ip, time::Float64)
     basis = element(ip, time)
     n = length(element)
     m = length(field_)
-    @assert n == m
+    if n != m
+        error("Error when trying to interpolate field $field at coords $ip and time $time: element length is $n and field length is $m, f = Nᵢfᵢ makes no sense!")
+    end
     return sum([field_[i]*basis[i] for i=1:n])
 end
 
@@ -118,7 +132,7 @@ function update!{K,V}(element::Element, field_name::ASCIIString, data::Pair{Floa
     update!(element, field_name, time => element_data)
 end
 
-function update!(element::Element, field_name::ASCIIString, datas::Union{Real, Vector, Pair{Float64, Union{Real, Vector{Any}}}}...)
+function update!(element::Element, field_name::ASCIIString, datas::Union{Real, Vector, Pair{Float64, Union{Float64, Real, Vector{Any}}}}...)
     for data in datas
         if haskey(element, field_name)
             update!(element[field_name], data)
@@ -129,6 +143,12 @@ function update!(element::Element, field_name::ASCIIString, datas::Union{Real, V
                 element[field_name] = data
             end
         end
+    end
+end
+
+function update!(element::Element, field_name::ASCIIString, datas::Pair...)
+    for data in datas
+        update!(element, field_name, data)
     end
 end
 
@@ -200,11 +220,12 @@ function update!(elements::Vector, field_name::ASCIIString, data)
     end
 end
 
+dbasis_cache = ForwardDiff.jacobian
 """ Evaluate partial derivatives of basis functions using ForwardDiff. """
 function get_dbasis(element::Element, ip, time)
     xi = isa(ip, IP) ? ip.coords : ip
     basis(xi) = vec(get_basis(element, xi, time))
-    return ForwardDiff.jacobian(basis, xi, cache=autodiffcache)'
+    return ForwardDiff.jacobian(basis, xi)'
 end
 
 """ Check existence of field. """
