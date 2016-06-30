@@ -9,8 +9,10 @@ module JuliaFEM
 importall Base
 using ForwardDiff
 using JLD
-autodiffcache = ForwardDiffCache()
-# export derivative, jacobian, hessian
+
+#Grad = Val{:Grad}
+#detJ = Val{:detJ}
+#export Grad, detJ
 
 include("common.jl")
 
@@ -168,5 +170,6 @@ end
 module Interfaces
 include("interfaces.jl")
 end
+
 
 end # module
