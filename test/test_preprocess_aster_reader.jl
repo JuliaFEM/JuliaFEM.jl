@@ -150,3 +150,33 @@ end
     @test haskey(mesh2.element_sets, "BLOCK")
     @test length(mesh2.elements) == 1
 end
+
+function calculate_volume(eltype::Symbol)
+    fn = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
+    mesh = aster_read_mesh(fn, "$eltype")
+    elements = create_elements(mesh, eltype)
+    V = 0.0
+    time = 0.0
+    for element in elements
+        for ip in get_integration_points(element)
+            detJ = element(ip, time, Val{:detJ})
+            detJ > 0 || warn("negative determinant for element $eltype !")
+            V += ip.weight*detJ
+        end
+    end
+    info("volume of $eltype is $V")
+    return V
+end
+
+@testset "calculate volume for primitives" begin
+    @test isapprox(calculate_volume(:Tet4), 1/6)
+    @test isapprox(calculate_volume(:Tet10), 1/6)
+    @test isapprox(calculate_volume(:Hex8), 2^3)
+    @test isapprox(calculate_volume(:Hex20), 2^3)
+    @test isapprox(calculate_volume(:Hex27), 2^3)
+#   @test isapprox(get_volume("PE6"), V)
+#   @test isapprox(get_volume("PY5"), V)
+#   @test isapprox(get_volume("P15"), V)
+#   @test isapprox(get_volume("P13"), V)
+end
+

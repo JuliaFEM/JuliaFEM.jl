@@ -9,13 +9,13 @@ using JuliaFEM.Test
     model = open(parse_abaqus, Pkg.dir("JuliaFEM")*"/geometry/3d_beam/palkki.inp")
     @test length(model["nodes"]) == 298
     @test length(model["elements"]) == 120
-    @test length(model["elsets"]["BODY1"]) == 120
+    @test length(model["elsets"]["Body1"]) == 120
     @test length(model["nsets"]["SUPPORT"]) == 9
     @test length(model["nsets"]["LOAD"]) == 9
     @test length(model["nsets"]["TOP"]) == 83
 end
 
-@testset "test that reader throws error when dimension information of elemenet is missing" begin
+@testset "test that reader throws error when dimension information of element is missing" begin
     #   *ELEMENT, TYPE=neverseenbefore, ELSET=Body1
     data = """
     1,       243,       240,       191,       117,       245,       242,       244,
@@ -23,7 +23,7 @@ end
     """
     model = Dict()
     header = Dict("section"=>"ELEMENT", "options" => Dict("TYPE" => "neverseenbefore", "ELSET"=>"Body1"))
-    @test_throws parse_element_section(model, header, data)
+    @test_throws Exception parse_element_section(model, header, data)
 end
 
 @testset "test read element section" begin
