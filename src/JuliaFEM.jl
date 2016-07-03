@@ -86,10 +86,6 @@ export calculate_normals,
 include("problems_contact.jl")
 export Contact
 
-# rest of things
-include("utils.jl")
-include("core.jl")
-
 module API
 include("api.jl")
 # export ....
