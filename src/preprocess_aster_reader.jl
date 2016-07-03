@@ -128,28 +128,22 @@ end
 function aster_renumber_nodes!(mesh1, mesh2)
 
     reserved_node_ids = Set(collect(keys(mesh1["nodes"])))
-    @debug info("already reserved node ids: $reserved_node_ids")
     mesh2_node_numbering = Dict{Int64, Int64}()
 
     # find new node ids assigned for mesh 2
     k = 1
     for node_id in sort(collect(keys(mesh2["nodes"])))
-        @debug info("mesh2: processing node $node_id")
         # if node id is reserved in mesh 1, find new number
         if node_id in reserved_node_ids
-            @debug info("node id conflict, $node_id already defined in mesh 1, renumbering")
             while k in reserved_node_ids
                 k += 1
             end
-            @debug info("mesh2: node $node_id -> $k")
             mesh2_node_numbering[node_id] = k
             push!(reserved_node_ids, k)
         else
             mesh2_node_numbering[node_id] = node_id
         end
     end
-    @debug info("new node numering:")
-    @debug println(mesh2_node_numbering)
     aster_renumber_nodes_!(mesh2, mesh2_node_numbering)
 
 #=
@@ -175,28 +169,22 @@ end
 function aster_renumber_elements!(mesh1, mesh2)
 
     reserved_element_ids = Set(collect(keys(mesh1["connectivity"])))
-    @debug info("already reserved element ids: $reserved_element_ids")
     mesh2_element_numbering = Dict{Int64, Int64}()
 
     # find new element ids assigned for mesh 2
     k = 1
     for element_id in sort(collect(keys(mesh2["connectivity"])))
-        @debug info("mesh2: processing element $element_id")
         # if node id is reserved in mesh 1, find new number
         if element_id in reserved_element_ids
-            @debug info("element id conflict, $element_id already defined in mesh 1, renumbering")
             while k in reserved_element_ids
                 k += 1
             end
-            @debug info("mesh2: element $element_id -> $k")
             mesh2_element_numbering[element_id] = k
             push!(reserved_element_ids, k)
         else
             mesh2_element_numbering[element_id] = element_id
         end
     end
-    @debug info("element numbering for mesh 2:")
-    @debug info(mesh2_element_numbering)
 
     # create new elements
     mesh2_old_elements = mesh2["connectivity"]

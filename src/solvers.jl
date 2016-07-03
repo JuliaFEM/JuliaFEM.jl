@@ -103,6 +103,9 @@ function get_field_assembly(solver::Solver; show_info=true)
 
     M = sparse(M, solver.ndofs, solver.ndofs)
     K = sparse(K, solver.ndofs, solver.ndofs)
+    if nnz(K) == 0
+        warn("Field assembly seems to be empty. Check that elements are pushed to problem and formulation is correct.")
+    end
     Kg = sparse(Kg, solver.ndofs, solver.ndofs)
     f = sparse(f, solver.ndofs, 1)
     fg = sparse(fg, solver.ndofs, 1)
@@ -171,6 +174,14 @@ function get_boundary_assembly(solver::Solver)
     return K, C1, C2, D, f, g
 end
 
+function resize!(A::SparseMatrixCSC, m::Int64, n::Int64)
+    (n == A.n) && (m == A.m) && return
+    @assert n >= A.n
+    @assert m >= A.m
+    append!(A.colptr, A.colptr[end]*ones(Int, m-A.m))
+    A.n = n
+    A.m = m
+end
 
 """
 Given C and g, construct new basis such that v = P*u + g
@@ -448,6 +459,11 @@ function NonlinearSolver(problems...)
     if length(problems) != 0
         push!(solver, problems...)
     end
+    return solver
+end
+function NonlinearSolver(name::ASCIIString, problems::Problem...)
+    solver = NonlinearSolver(problems...)
+    solver.name = name
     return solver
 end
 

@@ -99,10 +99,8 @@ end
     bc3 = Problem(Mortar, "interface between blocks", 2, "displacement")
     push!(bc3, sel1, mel1)
 
-    solver = Solver(Nonlinear)
-    solver.properties.linear_system_solver = :DirectLinearSolver_UMFPACK
-    push!(solver, body1, body2, bc1, bc2, bc3)
-    solver()
+    solver = LinearSolver(body1, body2, bc1, bc2, bc3)
+    call(solver)
 
     u = e2("displacement", [1.0, 1.0], 0.0)
     u_expected = [-1/3, 1.0]

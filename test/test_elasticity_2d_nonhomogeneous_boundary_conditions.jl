@@ -36,7 +36,7 @@ using JuliaFEM.Test
     update!(bel3, "displacement 1", 0.0)
     push!(bc, bel1, bel2, bel3)
 
-    solver = Solver("solve block problem")
+    solver = NonlinearSolver("solve block problem")
     push!(solver, block, bc)
     call(solver)
 
@@ -49,13 +49,13 @@ using JuliaFEM.Test
     info("u3 = $u3")
     @test isapprox(u3, u3_expected, atol=1.0e-5)
 
+#= TODO: to postprocess
     info("strain")
     for ip in get_integration_points(element)
         eps = ip("strain")
         @printf "%i | %8.3f %8.3f | %8.3f %8.3f %8.3f\n" ip.id ip.coords[1] ip.coords[2] eps[1] eps[2] eps[3]
         @test isapprox(eps, eps_expected, atol=1.0e-5)
     end
-#=
     info("cauchy stress")
     for ip in get_integration_points(element)
         sig = ip("cauchy stress")

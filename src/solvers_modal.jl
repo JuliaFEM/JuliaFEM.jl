@@ -23,7 +23,12 @@ function Modal(nev=10, which=:SM)
     solver = Modal(false, Vector(), Matrix(), nev, which)
 end
 
-function call(solver::Solver{Modal}; debug=false)
+function call(solver::Solver{Modal}; show_info=true, debug=false)
+    show_info && info(repeat("-", 80))
+    show_info && info("Starting natural frequency solver")
+    show_info && info("Increment time t=$(round(solver.time, 3))")
+    show_info && info(repeat("-", 80))
+    initialize!(solver)
     # assemble all field problems
     info("Assembling problems ...")
     tic()
@@ -36,7 +41,7 @@ function call(solver::Solver{Modal}; debug=false)
     end
     t1 = round(toq(), 2)
     info("Assembled in $t1 seconds.")
-    M, K, Kg, f = get_field_assembly(solver; with_mass_matrix=true)
+    M, K, Kg, f = get_field_assembly(solver)
     Kb, C1, C2, D, fb, g = get_boundary_assembly(solver)
     K = K + Kb
     f = f + fb

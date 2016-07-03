@@ -26,6 +26,14 @@ function call(element::Element{Poi1}, ip, time, ::Type{Val{:detJ}})
     return 1.0
 end
 
+function get_integration_order(element::Poi1)
+    return 1
+end
+
+function get_integration_points(element::Poi1, order::Int64)
+    return [ (1.0, [] ) ]
+end
+
 ### 1d elements
 
 type Seg2 <: AbstractElement

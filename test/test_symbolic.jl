@@ -1,12 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-# https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/notebooks/2015-06-14-data-structures.ipynb
-
-module SymbolicFieldTests
-
 using JuliaFEM.Test
-using JuliaFEM.Core: Basis, Field, FieldSet, Expression, diff, grad
 
 
 function get_basis()
@@ -122,4 +117,3 @@ function test_evaluate_time_derivative()
     @test isapprox(eval(result), mean([1.0, 2.0, 3.0, 4.0]))
 end
 
-end

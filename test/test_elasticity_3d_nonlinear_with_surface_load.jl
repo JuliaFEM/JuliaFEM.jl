@@ -38,7 +38,7 @@ using JuliaFEM.Test
     boundary_problem = Problem(Dirichlet, "symmetry boundary conditions", 3, "displacement")
     push!(boundary_problem, symxy, symxz, symyz)
 
-    solver = Solver("solve 3d block")
+    solver = NonlinearSolver("solve 3d block")
     push!(solver, elasticity_problem)
     push!(solver, boundary_problem)
     call(solver)

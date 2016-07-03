@@ -6,16 +6,20 @@ using JuliaFEM.Preprocess
 using JuliaFEM.Test
 
 @testset "test tet4 stiffness matrix" begin
-    el = Element(Tet4)
+    el = Element(Tet4, [1, 2, 3, 4])
     el["youngs modulus"] = 96.0
     el["poissons ratio"] = 1/3
     x1 = [2.0, 3.0, 4.0]
     x2 = [6.0, 3.0, 2.0]
     x3 = [2.0, 5.0, 1.0]
     x4 = [4.0, 3.0, 6.0]
+    u1 = u2 = u3 = u4 = zeros(3)
     el["geometry"] = Vector{Float64}[x1, x2, x3, x4]
+    u = Vector{Float64}[u1, u2, u3, u4]
     pr = Problem(Elasticity, "tet4", 3)
-    Kt, f = assemble(pr, el, 0.0, Val{:continuum_linear})
+    as = Assembly()
+    assemble!(as, pr, el, 0.0)
+    Kt = full(as.K)
     Kt_expected = [
          149.0   108.0   24.0   -1.0    6.0   12.0  -54.0   -48.0    0.0  -94.0   -66.0  -36.0
          108.0   344.0   54.0  -24.0  104.0   42.0  -24.0  -216.0  -12.0  -60.0  -232.0  -84.0
@@ -36,7 +40,5 @@ using JuliaFEM.Test
         info("Kt")
         dump(Kt)
     end
-    @test isapprox(Kt, Kt_expected)
-    Kt, f = assemble(pr, el, 0.0, Val{:continuum})
     @test isapprox(Kt, Kt_expected)
 end

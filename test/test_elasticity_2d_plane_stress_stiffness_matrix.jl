@@ -13,15 +13,21 @@ using JuliaFEM.Test
         2 => [1.0, 0.0],
         3 => [1.0, 1.0],
         4 => [0.0, 1.0])
+    u = Dict{Int64, Vector{Float64}}(
+        1 => [0.0, 0.0],
+        2 => [0.0, 0.0],
+        3 => [0.0, 0.0],
+        4 => [0.0, 0.0])
     update!(element, "geometry", X)
+    update!(element, "displacement", u)
     update!(element, "youngs modulus" =>  288.0, "poissons ratio" => 1/3)
-    element["displacement load"] = DCTI([4.0, 8.0])
+    update!(element, "displacement load", DCTI([4.0, 8.0]))
 
     problem = Problem(Elasticity, "[0x1] x [0x1] block", 2)
     problem.properties.formulation = :plane_stress
     assemble!(problem, element)
     K = full(problem.assembly.K)
-    f = full(problem.assembly.f)
+    f = vec(full(problem.assembly.f))
 
     K_expected = [
         144  54 -90   0 -72 -54  18   0

@@ -32,7 +32,7 @@ using JuliaFEM.Test
     update!(bc_elements_bottom, "displacement 2", 0.0)
     push!(bc_sym, bc_elements_left..., bc_elements_bottom...)
 
-    solver = Solver("solve block problem")
+    solver = NonlinearSolver("solve block problem")
     push!(solver, block, bc_sym)
     call(solver)
 
@@ -46,6 +46,7 @@ using JuliaFEM.Test
     info("u3 = $u3")
     @test isapprox(u3, u3_expected, atol=1.0e-5)
 
+    #= TODO: Test postprocessing in separate test
     info("strain")
     for ip in get_integration_points(block.elements[1])
         eps = ip("strain")
@@ -59,5 +60,6 @@ using JuliaFEM.Test
         @printf "%i | %8.3f %8.3f | %8.3f %8.3f %8.3f\n" ip.id ip.coords[1] ip.coords[2] sig[1] sig[2] sig[3]
         #@test isapprox(sig, sig_expected)
     end
+    =#
 end
 

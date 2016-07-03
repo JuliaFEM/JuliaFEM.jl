@@ -172,3 +172,23 @@ function size(A::SparseMatrixCOO, idx::Int)
     return size(A)[idx]
 end
 
+""" Matrix norm. Automatically convert to dense when asking for 2-norm for small matrices. """
+function Base.norm(A::SparseMatrixCOO, p=Inf; maxdim=1000)
+    dim = size(A, 1)
+    if p == 2 && dim > maxdim
+        info("Assembly norm: dim = $dim > $maxdim and p=$p, not making dense matrices for operation.")
+        return 0.0
+    end
+    if p == 2
+        return norm(full(A), p)
+    else
+        return norm(sparse(A), p)
+    end
+end
+
+function isapprox(A::SparseMatrixCOO, B::SparseMatrixCOO)
+    A2 = sparse(A)
+    B2 = sparse(B, size(A2)...)
+    return isapprox(A2, B2)
+end
+

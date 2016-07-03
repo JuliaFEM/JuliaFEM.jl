@@ -7,17 +7,9 @@ This is JuliaFEM -- Finite Element Package
 module JuliaFEM
 
 importall Base
-using ForwardDiff
-using JLD
-
-#Grad = Val{:Grad}
-#detJ = Val{:detJ}
-#export Grad, detJ
-
-include("common.jl")
 
 include("fields.jl")
-export Field, DCTI, DVTI, DCTV, DVTV
+export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV
 include("types.jl")  # data types: Point, IntegrationPoint, ...
 export AbstractPoint, Point, IntegrationPoint, IP, Node
 #include("basis.jl")  # interpolation of discrete fields
@@ -26,15 +18,15 @@ export AbstractPoint, Point, IntegrationPoint, IP, Node
 ### ELEMENTS ###
 include("elements.jl") # common element routines
 export Node, AbstractElement, Element, update!, get_connectivity, get_basis, get_dbasis
-include("lagrange_macro.jl") # Continuous Galerkin (Lagrange) elements generated using macro
-include("lagrange.jl") # Continuous Galerkin (Lagrange) elements
+include("elements_lagrange_macro.jl") # Continuous Galerkin (Lagrange) elements generated using macro
+include("elements_lagrange.jl") # Continuous Galerkin (Lagrange) elements
 export get_reference_coordinates
 export Poi1,
        Seg2, Seg3,
        Tri3, Tri6, Quad4, Quad8, Quad9,
        Tet4, Tet10, Hex8, Hex20, Hex27
 
-include("nurbs.jl")
+include("elements_nurbs.jl")
 export NSeg, NSurf, NSolid, is_nurbs
 
 #include("hierarchical.jl") # P-elements
@@ -50,13 +42,13 @@ export Problem, AbstractProblem, FieldProblem, BoundaryProblem,
        get_unknown_field_dimension, get_gdofs, Assembly,
        get_parent_field_name, get_elements
 
-include("elasticity.jl")
+include("problems_elasticity.jl")
 export Elasticity
 
-include("dirichlet.jl")
+include("problems_dirichlet.jl")
 export Dirichlet
 
-include("heat.jl")
+include("problems_heat.jl")
 export Heat
 
 export assemble!, postprocess!
@@ -74,22 +66,24 @@ export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
        get_field_problems, get_boundary_problems,
        get_field_assembly, get_boundary_assembly,
        initialize!, create_projection, eliminate_interior_dofs
-include("modal.jl")
+include("solvers_modal.jl")
 export Modal
 
 include("optics.jl")
 export find_intersection, calc_reflection, calc_normal
 
 ### Mortar methods ###
-include("mortar.jl")
+include("problems_mortar.jl")
+include("problems_mortar_2d_autodiff.jl")
 export calculate_normals,
        calculate_normals!,
        project_from_slave_to_master,
        project_from_master_to_slave,
-       Mortar, get_slave_elements
+       Mortar, get_slave_elements,
+       get_polygon_clip
 
 ### Mortar methods, contact mechanics extension ###
-include("contact.jl")
+include("problems_contact.jl")
 export Contact
 
 # rest of things

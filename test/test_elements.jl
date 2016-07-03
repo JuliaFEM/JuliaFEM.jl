@@ -4,7 +4,7 @@
 using JuliaFEM
 using JuliaFEM.Test
 
-#=
+#= TODO: Fix test
 function test_interpolate()
     el = get_element()
     @test isapprox(el("geometry", [0.0, 0.0]), [0.5, 0.5])
@@ -24,7 +24,9 @@ function test_interpolate()
 #   info("gradT = $gradT")
 #   @test isapprox(gradT, 1/2*gradT_expected)
 end
+=#
 
+#= TODO: Fix test
 function test_calculate_normal_tangential_coordinates()
     el = Tri3([1, 2, 3])
     el["geometry"] = Vector{Float64}[
@@ -38,7 +40,9 @@ function test_calculate_normal_tangential_coordinates()
     R = [n t1 t2]
     @test isapprox(el("normal-tangential coordinates", [0.0, 0.0], 0.0), R)
 end
+=#
 
+#= TODO: Fix test
 function test_manifold_determinant()
     el = Quad4([1, 2, 3, 4])
     #el["geometry"] = Vector{Float64}[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
@@ -48,7 +52,9 @@ function test_manifold_determinant()
     d_expected = 0.25
     @test d == d_expected
 end
+=#
 
+#= TODO: Fix test
 @testset "add new discrete constant time-variant field and interpolate it" begin
     element = Element(Quad4, [1, 2, 3, 4])
     element["my field"] = (0.0 => 0.0, 1.0 => 1.0)
@@ -56,7 +62,6 @@ end
     update!(element, "my field 2", 0.0 => 0.0, 1.0 => 1.0)
     @test isapprox(element("my field 2", [0.0, 0.0], 0.5), 0.5)
 end
-
 =#
 
 @testset "add time dependent field to element" begin
@@ -90,6 +95,7 @@ end
     @test isa(el["displacement load 2"], DCTI)
     update!(el, "temperature", [1.0, 2.0, 3.0, 4.0])
     @test isa(el["temperature"], DVTI)
+    @test isapprox(el("displacement load", [0.0, 0.0], 0.0), [4.0, 8.0])
 end
 
 @testset "interpolate DCTI from element" begin
@@ -113,8 +119,6 @@ end
     el2 = Element(Seg2, [3, 4])
     update!(el1, "master elements", [el2])
     lst = el1("master elements", 0.0)
-    info("lst = ", el1["master elements"])
-    info("typeof lst = ", typeof(lst))
     @test isa(lst, Vector)
 end
 

@@ -1,15 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-module ElementTests
-
+using JuliaFEM
 using JuliaFEM.Test
-
-using JuliaFEM.Core: AbstractProblem, Problem
-using JuliaFEM.Core: Element, Seg2, Quad4
-using JuliaFEM.Core: IntegrationPoint, solve!, get_jacobian
-
-import JuliaFEM.Core: get_unknown_field_name, get_unknown_field_type, get_potential_energy
 
 abstract HeatProblem <: AbstractProblem
 
@@ -104,4 +97,3 @@ function test_potential_energy_method_2()
     # @test isapprox(temp, 2.93509690572300E+00)  # tested using Code Aster
 end
 
-end

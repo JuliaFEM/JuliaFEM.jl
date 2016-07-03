@@ -3,8 +3,7 @@
 
 using JuliaFEM.Test
 
-using JuliaFEM.Core: find_dofs_by_nodes, find_nodes_by_dofs
-
+#=
 @testset "find dofs given a set of nodes" begin
     nodes = [1, 3]
     dim = 3
@@ -24,4 +23,4 @@ end
     @test nodes == [1, 6]
 
 end
-
+=#

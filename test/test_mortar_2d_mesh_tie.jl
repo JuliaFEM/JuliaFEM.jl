@@ -47,7 +47,7 @@ end
     p2.properties.formulation = :plane_stress
     p4.properties.adjust = true
     p4.properties.rotate_normals = false
-    solver = Solver(Nonlinear)
+    solver = Solver(Linear)
     push!(solver, p1, p2, p3, p4)
     call(solver)
     el5 = p4.elements[1]
@@ -61,10 +61,12 @@ end
     mesh = aster_read_mesh(meshfile)
 
     upper = Problem(Heat, "upper", 1)
+    upper.properties.formulation = "2D"
     upper.elements = create_elements(mesh, "UPPER")
     update!(upper.elements, "temperature thermal conductivity", 1.0)
 
     lower = Problem(Heat, "lower", 1)
+    lower.properties.formulation = "2D"
     lower.elements = create_elements(mesh, "LOWER")
     update!(lower.elements, "temperature thermal conductivity", 1.0)
 
@@ -82,9 +84,22 @@ end
     update!(interface_slave_elements, "master elements", interface_master_elements)
     interface.elements = [interface_master_elements; interface_slave_elements]
 
-    solver = Solver()
+    solver = Solver(Linear)
     push!(solver, upper, lower, bc_upper, bc_lower, interface)
     call(solver)
+
+    interface_norm = norm(interface.assembly)
+    # for bi-orthogonal:
+    #interface_norm_expected = [0.0, 0.0, 0.0, 0.0, 0.0, 0.44870723441585775, 0.44870723441585775, 0.0, 0.0, 0.0]
+    interface_norm_expected = [0.0, 0.0, 0.0, 0.0, 0.0, 0.39361633468943247, 0.39361633468943247, 0.0, 0.0, 0.0]
+    info("Interface norm:          $interface_norm")
+    info("Interface norm expected: $interface_norm_expected")
+    @test isapprox(interface_norm, interface_norm_expected)
+
+    T_upper = first(bc_upper.elements)("temperature", [0.0], 0.0)
+    T_lower = first(bc_lower.elements)("temperature", [0.0], 0.0)
+    T_middle = first(interface.elements)("temperature", [0.0], 0.0)
+    info("T upper: $T_upper, T lower: $T_lower, T interface: $T_middle")
 
     node_ids, temperature = get_nodal_vector(interface.elements, "temperature", 0.0)
     T = [t[1] for t in temperature]
@@ -158,7 +173,7 @@ function JuliaFEM.get_model(::Type{Val{Symbol("splitted block, plane stress elas
     update!(interface_slave_elements, "master elements", interface_master_elements)
     interface.elements = [interface_master_elements; interface_slave_elements]
 
-    solver = Solver(Nonlinear)
+    solver = Solver(Linear)
     push!(solver, upper, lower, bc_upper, bc_lower, interface, bc_corner)
 
     return solver
@@ -169,7 +184,6 @@ end
     solver = get_model("splitted block, plane stress elasticity and mesh tie")
     upper, lower, bc_upper, bc_lower, interface = solver.problems
     call(solver)
-    @test solver.properties.iteration == 2
     slave_elements = get_slave_elements(interface)
     node_ids, la = get_nodal_vector(slave_elements, "reaction force", 0.0)
     for lai in la
@@ -224,7 +238,7 @@ function JuliaFEM.get_model(::Type{Val{Symbol("mesh tie with curved 2d block")}}
     interface.properties.dual_basis = dual_basis
     interface.properties.use_forwarddiff = use_forwarddiff
 
-    solver = Solver(Nonlinear)
+    solver = Solver(Linear)
     push!(solver, upper, lower, bc_upper, bc_lower, interface)
 
     return solver
@@ -238,7 +252,6 @@ end
         dual_basis=false)
     call(solver)
     interface = solver["interface between upper and lower block"]
-    @test solver.properties.iteration == 2
     @test isapprox(norm(interface.assembly.u), 0.11339715157447851)
 end
 
@@ -249,8 +262,6 @@ end
         dual_basis=true)
     call(solver)
     interface = solver["interface between upper and lower block"]
-    @test solver.properties.iteration == 2
-    # differs -- why?
     @test isapprox(norm(interface.assembly.u), 0.11660422877751599)
 end
 
@@ -261,7 +272,6 @@ end
         dual_basis=false)
     call(solver)
     interface = solver["interface between upper and lower block"]
-    @test solver.properties.iteration == 2
     @test isapprox(norm(interface.assembly.u), 0.34230262165505887)
 end
 
@@ -272,6 +282,6 @@ end
         dual_basis=true)
     call(solver)
     interface = solver["interface between upper and lower block"]
-    @test solver.properties.iteration == 2
     @test isapprox(norm(interface.assembly.u), 0.34318800698017704)
 end
+

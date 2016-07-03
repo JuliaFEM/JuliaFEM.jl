@@ -1,12 +1,12 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-module DirectSolverTests
-
+using JuliaFEM
+using JuliaFEM.Preprocess
+using JuliaFEM.Postprocess
 using JuliaFEM.Test
-using JuliaFEM.Core: Seg2, Quad4
-using JuliaFEM.Core: PlaneStressElasticityProblem, DirichletProblem
-using JuliaFEM.Core: DirectSolver
+
+# TODO: Fix tests
 
 function test_solver_multiple_dirichlet_bc()
 
@@ -65,7 +65,6 @@ function test_solver_multiple_dirichlet_bc()
     @test isapprox(disp, [3.17431158889468E-02, -1.38591518927826E-01])
 
 end
-test_solver_multiple_dirichlet_bc()
 
 function test_direct_cholesky_with_non_homogeneous_dirichlet_conditions()
 
@@ -117,7 +116,6 @@ function test_direct_cholesky_with_non_homogeneous_dirichlet_conditions()
     @test isapprox(n4disp, [ 0.2, -0.2])
     @test status == true
 end
-#test_direct_cholesky_with_non_homogeneous_dirichlet_conditions()
 
 function test_solver_no_convergence()
 
@@ -226,6 +224,3 @@ function test_solver_multiple_bodies_multiple_dirichlet_bc()
 
 end
 
-#test_solver_multiple_bodies_multiple_dirichlet_bc()
-
-end

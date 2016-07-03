@@ -6,7 +6,7 @@ using JuliaFEM.Preprocess
 using JuliaFEM.Test
 
 @testset "test tet10 stiffness matrix" begin
-    el = Element(Tet10)
+    el = Element(Tet10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     el["youngs modulus"] = 480.0
     el["poissons ratio"] = 1/3
     x1 = [2.0, 3.0, 4.0]
@@ -19,9 +19,19 @@ using JuliaFEM.Test
     x8 = 0.5*(x1+x4)
     x9 = 0.5*(x2+x4)
     x10 = 0.5*(x3+x4)
-    el["geometry"] = Vector{Float64}[x1, x2, x3, x4, x5, x6, x7, x8, x9, x10]
+    X = Dict{Int64, Vector{Float64}}(
+        1 => x1, 2 => x2, 3 => x3, 4 => x4, 5 => x5,
+        6 => x6, 7 => x7, 8 => x8, 9 => x9, 10 => x10)
+    u = Dict{Int64, Vector{Float64}}()
+    for i=1:10
+        u[i] = [0.0, 0.0, 0.0]
+    end
+    update!(el, "geometry", X)
+    update!(el, "displacement", u)
     pr = Problem(Elasticity, "tet10", 3)
-    Kt, f = assemble(pr, el, 0.0, Val{:continuum_linear})
+    ass = Assembly()
+    assemble!(ass, pr, el, 0.0)
+    Kt = full(ass.K)
     eigs = real(eigvals(Kt))
     eigs_expected = [8809.45, 4936.01, 2880.56, 2491.66, 2004.85,
                      1632.49, 1264.32, 1212.42, 817.905,

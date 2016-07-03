@@ -1,17 +1,10 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-module TypesTests
-
+using JuliaFEM
 using JuliaFEM.Test
 
-using JuliaFEM.Core: Field, FieldSet
-
-function test_foo()
-    @test 1+1 == 2
-end
-
-#= to be fixed
+#= TODO: Fix test
 
 facts("test interpolation of fields") do
 
@@ -76,5 +69,3 @@ facts("test interpolation of fields") do
 end
 
 =#
-
-end
