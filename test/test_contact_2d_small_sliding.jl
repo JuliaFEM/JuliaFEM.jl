@@ -45,7 +45,6 @@ function get_model(::Type{Val{Symbol("curved 2d contact small sliding")}})
     interface_master_elements = create_elements(mesh, "UPPER_BOTTOM")
     update!(interface_slave_elements, "master elements", interface_master_elements)
     interface.elements = [interface_master_elements; interface_slave_elements]
-    info("type of list is ", typeof(first(interface_slave_elements)("master elements", 0.0)))
 
     solver = Solver(Nonlinear)
     push!(solver, upper, lower, bc_upper, bc_lower, interface)
@@ -70,7 +69,7 @@ end
 function get_model(::Type{Val{Symbol("hertz contact, full 2d model")}})
     # from fenet d3613 advanced finite element contact benchmarks
     # a = 6.21 mm, pmax = 3585 MPa
-    # this is a very dense mesh and for that reason pmax is not very
+    # this is a very sparse mesh and for that reason pmax is not very
     # (only 6 elements in -20 .. 20 mm contact zone, 3 elements in contact
     # instead integrate pressure in normal and tangential direction
     mesh = get_mesh("hertz contact, full 2d model")
