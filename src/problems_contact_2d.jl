@@ -3,7 +3,16 @@
 
 typealias ContactElements2D Union{Seg2}
 
-""" Frictionless 2d small sliding contact without forwarddiff. """
+"""
+Frictionless 2d small sliding contact without forwarddiff.
+
+problem
+time
+dimension
+finite_sliding
+friction
+use_forwarddiff
+"""
 function assemble!(problem::Problem{Contact}, time::Float64,
                    ::Type{Val{1}}, ::Type{Val{false}},
                    ::Type{Val{false}}, ::Type{Val{false}}; debug=false)
@@ -23,11 +32,11 @@ function assemble!(problem::Problem{Contact}, time::Float64,
     for slave_element in slave_elements
 
         nsl = length(slave_element)
-        X1 = slave_element["geometry"](time)
-        u1 = slave_element["displacement"](time)
-        la1 = slave_element["reaction force"](time)
-        n1 = slave_element["normal"](time)
-        t1 = slave_element["tangent"](time)
+        X1 = slave_element("geometry", time)
+        u1 = slave_element("displacement", time)
+        la1 = slave_element("reaction force", time)
+        n1 = slave_element("normal", time)
+        t1 = slave_element("tangent", time)
         x1 = X1 + u1
         Q1_ = [n1[1] t1[1]]
         Q2_ = [n1[2] t1[2]]
@@ -38,7 +47,7 @@ function assemble!(problem::Problem{Contact}, time::Float64,
 
         if "element area" in props.store_fields
             element_area = 0.0
-            for ip in get_integration_points(slave_element, 3)
+            for ip in get_integration_points(slave_element)
                 detJ = slave_element(ip, time, Val{:detJ})
                 w = ip.weight*detJ
                 element_area += w
@@ -242,7 +251,5 @@ function assemble!(problem::Problem{Contact}, time::Float64,
     problem.assembly.C2 = C2
     problem.assembly.D = D
     problem.assembly.g = g
-
-    return
 
 end
