@@ -142,57 +142,55 @@ end
 
 ### Accessing and manipulating discrete fields
 
-function Base.getindex(field::DVTV, i::Int64)
+function getindex(field::DVTV, i::Int64)
     return field.data[i]
 end
 
-function Base.push!(field::DCTV, data::Pair)
+function push!(field::DCTV, data::Pair)
     push!(field.data, data)
 end
 
-function Base.push!(field::DVTV, data::Pair)
-#    info("field.data = \n$(field.data)")
-#    info("data = \n$data")
+function push!(field::DVTV, data::Pair)
     push!(field.data, data)
 end
 
-function Base.getindex(field::DVTV, i::Int64)
+function getindex(field::DVTV, i::Int64)
     return field.data[i]
 end
 
-function Base.getindex(field::DVTI, i::Int64)
+function getindex(field::DVTI, i::Int64)
     return field.data[i]
 end
 
-function Base.getindex(field::DCTV, i::Int64)
+function getindex(field::DCTV, i::Int64)
     return field.data[i]
 end
 
-function Base.getindex(field::Field, i::Int64)
+function getindex(field::Field, i::Int64)
     return field.data[i]
 end
 
-function Base.length(field::DVTI)
+function length(field::DVTI)
     return length(field.data)
 end
 
-function Base.length(field::DCTI)
+function length(field::DCTI)
     return 1
 end
 
-function Base.length(field::DVTV)
+function length(field::DVTV)
     return length(field.data)
 end
 
-function Base.length(field::DCTV)
+function length(field::DCTV)
     return length(field.data)
 end
 
-function Base.first(field::Union{DCTV, DVTV})
+function first(field::Union{DCTV, DVTV})
     return field[1]
 end
 
-function Base.isapprox(f1::DCTI, f2::DCTI)
+function isapprox(f1::DCTI, f2::DCTI)
     isapprox(f1.data, f2.data)
 end
 
@@ -236,8 +234,7 @@ function vec(field::DVTI)
 end
 
 function vec(field::DCTV)
-    info("trying to vectorize $field")
-    error("does not make sense")
+    error("trying to vectorize $field does not make sense")
 end
 
 function endof(field::Field)
@@ -321,21 +318,21 @@ end
 ### Interpolation
 
 """ Interpolate time-invariant field in time direction. """
-function Base.call(field::DVTI, time::Float64)
+function call(field::DVTI, time::Float64)
     return field
 end
-function Base.call(field::DCTI, time::Float64)
+function call(field::DCTI, time::Float64)
     return field
 end
-function Base.call(field::CVTI, time::Float64)
+function call(field::CVTI, time::Float64)
     return field.data()
 end
-function Base.call(field::CCTI, time::Float64)
+function call(field::CCTI, time::Float64)
     return field.data()
 end
 
 """ Interpolate constant time-variant field in time direction. """
-function Base.call(field::DCTV, time::Real)
+function call(field::DCTV, time::Real)
     time < first(field).time && return DCTI(first(field).data)
     time > last(field).time && return DCTI(last(field).data)
     for i=reverse(1:length(field))
@@ -355,7 +352,7 @@ function Base.call(field::DCTV, time::Real)
     error("interpolate DCTV: unknown failure when interpolating $(field.data) for time $time")
 end
 
-function Base.call(field::DVTV, time::Float64)
+function call(field::DVTV, time::Float64)
     time < first(field).time && return DVTI(first(field).data)
     time > last(field).time && return DVTI(last(field).data)
     for i=reverse(1:length(field))
@@ -376,17 +373,17 @@ function Base.call(field::DVTV, time::Float64)
 end
 
 """ Interpolate constant field in spatial dimension. """
-function Base.call(basis::CVTI, field::DCTI, xi::Vector)
+function call(basis::CVTI, field::DCTI, xi::Vector)
     return field.data
 end
 
 """ Interpolate variable field in spatial dimension. """
-function Base.call(basis::CVTI, values::DVTI, xi::Vector)
+function call(basis::CVTI, values::DVTI, xi::Vector)
     N = basis(xi)
     return sum([N[i]*values[i] for i=1:length(N)])
 end
 
-function Base.call(basis::CVTI, geometry::DVTI, xi::Vector, ::Type{Val{:grad}})
+function call(basis::CVTI, geometry::DVTI, xi::Vector, ::Type{Val{:grad}})
     dbasis = basis(xi, Val{:grad})
 #    J = sum([dbasis[:,i]*geometry[i]' for i=1:length(geometry)])
     J = sum([kron(dbasis[:,i], geometry[i]') for i=1:length(geometry)])
@@ -395,14 +392,14 @@ function Base.call(basis::CVTI, geometry::DVTI, xi::Vector, ::Type{Val{:grad}})
     return grad
 end
 
-function Base.call(basis::CVTI, geometry::DVTI, values::DVTI, xi::Vector, ::Type{Val{:grad}})
+function call(basis::CVTI, geometry::DVTI, values::DVTI, xi::Vector, ::Type{Val{:grad}})
     grad = call(basis, geometry, xi, Val{:grad})
 #    gradf = sum([grad[:,i]*values[i]' for i=1:length(geometry)])'
     gradf = sum([kron(grad[:,i], values[i]') for i=1:length(values)])'
     return length(gradf) == 1 ? gradf[1] : gradf
 end
 
-function Base.call(basis::CVTI, xi::Vector, time::Number)
+function call(basis::CVTI, xi::Vector, time::Number)
     call(basis, xi)
 end
 
@@ -413,3 +410,4 @@ end
 ### FIELDSET ###
 
 typealias FieldSet Dict{ASCIIString, Field}
+

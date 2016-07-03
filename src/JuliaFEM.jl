@@ -27,33 +27,17 @@ export AbstractPoint, Point, IntegrationPoint, IP, Node
 include("elements.jl") # common element routines
 export Node, AbstractElement, Element, update!, get_connectivity, get_basis, get_dbasis
 include("lagrange_macro.jl") # Continuous Galerkin (Lagrange) elements generated using macro
+include("lagrange.jl") # Continuous Galerkin (Lagrange) elements
+export get_reference_coordinates
+export Poi1,
+       Seg2, Seg3,
+       Tri3, Tri6, Quad4, Quad8, Quad9,
+       Tet4, Tet10, Hex8, Hex20, Hex27
 
-type Poi1 <: AbstractElement
-end
-
-function size(element::Element{Poi1})
-    return (0, 1)
-end
-
-function length(element::Element{Poi1})
-    return 1
-end
-
-function get_basis(element::Element{Poi1}, ip, time)
-    return [1]
-end
-
-function call(element::Element{Poi1}, ip, time, ::Type{Val{:detJ}})
-    return 1.0
-end
-
-export Poi1, Seg2, Seg3, Tri3, Tri6, Quad4, Hex8, Tet4, Tet10
 include("nurbs.jl")
 export NSeg, NSurf, NSolid, is_nurbs
 
 #include("hierarchical.jl") # P-elements
-#include("mortar_elements.jl") # Mortar elements
-#include("equations.jl")
 
 include("integrate.jl")  # default integration points for elements
 export get_integration_points
@@ -66,7 +50,7 @@ export Problem, AbstractProblem, FieldProblem, BoundaryProblem,
        get_unknown_field_dimension, get_gdofs, Assembly,
        get_parent_field_name, get_elements
 
-include("elasticity.jl") # elasticity equations
+include("elasticity.jl")
 export Elasticity
 
 include("dirichlet.jl")
@@ -75,7 +59,7 @@ export Dirichlet
 include("heat.jl")
 export Heat
 
-export assemble, assemble!
+export assemble!, postprocess!
 
 function assemble!(problem::Problem, element::Element, time=0.0)
     assemble!(problem.assembly, problem, element, time)
@@ -89,7 +73,7 @@ export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
        get_unknown_field_name, get_formulation_type,
        get_field_problems, get_boundary_problems,
        get_field_assembly, get_boundary_assembly,
-       initialize!, create_projection
+       initialize!, create_projection, eliminate_interior_dofs
 include("modal.jl")
 export Modal
 
@@ -124,9 +108,11 @@ export create_elements, Mesh,
        add_element!, add_elements!,
        add_element_to_element_set!,
        add_node_to_node_set!,
-       find_nearest_nodes
+       find_nearest_nodes,
+       reorder_element_connectivity!
 include("preprocess_abaqus_reader.jl")
 include("preprocess_abaqus_reader_old.jl")
+export parse_abaqus, parse_section, parse_element_section
 include("preprocess_aster_reader.jl")
 export aster_create_elements, parse_aster_med_file, is_aster_mail_keyword,
        parse_aster_header, aster_parse_nodes, aster_renumber_nodes!,
@@ -146,10 +132,14 @@ export get_mesh, get_model
 
 module Postprocess
 include("postprocess_utils.jl")
-export calc_nodal_values!, get_nodal_vector, copy_field!
+export calc_nodal_values!, 
+       get_nodal_vector,
+       get_nodal_dict,
+       copy_field!
 include("postprocess_xdmf.jl")
 export XDMF, xdmf_new_result!, xdmf_save_field!, xdmf_save!
 end
+export Postprocessor
 
 """ JuliaFEM testing routines. """
 module Test
@@ -170,6 +160,5 @@ end
 module Interfaces
 include("interfaces.jl")
 end
-
 
 end # module

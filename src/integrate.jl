@@ -67,8 +67,8 @@ end
 ### 1d elements
 
 typealias CartesianLineElement Union{Seg2, Seg3, NSeg}
-typealias CartesianSurfaceElement Union{Quad4, NSurf}
-typealias CartesianVolumeElement Union{Hex8, NSolid}
+typealias CartesianSurfaceElement Union{Quad4, Quad8, Quad9, NSurf}
+typealias CartesianVolumeElement Union{Hex8, Hex20, Hex27, NSolid}
 
 function get_integration_points(element::CartesianLineElement, order::Int64)
     w, xi = get_integration_points(order)
@@ -238,7 +238,7 @@ end
 
 typealias LinearElement Union{Seg2, Tri3, Quad4, Tet4, Hex8}
 
-typealias QuadraticElement Union{Seg3, Tri6, Tet10}
+typealias QuadraticElement Union{Seg3, Tri6, Tet10, Quad8, Quad9, Hex20, Hex27}
 
 function get_integration_order(element::LinearElement)
     return 2

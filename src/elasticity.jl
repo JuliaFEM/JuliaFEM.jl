@@ -1,8 +1,36 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-""" Elasticity problem
+""" Elasticity equations.
 
+Field equation is:
+    
+    m∂²u/∂t² = ∇⋅σ - b
+
+Weak form is: find u∈U such that ∀v in V
+
+    δW := ∫ρ₀∂²u/∂t²⋅δu dV₀ + ∫S:δE dV₀ - ∫b₀⋅δu dV₀ - ∫t₀⋅δu dA₀ = 0
+
+where
+
+    ρ₀ = density
+    b₀ = displacement load
+    t₀ = displacement traction
+
+Formulations
+------------
+plane stress, plane strain, 3D
+
+References
+----------
+
+https://en.wikipedia.org/wiki/Linear_elasticity
+https://en.wikipedia.org/wiki/Finite_strain_theory
+https://en.wikipedia.org/wiki/Stress_measures
+https://en.wikipedia.org/wiki/Mooney%E2%80%93Rivlin_solid
+https://en.wikipedia.org/wiki/Strain_energy_density_function
+https://en.wikipedia.org/wiki/Plane_stress
+https://en.wikipedia.org/wiki/Hooke's_law
 
 """
 type Elasticity <: FieldProblem
@@ -38,8 +66,14 @@ function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::El
     add!(assembly.f, gdofs, f)
 end
 
+typealias Elasticity2DSurfaceElements Union{Poi1, Seg2, Seg3}
+typealias Elasticity2DVolumeElements Union{Tri3, Tri6, Quad4, Quad8, Quad9}
+typealias Elasticity3DSurfaceElements Union{Poi1, Tri3, Tri6, Quad4, Quad8, Quad9}
+typealias Elasticity3DVolumeElements Union{Tet4, Tet10, Hex8, Hex20, Hex27}
+
+
 """ Elasticity equations for 2d cases. """
-function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, element::Element{El}, time, ::Type{Val{:plane}})
+function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, element::Element{El}, time, ::Type{Val{:plane}})
 
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
@@ -162,7 +196,7 @@ function assemble{El<:Union{Tri3,Tri6,Quad4}}(problem::Problem{Elasticity}, elem
     return Km, Kg, f
 end
 
-function assemble{El<:Union{Poi1,Seg2,Seg3}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:plane}})
+function assemble{El<:Elasticity2DSurfaceElements}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:plane}})
 
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
@@ -203,7 +237,7 @@ function assemble{El<:Union{Poi1,Seg2,Seg3}}(problem::Problem{Elasticity}, eleme
 end
 
 """ Elasticity equations, 3d, linear. """
-function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum_linear}})
+function assemble{El<:Elasticity3DVolumeElements}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum_linear}})
 
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
@@ -270,7 +304,7 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
 end
 
 """ Material and geometric stiffness for linear buckling analysis. """
-function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum_buckling}})
+function assemble{El<:Elasticity3DVolumeElements}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum_buckling}})
 
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
@@ -348,7 +382,7 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
 end
 
 """ Elasticity equations, 3d nonlinear. """
-function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum}})
+function assemble{El<:Elasticity3DVolumeElements}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum}})
 
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
@@ -487,7 +521,7 @@ function assemble{El<:Union{Tet4, Tet10, Hex8}}(problem::Problem{Elasticity}, el
 end
 
 """ Elasticity equations, surface traction for continuum formulation. """
-function assemble{El<:Union{Tri3, Tri6, Quad4}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum}})
+function assemble{El<:Elasticity3DSurfaceElements}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum}})
 
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
@@ -521,39 +555,11 @@ function assemble{El<:Union{Tri3, Tri6, Quad4}}(problem::Problem{Elasticity}, el
     return Km, Kg, f
 end
 
-function assemble{El<:Union{Tri3, Tri6, Quad4}}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum_linear}})
+function assemble{El<:Elasticity3DSurfaceElements}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum_linear}})
     return assemble(problem, element, time, Val{:continuum})
 end
 
 """ Elasticity equations using ForwardDiff
-
-Formulation
------------
-
-Field equation is:
-∂u/∂t = ∇⋅f - b
-
-Weak form is: find u∈U such that ∀v in V
-
-    δW := ∫ρ₀∂²u/∂t²⋅δu dV₀ + ∫S:δE dV₀ - ∫b₀⋅δu dV₀ - ∫t₀⋅δu dA₀ = 0
-
-where
-
-    ρ₀ = density
-    b₀ = displacement load
-    t₀ = displacement traction
-
-References
-----------
-
-https://en.wikipedia.org/wiki/Linear_elasticity
-https://en.wikipedia.org/wiki/Finite_strain_theory
-https://en.wikipedia.org/wiki/Stress_measures
-https://en.wikipedia.org/wiki/Mooney%E2%80%93Rivlin_solid
-https://en.wikipedia.org/wiki/Strain_energy_density_function
-https://en.wikipedia.org/wiki/Plane_stress
-https://en.wikipedia.org/wiki/Hooke's_law
-
 """
 function assemble(problem::Problem{Elasticity}, element::Element, time::Real, ::Type{Val{:forwarddiff}})
 
