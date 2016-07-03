@@ -86,6 +86,7 @@ export calculate_normals,
 
 ### Mortar methods, contact mechanics extension ###
 include("problems_contact.jl")
+include("problems_contact_2d.jl")
 export Contact
 
 module API
