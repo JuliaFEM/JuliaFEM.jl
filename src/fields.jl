@@ -10,9 +10,12 @@ abstract Variable <: AbstractField
 abstract TimeVariant <: AbstractField
 abstract TimeInvariant <: AbstractField
 
+
 type Field{A<:Union{Discrete,Continuous}, B<:Union{Constant,Variable}, C<:Union{TimeVariant,TimeInvariant}}
     data
 end
+
+typealias FieldSet Dict{ASCIIString, Field}
 
 ### Basic data structure for discrete field
 
@@ -210,20 +213,20 @@ function Base.(:-)(f1::DVTI, f2::DVTI)
     return DVTI(f1.data - f2.data)
 end
 
-""" Multiply DCTI field with a constant ``c``. """
 function Base.(:*){T<:Real}(c::T, field::DVTI)
     return DVTI(c*field.data)
 end
 
-""" Interpolate with basis functions. """
 function Base.(:*)(N::Matrix, f::DCTI)
     return f.data*N'
 end
 
-""" Multiply DVTI field with another vector T. Vector length
-must match to the field length and this can be used mainly
-for interpolation purposes, i.e., u = ∑ Nᵢuᵢ
-"""
+
+#  
+#   Multiply DVTI field with another vector T. Vector length
+#   must match to the field length and this can be used mainly
+#   for interpolation purposes, i.e., u = ∑ Nᵢuᵢ
+#  
 function Base.(:*)(T::Vector, f::DVTI)
     @assert length(T) == length(f)
     return sum([T[i]*f[i] for i=1:length(f)])
@@ -406,8 +409,4 @@ end
 function Base.(:*)(grad::Matrix, field::DVTI)
     return sum([kron(grad[:,i], field[i]') for i=1:length(field)])'
 end
-
-### FIELDSET ###
-
-typealias FieldSet Dict{ASCIIString, Field}
 
