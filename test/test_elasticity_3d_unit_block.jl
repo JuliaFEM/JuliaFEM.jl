@@ -7,7 +7,7 @@ using JuliaFEM.Postprocess
 using JuliaFEM.Test
 
 function calc_model(mesh_name; with_volume_load=false, debug_print=false)
-    meshfile = Pkg.dir("JuliaFEM")*"/geometry/3d_blocks/BLOCK.med"
+    meshfile = Pkg.dir("JuliaFEM")*"/test/testdata/3d_block.med"
     mesh = aster_read_mesh(meshfile, mesh_name)
 
     block = Problem(Elasticity, "BLOCK", 3)
