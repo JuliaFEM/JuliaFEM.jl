@@ -108,3 +108,13 @@ end
     @test isapprox(el("foo1", 1.5), el("foo2", 1.5))
 end
 
+@testset "add elements to elements" begin
+    el1 = Element(Seg2, [1, 2])
+    el2 = Element(Seg2, [3, 4])
+    update!(el1, "master elements", [el2])
+    lst = el1("master elements", 0.0)
+    info("lst = ", el1["master elements"])
+    info("typeof lst = ", typeof(lst))
+    @test isa(lst, Vector)
+end
+
