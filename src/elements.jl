@@ -41,7 +41,7 @@ function last(element::Element, field_name::ASCIIString)
     return last(element[field_name])
 end
 
-function call(element::Element, ip, time)
+function call(element::Element, ip, time=0.0)
     return get_basis(element, ip, time)
 end
 
@@ -75,8 +75,17 @@ function call(element::Element, field_name::ASCIIString, ip, time, ::Type{Val{:G
     return element(ip, time, Val{:Grad})*element[field_name](time)
 end
 
+function call(element::Element, field::Field, time)
+    return field(time)
+end
+
+function call(element::Element, field::DCTI, time)
+    return field.data
+end
+
 function call(element::Element, field_name::ASCIIString, time)
-    return element[field_name](time)
+    field = element[field_name]
+    return call(element, field, time)
 end
 
 function call(element::Element, field_name::ASCIIString, ip, time::Float64)
@@ -220,6 +229,7 @@ function update!(elements::Vector, field_name::ASCIIString, data)
     end
 end
 
+#=
 dbasis_cache = ForwardDiff.jacobian
 """ Evaluate partial derivatives of basis functions using ForwardDiff. """
 function get_dbasis(element::Element, ip, time)
@@ -227,6 +237,7 @@ function get_dbasis(element::Element, ip, time)
     basis(xi) = vec(get_basis(element, xi, time))
     return ForwardDiff.jacobian(basis, xi)'
 end
+=#
 
 """ Check existence of field. """
 function haskey(element::Element, field_name)

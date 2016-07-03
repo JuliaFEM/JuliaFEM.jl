@@ -1,6 +1,17 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+#=
+- read meshes from different formats
+- reorder connectivity, create element sets, node sets, ...
+- create partitions for parallel runs
+- renumber elements / nodes
+- maybe precheck for bad elements
+- check surface normal direction in boundary elements
+- orientation of 2d elements
+- etc only topology related stuff
+=#
+
 importall Base
 
 using JuliaFEM
@@ -88,8 +99,25 @@ function create_elements(mesh::Mesh)
     return elements
 end
 
-function create_elements(mesh::Mesh, element_set::ASCIIString)
-    return create_elements(filter_by_element_set(mesh, element_set))
+function create_elements(mesh::Mesh, element_sets::ASCIIString...)
+    elements = Element[]
+    for element_set in element_sets
+        new_elements = create_elements(filter_by_element_set(mesh, element_set))
+        push!(elements, new_elements...)
+    end
+    return elements
+end
+
+function create_elements(mesh::Mesh, element_type::Symbol)
+    elements = Element[]
+    for (elid, elcon) in mesh.elements
+        eltype = mesh.element_types[elid]
+        eltype == element_type || continue
+        element = Element(JuliaFEM.(eltype), elcon)
+        update!(element, "geometry", mesh.nodes)
+        push!(elements, element)
+    end
+    return elements
 end
 
 """ find npts nearest nodes form mesh and return id numbers as list. """
@@ -102,5 +130,40 @@ function find_nearest_nodes(mesh::Mesh, coords::Vector, npts=1)
     nd = s[1:npts] # [(id1, dist1), (id2, dist2), ..., (id_npts, dist_npts)]
     node_ids = [n[1] for n in nd]
     return node_ids
+end
+
+"""
+Apply new node ordering to elements. In JuliaFEM same node ordering is used
+than in ABAQUS and if mesh is parsed from FEM format with other node ordering
+this can be used to reorder nodes.
+
+Parameters
+----------
+mapping :: Dict{Symbol, Vector{Int}}
+    e.g. :Tet10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+"""
+function reorder_element_connectivity!(mesh::Mesh, mapping::Dict{Symbol, Vector{Int}})
+    for (elid, eltype) in mesh.element_types
+        haskey(mapping, eltype) || continue
+        new_order = mapping[eltype]
+        element_connectivity = mesh.elements[elid]
+        new_element_connectivity = element_connectivity[new_order]
+        mesh.elements[elid] = new_element_connectivity
+    end
+end
+
+"""
+Swap surface element connectivity s.t. normals point outward
+"""
+function check_orientation!
+    # TODO
+end
+
+"""
+Partition model using METIS
+"""
+function partition_model!
+    # TODO
 end
 

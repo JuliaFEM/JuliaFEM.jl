@@ -96,11 +96,11 @@ function assemble!(problem::Problem{Contact}, time::Float64,
         end
 
         # 3. loop all master elements
-        for master_element in slave_element["master elements"](time)
+        for master_element in slave_element("master elements", time)
 
             nm = length(master_element)
-            X2 = master_element["geometry"](time)
-            u2 = master_element["displacement"](time)
+            X2 = master_element("geometry", time)
+            u2 = master_element("displacement", time)
             x2 = X2 + u2
 
             norm(mean(X1) - X2[1]) / norm(X1[2] - X1[1]) < props.distval || continue

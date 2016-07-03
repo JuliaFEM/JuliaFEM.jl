@@ -207,11 +207,11 @@ conditions are first eliminated before solution.
 """
 function solve!(K, C1, C2, D, f, g, u, la, ::Type{Val{1}}; F=nothing, debug=false)
 
-    nnz(D) == 0 || return false
+    nnz(D) == 0 || return F, false
     nz = get_nonzero_rows(C2)
     B = get_nonzero_rows(C2')
     # C2^-1 exists or this doesn't work
-    length(nz) == length(B) || return false
+    length(nz) == length(B) || return F, false
 
     A = get_nonzero_rows(K)
     I = setdiff(A, B)
@@ -227,8 +227,7 @@ function solve!(K, C1, C2, D, f, g, u, la, ::Type{Val{1}}; F=nothing, debug=fals
     try
         u[B] = lufact(C2[nz,B]) \ full(g[nz])
     catch
-        info("solver #1 failed to solve boundary dofs (you should not see this message).")
-        return false
+        error("solver #1 failed to solve boundary dofs (you should not see this message).")
     end
 
     # solve interior domain using LDLt factorization
@@ -296,9 +295,7 @@ function solve_linear_system(solver::Solver; F=nothing, empty_assemblies_before_
     i = 0
     for i in [1, 2]
         F, status = solve!(K, C1, C2, D, f, g, u, la, Val{i}; F=F)
-        if status
-            break
-        end
+        status && break
     end
     status || error("Failed to solve linear system!")
 
@@ -467,11 +464,6 @@ Main differences in this solver, compared to nonlinear solver are:
 
 """
 type Linear <: AbstractSolver
-    norms :: Vector{Tuple}
-end
-
-function Linear()
-    solver = Linear([])
 end
 
 function assemble!(solver::Solver{Linear}; show_info=true)
@@ -525,4 +517,67 @@ function LinearSolver(name::ASCIIString, problems::Problem...)
 end
 
 ### End of linear quasistatic solver
+
+### Postprocessor
+
+type Postprocessor <: AbstractSolver
+    assembly :: Assembly
+    F :: Union{Factorization, Void}
+end
+
+function Postprocessor()
+    Postprocessor(Assembly(), nothing)
+end
+
+function assemble!(solver::Solver{Postprocessor}; show_info=true)
+    show_info && info("Assembling problems ...")
+    tic()
+    nproblems = 0
+    ndofs = 0
+    assembly = solver.properties.assembly
+    empty!(assembly)
+    for problem in get_problems(solver)
+        for element in get_elements(problem)
+            postprocess!(assembly, problem, element, solver.time)
+        end
+        nproblems += 1
+        ndofs = max(ndofs, size(problem.assembly.K, 2))
+    end
+    solver.ndofs = ndofs
+    t1 = round(toq(), 2)
+    show_info && info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
+end
+
+function call(solver::Solver{Postprocessor}; show_info=true)
+    t0 = Base.time()
+    show_info && info(repeat("-", 80))
+    show_info && info("Starting postprocessor")
+    show_info && info("Increment time t=$(round(solver.time, 3))")
+    show_info && info(repeat("-", 80))
+    initialize!(solver)
+    assemble!(solver)
+    assembly = solver.properties.assembly
+    M = sparse(assembly.M)
+    f = sparse(assembly.f)
+    F = cholfact(M)
+    q = F \ f
+    t1 = round(Base.time()-t0, 2)
+    show_info && info("Postprocess of results ready in $t1 seconds.")
+    return q
+end
+
+""" Convenience function to call postprocessor. """
+function Postprocessor(problems::Problem...)
+    solver = Solver(Postprocessor, "default postprocessor")
+    if length(problems) != 0
+        push!(solver, problems...)
+    end
+    return solver
+end
+
+function Postprocessor(name::ASCIIString, problems::Problem...)
+    solver = Postprocessor(problems...)
+    solver.name = name
+    return solver
+end
 

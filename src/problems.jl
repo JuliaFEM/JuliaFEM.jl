@@ -266,8 +266,12 @@ function update_elements!{P<:BoundaryProblem}(problem::Problem{P}, u, la)
     end
 end
 
-function get_elements(problem)
+function get_elements(problem::Problem)
     return problem.elements
+end
+
+function length(problem::Problem)
+    return length(problem.elements)
 end
 
 function update!(problem::Problem, field_name::ASCIIString, field)
@@ -295,6 +299,12 @@ end
 
 function push!(problem::Problem, elements::Vector)
     push!(problem.elements, elements...)
+end
+
+function push!(problem::Problem, elements_::Vector...)
+    for elements in elements_
+        push!(problem.elements, elements...)
+    end
 end
 
 function get_gdofs(element::Element, dim::Int)

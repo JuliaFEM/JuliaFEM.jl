@@ -36,7 +36,7 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Ele
     else
         Ae = eye(nnodes)
         De = zeros(nnodes, nnodes)
-        for ip in get_integration_points(element)
+        for ip in get_integration_points(element, 1)
             N = element(ip, time)
             detJ = element(ip, time, Val{:detJ})
             De += ip.weight*N'*N*detJ
@@ -53,7 +53,7 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet}, element::Ele
     end
 
     # right hand side
-    for ip in get_integration_points(element)
+    for ip in get_integration_points(element, 1)
         detJ = element(ip, time, Val{:detJ})
         w = ip.weight*detJ
         N = element(ip, time)

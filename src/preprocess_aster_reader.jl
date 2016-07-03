@@ -309,18 +309,6 @@ function get_element_sets(med::MEDFile, mesh_name)
     return es
 end
 
-global const med_elmap = Dict{Symbol, Vector{Int}}(
-    :PO1 => [1],
-    :SE2 => [1, 2],
-    :SE3 => [1, 2, 3],
-    :TR3 => [1, 2, 3],
-    :QU4 => [1, 2, 3, 4],
-    :TE4 => [3, 2, 1, 4],
-    :TR6 => [1, 2, 3, 4, 5, 6],
-    :QU8 => [1, 2, 3, 4, 5, 6, 7, 8],
-    :HE8 => [4, 8, 7, 3, 1, 5, 6, 2],  # ..?
-    :T10 => [3, 2, 1, 4, 6, 5, 7, 10, 9, 8])
-
 function get_connectivity(med::MEDFile, elsets, mesh_name)
     elsets[0] = :OTHER
     increments = keys(med.data["ENS_MAA"][mesh_name])
@@ -340,12 +328,14 @@ function get_connectivity(med::MEDFile, elsets, mesh_name)
             eltype = Symbol(eltype)
             elco = element_connectivity[:, i]
             elset = Symbol(elsets[elset_ids[i]])
+#= to more general preprocess
             if haskey(med_elmap, eltype)
                 elco = elco[med_elmap[eltype]]
             else
                 warn("no element mapping info found for element type $eltype")
                 warn("consider this as a warning: element may have french nodal ordering")
             end
+=#
             d[element_ids[i]] = (eltype, elset, elco)
         end
     end
@@ -390,21 +380,56 @@ function parse_aster_med_file(fn::ASCIIString, mesh_name=nothing; debug=false)
     return result
 end
 
+# some glues about ordering, this is still a mystery..
+# http://onelab.info/pipermail/gmsh/2008/003850.html
+# http://caelinux.org/wiki/index.php/Proj:UNVConvert
+
+#global const med_connectivity = Dict{Symbol, Vector{Int}}(
+#    :Tet4 => [3, 2, 1, 4],
+#    :Hex8 => [4, 8, 7, 3, 1, 5, 6, 2],  # ..?
+#    :Tet10 => [3, 2, 1, 4, 6, 5, 7, 10, 9, 8])
+
+global const med_connectivity = Dict{Symbol, Vector{Int}}(
+    :Tet4  => [4,3,1,2],
+    :Tet10 => [4,3,1,2,10,7,8,9,6,5],
+    :Hex8  => [4,8,7,3,1,5,6,2],
+    :Hex20 => [4,8,7,3,1,5,6,2,20,15,19,11,12,16,14,10,17,13,18,9],
+    :Hex27 => [4,8,7,3,1,5,6,2,20,15,19,11,12,16,14,10,17,13,18,9,24,25,26,23,21,22,27])
+
+# element names in CA -> element names in JuliaFEM
 global const mapping = Dict(
+
     :PO1 => :Poi1,
+
     :SE2 => :Seg2,
     :SE3 => :Seg3,
+    :SE4 => :Seg4,
+
     :TR3 => :Tri3,
     :TR6 => :Tri6,
+    :TR7 => :Tru6,
+
     :QU4 => :Quad4,
     :QU8 => :Quad8,
     :QU9 => :Quad9,
+
+    :TE4 => :Tet4,
+    :T10 => :Tet10,
+
+    :PE6 => :Penta6,
+    :P15 => :Penta15,
+    :P18 => :Penta18,
+
     :HE8 => :Hex8,
     :H20 => :Hex20,
-    :TE4 => :Tet4,
-    :T10 => :Tet10)
+    :H27 => :Hex27,
 
-function aster_read_mesh(fn::ASCIIString, mesh_name=nothing)
+    :PY5 => :Pyramid5,
+    :P13 => :Pyramid13,
+
+    )
+
+function aster_read_mesh(fn::ASCIIString, mesh_name=nothing; reorder_element_connectivity=true)
     result = parse_aster_med_file(fn, mesh_name)
     mesh = Mesh()
     for (nid, (nset, ncoords)) in result["nodes"]
@@ -415,6 +440,9 @@ function aster_read_mesh(fn::ASCIIString, mesh_name=nothing)
         haskey(mapping, eltype) || error("Code Aster .med reader: element type $eltype not found from mapping")
         add_element!(mesh, elid, mapping[eltype], elcon)
         add_element_to_element_set!(mesh, string(elset), elid)
+    end
+    if reorder_element_connectivity
+        reorder_element_connectivity!(mesh, med_connectivity)
     end
     return mesh
 end

@@ -85,6 +85,20 @@ function get_nodal_vector(elements, field_name, time)
     return node_ids, field
 end
 
+""" Return nodal values in Dict format. """
+function get_nodal_dict(T::DataType, elements, field_name, time)
+    f = T()
+    for element in elements
+        for (c, v) in zip(get_connectivity(element), element(field_name, time))
+            if haskey(f, c)
+                @assert isapprox(f[c], v)
+            end
+            f[c] = v
+        end
+    end
+    return f
+end
+
 """ Update nodal field values from set of elements to another. Can be used to
 transform e.g. reaction force from boundary element set to surface of
 volume elements for easier postprocess.
@@ -112,5 +126,19 @@ end
 
 function copy_field!(src_problem::Problem, dst_problem::Problem, field_name, time)
     copy_field!(src_problem.elements, dst_problem.elements, field_name, time)
+end
+
+""" Return field calculated to nodal points for elements in problem p. """
+function call(problem::Problem, field_name, time=0.0)
+    f = Dict()
+    for element in get_elements(problem)
+        for (c, v) in zip(get_connectivity(element), element(field_name, time))
+            if haskey(f, c)
+                @assert isapprox(f[c], v)
+            end
+            f[c] = v
+        end
+    end
+    return f
 end
 
