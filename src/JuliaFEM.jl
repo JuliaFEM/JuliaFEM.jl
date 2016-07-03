@@ -74,6 +74,8 @@ export find_intersection, calc_reflection, calc_normal
 
 ### Mortar methods ###
 include("problems_mortar.jl")
+include("problems_mortar_2d.jl")
+include("problems_mortar_3d.jl")
 include("problems_mortar_2d_autodiff.jl")
 export calculate_normals,
        calculate_normals!,

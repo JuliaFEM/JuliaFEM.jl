@@ -15,6 +15,8 @@ function run_tests(; verbose=true)
         verbose && info("$i   $test_file")
     end
 
+    t0 = Base.time()
+
     body = quote
         @testset "JuliaFEM" begin
             for fn in $test_files
@@ -24,6 +26,8 @@ function run_tests(; verbose=true)
     end
     eval(body)
 
+    t1 = round(Base.time()-t0, 2)
+    info("Testing completed in $t1 seconds.")
 end
 
 run_tests()
