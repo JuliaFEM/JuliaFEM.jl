@@ -26,6 +26,31 @@ function append!(assembly::Assembly, sub_assembly::Assembly)
     append!(assembly.c, sub_assembly.c)
 end
 
+""" Calculate norm of assembly, i.e., norm of each block of matrix. """
+function norm(assembly::Assembly, p=2)
+    N1 = norm(assembly.M, p)
+    N2 = norm(assembly.K, p)
+    N3 = norm(assembly.Kg, p)
+    N4 = norm(assembly.f, p)
+    N5 = norm(assembly.fg, p)
+    N6 = norm(assembly.C1, p)
+    N7 = norm(assembly.C2, p)
+    N8 = norm(assembly.D, p)
+    N9 = norm(assembly.g, p)
+    N10 = norm(assembly.c, p)
+    return [N1, N2, N3, N4, N5, N6, N7, N8, N9, N10]
+end
+
+function isapprox(a1::Assembly, a2::Assembly)
+    T = isapprox(a1.K, a2.K)
+    T &= isapprox(a1.C1, a2.C1)
+    T &= isapprox(a1.C2, a2.C2)
+    T &= isapprox(a1.D, a2.D)
+    T &= isapprox(a1.f, a2.f)
+    T &= isapprox(a1.g, a2.g)
+    return T
+end
+
 function assemble_prehook!
 end
 

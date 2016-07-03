@@ -1,6 +1,9 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+using ForwardDiff
+# TODO: evaluate partial derivatives of basis functions without forwarddiff
+
 """ NURBS segment. """
 type NSeg <: AbstractElement
     order :: Int
@@ -96,6 +99,14 @@ function get_basis(element::Element{NSolid}, xi::Vector, time)
     u, v, w = xi
     N = [w[i,j,k]*NURBS(i,pu,u,tu)*NURBS(j,pv,v,tv)*NURBS(k,pw,w,tw) for i=1:nu, j=1:nv, k=1:nw]
     return N / sum(N)
+end
+
+# TODO: evaluate partial derivatives of basis functions without forwarddiff
+""" Evaluate partial derivatives of basis functions using ForwardDiff. """
+function get_dbasis{E<:Union{NSeg, NSurf, NSolid}}(element::Element{E}, ip, time)
+    xi = isa(ip, IP) ? ip.coords : ip
+    basis(xi) = vec(get_basis(element, xi, time))
+    return ForwardDiff.jacobian(basis, xi)'
 end
 
 function length(element::Element{NSeg})

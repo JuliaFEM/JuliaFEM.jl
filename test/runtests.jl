@@ -3,12 +3,17 @@
 
 using JuliaFEM.Test
 
-function run_tests(; quiet=false)
+function run_tests(; verbose=true)
 
     maybe_test_files = readdir(Pkg.dir("JuliaFEM")*"/test")
     is_test_file(fn) = startswith(fn, "test_") & endswith(fn, ".jl")
     test_files = filter(is_test_file, maybe_test_files)
     #test_files = ["test_nodal_constraints.jl"]
+
+    verbose && info("Test files:")
+    for (i, test_file) in enumerate(test_files)
+        verbose && info("$i   $test_file")
+    end
 
     body = quote
         @testset "JuliaFEM" begin

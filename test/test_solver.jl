@@ -1,14 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-module SolverTests
-
+using JuliaFEM
 using JuliaFEM.Test
-
-using JuliaFEM.Core: Seg2, Quad4
-using JuliaFEM.Core: DirichletProblem, HeatProblem
-using JuliaFEM.Core: LinearSolver
-using JuliaFEM.Core: solve
 
 function test_linearsolver()
     el1 = Quad4([1, 2, 3, 4])
@@ -51,7 +45,6 @@ function test_linearsolver()
     info("Temperature at point X = $X is T = $T")
     @test isapprox(T, 100.0)
 end
-#test_linearsolver()
 
 function test_solvers()
     K =  [
@@ -94,6 +87,3 @@ function test_solvers()
     @test isapprox(u3, expected)
 end
 
-# test_solvers()
-
-end

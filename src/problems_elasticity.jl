@@ -181,7 +181,7 @@ function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, 
 
         if haskey(element, "displacement load")
             b = element("displacement load", ip, time)
-            f += w*vec(N'*b)
+            f += w*vec(b*N)
         end
 
         for i=1:dim

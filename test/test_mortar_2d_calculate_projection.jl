@@ -18,7 +18,7 @@ function get_test_2d_model()
     sel2 = Element(Seg2, [11, 12])
     update!([mel1, mel2, sel1, sel2], "geometry", X)
     update!([sel1, sel2], "master elements", [sel1, sel2])
-    calculate_normals!([sel1, sel2], 0.0)
+    calculate_normals!([sel1, sel2], 0.0, Val{1})
     return [sel1, sel2], [mel1, mel2]
 end
 
@@ -62,7 +62,7 @@ end
     mel1 = Element(Seg2, [3, 4])
     update!([sel1, mel1], "geometry", X)
     time = 0.0
-    calculate_normals!([sel1], time)
+    calculate_normals!([sel1], time, Val{1})
 
     X2 = mel1("geometry", [-1.0], time)
     xi = project_from_master_to_slave(sel1, X2, time)

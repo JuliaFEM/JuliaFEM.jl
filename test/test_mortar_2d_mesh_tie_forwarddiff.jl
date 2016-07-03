@@ -60,27 +60,26 @@ function JuliaFEM.get_model(::Type{Val{Symbol("mesh tie with curved 2d block")}}
     interface.assembly.u = zeros(2*length(mesh.nodes))
     interface.assembly.la = zeros(2*length(mesh.nodes))
 
-    solver = Solver(Nonlinear)
+    solver = Solver(Linear)
     push!(solver, upper, lower, bc_upper, bc_lower, interface)
 
     return solver
 
 end
 
+#=
 
 @testset "curved surface with adjust=true, standard lagrange, slave=lower surface, dy=0.0" begin
     # TODO: analytical solution now known, verify using other fem software
     solver = get_model("mesh tie with curved 2d block";
         adjust=false, tolerance=10, dy=-0.1, rotate_normals=true,
-        dual_basis=true, use_forwarddiff=true, finite_strain=true,
-        geometric_stiffness=true)
+        dual_basis=true, use_forwarddiff=true, finite_strain=false,
+        geometric_stiffness=false)
     call(solver)
     interface = solver["interface between upper and lower block"]
-    @test solver.properties.iteration == 2
     @test isapprox(norm(interface.assembly.u), 0.11339715157447851)
 end
 
-#=
 
 @testset "curved surface with adjust=true, dual lagrange, slave=lower surface, dy=0.0" begin
     # TODO: analytical solution now known, verify using other fem software
@@ -118,21 +117,7 @@ end
 
 =#
 
-function Base.isapprox(A::SparseMatrixCOO, B::SparseMatrixCOO)
-    A2 = sparse(A)
-    B2 = sparse(B, size(A2)...)
-    return isapprox(A2, B2)
-end
 
-function Base.isapprox(a1::Assembly, a2::Assembly)
-    T = isapprox(a1.K, a2.K)
-    T &= isapprox(a1.C1, a2.C1)
-    T &= isapprox(a1.C2, a2.C2)
-    T &= isapprox(a1.D, a2.D)
-    T &= isapprox(a1.f, a2.f)
-    T &= isapprox(a1.g, a2.g)
-    return T
-end
 
 @testset "compare forwarddiff solution to normal" begin
     X = Dict(
@@ -164,6 +149,7 @@ end
     assemble!(p2, 0.0)
     @test isapprox(p1.assembly, p2.assembly)
 
+    #=
     empty!(p1.assembly)
     empty!(p2.assembly)
     p1.properties.adjust = true
@@ -191,5 +177,6 @@ end
     dump(g1)
     dump(g2)
     @test isapprox(p1.assembly, p2.assembly)
+    =#
 end
 

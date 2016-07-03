@@ -1,9 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+using JuliaFEM
 using JuliaFEM.Test
-
-using JuliaFEM.Core: DCTV, DCTI
 
 @testset "test interpolation of discrete constant time-variant field" begin
     f = DCTV(0.0 => 0.0, 1.0 => 1.0)

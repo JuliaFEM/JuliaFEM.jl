@@ -1,12 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-module TestAutoDiffWeakForm
-
+using JuliaFEM
 using JuliaFEM.Test
-
-using JuliaFEM.Core: Problem, AbstractProblem, CG, Element, IntegrationPoint, Quad4, solve!
-import JuliaFEM.Core: get_unknown_field_name, get_unknown_field_type, get_residual_vector
 
 abstract PlaneStressElasticityProblem <: AbstractProblem
 
@@ -22,7 +18,7 @@ function get_unknown_field_type{P<:PlaneStressElasticityProblem}(::Type{P})
     return Vector{Float64}
 end
 
-function get_residual_vector{EL<:CG}(problem::Problem{PlaneStressElasticityProblem}, element::Element{EL}, ip::IntegrationPoint, time::Number; variation=nothing)
+function get_residual_vector(problem::Problem{PlaneStressElasticityProblem}, element::Element, ip::IntegrationPoint, time::Number; variation=nothing)
 
 
     basis = element(ip, time)
@@ -71,4 +67,3 @@ function test_residual_form()
     @test isapprox(disp[2], -8.77303119819776E+00)
 end
 
-end

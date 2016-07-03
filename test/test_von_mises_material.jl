@@ -1,6 +1,4 @@
-module VonMisesTests
-
-using PyPlot
+#using PyPlot
 using JuliaFEM.Test
 using JuliaFEM.MaterialModels: stiffnessTensor, calculate_stress, State
 using JuliaFEM.MaterialModels: stiffnessTensorPlaneStress
@@ -240,6 +238,5 @@ end
 
 # test_von_mises_3D_basic()
 
-test_von_mises_planestress_basic()
+#test_von_mises_planestress_basic()
 
-end

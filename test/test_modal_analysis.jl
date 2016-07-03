@@ -18,7 +18,7 @@ using JuliaFEM.Test
     e1 = Element(Tet4, [1, 2, 3, 4])
     e2 = Element(Tri3, [1, 2, 3])
     update!([e1, e2], "geometry", X)
-    update!([e1, e2], "displacement", u)
+    update!([e1, e2], "displacement", 0.0 => u)
     update!(e1, "youngs modulus" => 96.0,
                 "poissons ratio" => 1.0/3.0,
                 "density" => 420.0)
@@ -27,6 +27,7 @@ using JuliaFEM.Test
                 "displacement 3" => 0.0)
     p1 = Problem(Elasticity, 3)
     p1.properties.finite_strain = false
+    p1.properties.geometric_stiffness = false
     p2 = Problem(Dirichlet, p1)
     push!(p1, e1)
     push!(p2, e2)
@@ -37,6 +38,10 @@ using JuliaFEM.Test
     call(s1; debug=true)
     @test isapprox(s1.properties.eigvals, [4/3, 1/3])
 
+    empty!(p1)
+    empty!(p2)
+    empty!(p1.assembly.M)
+#   p1.properties.finite_strain = true
     p1.properties.geometric_stiffness = true
     s1.properties.geometric_stiffness = true
     call(s1; debug=true)
@@ -64,9 +69,11 @@ end
     update!([el1, el2, el3, el4], "geometry", X)
     update!([el1, el2], "density", 6.0)
     update!([el1, el2], "temperature thermal conductivity", 36.0)
+    #update!([el1, el2], "temperature", 0.0 => T)
     update!([el1, el2], "temperature", T)
     update!([el3, el4], "temperature 1", 0.0)
     p1 = Problem(Heat, "combined body", 1)
+    p1.properties.formulation = "2D"
     p2 = Problem(Dirichlet, "fixed ends", 1, "temperature")
     push!(p1, el1, el2)
     push!(p2, el3, el4)
@@ -98,6 +105,7 @@ end
     el5 = Element(Seg2, [3, 4])
     el6 = Element(Seg2, [5, 6])
     update!([el1, el2, el3, el4, el5, el6], "geometry", X)
+    #update!([el1, el2], "temperature", 0.0 => T)
     update!([el1, el2], "temperature", T)
     update!([el1, el2], "density", 6.0)
     update!([el1, el2], "temperature thermal conductivity", 36.0)
@@ -105,6 +113,8 @@ end
     update!(el5, "master elements", [el6])
     p1 = Problem(Heat, "body 1", 1)
     p2 = Problem(Heat, "body 2", 1)
+    p1.properties.formulation = "2D"
+    p2.properties.formulation = "2D"
     p3 = Problem(Dirichlet, "fixed ends", 1, "temperature")
     p4 = Problem(Mortar, "interface between bodies", 1, "temperature")
     p4.properties.dimension = 1

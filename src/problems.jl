@@ -152,7 +152,13 @@ function initialize!(problem::Problem, time=0.0)
         gdofs = get_gdofs(problem, element)
         if haskey(element, field_name)
             # if field is found, copy last known solution to new time as initial guess
-            if !isapprox(last(element[field_name]).time, time)
+            field = last(element[field_name])
+            if !isa(field, TimeVariantField)
+                info("Unable to initialize field $field_name for problem, is not time variant?")
+                continue
+            end
+
+            if !isapprox(field.time, time)
                 last_data = copy(last(element[field_name]).data)
                 push!(element[field_name], time => last_data)
             end

@@ -12,29 +12,26 @@ using JuliaFEM.Test
 
     upper = Problem(Heat, "upper", 1)
     upper.elements = create_elements(mesh, "UPPER")
-    update!(upper.elements, "temperature thermal conductivity", 1.0)
+    update!(upper, "temperature thermal conductivity", 1.0)
     lower = Problem(Heat, "lower", 1)
     lower.elements = create_elements(mesh, "LOWER")
-    update!(lower.elements, "temperature thermal conductivity", 1.0)
+    update!(lower, "temperature thermal conductivity", 1.0)
 
     bc_upper = Problem(Dirichlet, "upper boundary", 1, "temperature")
     bc_upper.elements = create_elements(mesh, "UPPER_TOP")
-    update!(bc_upper.elements, "temperature 1", 0.0)
+    update!(bc_upper, "temperature 1", 0.0)
 
     bc_lower = Problem(Dirichlet, "lower boundary", 1, "temperature")
     bc_lower.elements = create_elements(mesh, "LOWER_BOTTOM")
-    update!(bc_lower.elements, "temperature 1", 1.0)
+    update!(bc_lower, "temperature 1", 1.0)
 
     interface = Problem(Mortar, "interface between upper and lower block", 1, "temperature")
     interface_slave_elements = create_elements(mesh, "LOWER_TOP")
     interface_master_elements = create_elements(mesh, "UPPER_BOTTOM")
     update!(interface_slave_elements, "master elements", interface_master_elements)
     interface.elements = [interface_master_elements; interface_slave_elements]
-    interface.properties.dimension = 2
 
-    solver = Solver()
-    solver.properties.linear_system_solver = :DirectLinearSolver_UMFPACK
-    push!(solver, upper, lower, bc_upper, bc_lower, interface)
+    solver = LinearSolver(upper, lower, bc_upper, bc_lower, interface)
     call(solver)
     
     node_ids, temperature = get_nodal_vector(interface.elements, "temperature", 0.0)
