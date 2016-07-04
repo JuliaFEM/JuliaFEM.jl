@@ -337,9 +337,33 @@ end
 """ Default initializer for solver. """
 function initialize!(solver::Solver; show_info=true)
     show_info && info("Initializing problems ...")
+    problems = get_problems(solver)
+    length(problems) != 0 || error("Empty solver, add problems to solver using push!")
     t0 = Base.time()
-    for problem in solver.problems
+    field_problems = get_field_problems(solver)
+    length(field_problems) != 0 || warn("No field problem found from solver, add some..?")
+    field_dim = get_unknown_field_dimension(first(field_problems))
+    field_name = get_unknown_field_name(first(field_problems))
+    info("initialize!(): looks we are solving $field_name, $field_dim dofs/node")
+    nodes = Set{Int64}()
+    for problem in problems
         initialize!(problem, solver.time)
+        for element in get_elements(problem)
+            conn = get_connectivity(element)
+            push!(nodes, conn...)
+        end
+    end
+    nnodes = length(nodes)
+    info("Total number of nodes in problems: $nnodes")
+    maxdof = maximum(nnodes)*field_dim
+    info("# of max dof (=size of solution vector) is $maxdof")
+    u = zeros(maxdof)
+    la = zeros(maxdof)
+    # TODO: this could be used to initialize elements too...
+    for problem in problems
+        problem.assembly.u = u
+        problem.assembly.la = la
+        # initialize(problem, ....)
     end
     t1 = round(Base.time()-t0, 2)
     show_info && info("Initialized problems in $t1 seconds.")

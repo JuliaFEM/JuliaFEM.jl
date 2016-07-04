@@ -1,17 +1,10 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-typealias ContactElements2D Union{Seg2}
-
 """
 Frictionless 2d small sliding contact without forwarddiff.
 
-problem
-time
-dimension
-finite_sliding
-friction
-use_forwarddiff
+true/false flags: finite_sliding, friction, use_forwarddiff
 """
 function assemble!(problem::Problem{Contact}, time::Float64,
                    ::Type{Val{1}}, ::Type{Val{false}},
