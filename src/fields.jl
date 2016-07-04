@@ -15,7 +15,7 @@ type Field{A<:Union{Discrete,Continuous}, B<:Union{Constant,Variable}, C<:Union{
     data
 end
 
-typealias FieldSet Dict{ASCIIString, Field}
+typealias FieldSet Dict{String, Field}
 
 ### Basic data structure for discrete field
 
@@ -396,14 +396,14 @@ function call(basis::CVTI, geometry::DVTI, xi::Vector, ::Type{Val{:grad}})
 end
 
 function call(basis::CVTI, geometry::DVTI, values::DVTI, xi::Vector, ::Type{Val{:grad}})
-    grad = call(basis, geometry, xi, Val{:grad})
+    grad = basis(geometry, xi, Val{:grad})
 #    gradf = sum([grad[:,i]*values[i]' for i=1:length(geometry)])'
     gradf = sum([kron(grad[:,i], values[i]') for i=1:length(values)])'
     return length(gradf) == 1 ? gradf[1] : gradf
 end
 
 function call(basis::CVTI, xi::Vector, time::Number)
-    call(basis, xi)
+    basis(xi)
 end
 
 function Base.(:*)(grad::Matrix, field::DVTI)

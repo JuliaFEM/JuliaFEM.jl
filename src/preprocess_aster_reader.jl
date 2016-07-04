@@ -39,7 +39,7 @@ function aster_create_elements(mesh, element_set, element_type=nothing; reverse_
 end
 
 
-function aster_parse_nodes(section::ASCIIString; strip_characters=true)
+function aster_parse_nodes(section::String; strip_characters=true)
     nodes = Dict{Any, Vector{Float64}}()
     has_started = false
     for line in split(section, '\n')
@@ -68,10 +68,10 @@ function aster_parse_nodes(section::ASCIIString; strip_characters=true)
     return nodes
 end
 
-function parse(mesh::ASCIIString, ::Type{Val{:CODE_ASTER_MAIL}})
-    model = Dict{ASCIIString, Any}()
+function parse(mesh::String, ::Type{Val{:CODE_ASTER_MAIL}})
+    model = Dict{String, Any}()
     header = nothing
-    data = ASCIIString[]
+    data = String[]
     for line in split(mesh, '\n')
         length(line) != 0 || continue
         info("line: $line")
@@ -242,7 +242,7 @@ type MEDFile
     data :: Dict
 end
 
-function MEDFile(fn::ASCIIString)
+function MEDFile(fn::String)
     MEDFile(h5read(fn, "/"))
 end
 
@@ -334,9 +334,9 @@ end
 
 Paramters
 ---------
-fn :: ASCIIString
+fn :: String
     file name to parse
-mesh_name :: ASCIIString, optional
+mesh_name :: String, optional
     mesh name, if several meshes in one file
 
 Returns
@@ -344,7 +344,7 @@ Returns
 Dict containing fields "nodes" and "connectivity".
 
 """
-function parse_aster_med_file(fn::ASCIIString, mesh_name=nothing; debug=false)
+function parse_aster_med_file(fn::String, mesh_name=nothing; debug=false)
     med = MEDFile(fn)
     if isa(mesh_name, Void)
         mesh_names = get_mesh_names(med::MEDFile)
@@ -362,7 +362,7 @@ function parse_aster_med_file(fn::ASCIIString, mesh_name=nothing; debug=false)
     end
     nodes = get_nodes(med, nsets, mesh_name)
     conn = get_connectivity(med, elsets, mesh_name)
-    result = Dict{ASCIIString, Any}()
+    result = Dict{String, Any}()
     result["nodes"] = nodes
     result["connectivity"] = conn
     return result
@@ -417,7 +417,7 @@ global const mapping = Dict(
 
     )
 
-function aster_read_mesh(fn::ASCIIString, mesh_name=nothing; reorder_element_connectivity=true)
+function aster_read_mesh(fn::String, mesh_name=nothing; reorder_element_connectivity=true)
     result = parse_aster_med_file(fn, mesh_name)
     mesh = Mesh()
     for (nid, (nset, ncoords)) in result["nodes"]

@@ -44,8 +44,8 @@ https://en.wikipedia.org/wiki/Thermal_diffusivity
 https://en.wikipedia.org/wiki/Volumetric_heat_capacity
 """
 type Heat <: FieldProblem
-    formulation :: ASCIIString
-    store_fields :: Vector{ASCIIString}
+    formulation :: String
+    store_fields :: Vector{String}
 end
 
 function Heat()

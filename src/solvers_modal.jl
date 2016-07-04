@@ -8,7 +8,7 @@ Examples
 julia> problems = get_problems()
 julia> solver = Solver(Modal)
 julia> push!(solver, problems...)
-julia> call(solver)
+julia> solver()
 
 """
 type Modal <: AbstractSolver

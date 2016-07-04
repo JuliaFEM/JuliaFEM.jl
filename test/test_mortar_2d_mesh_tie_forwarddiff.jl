@@ -75,7 +75,7 @@ end
         adjust=false, tolerance=10, dy=-0.1, rotate_normals=true,
         dual_basis=true, use_forwarddiff=true, finite_strain=false,
         geometric_stiffness=false)
-    call(solver)
+    solver()
     interface = solver["interface between upper and lower block"]
     @test isapprox(norm(interface.assembly.u), 0.11339715157447851)
 end
@@ -86,7 +86,7 @@ end
     solver = get_model("mesh tie with curved 2d block";
         adjust=true, tolerance=10, dy=0.0, rotate_normals=true,
         dual_basis=true, use_forwarddiff=true)
-    call(solver)
+    solver()
     interface = solver["interface between upper and lower block"]
     @test solver.properties.iteration == 2
     # differs -- why?
@@ -98,7 +98,7 @@ end
     solver = get_model("mesh tie with curved 2d block";
         adjust=true, tolerance=10, dy=-0.1, rotate_normals=true,
         dual_basis=false, use_forwarddiff=true)
-    call(solver)
+    solver()
     interface = solver["interface between upper and lower block"]
     @test solver.properties.iteration == 2
     @test isapprox(norm(interface.assembly.u), 0.34230262165505887)
@@ -109,7 +109,7 @@ end
     solver = get_model("mesh tie with curved 2d block";
         adjust=true, tolerance=10, dy=-0.1, rotate_normals=true,
         dual_basis=true, use_forwarddiff=true)
-    call(solver)
+    solver()
     interface = solver["interface between upper and lower block"]
     @test solver.properties.iteration == 2
     @test isapprox(norm(interface.assembly.u), 0.34318800698017704)

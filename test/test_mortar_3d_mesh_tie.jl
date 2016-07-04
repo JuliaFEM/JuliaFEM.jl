@@ -32,7 +32,7 @@ using JuliaFEM.Test
     interface.elements = [interface_master_elements; interface_slave_elements]
 
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, interface)
-    call(solver)
+    solver()
     
     node_ids, temperature = get_nodal_vector(interface.elements, "temperature", 0.0)
     T = [t[1] for t in temperature]

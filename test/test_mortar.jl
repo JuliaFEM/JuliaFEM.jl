@@ -372,7 +372,7 @@ function test_3d_problem()
     push!(solver, tie)
     solver.nonlinear_problem = false
     solver.method = :UMFPACK
-    call(solver, 0.0)
+    solver()
     X = el2("geometry", [1.0, 1.0, 1.0], 0.0)
     u = el2("displacement", [1.0, 1.0, 1.0], 0.0)
     info("displacement at $X = $u")

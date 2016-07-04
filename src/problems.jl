@@ -84,9 +84,9 @@ function get_dofs(assembly::Assembly)
 end
 
 type Problem{P<:AbstractProblem}
-    name :: ASCIIString              # descriptive name for problem
+    name :: String              # descriptive name for problem
     dimension :: Int                 # degrees of freedom per node
-    parent_field_name :: ASCIIString # (optional) name of parent field e.g. "displacement"
+    parent_field_name :: String # (optional) name of parent field e.g. "displacement"
     elements :: Vector{Element}
     dofmap :: Dict{Element, Vector{Int64}} # connects element local dofs to global dofs
     assembly :: Assembly
@@ -103,7 +103,7 @@ julia> prob1 = Problem(Elasticity, "this is my problem", 3)
 julia> prob2 = Problem(Elasticity, 3)
 
 """
-function Problem{P<:FieldProblem}(::Type{P}, name::ASCIIString, dimension::Int64)
+function Problem{P<:FieldProblem}(::Type{P}, name::String, dimension::Int64)
     Problem{P}(name, dimension, "none", [], Dict(), Assembly(), P())
 end
 function Problem{P<:FieldProblem}(::Type{P}, dimension::Int64)
@@ -280,7 +280,7 @@ function length(problem::Problem)
     return length(problem.elements)
 end
 
-function update!(problem::Problem, field_name::ASCIIString, field)
+function update!(problem::Problem, field_name::String, field)
     update!(problem.elements, field_name, field)
 end
 

@@ -8,7 +8,7 @@ using JuliaFEM.API: Model
 Function for creating solver and all the necessary components
 for the calculation
 """
-function get_solver(model::Model, case_name::ASCIIString)
+function get_solver(model::Model, case_name::String)
     case = model.load_cases[case_name]
     
     # Create core elements
@@ -118,7 +118,7 @@ end
 
 """
 """
-function solve!(model::Model, case_name::ASCIIString, time::Float64)
+function solve!(model::Model, case_name::String, time::Float64)
     # Create solver
 	solver = get_solver(model, case_name)
 

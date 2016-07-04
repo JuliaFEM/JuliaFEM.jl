@@ -54,7 +54,7 @@ end
     update!(nodal_bc, "displacement 1", 0.5)
     update!(nodal_bc, "displacement 2", 0.0)
     push!(solver, nodal_bc)
-    call(solver)
+    solver()
     pel = nodal_bc.elements[1]
     la = pel("reaction force", [0.0], 0.0)
     info("reaction force: $la")
@@ -76,7 +76,7 @@ end
     update!(point_load, "displacement traction force 1", 72.0)
     update!(point_load, "displacement traction force 2", 27.0)
     push!(solver["body"], point_load)
-    call(solver)
+    solver()
     @test isapprox(point_load("displacement", [], 0.0), [0.5, 0.0])
 end
 

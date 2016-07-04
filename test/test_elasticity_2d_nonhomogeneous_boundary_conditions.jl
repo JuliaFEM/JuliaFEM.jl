@@ -38,7 +38,7 @@ using JuliaFEM.Test
 
     solver = NonlinearSolver("solve block problem")
     push!(solver, block, bc)
-    call(solver)
+    solver()
 
     # from code aster
     eps_expected = [-2.08333312468287E-01, 6.25000000000000E-01, 0.0]

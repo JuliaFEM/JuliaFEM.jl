@@ -38,7 +38,7 @@ type Elasticity <: FieldProblem
     formulation :: Symbol
     finite_strain :: Bool
     geometric_stiffness :: Bool
-    store_fields :: Vector{ASCIIString}
+    store_fields :: Vector{String}
 end
 function Elasticity()
     # formulations: plane_stress, plane_strain, continuum

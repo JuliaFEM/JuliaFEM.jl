@@ -49,7 +49,7 @@ end
     p4.properties.rotate_normals = false
     solver = Solver(Linear)
     push!(solver, p1, p2, p3, p4)
-    call(solver)
+    solver()
     el5 = p4.elements[1]
     u = el5("displacement", [0.0], 0.0)
     info("u = $u")
@@ -86,7 +86,7 @@ end
 
     solver = Solver(Linear)
     push!(solver, upper, lower, bc_upper, bc_lower, interface)
-    call(solver)
+    solver()
 
     interface_norm = norm(interface.assembly)
     # for bi-orthogonal:
@@ -123,7 +123,7 @@ end
     solver = Solver(Nonlinear)
     solver.properties.linear_system_solver = :DirectLinearSolver_UMFPACK
     push!(solver, p1, p2, p3, p4)
-    call(solver)
+    solver()
     el5 = p4.elements[1]
     u = el5("displacement", [0.0], 0.0)
     info("u = $u")
@@ -183,7 +183,7 @@ end
 @testset "test mesh tie with splitted block and plane stress elasticity" begin
     solver = get_model("splitted block, plane stress elasticity and mesh tie")
     upper, lower, bc_upper, bc_lower, interface = solver.problems
-    call(solver)
+    solver()
     slave_elements = get_slave_elements(interface)
     node_ids, la = get_nodal_vector(slave_elements, "reaction force", 0.0)
     for lai in la
@@ -250,7 +250,7 @@ end
     solver = get_model("mesh tie with curved 2d block";
         adjust=true, tolerance=10, dy=0.0, rotate_normals=true,
         dual_basis=false)
-    call(solver)
+    solver()
     interface = solver["interface between upper and lower block"]
     @test isapprox(norm(interface.assembly.u), 0.11339715157447851)
 end
@@ -260,7 +260,7 @@ end
     solver = get_model("mesh tie with curved 2d block";
         adjust=true, tolerance=10, dy=0.0, rotate_normals=true,
         dual_basis=true)
-    call(solver)
+    solver()
     interface = solver["interface between upper and lower block"]
     @test isapprox(norm(interface.assembly.u), 0.11660422877751599)
 end
@@ -270,7 +270,7 @@ end
     solver = get_model("mesh tie with curved 2d block";
         adjust=true, tolerance=10, dy=-0.1, rotate_normals=true,
         dual_basis=false)
-    call(solver)
+    solver()
     interface = solver["interface between upper and lower block"]
     @test isapprox(norm(interface.assembly.u), 0.34230262165505887)
 end
@@ -280,7 +280,7 @@ end
     solver = get_model("mesh tie with curved 2d block";
         adjust=true, tolerance=10, dy=-0.1, rotate_normals=true,
         dual_basis=true)
-    call(solver)
+    solver()
     interface = solver["interface between upper and lower block"]
     @test isapprox(norm(interface.assembly.u), 0.34318800698017704)
 end

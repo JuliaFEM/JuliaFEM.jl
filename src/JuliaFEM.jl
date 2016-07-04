@@ -12,8 +12,6 @@ include("fields.jl")
 export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV
 include("types.jl")  # data types: Point, IntegrationPoint, ...
 export AbstractPoint, Point, IntegrationPoint, IP, Node
-#include("basis.jl")  # interpolation of discrete fields
-#include("symbolic.jl") # a thin symbolic layer for fields
 
 ### ELEMENTS ###
 include("elements.jl") # common element routines
@@ -114,11 +112,11 @@ export aster_create_elements, parse_aster_med_file, is_aster_mail_keyword,
        filter_by_element_set, filter_by_element_id, MEDFile
 end
 
-function get_mesh(mesh_name::ASCIIString, args...; kwargs...)
+function get_mesh(mesh_name::String, args...; kwargs...)
     return get_mesh(Val{Symbol(mesh_name)}, args...; kwargs...)
 end
 
-function get_model(model_name::ASCIIString, args...; kwargs...)
+function get_model(model_name::String, args...; kwargs...)
     return get_model(Val{Symbol(model_name)}, args...; kwargs...)
 end
 
