@@ -41,7 +41,7 @@ using JuliaFEM.Test
     solver = NonlinearSolver("solve 3d block")
     push!(solver, elasticity_problem)
     push!(solver, boundary_problem)
-    call(solver)
+    solver()
 
     disp = element1("displacement", [1.0, 1.0, 1.0], 0.0)
     info("displacement at tip: $disp")

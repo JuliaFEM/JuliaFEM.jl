@@ -73,7 +73,7 @@ end
 
 @testset "test simple two element contact" begin
     solver = get_model("two element contact")
-    call(solver)
+    solver()
     contact = solver["LOWER_TO_UPPER"]
     master = first(contact.elements)
     slave = last(contact.elements)

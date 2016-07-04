@@ -8,7 +8,7 @@ end
 """
 Add node to model and renumber for output
 """
-function add_node!(model::Model, index::Union{Int64, ASCIIString},
+function add_node!(model::Model, index::Union{Int64, String},
     coords::Vector{Float64})
     node = Node(index, coords)
     model.nodes[index] = node
@@ -25,7 +25,7 @@ function add_solver!(case::Simulation, solver)
     case.solver = solver
 end
 
-function add_material!(model::Model, set_name::ASCIIString, material::Material)
+function add_material!(model::Model, set_name::String, material::Material)
     element_set = model.elsets[set_name]
     set_ids = element_set.elements
     for each in set_ids
@@ -35,7 +35,7 @@ function add_material!(model::Model, set_name::ASCIIString, material::Material)
     element_set.material = material
 end
 
-function add_element!(model::Model, idx::Union{Int64, ASCIIString},
+function add_element!(model::Model, idx::Union{Int64, String},
     eltype::Symbol, node_ids::Vector{Int64})
 
     element = Element(idx, node_ids, eltype)
@@ -47,27 +47,27 @@ function add_element_set!(model::Model, elset::ElementSet)
     model.elsets[name] = elset
 end
 
-function add_element_set!(model::Model, name::ASCIIString, ids::Vector{Int64})
+function add_element_set!(model::Model, name::String, ids::Vector{Int64})
     elset = ElementSet(name, ids)
     model.elsets[name] = elset
 end
 
-function add_node_set!(model::Model, name::ASCIIString, ids::Vector{Int64})
+function add_node_set!(model::Model, name::String, ids::Vector{Int64})
     nset = NodeSet(name, ids)
     model.nsets[name] = nset
 end
 
-function add_element_set!(model::Model, name::ASCIIString,
+function add_element_set!(model::Model, name::String,
     elements::Vector{Element})
     elset = ElementSet(name, elements)
 model.elsets[name] = elset
 end
 
-function add_element_set!(case::Simulation, name::ASCIIString)
+function add_element_set!(case::Simulation, name::String)
     push!(case.sets, name)
 end
 
-function add_simulation!(model::Model, name::ASCIIString, case::Simulation)
+function add_simulation!(model::Model, name::String, case::Simulation)
     model.load_cases[name] = case
 end
 #function Base.convert{T<:AbstractFloat}(::Type{Node}, data::Vector{T})
@@ -80,7 +80,7 @@ end
 #end
 #
 #
-#function get_element_set(model::Model, set_name::ASCIIString)
+#function get_element_set(model::Model, set_name::String)
 #    get_set = model.sets[set_name]
 #    isa(get_set, ElementSet) ? get_set : err("Found set $(set_name)
 #    but it is not a ElementSet. Check if you have used

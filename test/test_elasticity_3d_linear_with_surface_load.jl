@@ -40,7 +40,7 @@ using JuliaFEM.Test
     push!(boundary_problem, symxy, symxz, symyz)
 
     solver = LinearSolver(elasticity_problem, boundary_problem)
-    call(solver)
+    solver()
 
     disp = element1("displacement", [1.0, 1.0, 1.0], 0.0)
     info("displacement at tip: $disp")
@@ -70,7 +70,7 @@ function solve_rod_model_elasticity(eltype)
     update!(p4, "displacement 2", 0.0)
     update!(p5, "displacement 3", 0.0)
     solver = LinearSolver(p1, p2, p3, p4, p5)
-    call(solver)
+    solver()
     u_max = maximum(p1.assembly.u)
     info("$eltype, u_max = $u_max")
     return u_max

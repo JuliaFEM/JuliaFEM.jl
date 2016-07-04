@@ -35,7 +35,7 @@ function calc_model(mesh_name; with_volume_load=false, debug_print=false)
 
     solver = LinearSolver("Solver block problem")
     push!(solver, block, traction, bc)
-    call(solver)
+    solver()
 
     max_u = maximum(block.assembly.u)
     nu = round(Int, length(block.assembly.u)/3)

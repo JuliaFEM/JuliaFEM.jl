@@ -41,7 +41,7 @@ using JuliaFEM.Test
 
     solver = Solver()
     push!(solver, body, bc)
-    call(solver)
+    solver()
     disp = element("displacement", [1.0, 1.0], 0.0)
     info("displacement at tip: $disp")
     # verified using Code Aster, verification/2015-10-22-plane-stress/cplan_grot_gdep_volume_force.resu

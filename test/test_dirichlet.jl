@@ -122,7 +122,7 @@ end
     update!(element, "geometry", X)
     update!(element, "displacement 1", 0.0)
     f(xi, time) = begin
-        info("function call at xi = $xi, time = $time")
+        info("function called at xi = $xi, time = $time")
         X = element("geometry", xi, time)
         info("geometry at xi, X = $X")
         val = X[1]*time

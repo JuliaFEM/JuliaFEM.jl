@@ -44,7 +44,7 @@ end
 
     solver = get_model("test 2d linear elasticity with surface + volume load")
     block, bc_sym = solver.problems
-    call(solver)
+    solver()
 
     f = 288.0
     g = 576.0
@@ -86,7 +86,7 @@ end
     solver = get_model("test 2d linear elasticity with surface + volume load")
     save("/tmp/model.jld", "linear_model", solver)
     solver2 = load("/tmp/model.jld")["linear_model"]
-    call(solver2)
+    solver2()
     save("/tmp/model.jld", "results", solver2)
     solver3 = load("/tmp/model.jld")["results"]
     block = solver3["BLOCK"]

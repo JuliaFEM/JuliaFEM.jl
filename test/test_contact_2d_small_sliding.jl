@@ -55,7 +55,7 @@ end
 @testset "test all nodes in contact" begin
     # FIXME: needs verification of some other fem software
     solver = get_model("curved 2d contact small sliding")
-    call(solver)
+    solver()
     upper, lower, bc_upper, bc_lower, interface = solver.problems
     @test isapprox(norm(interface.assembly.u), 0.49563347601324315)
 end
@@ -119,7 +119,7 @@ end
 
 @testset "test frictionless hertz contact, 2d plane strain" begin
     solver = get_model("hertz contact, full 2d model")
-    call(solver)
+    solver()
     upper, lower, bc_fixed, bc_sym_23, load, contact = solver.problems
     slaves = get_slave_elements(contact)
     node_ids, la = get_nodal_vector(slaves, "reaction force", 0.0)

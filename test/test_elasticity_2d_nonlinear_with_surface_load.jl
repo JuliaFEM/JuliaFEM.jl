@@ -34,7 +34,7 @@ using JuliaFEM.Test
 
     solver = NonlinearSolver("solve block problem")
     push!(solver, block, bc_sym)
-    call(solver)
+    solver()
 
     # from code aster
     u3_expected = [-4.92316106779943E-01, 7.96321884292103E-01]

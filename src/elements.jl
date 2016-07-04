@@ -7,7 +7,7 @@ type Element{E<:AbstractElement}
     id :: Int
     connectivity :: Vector{Int}
     integration_points :: Vector{IP}
-    fields :: Dict{ASCIIString, Field}
+    fields :: Dict{String, Field}
     properties :: E
 end
 
@@ -17,27 +17,27 @@ function Element{E<:AbstractElement}(::Type{E}, connectivity=[], integration_poi
     return element
 end
 
-function getindex(element::Element, field_name::ASCIIString)
+function getindex(element::Element, field_name::String)
     return element.fields[field_name]
 end
 
-function setindex!(element::Element, data::Field, field_name::ASCIIString)
+function setindex!(element::Element, data::Field, field_name::String)
     element.fields[field_name] = data
 end
 
-function setindex!(element::Element, data, field_name::ASCIIString)
+function setindex!(element::Element, data, field_name::String)
     element.fields[field_name] = Field(data)
 end
 
-function call(element::Element, field_name::ASCIIString)
+function call(element::Element, field_name::String)
     return element[field_name]
 end
 
-function call(element::Element, field_name::ASCIIString, time)
+function call(element::Element, field_name::String, time)
     return element[field_name](time)
 end
 
-function last(element::Element, field_name::ASCIIString)
+function last(element::Element, field_name::String)
     return last(element[field_name])
 end
 
@@ -71,7 +71,7 @@ function call(element::Element, ip, time, ::Type{Val{:Grad}})
     return inv(J)*get_dbasis(element, ip, time)
 end
 
-function call(element::Element, field_name::ASCIIString, ip, time, ::Type{Val{:Grad}})
+function call(element::Element, field_name::String, ip, time, ::Type{Val{:Grad}})
     return element(ip, time, Val{:Grad})*element[field_name](time)
 end
 
@@ -83,14 +83,14 @@ function call(element::Element, field::DCTI, time)
     return field.data
 end
 
-function call(element::Element, field_name::ASCIIString, time)
+function call(element::Element, field_name::String, time)
     field = element[field_name]
-    return call(element, field, time)
+    return element(field, time)
 end
 
-function call(element::Element, field_name::ASCIIString, ip, time::Float64)
+function call(element::Element, field_name::String, ip, time::Float64)
     field = element[field_name]
-    return call(element, field, ip, time)
+    return element(field, ip, time)
 end
 
 function call(element::Element, field::DCTI, ip, time::Float64)
@@ -131,17 +131,17 @@ julia> update!(element, "geometry", data)
 As a result element now have time invariant (variable) vector field "geometry" with data ([0.0, 0.0], [1.0, 2.0]).
 
 """
-function update!(element::Element, field_name::ASCIIString, data::Dict)
+function update!(element::Element, field_name::String, data::Dict)
     element[field_name] = [data[i] for i in get_connectivity(element)]
 end
 
-function update!{K,V}(element::Element, field_name::ASCIIString, data::Pair{Float64, Dict{K, V}})
+function update!{K,V}(element::Element, field_name::String, data::Pair{Float64, Dict{K, V}})
     time, field_data = data
     element_data = V[field_data[i] for i in get_connectivity(element)]
     update!(element, field_name, time => element_data)
 end
 
-function update!(element::Element, field_name::ASCIIString, datas::Union{Real, Vector, Pair{Float64, Union{Float64, Real, Vector{Any}}}}...)
+function update!(element::Element, field_name::String, datas::Union{Real, Vector, Pair{Float64, Union{Float64, Real, Vector{Any}}}}...)
     for data in datas
         if haskey(element, field_name)
             update!(element[field_name], data)
@@ -155,13 +155,13 @@ function update!(element::Element, field_name::ASCIIString, datas::Union{Real, V
     end
 end
 
-function update!(element::Element, field_name::ASCIIString, datas::Pair...)
+function update!(element::Element, field_name::String, datas::Pair...)
     for data in datas
         update!(element, field_name, data)
     end
 end
 
-function update!(element::Element, field_name::ASCIIString, data::Pair{Float64, Vector{Any}})
+function update!(element::Element, field_name::String, data::Pair{Float64, Vector{Any}})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
@@ -169,7 +169,7 @@ function update!(element::Element, field_name::ASCIIString, data::Pair{Float64, 
     end
 end
 
-function update!(element::Element, field_name::ASCIIString, data::Pair{Float64, Vector{Int64}})
+function update!(element::Element, field_name::String, data::Pair{Float64, Vector{Int64}})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
@@ -177,7 +177,7 @@ function update!(element::Element, field_name::ASCIIString, data::Pair{Float64, 
     end
 end
 
-function update!(element::Element, field_name::ASCIIString, data::Pair{Float64, Vector{Vector{Float64}}})
+function update!(element::Element, field_name::String, data::Pair{Float64, Vector{Vector{Float64}}})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
@@ -185,7 +185,7 @@ function update!(element::Element, field_name::ASCIIString, data::Pair{Float64, 
     end
 end
 
-function update!(element::Element, field_name::ASCIIString, data::Pair{Float64, Float64})
+function update!(element::Element, field_name::String, data::Pair{Float64, Float64})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
@@ -193,7 +193,7 @@ function update!(element::Element, field_name::ASCIIString, data::Pair{Float64, 
     end
 end
 
-function update!(element::Element, field_name::ASCIIString, data::Union{Float64, Vector})
+function update!(element::Element, field_name::String, data::Union{Float64, Vector})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
@@ -215,15 +215,15 @@ function update!(element::Element, datas::Pair...)
     end
 end
 
-function update!(element::Element, field_name::ASCIIString, data::Function)
+function update!(element::Element, field_name::String, data::Function)
     element[field_name] = data
 end
 
-function update!(element::Element, field_name::ASCIIString, field::Field)
+function update!(element::Element, field_name::String, field::Field)
     element[field_name] = field
 end
 
-function update!(elements::Vector, field_name::ASCIIString, data)
+function update!(elements::Vector, field_name::String, data)
     for element in elements
         update!(element, field_name, data)
     end
@@ -290,7 +290,7 @@ end
 
 type Element{E}
     connectivity :: Vector{Int}
-    fields :: Dict{ASCIIString, Field}
+    fields :: Dict{String, Field}
     # matrices to construct dual basis
     D :: Matrix{Float64}
     M :: Matrix{Float64}
@@ -344,31 +344,31 @@ Examples
 >>> element["temperature"] = (0.0, [0, 0, 0, 0]), (1.0, [1, 2, 3, 4])
 >>> element["temperature"] = (0.0 => [0, 0, 0, 0], 1.0 => [1, 2, 3, 4])
 """
-function Base.setindex!(element::Element, data, name::ASCIIString)
+function Base.setindex!(element::Element, data, name::String)
     element.fields[name] = Field(data)
 end
-function Base.setindex!(element::Element, field::Field, name::ASCIIString)
+function Base.setindex!(element::Element, field::Field, name::String)
     element.fields[name] = field
 end
-function Base.setindex!(element::Element, data::Tuple, name::ASCIIString)
+function Base.setindex!(element::Element, data::Tuple, name::String)
     element.fields[name] = Field(data...)
 end
 
 
 typealias VecOrIP Union{Vector, IntegrationPoint}
 
-function call(element::Element, field_name::ASCIIString, time::Real, variation=nothing)
+function call(element::Element, field_name::String, time::Real, variation=nothing)
     return isa(variation, Void) ? element[field_name](time) : variation
 end
 
-function call(element::Element, field_name::ASCIIString, xi::VecOrIP, time::Number, variation=nothing)
+function call(element::Element, field_name::String, xi::VecOrIP, time::Number, variation=nothing)
     field = element(field_name, time, variation)
 #   field = isa(variation, Void) ? element[field_name](time) : variation
     basis = get_basis(element)
     return basis(field, xi)
 end
 
-function call(element::Element, field_name::ASCIIString, xi::VecOrIP, time::Number, ::Type{Val{:grad}}, variation=nothing)
+function call(element::Element, field_name::String, xi::VecOrIP, time::Number, ::Type{Val{:grad}}, variation=nothing)
 #   field = isa(variation, Void) ? element[field_name](time) : variation
     field = element(field_name, time, variation)
     basis = get_basis(element)
@@ -376,20 +376,20 @@ function call(element::Element, field_name::ASCIIString, xi::VecOrIP, time::Numb
     return basis(geom, field, xi, Val{:grad})
 end
 
-function call(element::Element, field_name::ASCIIString, xi::VecOrIP)
+function call(element::Element, field_name::String, xi::VecOrIP)
     field = element[field_name]
     basis = get_basis(element)
     return basis(element[field_name], xi)
 end
 
-function call(element::Element, field_name::ASCIIString, xi::VecOrIP, ::Type{Val{:grad}})
+function call(element::Element, field_name::String, xi::VecOrIP, ::Type{Val{:grad}})
     field = element[field_name]
     geom = element["geometry"]
     basis = get_basis(element)
     return basis(geom, field, xi, Val{:grad})
 end
 
-function call(element::Element, field_name::ASCIIString, time::Number)
+function call(element::Element, field_name::String, time::Number)
     return element[field_name](time)
 end
 
@@ -462,7 +462,7 @@ function call{E}(element::Element{E}, xi::VecOrIP, time::Float64, ::Type{Val{:gr
     return basis(element["geometry"](time), xi, Val{:grad})
 end
 
-function call(element::Element, field_name::ASCIIString)
+function call(element::Element, field_name::String)
     return element[field_name]
 end
 
@@ -630,7 +630,7 @@ end
 
 """ Update values for several elements at once. """
 # FIXME: with or without {T} ?
-function update!{T}(elements::Vector{Element{T}}, field_name::ASCIIString, data...)
+function update!{T}(elements::Vector{Element{T}}, field_name::String, data...)
     for element in elements
         update!(element, field_name, data...)
     end

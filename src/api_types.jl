@@ -3,12 +3,12 @@
 
 
 type NeumannBC
-    set_name :: ASCIIString
+    set_name :: String
     value :: Any
 end
 
 type DirichletBC 
-    set_name :: ASCIIString
+    set_name :: String
     value :: Any
 end
 
@@ -21,13 +21,13 @@ typealias HeatFluxBC NeumannBC
 """
 """
 type Material
-    name :: ASCIIString
-    scalar_data :: Dict{ASCIIString, Any}
+    name :: String
+    scalar_data :: Dict{String, Any}
 end
 
 #Material(name, data) = Material(name, Dict(data))
-Material(name) = Material(name, Dict{ASCIIString, Any}())
-Material() = Material("", Dict{ASCIIString, Any}())
+Material(name) = Material(name, Dict{String, Any}())
+Material() = Material("", Dict{String, Any}())
 
 function Base.setindex!{T <: AbstractString }(material::Material, val, name::T)
     material.scalar_data[name] = val 
@@ -35,12 +35,12 @@ end
 
 
 type Node 
-    id :: Union{Integer, ASCIIString}
+    id :: Union{Integer, String}
     coords :: Array{Float64, 1}
 end
 
 type Element
-    id :: Union{Integer, ASCIIString, Void}
+    id :: Union{Integer, String, Void}
     connectivity :: Vector{Int64}
     element_type :: Symbol
     results :: Any # Dict{}
@@ -50,22 +50,22 @@ end
 Element(a, b, c) = Element(a, b, c, nothing, Material())
 
 type NodeSet
-    name :: ASCIIString
+    name :: String
     nodes :: Vector{Int64}
 end
 
 """
 """
 type ElementSet
-    name :: ASCIIString
-    elements :: Vector{Union{Int64, ASCIIString}} 
+    name :: String
+    elements :: Vector{Union{Int64, String}} 
     material :: Material
 end
 
-ElementSet(name::ASCIIString, elements::Vector{Element}) =
+ElementSet(name::String, elements::Vector{Element}) =
     ElementSet(name, map(x-> x.id, elements), Material())
 
-ElementSet(name::ASCIIString, ids::Vector{Int64}) =
+ElementSet(name::String, ids::Vector{Int64}) =
     ElementSet(name, ids, Material())
 
 """
@@ -76,10 +76,10 @@ type Simulation
     neumann_boundary_conditions :: Vector{NeumannBC}
     dirichlet_boundary_conditions :: Vector{DirichletBC}
     solver
-    sets :: Vector{ASCIIString}
+    sets :: Vector{String}
 end
 
-Simulation(a) = Simulation(a, NeumannBC[], DirichletBC[], nothing, ASCIIString[])
+Simulation(a) = Simulation(a, NeumannBC[], DirichletBC[], nothing, String[])
 
 
 """
@@ -88,17 +88,17 @@ Model type
 Used for constructing the calculation model
 """
 type Model
-    name :: ASCIIString 
-    nodes :: Dict{Union{Int64, ASCIIString}}
-    elements :: Dict{Union{ASCIIString, Int64}, Element} 
-    elsets :: Dict{ASCIIString, ElementSet}
-    nsets :: Dict{ASCIIString, NodeSet}
-    load_cases :: Dict{ASCIIString, Simulation}
-    renum_nodes :: Dict{Union{Int64, ASCIIString}, Int64}
+    name :: String 
+    nodes :: Dict{Union{Int64, String}}
+    elements :: Dict{Union{String, Int64}, Element} 
+    elsets :: Dict{String, ElementSet}
+    nsets :: Dict{String, NodeSet}
+    load_cases :: Dict{String, Simulation}
+    renum_nodes :: Dict{Union{Int64, String}, Int64}
     #settings :: Dict{AbstractString, Real}
 end
 
-function Model(name::ASCIIString, abq_input::Dict)
+function Model(name::String, abq_input::Dict)
     model  = Model(name)
     nodes        = abq_input["nodes"]
     elements     = abq_input["elements"]
@@ -129,18 +129,18 @@ function Model(name::ASCIIString, abq_input::Dict)
     model
 end
 
-Model(name::ASCIIString) = Model(
+Model(name::String) = Model(
     name,
-    Dict{Union{Int64, ASCIIString}, Node}(),
-    Dict{Union{Int64, ASCIIString}, Element}(),
-    Dict{ASCIIString, NodeSet}(),
-    Dict{ASCIIString, ElementSet}(),
-    Dict{ASCIIString, Simulation}(),
-    Dict{Union{Int64, ASCIIString}, Int64}()
+    Dict{Union{Int64, String}, Node}(),
+    Dict{Union{Int64, String}, Element}(),
+    Dict{String, NodeSet}(),
+    Dict{String, ElementSet}(),
+    Dict{String, Simulation}(),
+    Dict{Union{Int64, String}, Int64}()
 )
 
-function Base.setindex!(dict::Dict{Union{ASCIIString, Int64}, Node},
-    vals::Vector{Float64}, idx::Union{ASCIIString, Int64})
+function Base.setindex!(dict::Dict{Union{String, Int64}, Node},
+    vals::Vector{Float64}, idx::Union{String, Int64})
     dict[idx] = Node(idx, vals)
 end
 

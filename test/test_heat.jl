@@ -22,7 +22,7 @@ using JuliaFEM.Postprocess
     info("# of elements in fixed set: $(length(fixed))")
     update!(fixed, "temperature 1", 0.0)
     solver = LinearSolver(prob, face, fixed)
-    call(solver)
+    solver()
     T = prob.assembly.u
     info("Solution: $T")
     T_expected = [ # using code aster
@@ -94,7 +94,7 @@ end
     # T=1 on free boundary, u(x,y) = -1/6*(1/2*f*x^2 - f*x)
     # when boundary flux not active (at t=0)
     solver.time = 0.0
-    call(solver)
+    solver()
     # interpolate temperature at middle of element 2 (flux boundary) at time t=0:
     T = el2("temperature", [0.0], 0.0)
     @test isapprox(T[1], 1.0)
@@ -103,7 +103,7 @@ end
     # u(x,y) = x which equals T=1 on boundary.
     # at time t=1.0 all loads should be on.
     solver.time = 1.0
-    call(solver)
+    solver()
     T = el2("temperature", [0.0], 1.0)
     @test isapprox(T[1], 2.0)
 end
@@ -152,7 +152,7 @@ end
     push!(p2, e3)
 
     solver = LinearSolver(p1, p2)
-    call(solver)
+    solver()
     T_min = minimum(p1.assembly.u)
     @test isapprox(T_max, T_acc(0.2); rtol=4.5e-2)
 end
@@ -189,7 +189,7 @@ end
     update!(p2, "temperature 1", 100.0)
 
     solver = LinearSolver(p1, p2)
-    call(solver)
+    solver()
 
     # fields extracted from Code Aster .resu file
     TEMP = Dict{Int64, Float64}(
@@ -221,7 +221,7 @@ end
         8 => [1.74447696000717E+04, -4.72904678032179E+02, -1.75280965396335E+02])
 
     postprocessor = Postprocessor(p1)
-    flux = full(call(postprocessor))
+    flux = full(postprocessor())
     fluxd = Dict{Int64, Vector{Float64}}()
     for j=1:8
         fluxd[j] = vec(flux[j,:])
@@ -269,7 +269,7 @@ end
         update!(p1, "temperature heat transfer coefficient", 1000.0)
         update!(p2, "temperature 1", 100.0)
         solver = LinearSolver(p1, p2)
-        call(solver)
+        solver()
         T_min = minimum(p1.assembly.u)
         return T_min
     end
@@ -317,7 +317,7 @@ end
         p2.elements = create_elements(mesh, "FACE1")
         update!(p2, "temperature 1", 100.0)
         solver = LinearSolver(p1, p2)
-        call(solver)
+        solver()
         return p1.assembly.u
     end
 

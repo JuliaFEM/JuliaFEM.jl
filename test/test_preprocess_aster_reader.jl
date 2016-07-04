@@ -66,7 +66,7 @@ end
 
 @testset "test combining meshes" begin
 
-    mesh1 = Dict{ASCIIString, Any}(
+    mesh1 = Dict{String, Any}(
         "nodes" => Dict{Int64, Vector{Float64}}(
             1 => [1.0, 2.0],
             2 => [2.0, 3.0]
@@ -76,7 +76,7 @@ end
         ),
     )
 
-    mesh2 = Dict{ASCIIString, Any}(
+    mesh2 = Dict{String, Any}(
         "nodes" => Dict{Int64, Vector{Float64}}(
             1 => [3.0, 4.0],
             2 => [4.0, 5.0]

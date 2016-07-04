@@ -100,7 +100,7 @@ function parse_abaqus(fid::IOStream)
     model = Dict()
     section = nothing
     header = nothing
-    data = ASCIIString[]
+    data = String[]
     info("Registered handlers: $(keys(handlers))")
 
     function process_section(section)

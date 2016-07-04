@@ -18,10 +18,10 @@ using JuliaFEM
 
 type Mesh
     nodes :: Dict{Int64, Vector{Float64}}
-    node_sets :: Dict{ASCIIString, Set{Int64}}
+    node_sets :: Dict{String, Set{Int64}}
     elements :: Dict{Int64, Vector{Int64}}
     element_types :: Dict{Int64, Symbol}
-    element_sets :: Dict{ASCIIString, Set{Int64}}
+    element_sets :: Dict{String, Set{Int64}}
 end
 
 function Mesh()
@@ -38,7 +38,7 @@ function add_nodes!(mesh::Mesh, nodes::Dict{Int64, Vector{Float64}})
     end
 end
 
-function add_node_to_node_set!(mesh::Mesh, set_name::ASCIIString, nids...)
+function add_node_to_node_set!(mesh::Mesh, set_name::String, nids...)
     if !haskey(mesh.node_sets, set_name)
         mesh.node_sets[set_name] = Set{Int64}()
     end
@@ -56,7 +56,7 @@ function add_elements!(mesh::Mesh, elements::Dict{Int64, Tuple{Symbol, Vector{In
     end
 end
 
-function add_element_to_element_set!(mesh::Mesh, set_name::ASCIIString, elids...)
+function add_element_to_element_set!(mesh::Mesh, set_name::String, elids...)
     if !haskey(mesh.element_sets, set_name)
         mesh.element_sets[set_name] = Set{Int64}()
     end
@@ -84,7 +84,7 @@ function filter_by_element_id(mesh::Mesh, element_ids::Vector{Int64})
     return mesh2
 end
 
-function filter_by_element_set(mesh::Mesh, set_name::ASCIIString)
+function filter_by_element_set(mesh::Mesh, set_name::String)
     filter_by_element_id(mesh::Mesh, collect(mesh.element_sets[set_name]))
 end
 
@@ -99,7 +99,7 @@ function create_elements(mesh::Mesh)
     return elements
 end
 
-function create_elements(mesh::Mesh, element_sets::ASCIIString...)
+function create_elements(mesh::Mesh, element_sets::String...)
     elements = Element[]
     for element_set in element_sets
         new_elements = create_elements(filter_by_element_set(mesh, element_set))

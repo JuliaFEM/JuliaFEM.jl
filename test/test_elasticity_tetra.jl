@@ -26,7 +26,7 @@ using JuliaFEM.Test
     push!(p2, e2)
     s = Solver(Linear)
     push!(s, p1, p2)
-    call(s)
+    s()
     u_4 = p1.assembly.u[10:end]
     u_expected = [-3.0/220.0, -9.0/220.0, 1.0/10.0]
     @test isapprox(u_4, u_expected)
@@ -56,7 +56,7 @@ end
     push!(p2, e2)
     s = Solver(Linear)
     push!(s, p1, p2)
-    call(s)
+    s()
     u_4 = p1.assembly.u[10:end]
     u_expected = [-17.0/14.0, -27.0/14.0, 1.0]
     info("u_4 = $(u_4)")

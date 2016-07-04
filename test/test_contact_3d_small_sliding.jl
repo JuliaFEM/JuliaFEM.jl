@@ -45,7 +45,7 @@ using JuliaFEM.Test
     solver = Solver(Nonlinear)
     push!(solver, upper, lower, bc_upper, bc_lower, contact)
 
-    call(solver)
+    solver()
     for element in get_slave_elements(contact)
         normal = element("normal", [1/3, 1/3], solver.time)
         @test isapprox(normal, [0.0, 0.0, 1.0])

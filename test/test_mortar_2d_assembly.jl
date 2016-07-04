@@ -100,7 +100,7 @@ end
     push!(bc3, sel1, mel1)
 
     solver = LinearSolver(body1, body2, bc1, bc2, bc3)
-    call(solver)
+    solver()
 
     u = e2("displacement", [1.0, 1.0], 0.0)
     u_expected = [-1/3, 1.0]

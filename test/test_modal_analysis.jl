@@ -35,7 +35,7 @@ using JuliaFEM.Test
     s1.properties.which = :LM
     push!(s1, p1, p2)
 
-    call(s1; debug=true)
+    s1(; debug=true)
     @test isapprox(s1.properties.eigvals, [4/3, 1/3])
 
     empty!(p1)
@@ -44,7 +44,7 @@ using JuliaFEM.Test
 #   p1.properties.finite_strain = true
     p1.properties.geometric_stiffness = true
     s1.properties.geometric_stiffness = true
-    call(s1; debug=true)
+    s1(; debug=true)
     @test isapprox(s1.properties.eigvals, [5/3, 2/3])
 end
 
@@ -80,7 +80,7 @@ end
 
     solver = Solver(Modal)
     push!(solver, p1, p2)
-    call(solver)
+    solver()
     @test isapprox(solver.properties.eigvals[1], 1.0)
 end
 
@@ -124,7 +124,7 @@ end
     push!(p4, el5, el6)
     solver = Solver(Modal)
     push!(solver, p1, p2, p3, p4)
-    call(solver)
+    solver()
     @test isapprox(solver.properties.eigvals[1], 1.0)
 end
 
