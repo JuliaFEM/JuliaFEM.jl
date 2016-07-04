@@ -39,7 +39,7 @@ using JuliaFEM.Postprocess
     @test isapprox(T, T_expected; rtol=1.0e-6)
 end
 
-@testset "one element heat problem" begin
+@testset "2d heat problem (one element)" begin
 
     X = Dict{Int, Vector{Float64}}(
         1 => [0.0,0.0],
@@ -65,15 +65,9 @@ end
     problem.properties.formulation = "2D"
     push!(problem, el1, el2)
 
-    # define boundary element for dirichlet boundary condition
-    el3 = Element(Seg2, [3, 4])
-    update!(el3, "geometry", X)
-    update!(el3, "temperature 1", 0.0)
-
-    boundary_condition = Problem(Dirichlet, "T=0 on top", 1, "temperature")
-    push!(boundary_condition, el3)
-
-    # manual assembling of problem + solution:
+    # Set constant source f=12 with k=6. Accurate solution is
+    # T=1 on free boundary, u(x,y) = -1/6*(1/2*f*x^2 - f*x)
+    # when boundary flux not active (at t=0)
     assemble!(problem, 0.0)
     A = full(problem.assembly.K)
     b = full(problem.assembly.f)
@@ -86,26 +80,14 @@ end
     @test isapprox(A, A_expected)
     @test isapprox(A[free_dofs, free_dofs] \ b[free_dofs], [1.0, 1.0])
 
-    # using Solver
-    solver = LinearSolver("solve heat problem")
-    push!(solver, problem, boundary_condition)
-
-    # Set constant source f=12 with k=6. Accurate solution is
-    # T=1 on free boundary, u(x,y) = -1/6*(1/2*f*x^2 - f*x)
-    # when boundary flux not active (at t=0)
-    solver.time = 0.0
-    solver()
-    # interpolate temperature at middle of element 2 (flux boundary) at time t=0:
-    T = el2("temperature", [0.0], 0.0)
-    @test isapprox(T[1], 1.0)
-
     # Set constant flux g=6 on boundary. Accurate solution is
     # u(x,y) = x which equals T=1 on boundary.
     # at time t=1.0 all loads should be on.
-    solver.time = 1.0
-    solver()
-    T = el2("temperature", [0.0], 1.0)
-    @test isapprox(T[1], 2.0)
+    empty!(problem)
+    assemble!(problem, 1.0)
+    A = full(problem.assembly.K)
+    b = full(problem.assembly.f)
+    @test isapprox(A[free_dofs, free_dofs] \ b[free_dofs], [2.0, 2.0])
 end
 
 function T_acc(x)

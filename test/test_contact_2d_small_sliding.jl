@@ -38,16 +38,16 @@ function get_model(::Type{Val{Symbol("curved 2d contact small sliding")}})
     update!(bc_lower, "displacement 1", 0.0)
     update!(bc_lower, "displacement 2", 0.0)
 
-    interface = Problem(Contact, "contact between upper and lower block", 2, "displacement")
-    interface.properties.dimension = 1
-    interface.properties.rotate_normals = true
-    interface_slave_elements = create_elements(mesh, "LOWER_TOP")
-    interface_master_elements = create_elements(mesh, "UPPER_BOTTOM")
-    update!(interface_slave_elements, "master elements", interface_master_elements)
-    interface.elements = [interface_master_elements; interface_slave_elements]
+    contact = Problem(Contact, "contact between upper and lower block", 2, "displacement")
+    contact.properties.dimension = 1
+    contact.properties.rotate_normals = true
+    contact_slave_elements = create_elements(mesh, "LOWER_TOP")
+    contact_master_elements = create_elements(mesh, "UPPER_BOTTOM")
+    update!(contact_slave_elements, "master elements", contact_master_elements)
+    contact.elements = [contact_master_elements; contact_slave_elements]
 
     solver = Solver(Nonlinear)
-    push!(solver, upper, lower, bc_upper, bc_lower, interface)
+    push!(solver, upper, lower, bc_upper, bc_lower, contact)
     return solver
 
 end
@@ -56,23 +56,13 @@ end
     # FIXME: needs verification of some other fem software
     solver = get_model("curved 2d contact small sliding")
     solver()
-    upper, lower, bc_upper, bc_lower, interface = solver.problems
-    @test isapprox(norm(interface.assembly.u), 0.49563347601324315)
-end
-
-
-function get_mesh(::Type{Val{Symbol("hertz contact, full 2d model")}})
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/hertz_2d_full.med"
-    mesh = aster_read_mesh(meshfile)
+    upper, lower, bc_upper, bc_lower, contact = solver.problems
+    @test isapprox(norm(contact.assembly.u), 0.49563347601324315)
 end
 
 function get_model(::Type{Val{Symbol("hertz contact, full 2d model")}})
-    # from fenet d3613 advanced finite element contact benchmarks
-    # a = 6.21 mm, pmax = 3585 MPa
-    # this is a very sparse mesh and for that reason pmax is not very
-    # (only 6 elements in -20 .. 20 mm contact zone, 3 elements in contact
-    # instead integrate pressure in normal and tangential direction
-    mesh = get_mesh("hertz contact, full 2d model")
+    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/hertz_2d_full.med"
+    mesh = aster_read_mesh(meshfile)
 
     upper = Problem(Elasticity, "CYLINDER", 2)
     upper.properties.formulation = :plane_strain
@@ -106,6 +96,9 @@ function get_model(::Type{Val{Symbol("hertz contact, full 2d model")}})
 
     contact = Problem(Contact, "contact between block and cylinder", 2, "displacement")
     contact.properties.rotate_normals = true
+    contact.properties.finite_sliding = false
+    contact.properties.friction = false
+    contact.properties.use_forwarddiff = false
     contact_slave_elements = create_elements(mesh, "CYLINDER_TO_BLOCK")
     contact_master_elements = create_elements(mesh, "BLOCK_TO_CYLINDER")
     update!(contact_slave_elements, "master elements", contact_master_elements)
@@ -118,14 +111,21 @@ function get_model(::Type{Val{Symbol("hertz contact, full 2d model")}})
 end
 
 @testset "test frictionless hertz contact, 2d plane strain" begin
+    # from fenet d3613 advanced finite element contact benchmarks
+    # a = 6.21 mm, pmax = 3585 MPa
+    # this is a very sparse mesh and for that reason pmax is not very
+    # (only 6 elements in -20 .. 20 mm contact zone, 3 elements in contact
+    # instead integrate pressure in normal and tangential direction
     solver = get_model("hertz contact, full 2d model")
-    solver()
     upper, lower, bc_fixed, bc_sym_23, load, contact = solver.problems
+    solver()
     slaves = get_slave_elements(contact)
     node_ids, la = get_nodal_vector(slaves, "reaction force", 0.0)
     node_ids, n = get_nodal_vector(slaves, "normal", 0.0)
     pres = [dot(ni, lai) for (ni, lai) in zip(n, la)]
-    @test isapprox(maximum(pres), 4060.010799583303)
+    #@test isapprox(maximum(pres), 4060.010799583303)
+    # 12 % error in maximum pressure
+    @test isapprox(maximum(pres), 3585.0; rtol = 12.0e-2)
     # integrate pressure in normal and tangential direction
     Rn = 0.0
     Rt = 0.0
@@ -141,7 +141,8 @@ end
             Rt += w*dot(t, la)
         end
     end
-    @test isapprox(Rn, 35.0e3; rtol=0.0015)
+    # under 0.15 % error in reaction force
+    @test isapprox(Rn, 35.0e3; rtol=0.15e-2)
     @test isapprox(Rt, 0.0; atol=10.0)
 end
 

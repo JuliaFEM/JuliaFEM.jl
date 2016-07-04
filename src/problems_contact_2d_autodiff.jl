@@ -1,6 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+using ForwardDiff
+
 """ Find segment from slave element corresponding to master element nodes.
 
 Parameters
@@ -21,10 +23,10 @@ function project_from_master_to_slave{E<:MortarElements2D}(
     slave_element::Element{E}, x1_::DVTI, n1_::DVTI, x2::Vector;
     tol=1.0e-10, max_iterations=20)
 
-    x1(xi1) = vec(get_basis(E, xi1))*x1_
-    dx1(xi1) = vec(get_dbasis(E, xi1))*x1_
-    n1(xi1) = vec(get_basis(E, xi1))*n1_
-    dn1(xi1) = vec(get_dbasis(E, xi1))*n1_
+    x1(xi1) = vec(get_basis(slave_element, [xi1], time))*x1_
+    dx1(xi1) = vec(get_dbasis(slave_element, [xi1], time))*x1_
+    n1(xi1) = vec(get_basis(slave_element, [xi1], time))*n1_
+    dn1(xi1) = vec(get_dbasis(slave_element, [xi1], time))*n1_
     cross2(a, b) = cross([a; 0], [b; 0])[3]
     R(xi1) = cross2(x1(xi1)-x2, n1(xi1))
     dR(xi1) = cross2(dx1(xi1), n1(xi1)) + cross2(x1(xi1)-x2, dn1(xi1))
@@ -53,8 +55,8 @@ function project_from_slave_to_master{E<:MortarElements2D}(
     master_element::Element{E}, x1::Vector, n1::Vector, x2_::DVTI;
     tol=1.0e-10, max_iterations=20)
 
-    x2(xi2) = vec(get_basis(E, xi2))*x2_
-    dx2(xi2) = vec(get_dbasis(E, xi2))*x2_
+    x2(xi2) = vec(get_basis(master_element, [xi2], time))*x2_
+    dx2(xi2) = vec(get_dbasis(master_element, [xi2], time))*x2_
     cross2(a, b) = cross([a; 0], [b; 0])[3]
     R(xi2) = cross2(x2(xi2)-x1, n1)
     dR(xi2) = cross2(dx2(xi2), n1)
@@ -73,12 +75,19 @@ function project_from_slave_to_master{E<:MortarElements2D}(
 
 end
 
-""" Assemble Mortar problem for two-dimensional problems, i.e. for Seg2 and Seg3 elements. """
-function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}})
+"""
+Frictionless 2d finite sliding contact with forwarddiff.
+
+true/false flags: finite_sliding, friction, use_forwarddiff
+"""
+function assemble!(problem::Problem{Contact}, time::Float64,
+                   ::Type{Val{1}},     ::Type{Val{true}},
+                   ::Type{Val{false}}, ::Type{Val{true}})
 
     props = problem.properties
     field_dim = get_unknown_field_dimension(problem)
     field_name = get_parent_field_name(problem)
+    slave_elements = get_slave_elements(problem)
 
     function calculate_interface(x::Vector)
 
@@ -94,16 +103,15 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}})
         # 1. update nodal normals for slave elements
         Q = [0.0 -1.0; 1.0 0.0]
         normals = zeros(u)
-        for element in get_elements(problem)
-            haskey(element, "master elements") || continue
+        for element in slave_elements
             conn = get_connectivity(element)
             push!(S, conn...)
             gdofs = get_gdofs(element, field_dim)
             X_el = element("geometry", time)
             u_el = Field(Vector[u[:,i] for i in conn])
             x_el = X_el + u_el
-            for ip in get_integration_points(element, Val{3})
-                dN = get_dbasis(element, ip)
+            for ip in get_integration_points(element, 3)
+                dN = get_dbasis(element, ip, time)
                 N = element(ip, time)
                 t = sum([kron(dN[:,i], x_el[i]') for i=1:length(x_el)])
                 normals[:, conn] += ip.weight*Q*t'*N
@@ -118,10 +126,14 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}})
                 normals[:,i] = -normals[:,i]
             end
         end
+        normals2 = Dict()
+        for j in S
+            normals2[j] = normals[:,j]
+        end
+        update!(slave_elements, "normal", time => normals2)
 
         # 2. loop all slave elements
-        for slave_element in get_elements(problem)
-            haskey(slave_element, "master elements") || continue
+        for slave_element in slave_elements
 
             slave_element_nodes = get_connectivity(slave_element)
             X1 = slave_element("geometry", time)
@@ -130,20 +142,19 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}})
             la1 = Field(Vector[la[:,i] for i in slave_element_nodes])
             n1 = Field(Vector[normals[:,i] for i in slave_element_nodes])
             nnodes = size(slave_element, 2)
-            update!(slave_element, "normals", time => ForwardDiff.get_value(n1.data))
 
             # 3. loop all master elements
-            for master_element in slave_element["master elements"]
+            for master_element in slave_element("master elements", time)
 
                 master_element_nodes = get_connectivity(master_element)
                 X2 = master_element("geometry", time)
                 u2 = Field(Vector[u[:,i] for i in master_element_nodes])
                 x2 = X2 + u2
 
-                x1_midpoint = 1/2*(x1[1]+x1[2])
-                x2_midpoint = 1/2*(x2[1]+x2[2])
-                distance = ForwardDiff.get_value(norm(x2_midpoint - x1_midpoint))
-                distance > props.maximum_distance && continue
+                #x1_midpoint = 1/2*(x1[1]+x1[2])
+                #x2_midpoint = 1/2*(x2[1]+x2[2])
+                #distance = ForwardDiff.get_value(norm(x2_midpoint - x1_midpoint))
+                #distance > props.maximum_distance && continue
 
                 # calculate segmentation: we care only about endpoints
                 # note: these are quadratic/cubic functions, analytical solution possible
@@ -151,7 +162,7 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}})
                 xi1b = -Inf
                 try
                     xi1a = project_from_master_to_slave(slave_element, x1, n1, x2[1])
-                    xi1b = project_from_master_to_slave(slave_element, x1, n1, x2[end])
+                    xi1b = project_from_master_to_slave(slave_element, x1, n1, x2[2])
                 catch
                     info("failed to create projection!!!!")
                     # TODO
@@ -163,13 +174,14 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}})
 
                 De = zeros(nnodes, nnodes)
                 Me = zeros(nnodes, nnodes)
-                for ip in get_integration_points(slave_element, Val{5})
+                for ip in get_integration_points(slave_element, 3)
                     # jacobian of slave element in deformed state
-                    dN = get_dbasis(slave_element, ip)
+                    dN = get_dbasis(slave_element, ip, time)
                     j = sum([kron(dN[:,i], x1[i]') for i=1:length(x1)])
                     w = ip.weight*norm(j)*l
-                    xi_s = dot([1/2*(1-ip.xi); 1/2*(1+ip.xi)], xi1)
-                    N1 = get_basis(slave_element, xi_s)
+                    xi = ip.coords[1]
+                    xi_s = dot([1/2*(1-xi); 1/2*(1+xi)], xi1)
+                    N1 = get_basis(slave_element, xi_s, time)
                     De += w*diagm(vec(N1))
                     Me += w*N1'*N1
                 end
@@ -179,25 +191,26 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}})
                 master_dofs = get_gdofs(master_element, field_dim)
 
                 # 4. loop integration points of segment
-                for ip in get_integration_points(slave_element, Val{5})
+                for ip in get_integration_points(slave_element, 3)
                     # jacobian of slave element in deformed state
-                    dN = get_dbasis(slave_element, ip)
+                    dN = get_dbasis(slave_element, ip, time)
                     j = sum([kron(dN[:,i], x1[i]') for i=1:length(x1)])
                     w = ip.weight*norm(j)*l
 
                     # project gauss point from slave element to master element
-                    xi_s = dot([1/2*(1-ip.xi); 1/2*(1+ip.xi)], xi1)
-                    N1 = vec(get_basis(slave_element, xi_s))
+                    xi = ip.coords[1]
+                    xi_s = dot([1/2*(1-xi); 1/2*(1+xi)], xi1)
+                    N1 = vec(get_basis(slave_element, xi_s, time))
                     x_s = N1*x1 # coordinate in gauss point
                     n_s = N1*n1 # normal direction in gauss point
                     t_s = Q'*n_s # tangent direction in gauss point
                     xi_m = project_from_slave_to_master(master_element, x_s, n_s, x2)
-                    N2 = vec(get_basis(master_element, xi_m))
+                    N2 = vec(get_basis(master_element, xi_m, time))
                     x_m = N2*x2
                     Phi = Ae*N1
 
                     la_s = Phi*la1 # traction force in gauss point
-                    gn = props.gap_sign*dot(n_s, x_s - x_m) # normal gap
+                    gn = -dot(n_s, x_s - x_m) # normal gap
 
                     fc[:,slave_element_nodes] += w*la_s*N1'
                     fc[:,master_element_nodes] -= w*la_s*N2'
@@ -213,22 +226,22 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}})
         # at this point we have calculated contact force fc and gap for all slave elements.
         # next task is to find out are they in contact or not and remove inactive nodes
 
-        nzgap = sort(nonzeros(sparse(ForwardDiff.get_value(gap))))
-        info("gap: $nzgap")
+        #nzgap = sort(nonzeros(sparse(ForwardDiff.get_value(gap))))
+        #info("gap: $nzgap")
 
         for (i, j) in enumerate(sort(collect(S)))
-            if j in props.always_inactive
-                info("special node $j always inactive")
-                C[:,j] = la[:,j]
-                continue
-            end
+#           if j in props.always_inactive
+#               info("special node $j always inactive")
+#               C[:,j] = la[:,j]
+#               continue
+#           end
             n = normals[:,j]
             t = Q'*n
             lan = dot(n, la[:,j])
             lat = dot(t, la[:,j])
 
             if lan - gap[1, j] > 0
-                info("set node $j active, normal direction = $(ForwardDiff.get_value(n)), tangent plane = $(ForwardDiff.get_value(t))")
+#               info("set node $j active, normal direction = $(ForwardDiff.get_value(n)), tangent plane = $(ForwardDiff.get_value(t))")
                 C[1,j] += gap[1, j]
                 C[2,j] += lat
             else
@@ -242,22 +255,23 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}})
 
     # x doesn't mean deformed configuration here
     x = [problem.assembly.u; problem.assembly.la]
-    ndofs = round(Int, length(x)/2)
-    A, allresults = ForwardDiff.jacobian(calculate_interface, x,
-                            ForwardDiff.AllResults, cache=autodiffcache)
-    b = -ForwardDiff.value(allresults)
-
+    if length(x) == 0
+        error("2d autodiff contact problem: initialize problem.assembly.u & la before solution")
+    end
+    A = ForwardDiff.jacobian(calculate_interface, x)
+    b = calculate_interface(x)
     A = sparse(A)
     b = sparse(b)
     SparseMatrix.droptol!(A, 1.0e-12)
     SparseMatrix.droptol!(b, 1.0e-12)
 
+    ndofs = round(Int, length(x)/2)
     K = A[1:ndofs,1:ndofs]
     C1 = transpose(A[1:ndofs,ndofs+1:end])
     C2 = A[ndofs+1:end,1:ndofs]
     D = A[ndofs+1:end,ndofs+1:end]
-    f = b[1:ndofs]
-    g = b[ndofs+1:end]
+    f = -b[1:ndofs]
+    g = -b[ndofs+1:end]
 
     empty!(problem.assembly)
     add!(problem.assembly.K, K)
@@ -267,6 +281,5 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}})
     add!(problem.assembly.f, f)
     add!(problem.assembly.g, g)
 
-    return problem.assembly
-
 end
+

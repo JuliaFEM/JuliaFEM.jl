@@ -21,14 +21,11 @@ function get_unknown_field_name(problem::Problem{Mortar})
 end
 
 function get_formulation_type(problem::Problem{Mortar})
-    return :incremental
-    #=
     if problem.properties.use_forwarddiff
         return :forwarddiff
     else
         return :incremental
     end
-    =#
 end
 
 function assemble!(problem::Problem{Mortar}, time::Float64)

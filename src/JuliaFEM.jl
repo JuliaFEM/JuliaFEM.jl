@@ -60,7 +60,7 @@ include("assembly.jl")
 include("solver_utils.jl")
 include("solvers.jl")
 export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
-       get_unknown_field_name, get_formulation_type,
+       get_unknown_field_name, get_formulation_type, get_problems,
        get_field_problems, get_boundary_problems,
        get_field_assembly, get_boundary_assembly,
        initialize!, create_projection, eliminate_interior_dofs
@@ -86,6 +86,7 @@ export calculate_normals,
 include("problems_contact.jl")
 include("problems_contact_2d.jl")
 include("problems_contact_3d.jl")
+include("problems_contact_2d_autodiff.jl")
 export Contact
 
 module API

@@ -34,7 +34,11 @@ function get_unknown_field_name(problem::Problem{Contact})
 end
 
 function get_formulation_type(problem::Problem{Contact})
-    return :incremental
+    if problem.properties.use_forwarddiff
+        return :forwarddiff
+    else
+        return :incremental
+    end
 end
 
 function assemble!(problem::Problem{Contact}, time::Real)
@@ -50,3 +54,4 @@ function assemble!(problem::Problem{Contact}, time::Real)
     assemble!(problem, time, dimension, finite_sliding, friction, use_forwarddiff)
 end
 
+typealias ContactElements2D Union{Seg2}

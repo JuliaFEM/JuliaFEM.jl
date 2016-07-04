@@ -203,7 +203,7 @@ function update_assembly!(problem, u, la)
     end
 
     # copy current solutions to previous ones and add/replace new solution
-    # TODO: here we have couple of options and they needs to be clarified
+    # TODO: here we have couple of options and they need to be clarified
     # for total formulation we are solving total quantity Ku = f while in
     # incremental formulation we solve KΔu = f and u = u + Δu
     assembly.u_prev = copy(assembly.u)
@@ -217,7 +217,7 @@ function update_assembly!(problem, u, la)
         assembly.u += u
         assembly.la = la
     elseif get_formulation_type(problem) == :forwarddiff
-        info("$(problem.name): forwarddiff formulation, adding increment to solution vector")
+        info("$(problem.name): forwarddiff formulation, adding increment to solution vector and reaction force vector")
         assembly.u += u
         assembly.la += la
     else
