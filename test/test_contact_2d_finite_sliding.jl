@@ -54,3 +54,18 @@ using JuliaFEM.Test
 #   @test isapprox(normu, 0.49745873784105105)
     @test isapprox(normu, 0.49745872893844145)
 end
+
+#= TODO: Fix test, this is not converging
+@testset "project from master to slave" begin
+    el = Element(Seg2, [1, 2])
+    x1 = DVTI(Vector{Float64}[
+             [ 0.07406987526791842, 0.6628967239474994],
+             [-0.24633092752656838, 0.4732606367688589]])
+    n1 = DVTI(Vector{Float64}[
+             [0.40398625635635355, 0.9147650543583191],
+             [-0.5093430176405901, 0.860563588807229]])
+    x2 = [0.5049198709043257, 0.27765317280577695]
+    xi = project_from_master_to_slave(el, x1, n1, x2; debug=true)
+    info("xi = $xi")
+end
+=#

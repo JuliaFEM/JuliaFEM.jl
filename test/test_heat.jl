@@ -9,7 +9,7 @@ using JuliaFEM.Postprocess
 @testset "Tet10 + convection" begin
     # For some reason Tet10 fails, maybe because of convection.
     mesh_file = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
-    mesh = aster_read_mesh(mesh_file, "Tet10")
+    mesh = aster_read_mesh(mesh_file, "TETRA_TET10_1")
     prob = Problem(Heat, "tet", 1)
     face = Problem(Heat, "face 4", 1)
     fixed = Problem(Dirichlet, "fixed face 3", 1, "temperature")

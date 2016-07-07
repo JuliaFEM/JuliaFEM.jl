@@ -6,6 +6,8 @@ This is JuliaFEM -- Finite Element Package
 """
 module JuliaFEM
 
+using Compat
+import Compat.String
 importall Base
 
 include("fields.jl")
@@ -15,10 +17,10 @@ export AbstractPoint, Point, IntegrationPoint, IP, Node
 
 ### ELEMENTS ###
 include("elements.jl") # common element routines
-export Node, AbstractElement, Element, update!, get_connectivity, get_basis, get_dbasis
+export Node, AbstractElement, Element, update!, get_connectivity, get_basis, get_dbasis, inside, get_local_coordinates
 include("elements_lagrange_macro.jl") # Continuous Galerkin (Lagrange) elements generated using macro
 include("elements_lagrange.jl") # Continuous Galerkin (Lagrange) elements
-export get_reference_coordinates
+export get_reference_coordinates, get_interpolation_polynomial
 export Poi1,
        Seg2, Seg3,
        Tri3, Tri6, Quad4, Quad8, Quad9,

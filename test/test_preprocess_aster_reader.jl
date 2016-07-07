@@ -151,9 +151,9 @@ end
     @test length(mesh2.elements) == 1
 end
 
-function calculate_volume(eltype::Symbol)
+function calculate_volume(mesh_name::String, eltype::Symbol)
     fn = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
-    mesh = aster_read_mesh(fn, "$eltype")
+    mesh = aster_read_mesh(fn, mesh_name)
     elements = create_elements(mesh, eltype)
     V = 0.0
     time = 0.0
@@ -168,15 +168,22 @@ function calculate_volume(eltype::Symbol)
     return V
 end
 
-@testset "calculate volume for primitives" begin
-    @test isapprox(calculate_volume(:Tet4), 1/6)
-    @test isapprox(calculate_volume(:Tet10), 1/6)
-    @test isapprox(calculate_volume(:Hex8), 2^3)
-    @test isapprox(calculate_volume(:Hex20), 2^3)
-    @test isapprox(calculate_volume(:Hex27), 2^3)
-#   @test isapprox(get_volume("PE6"), V)
-#   @test isapprox(get_volume("PY5"), V)
-#   @test isapprox(get_volume("P15"), V)
-#   @test isapprox(get_volume("P13"), V)
+@testset "calculate volume for 1 element models" begin
+    @test isapprox(calculate_volume("TRIANGLE_TRI3_1", :Tri3), 1/2)
+    @test isapprox(calculate_volume("TRIANGLE_TRI6_1", :Tri6), 1/2)
+#   @test isapprox(calculate_volume("TRIANGLE_TRI7_1", :Tri7), 1/2)
+    @test isapprox(calculate_volume("SQUARE_QUAD4_1", :Quad4), 2^2)
+    @test isapprox(calculate_volume("SQUARE_QUAD8_1", :Quad8), 2^2)
+    @test isapprox(calculate_volume("SQUARE_QUAD9_1", :Quad9), 2^2)
+    @test isapprox(calculate_volume("TETRA_TET4_1", :Tet4), 1/6)
+    @test isapprox(calculate_volume("TETRA_TET10_1", :Tet10), 1/6)
+#   @test isapprox(calculate_volume("TETRA_TET14_1", :Tet14), 1/6)
+    @test isapprox(calculate_volume("CUBE_HEX8_1", :Hex8), 2^3)
+    @test isapprox(calculate_volume("CUBE_HEX20_1", :Hex20), 2^3)
+    @test isapprox(calculate_volume("CUBE_HEX27_1", :Hex27), 2^3)
+#   @test isapprox(calculate_volume("WEDGE_WEDGE6_1", :Wedge6, 1/2))
+#   @test isapprox(calculate_volume("WEDGE_WEDGE15_1", :Wedge15, 1/2))
+#   @test isapprox(calculate_volume("PYRAMID_PYRAMID5_1", :Pyramid5, ?))
+#   @test isapprox(calculate_volume("PYRAMID_PYRAMID13_1", :Pyramid13, ?))
 end
 

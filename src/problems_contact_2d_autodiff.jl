@@ -21,7 +21,7 @@ xi
 """
 function project_from_master_to_slave{E<:MortarElements2D}(
     slave_element::Element{E}, x1_::DVTI, n1_::DVTI, x2::Vector;
-    tol=1.0e-10, max_iterations=20)
+    tol=1.0e-10, max_iterations=20, debug=false)
 
     x1(xi1) = vec(get_basis(slave_element, [xi1], time))*x1_
     dx1(xi1) = vec(get_dbasis(slave_element, [xi1], time))*x1_
@@ -32,21 +32,32 @@ function project_from_master_to_slave{E<:MortarElements2D}(
     dR(xi1) = cross2(dx1(xi1), n1(xi1)) + cross2(x1(xi1)-x2, dn1(xi1))
 
     xi1 = 0.0
+    xi1_next = 0.0
     dxi1 = 0.0
     for i=1:max_iterations
         dxi1 = -R(xi1)/dR(xi1)
-        xi1 += dxi1
-        if norm(dxi1) < tol
-            return xi1
+        dxi1 = clamp(dxi1, -0.3, 0.3)
+        xi1_next = clamp(xi1 + dxi1, -1.0, 1.0)
+        if norm(xi1_next - xi1) < tol
+            return xi1_next
         end
+        if debug
+            info("xi1 = $xi1")
+            info("R(xi1) = $(R(xi1))")
+            info("dR(xi1) = $(dR(xi1))")
+            info("dxi1 = $dxi1")
+            info("norm = $(norm(xi1_next - xi1))")
+            info("xi1_next = $xi1_next")
+        end
+        xi1 = xi1_next
     end
 
-    info("x1 = $(ForwardDiff.get_value(x1_.data))")
-    info("n1 = $(ForwardDiff.get_value(n1_.data))")
-    info("x2 = $(ForwardDiff.get_value(x2))")
-    info("xi1 = $(ForwardDiff.get_value(xi1)), dxi1 = $(ForwardDiff.get_value(dxi1))")
-    info("-R(xi1) = $(ForwardDiff.get_value(-R(xi1)))")
-    info("dR(xi1) = $(ForwardDiff.get_value(dR(xi1)))")
+    info("x1 = $x1_")
+    info("n1 = $n1_")
+    info("x2 = $x2")
+    info("xi1 = $xi1, dxi1 = $dxi1")
+    info("-R(xi1) = $(-R(xi1))")
+    info("dR(xi1) = $(dR(xi1))")
     error("find projection from master to slave: did not converge")
 
 end
@@ -157,17 +168,8 @@ function assemble!(problem::Problem{Contact}, time::Float64,
                 #distance > props.maximum_distance && continue
 
                 # calculate segmentation: we care only about endpoints
-                # note: these are quadratic/cubic functions, analytical solution possible
-                xi1a = -Inf
-                xi1b = -Inf
-                try
-                    xi1a = project_from_master_to_slave(slave_element, x1, n1, x2[1])
-                    xi1b = project_from_master_to_slave(slave_element, x1, n1, x2[2])
-                catch
-                    info("failed to create projection!!!!")
-                    # TODO
-                    continue
-                end
+                xi1a = project_from_master_to_slave(slave_element, x1, n1, x2[1])
+                xi1b = project_from_master_to_slave(slave_element, x1, n1, x2[2])
                 xi1 = clamp([xi1a; xi1b], -1.0, 1.0)
                 l = 1/2*abs(xi1[2]-xi1[1])
                 isapprox(l, 0.0) && continue # no contribution in this master element
