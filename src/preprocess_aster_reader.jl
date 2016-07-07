@@ -346,11 +346,13 @@ Dict containing fields "nodes" and "connectivity".
 """
 function parse_aster_med_file(fn::String, mesh_name=nothing; debug=false)
     med = MEDFile(fn)
-    if isa(mesh_name, Void)
-        mesh_names = get_mesh_names(med::MEDFile)
-        all_meshes = join(mesh_names, ", ")
+    mesh_names = get_mesh_names(med::MEDFile)
+    all_meshes = join(mesh_names, ", ")
+    if mesh_name == nothing
         length(mesh_names) == 1 || error("several meshes found from med, pick one: $all_meshes")
         mesh_name = mesh_names[1]
+    else
+        mesh_name in mesh_names || error("Mesh $mesh_name not found from mesh file $fn. Available meshes: $all_meshes")
     end
     nsets = get_node_sets(med, mesh_name)
     elsets = get_element_sets(med, mesh_name)

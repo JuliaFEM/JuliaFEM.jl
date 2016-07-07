@@ -89,13 +89,8 @@ function filter_by_element_set(mesh::Mesh, set_name::String)
 end
 
 function create_elements(mesh::Mesh)
-    elements = Element[]
-    for (elid, elcon) in mesh.elements
-        eltype = mesh.element_types[elid]
-        element = Element(JuliaFEM.(eltype), elcon)
-        update!(element, "geometry", mesh.nodes)
-        push!(elements, element)
-    end
+    elements = [Element(JuliaFEM.(mesh.element_types[elid]), elcon) for (elid, elcon) in mesh.elements]
+    update!(elements, "geometry", mesh.nodes)
     return elements
 end
 
@@ -103,7 +98,7 @@ function create_elements(mesh::Mesh, element_sets::String...)
     elements = Element[]
     for element_set in element_sets
         new_elements = create_elements(filter_by_element_set(mesh, element_set))
-        push!(elements, new_elements...)
+        elements = [elements; new_elements]
     end
     return elements
 end
