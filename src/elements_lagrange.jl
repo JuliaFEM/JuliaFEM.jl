@@ -34,6 +34,10 @@ function get_integration_points(element::Poi1, order::Int64)
     return [ (1.0, [] ) ]
 end
 
+function get_reference_coordinates(::Type{Poi1})
+    Vector{Float64}[[0.0]]
+end
+
 ### 1d elements
 
 type Seg2 <: AbstractElement
@@ -575,4 +579,13 @@ end
 @create_basis Hex8
 @create_basis Hex20
 @create_basis Hex27
+
+function inside(::Union{Type{Seg2}, Type{Seg3}, Type{Quad4}, Type{Quad8},
+                        Type{Quad9}, Type{Hex8}, Type{Hex20}, Type{Hex27}}, xi)
+    return all(-1.0 .<= xi .<= 1.0)
+end
+
+function inside(::Union{Type{Tri3}, Type{Tri6}, Type{Tet4}, Type{Tet10}}, xi)
+    return all(xi .>= 0.0) && (sum(xi) <= 1.0)
+end
 
