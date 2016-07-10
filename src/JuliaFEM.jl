@@ -9,7 +9,7 @@ module JuliaFEM
 importall Base
 
 include("fields.jl")
-export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV
+export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment
 include("types.jl")  # data types: Point, IntegrationPoint, ...
 export AbstractPoint, Point, IntegrationPoint, IP, Node
 
@@ -132,7 +132,10 @@ include("postprocess_utils.jl")
 export calc_nodal_values!, 
        get_nodal_vector,
        get_nodal_dict,
-       copy_field!
+       copy_field!,
+       calculate_area,
+       calculate_center_of_mass,
+       calculate_second_moment_of_mass
 include("postprocess_xdmf.jl")
 export XDMF, xdmf_new_result!, xdmf_save_field!, xdmf_save!
 end

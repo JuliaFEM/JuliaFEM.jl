@@ -164,3 +164,83 @@ function call(problem::Problem, field_name::AbstractString, X::Vector, time::Flo
     return fillna
 end
 
+""" Calculate area of cross-section. """
+function calculate_area(problem::Problem, X=[0.0, 0.0], time=0.0)
+    A = 0.0
+    for element in get_elements(problem)
+        elsize = size(element)
+        elsize[1] == 2 || error("wrong dimension of problem for area calculation, element size = $elsize")
+        for ip in get_integration_points(element)
+            w = ip.weight*element(ip, time, Val{:detJ})
+            A += w
+        end
+    end
+    return A
+end
+
+""" Calculate volume of body. """
+function calculate_volume(problem::Problem, X=[0.0, 0.0, 0.0], time=0.0)
+    V = 0.0
+    for element in get_elements(problem)
+        elsize = size(element)
+        elsize[1] == 3 || error("wrong dimension of problem for area calculation, element size = $elsize")
+        for ip in get_integration_points(element)
+            w = ip.weight*element(ip, time, Val{:detJ})
+            V += w
+        end
+    end
+    return V
+end
+
+""" Calculate center of mass of body with respect to X.
+https://en.wikipedia.org/wiki/Center_of_mass
+"""
+function calculate_center_of_mass(problem::Problem, X=[0.0, 0.0, 0.0], time=0.0)
+    M = 0.0
+    Xc = zeros(X)
+    for element in get_elements(problem)
+        for ip in get_integration_points(element)
+            w = ip.weight*element(ip, time, Val{:detJ})
+            M += w
+            rho = haskey(element, "density") ? element("density", ip, time) : 1.0
+            Xp = element("geometry", ip, time)
+            Xc += w*rho*(Xp-X)
+        end
+    end
+    return 1.0/M * Xc
+end
+
+""" Calculate second moment of mass with respect to X.
+https://en.wikipedia.org/wiki/Second_moment_of_area
+"""
+function calculate_second_moment_of_mass(problem::Problem, X=[0.0, 0.0, 0.0], time=0.0)
+    n = length(X)
+    I = zeros(n, n)
+    for element in get_elements(problem)
+        for ip in get_integration_points(element)
+            w = ip.weight*element(ip, time, Val{:detJ})
+            rho = haskey(element, "density") ? element("density", ip, time) : 1.0
+            Xp = element("geometry", ip, time) - X
+            I += w*rho*Xp*Xp'
+        end
+    end
+    return I
+end
+
+function getindex(problem::Problem, field_name::AbstractString)
+    info("fetching result $field_name")
+    timeframes = []
+    for frame in first(problem.elements)[field_name].data
+        push!(timeframes, frame.time)
+    end
+    info("time frames: $timeframes")
+    conn = get_connectivity(problem)
+    increments = Increment[]
+    for time in timeframes
+        p = problem(field_name, time)
+        data = [p[id] for id in conn]
+        push!(increments, Increment(time, data))
+    end
+    return DVTV(increments)
+end
+

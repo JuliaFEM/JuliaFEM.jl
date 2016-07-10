@@ -410,3 +410,23 @@ function Base.(:*)(grad::Matrix, field::DVTI)
     return sum([kron(grad[:,i], field[i]') for i=1:length(field)])'
 end
 
+function DVTV(data::Pair{Float64, Vector}...)
+    return DVTV([Increment(d[1], d[2]) for d in data])
+end
+
+function start(f::DVTV)
+    return start(f.data)
+end
+
+function next(f::DVTV, state)
+    return next(f.data, state)
+end
+
+function done(f::DVTV, state)
+    return done(f.data, state)
+end
+
+""" Return time vector from time variable field. """
+function keys(field::DVTV)
+    return Float64[increment.time for increment in field]
+end

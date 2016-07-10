@@ -313,6 +313,10 @@ function push!(problem::Problem, elements_::Vector...)
     end
 end
 
+function get_connectivity(problem::Problem)
+    return union([get_connectivity(element) for element in get_elements(problem)]...)
+end
+
 function get_gdofs(element::Element, dim::Int)
     conn = get_connectivity(element)
     if length(conn) == 0

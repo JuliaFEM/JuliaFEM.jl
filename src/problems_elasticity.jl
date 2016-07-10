@@ -69,7 +69,7 @@ end
 typealias Elasticity2DSurfaceElements Union{Poi1, Seg2, Seg3}
 typealias Elasticity2DVolumeElements Union{Tri3, Tri6, Quad4, Quad8, Quad9}
 typealias Elasticity3DSurfaceElements Union{Poi1, Tri3, Tri6, Quad4, Quad8, Quad9}
-typealias Elasticity3DVolumeElements Union{Tet4, Tet10, Hex8, Hex20, Hex27}
+typealias Elasticity3DVolumeElements Union{Tet4, Wedge6, Hex8, Tet10, Hex20, Hex27}
 
 
 """ Elasticity equations for 2d cases. """
@@ -544,11 +544,12 @@ function assemble{El<:Elasticity3DSurfaceElements}(problem::Problem{Elasticity},
                 f[i:dim:end] += w*vec(T*N)
             end
         end
-        if haskey(element, "displacement traction force n")
+        if haskey(element, "surface pressure")
             J = element(ip, time, Val{:Jacobian})'
             n = cross(J[:,1], J[:,2])
             n /= norm(n)
-            p = element("displacement traction force n", ip, time)
+            # sign convention, positive pressure is towards surface
+            p = -element("surface pressure", ip, time)
             f += w*p*vec(n*N)
         end
     end
