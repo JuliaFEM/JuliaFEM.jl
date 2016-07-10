@@ -56,6 +56,8 @@ function call(solver::Solver{Modal}; show_info=true, debug=false)
     P, h = create_projection(C1, g)
     K_red = P'*K*P
     M_red = P'*M*P
+    K_red = 1/2*(K_red + K_red')
+    M_red = 1/2*(M_red + M_red')
     t1 = round(toq(), 2)
     info("Eliminated dirichlet boundaries in $t1 seconds.")
 
@@ -71,7 +73,22 @@ function call(solver::Solver{Modal}; show_info=true, debug=false)
     end
 
     tic()
-    om2, X = eigs(K_red[nz,nz], M_red[nz,nz]; nev=props.nev, which=props.which)
+    om2 = nothing
+    X = nothing
+    try
+        om2, X = eigs(K_red[nz,nz], M_red[nz,nz]; nev=props.nev, which=props.which)
+    catch
+        info("failed to calculate eigenvalues")
+        info("K sym?", issym(K_red[nz,nz]))
+        info("M sym?", issym(M_red[nz,nz]))
+        info("K posdef?", isposdef(K_red[nz,nz]))
+        info("M posdef?", isposdef(M_red[nz,nz]))
+        k1 = maximum(abs(K_red[nz,nz] - K_red[nz,nz]'))
+        m1 = maximum(abs(M_red[nz,nz] - M_red[nz,nz]'))
+        info("K skewness ", k1)
+        info("M skewness ", m1)
+        rethrow()
+    end
     props.eigvals = om2
     props.eigvecs = zeros(ndofs, length(om2))
     v = zeros(ndofs)
@@ -82,6 +99,23 @@ function call(solver::Solver{Modal}; show_info=true, debug=false)
     end
     t1 = round(toq(), 2)
     info("Eigenvalues computed in $t1 seconds. Eigenvalues: $om2")
+
+    for i=1:length(om2)
+        u = props.eigvecs[:,i]
+        field_dim = get_unknown_field_dimension(solver)
+        field_name = get_unknown_field_name(solver)
+        nnodes = round(Int, length(u)/field_dim)
+        solution = reshape(u, field_dim, nnodes)
+        for problem in get_problems(solver)
+            local_sol = Dict{Int64, Vector{Float64}}()
+            for node_id in get_connectivity(problem)
+                local_sol[node_id] = solution[:, node_id]
+            end
+            freq = real(sqrt(om2[i])/(2.0*pi))
+            update!(problem, field_name, freq => local_sol)
+        end
+    end
+    
     return true
 end
 

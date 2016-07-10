@@ -19,6 +19,13 @@ function Solver{S<:AbstractSolver}(::Type{S}, name="solver", properties...)
     return solver
 end
 
+function Solver{S<:AbstractSolver}(::Type{S}, problems::Problem...)
+    variant = S()
+    solver = Solver{S}("$(S)Solver", 0.0, [], [], 0, variant)
+    push!(solver.problems, problems...)
+    return solver
+end
+
 function get_problems(solver::Solver)
     return solver.problems
 end
@@ -334,6 +341,26 @@ function assemble!(solver::Solver; show_info=true)
     show_info && info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
 end
 
+function get_unknown_fields(solver::Solver)
+    fields = Dict()
+    for problem in get_field_problems(solver)
+        field_name = get_unknown_field_name(problem)
+        field_dim = get_unknown_field_dimension(problem)
+        fields[field_name] = field_dim
+    end
+    return fields
+end
+
+function get_unknown_field_name(solver::Solver)
+    fields = get_unknown_fields(solver)
+    return join(sort(collect(keys(fields))), ", ")
+end
+
+function get_unknown_field_dimension(solver::Solver)
+    fields = get_unknown_fields(solver)
+    return sum(values(fields))
+end
+
 """ Default initializer for solver. """
 function initialize!(solver::Solver; show_info=true)
     show_info && info("Initializing problems ...")
@@ -342,8 +369,8 @@ function initialize!(solver::Solver; show_info=true)
     t0 = Base.time()
     field_problems = get_field_problems(solver)
     length(field_problems) != 0 || warn("No field problem found from solver, add some..?")
-    field_dim = get_unknown_field_dimension(first(field_problems))
-    field_name = get_unknown_field_name(first(field_problems))
+    field_name = get_unknown_field_name(solver)
+    field_dim = get_unknown_field_dimension(solver)
     info("initialize!(): looks we are solving $field_name, $field_dim dofs/node")
     nodes = Set{Int64}()
     for problem in problems
