@@ -49,7 +49,7 @@ end
     e2["displacement 3"] = 0.0
     e3 = Element(Tri3, [4, 3, 2])
     update!(e3, "geometry", nodes)
-    e3["displacement traction force n"] = 96.0
+    update!(e3, "surface pressure", -96.0)
     p1 = Problem(Elasticity, "tetra", 3)
     p2 = Problem(Dirichlet, "bc", 3, "displacement")
     push!(p1, e1, e3)
