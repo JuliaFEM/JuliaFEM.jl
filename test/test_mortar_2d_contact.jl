@@ -3,7 +3,7 @@
 
 using JuliaFEM
 using JuliaFEM.Preprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 function JuliaFEM.get_mesh(::Type{Val{Symbol("two elements 1.0x0.5 with 0.1 gap in y direction")}})
     mesh = Mesh()
@@ -21,12 +21,12 @@ function JuliaFEM.get_mesh(::Type{Val{Symbol("two elements 1.0x0.5 with 0.1 gap 
     add_element!(mesh, 4, :Seg2, [7, 8])
     add_element!(mesh, 5, :Seg2, [4, 3])
     add_element!(mesh, 6, :Seg2, [6, 5])
-    add_element_to_element_set!(mesh, "LOWER", 1)
-    add_element_to_element_set!(mesh, "UPPER", 2)
-    add_element_to_element_set!(mesh, "LOWER_BOTTOM", 3)
-    add_element_to_element_set!(mesh, "UPPER_TOP", 4)
-    add_element_to_element_set!(mesh, "LOWER_TOP", 5)
-    add_element_to_element_set!(mesh, "UPPER_BOTTOM", 6)
+    add_element_to_element_set!(mesh, :LOWER, 1)
+    add_element_to_element_set!(mesh, :UPPER, 2)
+    add_element_to_element_set!(mesh, :LOWER_BOTTOM, 3)
+    add_element_to_element_set!(mesh, :UPPER_TOP, 4)
+    add_element_to_element_set!(mesh, :LOWER_TOP, 5)
+    add_element_to_element_set!(mesh, :UPPER_BOTTOM, 6)
     return mesh
 end
 

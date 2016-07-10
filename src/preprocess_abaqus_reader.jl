@@ -79,7 +79,8 @@ end
 Parse elements from input.
 """
 function parse_section(model, lines, key, idx_start, idx_end, ::Type{Val{:ELEMENT}})
-    definition = uppercase(lines[idx_start])
+    #definition = uppercase(lines[idx_start])
+    definition = lines[idx_start]
     element_type = regex_match(r"TYPE=([\w\-\_]+)", definition, 1)
     eltype_sym = Symbol(element_type)
     eltype_nodes = element_has_nodes(Val{eltype_sym})
@@ -121,7 +122,9 @@ Parsing Node- and ElementSets.
 function parse_section(model, lines, key, idx_start, idx_end, ::Union{Type{Val{:NSET}}, Type{Val{:ELSET}}})
     set_regex_string = Dict(:NSET  => r"NSET=([\w\-\_]+)",
                             :ELSET => r"ELSET=([\w\-\_]+)" )
-    definition = uppercase(lines[idx_start])
+    #definition = uppercase(lines[idx_start])
+    # FIXME: do not uppercase set names
+    definition = lines[idx_start]
     regex_string = set_regex_string[key]
     set_name = regex_match(regex_string, definition, 1)
     info("Creating $(lowercase(string(key))) $set_name")
@@ -146,28 +149,27 @@ function parse_section(model, lines, key, idx_start, idx_end, ::Union{Type{Val{:
 end 
 
 """
-TODO ! Parse surface keyword
+Parse SURFACE keyword
 """
-function parse_section(model, lines, key, idx_start, idx_end,
-    ::Type{Val{:SURFACE}})
+function parse_section(model, lines, key, idx_start, idx_end, ::Type{Val{:SURFACE}})
     info("Parsing surface")
-    definition = uppercase(lines[idx_start])
-    ids = Vector{Tuple(Int, Int)}()
+    #definition = uppercase(lines[idx_start])
+    definition = lines[idx_start]
+    has_set_def = match(r"TYPE=([\w\_\-]+),.*NAME=([\w\_\-]+)", definition) 
+    has_set_def != nothing || return
+    set_type = Symbol(has_set_def[1])
+    set_name = Symbol(has_set_def[2])
+    data = Vector{Tuple{Int64, Symbol}}()
     for line in lines[idx_start + 1: idx_end]
-        if !(empty_or_comment_line(line))
-            m = matchall(r"[-0-9.]+", line)
-            node_id = parse(Int, m[1])
-            coords = float(m[2:end])
-            nodes[node_id] = coords
-            model["nodes"][node_id] = coords
-        end
+        empty_or_comment_line(line) && continue
+        m = match(r"(?P<element_id>\d+),.+(?P<element_side>S\d+).*", line)
+        element_id = parse(Int, m[:element_id])
+        element_side = Symbol(m[:element_side])
+        push!(data, (element_id, element_side))
     end
-    has_set_def = match(r"NSET=([\w\_\-]+)", definition) 
-    if has_set_def != nothing
-      set_name = has_set_def[1]
-      model["nsets"][set_name] = ids
-  end
-
+    model["surface_types"][set_name] = set_type
+    model["surfaces"][set_name] = data
+    return
 end
 
 """
@@ -181,7 +183,7 @@ function find_keywords(lines)
         end
     end
     push!(indexes, length(lines) + 1)
-    indexes
+    return indexes
 end
 
 """
@@ -195,21 +197,44 @@ function parse_abaqus(fid::IOStream)
     parser::Function = x->()
     model = Dict{AbstractString, Any}()
     model["nodes"] = Dict{Int64, Vector{Float64}}()
-    model["nsets"] = Dict{String, Vector{Int64}}()
-    model["elsets"] = Dict{String, Vector{Int64}}()
+    model["nsets"] = Dict{AbstractString, Vector{Int64}}()
+    model["elsets"] = Dict{AbstractString, Vector{Int64}}()
     model["elements"] = Dict{Integer, Any}()
+    model["surfaces"] = Dict{Symbol, Vector{Tuple{Int64, Symbol}}}()
+    model["surface_types"] = Dict{Symbol, Symbol}()
     for idx_end in keyword_indexes[2:end]
         keyword_line = uppercase(lines[idx_start])
-        keyword = regex_match(r"\s*(\w+)", keyword_line, 1)
+        keyword = regex_match(r"\s*([\w ]+)", keyword_line, 1)
         k_sym = Symbol(keyword)
-        if method_exists(parse_section, Tuple{Dict, Array{Integer, 1}, Symbol,
-            Integer, Integer, Type{Val{k_sym}}})
+        args = Tuple{Dict, Vector{Int}, Symbol, Int, Int, Type{Val{k_sym}}}
+        if method_exists(parse_section, args)
             parse_section(model, lines, k_sym, idx_start, idx_end-1, Val{k_sym})
-        else
-            warn("Unknown section: $(keyword)")
+#       else
+#           warn("Unknown section: $(keyword)")
         end
         idx_start = idx_end
     end
     return model
+end
+
+function abaqus_read_mesh(fn)
+    model = open(parse_abaqus, fn)
+    mesh = Mesh()
+    mesh.nodes = model["nodes"]
+    for (nset_name, node_ids) in model["nsets"]
+        mesh.node_sets[Symbol(nset_name)] = Set(node_ids)
+    end
+    for (elid, eldata) in model["elements"]
+        eltype = eldata["type"]
+        elcon = eldata["connectivity"]
+        mesh.elements[elid] = elcon
+        mesh.element_types[elid] = eltype
+    end
+    for (elset_name, element_ids) in model["elsets"]
+        mesh.element_sets[Symbol(elset_name)] = Set(element_ids)
+    end
+    mesh.surfaces = model["surfaces"]
+    mesh.surface_types = model["surface_types"]
+    return mesh
 end
 

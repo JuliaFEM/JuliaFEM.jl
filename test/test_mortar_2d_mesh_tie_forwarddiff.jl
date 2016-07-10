@@ -4,7 +4,7 @@
 using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 function JuliaFEM.get_mesh(::Type{Val{Symbol("curved 2d block splitted to upper and lower")}})
     meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/block_2d_curved.med"

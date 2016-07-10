@@ -3,7 +3,7 @@
 
 using JuliaFEM
 using JuliaFEM.Preprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "read ascii mesh" begin
     mesh = """
@@ -64,48 +64,6 @@ end
     @test length(nodes) == 8
 end
 
-@testset "test combining meshes" begin
-
-    mesh1 = Dict{String, Any}(
-        "nodes" => Dict{Int64, Vector{Float64}}(
-            1 => [1.0, 2.0],
-            2 => [2.0, 3.0]
-        ),
-        "connectivity" => Dict{Int64, Tuple{Symbol, Symbol, Vector{Int64}}}(
-            1 => (:SE2, :GRP1, [1, 2])
-        ),
-    )
-
-    mesh2 = Dict{String, Any}(
-        "nodes" => Dict{Int64, Vector{Float64}}(
-            1 => [3.0, 4.0],
-            2 => [4.0, 5.0]
-        ),
-        "connectivity" => Dict{Int64, Tuple{Symbol, Symbol, Vector{Int64}}}(
-            1 => (:SE2, :GRP1, [1, 2])
-        ),
-    )
-
-    aster_renumber_nodes!(mesh1, mesh2)
-    @test length(mesh2["nodes"]) == 2
-    @test 3 in keys(mesh2["nodes"])
-    @test 4 in keys(mesh2["nodes"])
-    @test mesh2["connectivity"][1] == (:SE2, :GRP1, [3, 4])
-
-    aster_renumber_elements!(mesh1, mesh2)
-    @test length(mesh2["connectivity"]) == 1
-    @test mesh2["connectivity"][2] == (:SE2, :GRP1, [3, 4])
-
-    mesh = aster_combine_meshes(mesh1, mesh2)
-    @test length(mesh["nodes"]) == 4
-    @test mesh["nodes"][1] == [1.0, 2.0]
-    @test mesh["nodes"][2] == [2.0, 3.0]
-    @test mesh["nodes"][3] == [3.0, 4.0]
-    @test mesh["nodes"][4] == [4.0, 5.0]
-    @test mesh["connectivity"][1] == (:SE2, :GRP1, [1, 2])
-    @test mesh["connectivity"][2] == (:SE2, :GRP1, [3, 4])
-end
-
 function JuliaFEM.get_mesh(::Type{Val{Symbol("block_2d_1elem_quad4")}})
     fn = Pkg.dir("JuliaFEM") * "/test/testdata/block_2d_1elem_quad4.med"
     mesh = aster_read_mesh(fn)
@@ -114,6 +72,7 @@ end
 
 @testset "test reading aster .med file" begin
     mesh = get_mesh("block_2d_1elem_quad4")
+    #=
     info("nodes")
     for (k, v) in mesh.nodes
         info("$k => $v")
@@ -130,15 +89,16 @@ end
     for (k, v) in mesh.element_sets
         info("$k => $v")
     end
+    =#
     @test length(mesh.element_sets) == 5
     @test length(mesh.node_sets) == 4
     @test length(mesh.elements) == 5
     @test length(mesh.nodes) == 4
-    for elset in ["BLOCK", "TOP", "BOTTOM", "LEFT", "RIGHT"]
+    for elset in [:BLOCK, :TOP, :BOTTOM, :LEFT, :RIGHT]
         @test haskey(mesh.element_sets, elset)
         @test length(mesh.element_sets[elset]) == 1
     end
-    for nset in ["TOP_LEFT", "TOP_RIGHT", "BOTTOM_LEFT", "BOTTOM_RIGHT"]
+    for nset in [:TOP_LEFT, :TOP_RIGHT, :BOTTOM_LEFT, :BOTTOM_RIGHT]
         @test haskey(mesh.node_sets, nset)
         @test length(mesh.node_sets[nset]) == 1
     end
@@ -146,15 +106,15 @@ end
 
 @testset "test filter by element set" begin
     mesh = get_mesh("block_2d_1elem_quad4")
-    mesh2 = filter_by_element_set(mesh, "BLOCK")
-    @test haskey(mesh2.element_sets, "BLOCK")
+    mesh2 = filter_by_element_set(mesh, :BLOCK)
+    @test haskey(mesh2.element_sets, :BLOCK)
     @test length(mesh2.elements) == 1
 end
 
-function calculate_volume(mesh_name::String, eltype::Symbol)
+function calculate_volume(mesh_name, eltype)
     fn = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
     mesh = aster_read_mesh(fn, mesh_name)
-    elements = create_elements(mesh, eltype)
+    elements = create_elements(mesh; element_type=eltype)
     V = 0.0
     time = 0.0
     for element in elements
@@ -171,7 +131,7 @@ end
 @testset "calculate volume for 1 element models" begin
     @test isapprox(calculate_volume("TRIANGLE_TRI3_1", :Tri3), 1/2)
     @test isapprox(calculate_volume("TRIANGLE_TRI6_1", :Tri6), 1/2)
-#   @test isapprox(calculate_volume("TRIANGLE_TRI7_1", :Tri7), 1/2)
+    @test isapprox(calculate_volume("TRIANGLE_TRI7_1", :Tri7), 1/2)
     @test isapprox(calculate_volume("SQUARE_QUAD4_1", :Quad4), 2^2)
     @test isapprox(calculate_volume("SQUARE_QUAD8_1", :Quad8), 2^2)
     @test isapprox(calculate_volume("SQUARE_QUAD9_1", :Quad9), 2^2)
@@ -181,7 +141,7 @@ end
     @test isapprox(calculate_volume("CUBE_HEX8_1", :Hex8), 2^3)
     @test isapprox(calculate_volume("CUBE_HEX20_1", :Hex20), 2^3)
     @test isapprox(calculate_volume("CUBE_HEX27_1", :Hex27), 2^3)
-#   @test isapprox(calculate_volume("WEDGE_WEDGE6_1", :Wedge6, 1/2))
+    @test isapprox(calculate_volume("WEDGE_WEDGE6_1", :Wedge6), 1)
 #   @test isapprox(calculate_volume("WEDGE_WEDGE15_1", :Wedge15, 1/2))
 #   @test isapprox(calculate_volume("PYRAMID_PYRAMID5_1", :Pyramid5, ?))
 #   @test isapprox(calculate_volume("PYRAMID_PYRAMID13_1", :Pyramid13, ?))

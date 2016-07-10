@@ -100,7 +100,7 @@ function xdmf_new_result!(xdmf::XDMF, elements::Vector, time)
     set_attribute(dataitem, "DataType", "Float")
     set_attribute(dataitem, "Format", "XML")
     #set_attribute(dataitem, "Precision", 8)
-    s = String[]
+    s = []
     ndim = 0
     for i in xdmf.permutation
         ndim += length(X[i])
@@ -117,7 +117,7 @@ function xdmf_new_result!(xdmf::XDMF, elements::Vector, time)
     set_attribute(dataitem, "Format", "XML")
     set_attribute(dataitem, "DataType", "Int")
 #   set_attribute(dataitem, "Precision", 8)
-    s = String[]
+    s = []
     eldim = 0
     for element in elements
         eltype = get_xdmf_element_code(element)
@@ -167,7 +167,7 @@ function xdmf_save_field!(xdmf, elements::Vector, time, field_name; field_type="
     #set_attribute(dataitem, "Precision", 8)
     debug && info("field dim = $field_dim")
     debug && info(f)
-    s = String[]
+    s = []
     dim = 0
     for i in xdmf.permutation
         gi = zeros(field_dim)

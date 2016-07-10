@@ -3,7 +3,7 @@
 
 using JuliaFEM
 using JuliaFEM.Preprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "test 2d nonlinear residual" begin
     X = Dict{Int64, Vector{Float64}}(

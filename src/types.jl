@@ -9,15 +9,15 @@ type Point{P<:AbstractPoint}
     id :: Int
     weight :: Float64
     coords :: Vector{Float64}
-    fields :: Dict{String, Field}
+    fields :: Dict{AbstractString, Field}
     properties :: P
 end
 
-function setindex!{T}(point::Point, val::Pair{Float64, T}, field_name::String)
+function setindex!{T}(point::Point, val::Pair{Float64, T}, field_name)
     point.fields[field_name] = Field(val)
 end
 
-function getindex(point::Point, field_name::String)
+function getindex(point::Point, field_name)
     return point.fields[field_name]
 end
 
@@ -25,11 +25,11 @@ function getindex(point::Point, idx::Int)
     return point.coords[idx]
 end
 
-function haskey(point::Point, field_name::String)
+function haskey(point::Point, field_name)
     return haskey(point.fields, field_name)
 end
 
-function call(point::Point, field_name::String, time::Float64=0.0)
+function call(point::Point, field_name, time=0.0)
     point.fields[field_name](time).data
 end
 

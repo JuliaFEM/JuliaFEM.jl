@@ -4,7 +4,7 @@
 using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "test that interface transfers constant field without error" begin
     meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/block_3d.med"

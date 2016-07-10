@@ -4,7 +4,7 @@
 # http://ahojukka5.github.io/posts/finite-element-solution-for-one-element-problem/
 
 using JuliaFEM
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "test 2d linear elasticity local matrices" begin
     element = Element(Quad4, [1, 2, 3, 4])

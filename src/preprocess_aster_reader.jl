@@ -4,42 +4,7 @@
 using HDF5
 using JuliaFEM
 
-function aster_create_elements(mesh, element_set, element_type=nothing; reverse_connectivity=false)
-    elements = Element[]
-    mapping = Dict(
-        :SE2 => Seg2,
-        :TR3 => Tri3,
-        :TR6 => Tri6,
-        :QU4 => Quad4,
-        :HE8 => Hex8,
-        :TE4 => Tet4,
-        :T10 => Tet10)
-    for (elid, (eltype, elset, elcon)) in mesh["connectivity"]
-        elset == element_set || continue
-        if !isa(element_type, Void)
-            if isa(element_type, Tuple)
-                if !(eltype in element_type)
-                    continue
-                end
-            elseif eltype != element_type
-                continue
-            end
-        end
-        if reverse_connectivity
-            elcon = reverse(elcon)
-        end
-        if !haskey(mapping, eltype)
-            error("aster_create_elements: unknown element mapping $eltype")
-        end
-        element = Element(mapping[eltype], elcon)
-        push!(elements, element)
-    end
-    update!(elements, "geometry", mesh["nodes"])
-    return elements
-end
-
-
-function aster_parse_nodes(section::String; strip_characters=true)
+function aster_parse_nodes(section; strip_characters=true)
     nodes = Dict{Any, Vector{Float64}}()
     has_started = false
     for line in split(section, '\n')
@@ -68,10 +33,10 @@ function aster_parse_nodes(section::String; strip_characters=true)
     return nodes
 end
 
-function parse(mesh::String, ::Type{Val{:CODE_ASTER_MAIL}})
-    model = Dict{String, Any}()
+function parse(mesh, ::Type{Val{:CODE_ASTER_MAIL}})
+    model = Dict()
     header = nothing
-    data = String[]
+    data = []
     for line in split(mesh, '\n')
         length(line) != 0 || continue
         info("line: $line")
@@ -90,151 +55,6 @@ function parse(mesh::String, ::Type{Val{:CODE_ASTER_MAIL}})
 end
 
 
-function aster_renumber_nodes_!(mesh, node_numbering)
-    old_nodes = mesh["nodes"]
-    new_nodes = typeof(old_nodes)()
-    for (node_id, node_coords) in old_nodes
-        new_node_id = node_numbering[node_id]
-        new_nodes[new_node_id] = node_coords
-    end
-    mesh["nodes"] = new_nodes
-    for (elid, (eltype, elset, elcon)) in mesh["connectivity"]
-        new_elcon = [node_numbering[node_id] for node_id in elcon]
-        mesh["connectivity"][elid] = (eltype, elset, new_elcon)
-    end
-end
-
-function aster_renumber_nodes(mesh)
-    nodemap = Dict{Int64,Int64}()
-    for (i, nid) in enumerate(keys(mesh["nodes"]))
-        nodemap[nid] = i
-    end
-    new_nodes = Dict{Int64, Vector{Float64}}()
-    for (nid, ncoords) in mesh["nodes"]
-        new_nodes[nodemap[nid]] = ncoords
-    end
-    function change_node_ids(old_ids::Vector{Int64})
-        return Int[nodemap[nid] for nid in old_ids]
-    end
-    new_elements = Dict{Int64, Tuple{Symbol, Symbol, Vector{Int64}}}()
-    for (elid, (eltype, elset, elcon)) in mesh["connectivity"]
-        new_elements[elid] = (eltype, elset, change_node_ids(elcon))
-    end
-    mesh["nodes"] = new_nodes
-    mesh["elements"] = new_elements
-    return mesh
-end
-
-function aster_renumber_nodes!(mesh1, mesh2)
-
-    reserved_node_ids = Set(collect(keys(mesh1["nodes"])))
-    mesh2_node_numbering = Dict{Int64, Int64}()
-
-    # find new node ids assigned for mesh 2
-    k = 1
-    for node_id in sort(collect(keys(mesh2["nodes"])))
-        # if node id is reserved in mesh 1, find new number
-        if node_id in reserved_node_ids
-            while k in reserved_node_ids
-                k += 1
-            end
-            mesh2_node_numbering[node_id] = k
-            push!(reserved_node_ids, k)
-        else
-            mesh2_node_numbering[node_id] = node_id
-        end
-    end
-    aster_renumber_nodes_!(mesh2, mesh2_node_numbering)
-
-#=
-    # create new nodes
-    mesh2_old_nodes = mesh2["nodes"]
-    mesh2_new_nodes = typeof(mesh2_old_nodes)()
-    for (node_id, node_coords) in mesh2_old_nodes
-        new_node_id = mesh2_node_numbering[node_id]
-        mesh2_new_nodes[new_node_id] = node_coords
-    end
-    mesh2["nodes"] = mesh2_new_nodes
-
-    # update connectivity
-    for (elid, (eltype, elset, elcon)) in mesh2["connectivity"]
-        new_elcon = [mesh2_node_numbering[node_id] for node_id in elcon]
-        mesh2["connectivity"][elid] = (eltype, elset, new_elcon)
-    end
-=#
-
-end
-
-
-function aster_renumber_elements!(mesh1, mesh2)
-
-    reserved_element_ids = Set(collect(keys(mesh1["connectivity"])))
-    mesh2_element_numbering = Dict{Int64, Int64}()
-
-    # find new element ids assigned for mesh 2
-    k = 1
-    for element_id in sort(collect(keys(mesh2["connectivity"])))
-        # if node id is reserved in mesh 1, find new number
-        if element_id in reserved_element_ids
-            while k in reserved_element_ids
-                k += 1
-            end
-            mesh2_element_numbering[element_id] = k
-            push!(reserved_element_ids, k)
-        else
-            mesh2_element_numbering[element_id] = element_id
-        end
-    end
-
-    # create new elements
-    mesh2_old_elements = mesh2["connectivity"]
-    mesh2_new_elements = typeof(mesh2_old_elements)()
-    for (element_id, element_data) in mesh2_old_elements
-        new_element_id = mesh2_element_numbering[element_id]
-        mesh2_new_elements[new_element_id] = element_data
-    end
-    mesh2["connectivity"] = mesh2_new_elements
-
-end
-
-
-function aster_combine_meshes(mesh1, mesh2)
-
-    # check that meshes are ready to be combined
-    node_ids_mesh_1 = collect(keys(mesh1["nodes"]))
-    node_ids_mesh_2 = collect(keys(mesh2["nodes"]))
-    if length(intersect(node_ids_mesh_1, node_ids_mesh_2)) != 0
-        error("nodes with same id number in both meshes, failed.")
-    end
-    element_ids_mesh_1 = collect(keys(mesh1["connectivity"]))
-    element_ids_mesh_2 = collect(keys(mesh2["connectivity"]))
-    if length(intersect(element_ids_mesh_1, element_ids_mesh_2)) != 0
-        error("elements with same id number in both meshes, failed.")
-    end
-    @assert similar(mesh1) == similar(mesh2)
-    @assert similar(mesh1["nodes"]) == similar(mesh2["nodes"])
-    @assert similar(mesh1["connectivity"]) == similar(mesh2["connectivity"])
-
-    new_mesh = similar(mesh1)
-    new_mesh["nodes"] = similar(mesh1["nodes"])
-    new_mesh["connectivity"] = similar(mesh1["connectivity"])
-
-    for (node_id, node_coords) in mesh1["nodes"]
-        new_mesh["nodes"][node_id] = node_coords
-    end
-    for (node_id, node_coords) in mesh2["nodes"]
-        new_mesh["nodes"][node_id] = node_coords
-    end
-    for (element_id, element_data) in mesh1["connectivity"]
-        new_mesh["connectivity"][element_id] = element_data
-    end
-    for (element_id, element_data) in mesh2["connectivity"]
-        new_mesh["connectivity"][element_id] = element_data
-    end
-    return new_mesh
-end
-
-
 """
 Code Aster binary file (.med), which is exported from SALOME.
 """
@@ -242,7 +62,7 @@ type MEDFile
     data :: Dict
 end
 
-function MEDFile(fn::String)
+function MEDFile(fn)
     MEDFile(h5read(fn, "/"))
 end
 
@@ -316,14 +136,6 @@ function get_connectivity(med::MEDFile, elsets, mesh_name)
             eltype = Symbol(eltype)
             elco = element_connectivity[:, i]
             elset = Symbol(elsets[elset_ids[i]])
-#= to more general preprocess
-            if haskey(med_elmap, eltype)
-                elco = elco[med_elmap[eltype]]
-            else
-                warn("no element mapping info found for element type $eltype")
-                warn("consider this as a warning: element may have french nodal ordering")
-            end
-=#
             d[element_ids[i]] = (eltype, elset, elco)
         end
     end
@@ -334,9 +146,9 @@ end
 
 Paramters
 ---------
-fn :: String
+fn
     file name to parse
-mesh_name :: String, optional
+mesh_name :: optional
     mesh name, if several meshes in one file
 
 Returns
@@ -344,7 +156,7 @@ Returns
 Dict containing fields "nodes" and "connectivity".
 
 """
-function parse_aster_med_file(fn::String, mesh_name=nothing; debug=false)
+function parse_aster_med_file(fn, mesh_name=nothing; debug=false)
     med = MEDFile(fn)
     mesh_names = get_mesh_names(med::MEDFile)
     all_meshes = join(mesh_names, ", ")
@@ -364,7 +176,7 @@ function parse_aster_med_file(fn::String, mesh_name=nothing; debug=false)
     end
     nodes = get_nodes(med, nsets, mesh_name)
     conn = get_connectivity(med, elsets, mesh_name)
-    result = Dict{String, Any}()
+    result = Dict("nodes" => nodes, "connectivity" => conn)
     result["nodes"] = nodes
     result["connectivity"] = conn
     return result
@@ -380,11 +192,12 @@ end
 #    :Tet10 => [3, 2, 1, 4, 6, 5, 7, 10, 9, 8])
 
 global const med_connectivity = Dict{Symbol, Vector{Int}}(
-    :Tet4  => [4,3,1,2],
-    :Tet10 => [4,3,1,2,10,7,8,9,6,5],
-    :Hex8  => [4,8,7,3,1,5,6,2],
-    :Hex20 => [4,8,7,3,1,5,6,2,20,15,19,11,12,16,14,10,17,13,18,9],
-    :Hex27 => [4,8,7,3,1,5,6,2,20,15,19,11,12,16,14,10,17,13,18,9,24,25,26,23,21,22,27])
+    :Tet4   => [4,3,1,2],
+    :Tet10  => [4,3,1,2,10,7,8,9,6,5],
+    :Wedge6 => [4,5,6,1,2,3],
+    :Hex8   => [4,8,7,3,1,5,6,2],
+    :Hex20  => [4,8,7,3,1,5,6,2,20,15,19,11,12,16,14,10,17,13,18,9],
+    :Hex27  => [4,8,7,3,1,5,6,2,20,15,19,11,12,16,14,10,17,13,18,9,24,25,26,23,21,22,27])
 
 # element names in CA -> element names in JuliaFEM
 global const mapping = Dict(
@@ -397,7 +210,7 @@ global const mapping = Dict(
 
     :TR3 => :Tri3,
     :TR6 => :Tri6,
-    :TR7 => :Tru6,
+    :TR7 => :Tri7,
 
     :QU4 => :Quad4,
     :QU8 => :Quad8,
@@ -406,9 +219,9 @@ global const mapping = Dict(
     :TE4 => :Tet4,
     :T10 => :Tet10,
 
-    :PE6 => :Penta6,
-    :P15 => :Penta15,
-    :P18 => :Penta18,
+    :PE6 => :Wedge6,
+    :P15 => :Wedge15,
+    :P18 => :Wedge18,
 
     :HE8 => :Hex8,
     :H20 => :Hex20,
@@ -419,17 +232,17 @@ global const mapping = Dict(
 
     )
 
-function aster_read_mesh(fn::String, mesh_name=nothing; reorder_element_connectivity=true)
+function aster_read_mesh(fn, mesh_name=nothing; reorder_element_connectivity=true)
     result = parse_aster_med_file(fn, mesh_name)
     mesh = Mesh()
     for (nid, (nset, ncoords)) in result["nodes"]
         add_node!(mesh, nid, ncoords)
-        add_node_to_node_set!(mesh, string(nset), nid)
+        add_node_to_node_set!(mesh, nset, nid)
     end
     for (elid, (eltype, elset, elcon)) in result["connectivity"]
         haskey(mapping, eltype) || error("Code Aster .med reader: element type $eltype not found from mapping")
         add_element!(mesh, elid, mapping[eltype], elcon)
-        add_element_to_element_set!(mesh, string(elset), elid)
+        add_element_to_element_set!(mesh, elset, elid)
     end
     if reorder_element_connectivity
         reorder_element_connectivity!(mesh, med_connectivity)

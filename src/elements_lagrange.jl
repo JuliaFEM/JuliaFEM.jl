@@ -22,7 +22,7 @@ function get_basis(element::Element{Poi1}, ip, time)
     return [1]
 end
 
-function call(element::Element{Poi1}, ip, time, ::Type{Val{:detJ}})
+function call(element::Element{Poi1}, ip, time::Float64, ::Type{Val{:detJ}})
     return 1.0
 end
 
@@ -175,6 +175,47 @@ function get_interpolation_polynomial(::Type{Tri6}, xi, ::Type{Val{:partial_deri
     [
         0  1  0  2*xi[1]  xi[2]  0
         0  0  1  0        xi[1]  2*xi[2]
+    ]
+end
+
+#
+
+type Tri7 <: AbstractElement
+end
+
+function description(::Type{Tri7})
+    "7 node triangle"
+end
+
+function size(element::Element{Tri7})
+    return (2, 7)
+end
+
+function length(element::Element{Tri7})
+    return 7
+end
+
+function get_reference_coordinates(::Type{Tri7})
+    Vector{Float64}[
+        [0.0, 0.0], # N1
+        [1.0, 0.0], # N2
+        [0.0, 1.0], # N3
+        [0.5, 0.0], # N4
+        [0.5, 0.5], # N5
+        [0.0, 0.5], # N6
+        [1/3, 1/3]] # N7
+end
+
+function get_interpolation_polynomial(::Type{Tri7}, xi)
+    [
+        1 xi[1] xi[2] xi[1]^2 xi[1]*xi[2] xi[2]^2 xi[1]^2*xi[2]^2
+    ]
+end
+
+function get_interpolation_polynomial(::Type{Tri7}, xi, ::Type{Val{:partial_derivatives}})
+    [
+        0  1  0  2*xi[1]  xi[2]  0        2*xi[1]*xi[2]^2
+        0  0  1  0        xi[1]  2*xi[2]  2*xi[1]^2*xi[2]
     ]
 end
 
@@ -387,6 +428,47 @@ end
 
 #
 
+type Wedge6 <: AbstractElement
+end
+
+function description(::Type{Wedge6})
+    "6 node prismatic element (wedge)"
+end
+
+function size(element::Element{Wedge6})
+    return (3, 6)
+end
+
+function length(element::Element{Wedge6})
+    return 6
+end
+
+function get_reference_coordinates(::Type{Wedge6})
+    Vector{Float64}[
+        [0.0, 0.0, -1.0], # N1
+        [1.0, 0.0, -1.0], # N2
+        [0.0, 1.0, -1.0], # N3
+        [0.0, 0.0,  1.0], # N4
+        [1.0, 0.0,  1.0], # N5
+        [0.0, 1.0,  1.0]] # N6
+end
+
+function get_interpolation_polynomial(::Type{Wedge6}, x)
+    [
+        1 x[1] x[2] x[3] x[1]*x[3] x[2]*x[3]
+    ]
+end
+
+function get_interpolation_polynomial(::Type{Wedge6}, x, ::Type{Val{:partial_derivatives}})
+    [
+        0  1  0  0  x[3]  0   
+        0  0  1  0  0     x[3]
+        0  0  0  1  x[1]  x[2]
+    ]
+end
+
+#
+
 type Hex8 <: AbstractElement
 end
 
@@ -571,11 +653,13 @@ end
 @create_basis Seg3
 @create_basis Tri3
 @create_basis Tri6
+@create_basis Tri7
 @create_basis Quad4
 @create_basis Quad8
 @create_basis Quad9
 @create_basis Tet4
 @create_basis Tet10
+@create_basis Wedge6
 @create_basis Hex8
 @create_basis Hex20
 @create_basis Hex27
@@ -585,7 +669,7 @@ function inside(::Union{Type{Seg2}, Type{Seg3}, Type{Quad4}, Type{Quad8},
     return all(-1.0 .<= xi .<= 1.0)
 end
 
-function inside(::Union{Type{Tri3}, Type{Tri6}, Type{Tet4}, Type{Tet10}}, xi)
+function inside(::Union{Type{Tri3}, Type{Tri6}, Type{Tri7}, Type{Tet4}, Type{Tet10}}, xi)
     return all(xi .>= 0.0) && (sum(xi) <= 1.0)
 end
 

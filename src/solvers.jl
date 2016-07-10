@@ -4,8 +4,8 @@
 abstract AbstractSolver
 
 type Solver{S<:AbstractSolver}
-    name :: String # some descriptive name for problem
-    time :: Real        # current time
+    name :: AbstractString # some descriptive name for problem
+    time :: Float64        # current time
     problems :: Vector{Problem}
     norms :: Vector{Tuple}  # solution norms for convergence studies
     ndofs :: Int        # number of degrees of freedom in problem
@@ -27,7 +27,7 @@ function push!(solver::Solver, problem)
     push!(solver.problems, problem)
 end
 
-function getindex(solver::Solver, problem_name::String)
+function getindex(solver::Solver, problem_name)
     for problem in get_problems(solver)
         if problem.name == problem_name
             return problem
@@ -485,7 +485,7 @@ function NonlinearSolver(problems...)
     end
     return solver
 end
-function NonlinearSolver(name::String, problems::Problem...)
+function NonlinearSolver(name::AbstractString, problems::Problem...)
     solver = NonlinearSolver(problems...)
     solver.name = name
     return solver
@@ -550,7 +550,7 @@ function LinearSolver(problems::Problem...)
     end
     return solver
 end
-function LinearSolver(name::String, problems::Problem...)
+function LinearSolver(name::AbstractString, problems::Problem...)
     solver = LinearSolver(problems...)
     solver.name = name
     return solver
@@ -615,7 +615,7 @@ function Postprocessor(problems::Problem...)
     return solver
 end
 
-function Postprocessor(name::String, problems::Problem...)
+function Postprocessor(name::AbstractString, problems::Problem...)
     solver = Postprocessor(problems...)
     solver.name = name
     return solver

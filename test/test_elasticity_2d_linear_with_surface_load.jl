@@ -4,7 +4,7 @@
 using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 using JLD
 
 function JuliaFEM.get_model(::Type{Val{Symbol("test 2d linear elasticity with surface + volume load")}})

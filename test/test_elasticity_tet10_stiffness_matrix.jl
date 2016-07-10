@@ -3,7 +3,7 @@
 
 using JuliaFEM
 using JuliaFEM.Preprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "test tet10 stiffness matrix" begin
     el = Element(Tet10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])

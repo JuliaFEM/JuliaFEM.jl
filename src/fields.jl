@@ -15,7 +15,7 @@ type Field{A<:Union{Discrete,Continuous}, B<:Union{Constant,Variable}, C<:Union{
     data
 end
 
-typealias FieldSet Dict{String, Field}
+typealias FieldSet Dict{AbstractString, Field}
 
 ### Basic data structure for discrete field
 

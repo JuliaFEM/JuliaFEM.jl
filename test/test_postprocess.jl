@@ -1,5 +1,5 @@
 using JuliaFEM
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "get nodal values" begin
     el1 = Element(Seg2, [1, 2])

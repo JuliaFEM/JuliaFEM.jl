@@ -3,7 +3,7 @@
 
 module InterfaceTests
 
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 function test_foo()
     @test 1+2 == 3

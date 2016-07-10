@@ -1,9 +1,10 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+
 using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "3d rod" begin
     mesh = aster_read_mesh(Pkg.dir("JuliaFEM")*"/test/testdata/primitives.med", "CYLINDER_20_TET4")
