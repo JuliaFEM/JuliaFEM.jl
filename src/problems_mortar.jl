@@ -8,7 +8,7 @@ type Mortar <: BoundaryProblem
     dual_basis :: Bool
     use_forwarddiff :: Bool
     distval :: Float64
-    store_fields :: Vector{String}
+    store_fields :: Vector{Symbol}
 end
 
 function Mortar()

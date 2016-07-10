@@ -4,7 +4,7 @@
 using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 import JuliaFEM: get_mesh, get_model
 
 function get_mesh(::Type{Val{Symbol("curved 2d mesh model")}})

@@ -3,7 +3,7 @@
 
 using JuliaFEM
 using JuliaFEM.Postprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "extrapolate stress from gauss points to nodes" begin
     X = Dict{Int, Vector{Float64}}(

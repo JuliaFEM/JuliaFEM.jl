@@ -1,9 +1,8 @@
-
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 function JuliaFEM.get_model(::Type{Val{Symbol("1x1 plane stress quad4 block")}})
     

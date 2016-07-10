@@ -1,7 +1,8 @@
+
 #using PyPlot
-using JuliaFEM.Test
-using JuliaFEM.MaterialModels: stiffnessTensor, calculate_stress, State
-using JuliaFEM.MaterialModels: stiffnessTensorPlaneStress
+using JuliaFEM.Testing
+#using JuliaFEM.MaterialModels: stiffnessTensor, calculate_stress, State
+#using JuliaFEM.MaterialModels: stiffnessTensorPlaneStress
 
 
 function test_von_mises_3D_basic()

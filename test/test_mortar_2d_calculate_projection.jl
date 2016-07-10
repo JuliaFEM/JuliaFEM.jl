@@ -2,7 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 function get_test_2d_model()
     X = Dict{Int64, Vector{Float64}}(

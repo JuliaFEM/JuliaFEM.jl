@@ -3,7 +3,7 @@
 
 using JuliaFEM
 using JuliaFEM.Preprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "read inp file" begin
     model = open(parse_abaqus, Pkg.dir("JuliaFEM")*"/geometry/3d_beam/palkki.inp")
@@ -34,45 +34,20 @@ end
     @test model["elsets"]["BEAM"] == [1, 2]
 end
 
-@testset "test unknown handler warning message" begin
-    fn = tempname()
-    fid = open(fn, "w")
-    testdata = """*ELEMENT2, TYPE=C3D10, ELSET=Body1
-    1,       243,       240,       191,       117,       245,       242,       244,
-    1,         2,       196
-    """
-    write(fid, testdata)
-    close(fid)
-    model = open(parse_abaqus, fn)
-    # empty model expected, parser doesn't know what to do with unknown section
-    @test length(model) == 0
+@testset "parse nodes from abaqus .inp file to Mesh" begin
+    fn = Pkg.dir("JuliaFEM") * "/test/testdata/cube_tet4.inp"
+    mesh = abaqus_read_mesh(fn)
+    info(mesh.surfaces)
+    @test length(mesh.nodes) == 10
+    @test length(mesh.elements) == 17
+    @test haskey(mesh.elements, 1)
+    @test mesh.elements[1] == [8, 10, 1, 2]
+    @test mesh.element_types[1] == :Tet4
+    @test haskey(mesh.node_sets, :SYM12)
+    @test haskey(mesh.element_sets, :CUBE)
+    @test haskey(mesh.surfaces, :LOAD)
+    @test length(mesh.surfaces[:LOAD]) == 2
+    @test mesh.surfaces[:LOAD][1] == (16, :S1)
+    @test mesh.surface_types[:LOAD] == :ELEMENT
 end
-
-#= TODO: fix test
-@testset "test that reader throws error when dimension information of element is missing" begin
-    #   *ELEMENT, TYPE=neverseenbefore, ELSET=Body1
-    data = """
-    1,       243,       240,       191,       117,       245,       242,       244,
-    1,         2,       196
-    """
-    model = Dict()
-    header = Dict("section"=>"ELEMENT", "options" => Dict("TYPE" => "neverseenbefore", "ELSET"=>"Body1"))
-    @test_throws Exception parse_element_section(model, header, data)
-end
-=#
-
-#= TODO: fix test
-@testset "test read surface set section" begin
-    data = """*SURFACE, TYPE=ELEMENT, NAME=LOAD
-    31429,S1
-    31481,S3
-    """
-    model = Dict{AbstractString, Any}()
-    model["nsets"] = Dict{AbstractString, Vector{Int}}()
-    model["elsets"] = Dict{AbstractString, Vector{Int}}()
-    model["elements"] = Dict{Integer, Any}()
-    parse_section(model, data, :SURFACE, 1, 3, Val{:SURFACE})
-    @test model["surfaces"]["LOAD"] == [(31429,1), (31481,3)]
-end
-=#
 

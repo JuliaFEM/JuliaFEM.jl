@@ -6,8 +6,6 @@ This is JuliaFEM -- Finite Element Package
 """
 module JuliaFEM
 
-using Compat
-import Compat.String
 importall Base
 
 include("fields.jl")
@@ -18,13 +16,15 @@ export AbstractPoint, Point, IntegrationPoint, IP, Node
 ### ELEMENTS ###
 include("elements.jl") # common element routines
 export Node, AbstractElement, Element, update!, get_connectivity, get_basis, get_dbasis, inside, get_local_coordinates
-include("elements_lagrange_macro.jl") # Continuous Galerkin (Lagrange) elements generated using macro
 include("elements_lagrange.jl") # Continuous Galerkin (Lagrange) elements
 export get_reference_coordinates, get_interpolation_polynomial
 export Poi1,
        Seg2, Seg3,
-       Tri3, Tri6, Quad4, Quad8, Quad9,
-       Tet4, Tet10, Hex8, Hex20, Hex27
+       Tri3, Tri6, Tri7,
+       Quad4, Quad8, Quad9,
+       Tet4, Tet10,
+       Wedge6,
+       Hex8, Hex20, Hex27
 
 include("elements_nurbs.jl")
 export NSeg, NSurf, NSolid, is_nurbs
@@ -59,7 +59,7 @@ end
 
 ### ASSEMBLY + SOLVE ###
 include("assembly.jl")
-include("solver_utils.jl")
+include("solvers_utils.jl")
 include("solvers.jl")
 export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
        get_unknown_field_name, get_formulation_type, get_problems,
@@ -91,10 +91,12 @@ include("problems_contact_3d.jl")
 include("problems_contact_2d_autodiff.jl")
 export Contact
 
+#=
 module API
 include("api.jl")
 # export ....
 end
+=#
 
 module Preprocess
 include("preprocess.jl")
@@ -106,8 +108,8 @@ export create_elements, Mesh,
        find_nearest_nodes,
        reorder_element_connectivity!
 include("preprocess_abaqus_reader.jl")
-include("preprocess_abaqus_reader_old.jl")
-export parse_abaqus, parse_section, parse_element_section
+export parse_abaqus, parse_section, parse_element_section,
+       abaqus_read_mesh, abaqus_read_model
 include("preprocess_aster_reader.jl")
 export aster_create_elements, parse_aster_med_file, is_aster_mail_keyword,
        parse_aster_header, aster_parse_nodes, aster_renumber_nodes!,
@@ -115,11 +117,11 @@ export aster_create_elements, parse_aster_med_file, is_aster_mail_keyword,
        filter_by_element_set, filter_by_element_id, MEDFile
 end
 
-function get_mesh(mesh_name::String, args...; kwargs...)
+function get_mesh(mesh_name::AbstractString, args...; kwargs...)
     return get_mesh(Val{Symbol(mesh_name)}, args...; kwargs...)
 end
 
-function get_model(model_name::String, args...; kwargs...)
+function get_model(model_name::AbstractString, args...; kwargs...)
     return get_model(Val{Symbol(model_name)}, args...; kwargs...)
 end
 
@@ -136,8 +138,15 @@ export XDMF, xdmf_new_result!, xdmf_save_field!, xdmf_save!
 end
 export Postprocessor
 
+# This connects model from preprocess_abaqus_reader to 
+# other JuliaFEM ecosystem and solves problem.
+module Abaqus
+include("abaqus.jl")
+export abaqus_read_model
+end
+
 """ JuliaFEM testing routines. """
-module Test
+module Testing
 if VERSION >= v"0.5-"
     using Base.Test
 else
@@ -148,12 +157,16 @@ export @test, @testset, @test_throws
 #include("test.jl")
 end
 
+#=
 module MaterialModels
 include("vonmises.jl")
 end
+=#
 
+#=
 module Interfaces
 include("interfaces.jl")
 end
+=#
 
 end # module

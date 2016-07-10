@@ -58,13 +58,9 @@ end
 
 ### "cartesian" elements, integration rules comes from tensor product
 
-### 0d elements
-
 function get_integration_points(element::Poi1)
     [ (1.0, [] ) ]
 end
-
-### 1d elements
 
 typealias CartesianLineElement Union{Seg2, Seg3, NSeg}
 typealias CartesianSurfaceElement Union{Quad4, Quad8, Quad9, NSurf}
@@ -90,7 +86,7 @@ end
 # http://math2.uncc.edu/~shaodeng/TEACHING/math5172/Lectures/Lect_15.PDF
 # http://libmesh.github.io/doxygen/quadrature__gauss__2D_8C_source.html
 
-typealias TriangularElement Union{Tri3, Tri6}
+typealias TriangularElement Union{Tri3, Tri6, Tri7}
 
 function get_integration_points(element::TriangularElement, ::Type{Val{1}})
     weights = [0.5]
@@ -229,16 +225,31 @@ function get_integration_points(element::TetrahedralElement, ::Type{Val{4}})
     return zip(weights, points)
 end
 
-function get_integration_points(element::Union{TriangularElement, TetrahedralElement}, order::Int64)
+typealias PrismaticElement Union{Wedge6}
+
+function get_integration_points(element::PrismaticElement, ::Type{Val{2}})
+    weights = 1/6*[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    points = Vector{Float64}[
+        [0.5, 0.0, -1.0/sqrt(3)],
+        [0.0, 0.5, -1.0/sqrt(3)],
+        [0.5, 0.5, -1.0/sqrt(3)],
+        [0.5, 0.0,  1.0/sqrt(3)],
+        [0.0, 0.5,  1.0/sqrt(3)],
+        [0.5, 0.5,  1.0/sqrt(3)]]
+    return zip(weights, points)
+end
+
+function get_integration_points(element::Union{TriangularElement,
+            TetrahedralElement, PrismaticElement}, order::Int64)
     return get_integration_points(element, Val{order})
 end
 
 ### default number of integration points for each element
 ### 2 for linear elements, 3 for quadratic
 
-typealias LinearElement Union{Seg2, Tri3, Quad4, Tet4, Hex8}
+typealias LinearElement Union{Seg2, Tri3, Quad4, Tet4, Wedge6, Hex8}
 
-typealias QuadraticElement Union{Seg3, Tri6, Tet10, Quad8, Quad9, Hex20, Hex27}
+typealias QuadraticElement Union{Seg3, Tri6, Tri7, Tet10, Quad8, Quad9, Hex20, Hex27}
 
 function get_integration_order(element::LinearElement)
     return 2

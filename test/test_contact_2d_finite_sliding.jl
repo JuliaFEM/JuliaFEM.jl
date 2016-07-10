@@ -1,7 +1,7 @@
 using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "2d curved block with frictionless finite sliding contact using forwarddiff" begin
     # FIXME: needs verification of some other fem software

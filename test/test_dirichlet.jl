@@ -2,7 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 #=
 In [36]: C = Matrix([[0], [30], [15]]) # node coordinates

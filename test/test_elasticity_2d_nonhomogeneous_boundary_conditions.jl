@@ -3,7 +3,7 @@
 
 using JuliaFEM
 using JuliaFEM.Preprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "2d nonlinear elasticity: test nonhomogeneous boundary conditions and stress calculation" begin
 

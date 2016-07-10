@@ -1,9 +1,10 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+
 using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "2d poisson problem with known analytical solution" begin
     # from FENiCS tutorial, u(x,y) = 1 + x² + 2y² on [0x1]×[0,1]
@@ -15,8 +16,8 @@ using JuliaFEM.Test
     field = Problem(Heat, "unit square, 6x4 triangular mesh", 1)
     field.elements = create_elements(mesh, "UNITSQUARE")
     field.properties.formulation = "2D"
-    update!(field, "temperature thermal conductivity", 1.0)
-    update!(field, "temperature load", -6.0)
+    update!(field, "thermal conductivity", 1.0)
+    update!(field, "heat source", -6.0)
 
     bc = Problem(Dirichlet, "u₀(x,y) = 1 + x² + 2y²", 1, "temperature")
     #bc.properties.order = 2
@@ -35,18 +36,18 @@ using JuliaFEM.Test
     T_fem = Float64[]
     T_acc = Float64[]
     for (nid, X) in field("geometry")
-#       info("$nid -> $X")
         push!(T_fem, field("temperature", X)[1])
         push!(T_acc, 1.0 + X[1]^2 + 2*X[2]^2)
     end
 
-    for element in bc.elements
-        for (X, T_fem) in zip(element("geometry", 0.0), element("temperature", 0.0))
-            x, y = X
-            T_acc = 1.0 + x^2 + 2*y^2
-#           info("(x,y) = ($x,$y), T_acc = $T_acc, T_fem = $T_fem")
-        end
-    end
-
     @test maximum(abs(T_fem-T_acc)) < 1.0e-12
+
+    # gradient of field is
+    gradT(X) = [2*X[1] 4*X[2]]
+    X = [0.5, 0.5]
+    gradT1 = gradT(X)
+    gradT2 = field("temperature", X, solver.time, Val{:Grad})
+    info("gradT1 = $gradT1, gradT2 = $gradT2")
+    # [1.1666666666666625 1.5000000000000018] quite big difference ..?
+    @test isapprox(gradT1, gradT2; rtol=25.0e-2)
 end

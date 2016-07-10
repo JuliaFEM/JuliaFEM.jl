@@ -129,7 +129,7 @@ function copy_field!(src_problem::Problem, dst_problem::Problem, field_name, tim
 end
 
 """ Return field calculated to nodal points for elements in problem p. """
-function call(problem::Problem, field_name::String, time::Float64=0.0)
+function call(problem::Problem, field_name::AbstractString, time::Float64=0.0)
     f = Dict()
     for element in get_elements(problem)
         for (c, v) in zip(get_connectivity(element), element(field_name, time))
@@ -143,11 +143,22 @@ function call(problem::Problem, field_name::String, time::Float64=0.0)
 end
 
 """ Interpolate field from a set of elements. """
-function call(problem::Problem, field_name::String, X::Vector, time::Float64=0.0; fillna=NaN)
+function call(problem::Problem, field_name::AbstractString, X::Vector, time::Float64=0.0; fillna=NaN)
     for element in get_elements(problem)
         if inside(element, X, time)
             xi = get_local_coordinates(element, X, time)
             return element(field_name, xi, time)
+        end
+    end
+    return fillna
+end
+
+""" Interpolate field from a set of elements. """
+function call(problem::Problem, field_name::AbstractString, X::Vector, time::Float64, ::Type{Val{:Grad}}; fillna=NaN)
+    for element in get_elements(problem)
+        if inside(element, X, time)
+            xi = get_local_coordinates(element, X, time)
+            return element(field_name, xi, time, Val{:Grad})
         end
     end
     return fillna

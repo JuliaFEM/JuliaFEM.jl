@@ -2,7 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "polygon clip case 1" begin
     S = Vector[

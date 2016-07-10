@@ -1,7 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 #= TODO: Fix test.
 @testset "calculate mortar matrices and weighted gap vector for 2d model" begin

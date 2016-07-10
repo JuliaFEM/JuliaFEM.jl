@@ -2,7 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "test integration point" begin
     ip = IP(1, 1.0, sqrt(1.0/3.0)*[-1.0, -1.0])

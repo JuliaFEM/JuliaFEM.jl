@@ -3,7 +3,7 @@
 
 using JuliaFEM
 using JuliaFEM.Preprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "test continuum 3d linear elasticity with surface load" begin
     nodes = Dict{Int64, Node}(

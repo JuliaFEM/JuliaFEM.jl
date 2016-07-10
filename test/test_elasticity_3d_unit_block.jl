@@ -4,7 +4,7 @@
 using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 function calc_model(mesh_name; with_volume_load=false, debug_print=false)
     meshfile = Pkg.dir("JuliaFEM")*"/test/testdata/3d_block.med"

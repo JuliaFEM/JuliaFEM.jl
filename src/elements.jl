@@ -7,7 +7,7 @@ type Element{E<:AbstractElement}
     id :: Int
     connectivity :: Vector{Int}
     integration_points :: Vector{IP}
-    fields :: Dict{String, Field}
+    fields :: Dict{AbstractString, Field}
     properties :: E
 end
 
@@ -17,15 +17,15 @@ function Element{E<:AbstractElement}(::Type{E}, connectivity=[], integration_poi
     return element
 end
 
-function getindex(element::Element, field_name::String)
+function getindex(element::Element, field_name::AbstractString)
     return element.fields[field_name]
 end
 
-function setindex!(element::Element, data::Field, field_name::String)
+function setindex!(element::Element, data::Field, field_name)
     element.fields[field_name] = data
 end
 
-function setindex!(element::Element, data::Function, field_name::String)
+function setindex!(element::Element, data::Function, field_name)
     if method_exists(data, Tuple{Element, Vector, Float64})
         # create enclosure to pass element as argument
         function wrapper_(ip, time)
@@ -38,34 +38,34 @@ function setindex!(element::Element, data::Function, field_name::String)
     element.fields[field_name] = field
 end
 
-function setindex!(element::Element, data, field_name::String)
+function setindex!(element::Element, data, field_name)
     element.fields[field_name] = Field(data)
 end
 
-function call(element::Element, field_name::String)
+function call(element::Element, field_name)
     return element[field_name]
 end
 
-function call(element::Element, field_name::String, time)
+function call(element::Element, field_name, time)
     return element[field_name](time)
 end
 
-function last(element::Element, field_name::String)
+function last(element::Element, field_name::AbstractString)
     return last(element[field_name])
 end
 
-function call(element::Element, ip, time=0.0)
+function call(element::Element, ip, time::Float64=0.0)
     return get_basis(element, ip, time)
 end
 
-function call(element::Element, ip, time, ::Type{Val{:Jacobian}})
+function call(element::Element, ip, time::Float64, ::Type{Val{:Jacobian}})
     X = element["geometry"](time)
     dN = get_dbasis(element, ip, time)
     J = sum([kron(dN[:,i], X[i]') for i=1:length(X)])
     return J
 end
 
-function call(element::Element, ip, time, ::Type{Val{:detJ}})
+function call(element::Element, ip, time::Float64, ::Type{Val{:detJ}})
     J = element(ip, time, Val{:Jacobian})
     n, m = size(J)
     if n == m  # volume element
@@ -79,12 +79,12 @@ function call(element::Element, ip, time, ::Type{Val{:detJ}})
     end
 end
 
-function call(element::Element, ip, time, ::Type{Val{:Grad}})
+function call(element::Element, ip, time::Float64, ::Type{Val{:Grad}})
     J = element(ip, time, Val{:Jacobian})
     return inv(J)*get_dbasis(element, ip, time)
 end
 
-function call(element::Element, field_name::String, ip, time, ::Type{Val{:Grad}})
+function call(element::Element, field_name::AbstractString, ip, time::Float64, ::Type{Val{:Grad}})
     return element(ip, time, Val{:Grad})*element[field_name](time)
 end
 
@@ -96,12 +96,12 @@ function call(element::Element, field::DCTI, time)
     return field.data
 end
 
-function call(element::Element, field_name::String, time)
+function call(element::Element, field_name::AbstractString, time)
     field = element[field_name]
     return element(field, time)
 end
 
-function call(element::Element, field_name::String, ip, time::Float64)
+function call(element::Element, field_name::AbstractString, ip, time::Float64)
     field = element[field_name]
     return element(field, ip, time)
 end
@@ -129,7 +129,7 @@ function call(element::Element, field::Field, ip, time::Float64)
     return sum([field_[i]*basis[i] for i=1:n])
 end
 
-function size(element::Element, dim::Int)
+function size(element::Element, dim)
     return size(element)[dim]
 end
 
@@ -144,17 +144,17 @@ julia> update!(element, "geometry", data)
 As a result element now have time invariant (variable) vector field "geometry" with data ([0.0, 0.0], [1.0, 2.0]).
 
 """
-function update!(element::Element, field_name::String, data::Dict)
+function update!(element::Element, field_name, data::Dict)
     element[field_name] = [data[i] for i in get_connectivity(element)]
 end
 
-function update!{K,V}(element::Element, field_name::String, data::Pair{Float64, Dict{K, V}})
+function update!{K,V}(element::Element, field_name, data::Pair{Float64, Dict{K, V}})
     time, field_data = data
     element_data = V[field_data[i] for i in get_connectivity(element)]
     update!(element, field_name, time => element_data)
 end
 
-function update!(element::Element, field_name::String, datas::Union{Real, Vector, Pair{Float64, Union{Float64, Real, Vector{Any}}}}...)
+function update!(element::Element, field_name::AbstractString, datas::Union{Real, Vector, Pair{Float64, Union{Float64, Real, Vector{Any}}}}...)
     for data in datas
         if haskey(element, field_name)
             update!(element[field_name], data)
@@ -168,13 +168,13 @@ function update!(element::Element, field_name::String, datas::Union{Real, Vector
     end
 end
 
-function update!(element::Element, field_name::String, datas::Pair...)
+function update!(element::Element, field_name, datas::Pair...)
     for data in datas
         update!(element, field_name, data)
     end
 end
 
-function update!(element::Element, field_name::String, data::Pair{Float64, Vector{Any}})
+function update!(element::Element, field_name, data::Pair{Float64, Vector{Any}})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
@@ -182,7 +182,7 @@ function update!(element::Element, field_name::String, data::Pair{Float64, Vecto
     end
 end
 
-function update!(element::Element, field_name::String, data::Pair{Float64, Vector{Int64}})
+function update!(element::Element, field_name, data::Pair{Float64, Vector{Int64}})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
@@ -190,7 +190,7 @@ function update!(element::Element, field_name::String, data::Pair{Float64, Vecto
     end
 end
 
-function update!(element::Element, field_name::String, data::Pair{Float64, Vector{Vector{Float64}}})
+function update!(element::Element, field_name, data::Pair{Float64, Vector{Vector{Float64}}})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
@@ -198,7 +198,7 @@ function update!(element::Element, field_name::String, data::Pair{Float64, Vecto
     end
 end
 
-function update!(element::Element, field_name::String, data::Pair{Float64, Float64})
+function update!(element::Element, field_name, data::Pair{Float64, Float64})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
@@ -206,7 +206,7 @@ function update!(element::Element, field_name::String, data::Pair{Float64, Float
     end
 end
 
-function update!(element::Element, field_name::String, data::Union{Float64, Vector})
+function update!(element::Element, field_name::AbstractString, data::Union{Float64, Vector})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
@@ -228,15 +228,15 @@ function update!(element::Element, datas::Pair...)
     end
 end
 
-function update!(element::Element, field_name::String, data::Function)
+function update!(element::Element, field_name, data::Function)
     element[field_name] = data
 end
 
-function update!(element::Element, field_name::String, field::Field)
+function update!(element::Element, field_name, field::Field)
     element[field_name] = field
 end
 
-function update!(elements::Vector, field_name::String, data)
+function update!(elements::Vector, field_name, data)
     for element in elements
         update!(element, field_name, data)
     end

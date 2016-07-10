@@ -19,7 +19,7 @@ type Contact <: BoundaryProblem
     use_forwarddiff :: Bool
     minimum_active_set_size :: Int
     distval :: Float64
-    store_fields :: Vector{String}
+    store_fields :: Vector{AbstractString}
 end
 
 function Contact()

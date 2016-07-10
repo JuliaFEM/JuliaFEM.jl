@@ -18,14 +18,17 @@ using JuliaFEM
 
 type Mesh
     nodes :: Dict{Int64, Vector{Float64}}
-    node_sets :: Dict{String, Set{Int64}}
+    node_sets :: Dict{Symbol, Set{Int64}}
     elements :: Dict{Int64, Vector{Int64}}
     element_types :: Dict{Int64, Symbol}
-    element_sets :: Dict{String, Set{Int64}}
+    element_codes :: Dict{Int64, Symbol}
+    element_sets :: Dict{Symbol, Set{Int64}}
+    surfaces :: Dict{Symbol, Vector{Tuple{Int64, Symbol}}}
+    surface_types :: Dict{Symbol, Symbol}
 end
 
 function Mesh()
-    return Mesh(Dict(), Dict(), Dict(), Dict(), Dict())
+    return Mesh(Dict(), Dict(), Dict(), Dict(), Dict(), Dict(), Dict(), Dict())
 end
 
 function add_node!(mesh::Mesh, nid::Int, ncoords::Vector{Float64})
@@ -38,7 +41,7 @@ function add_nodes!(mesh::Mesh, nodes::Dict{Int64, Vector{Float64}})
     end
 end
 
-function add_node_to_node_set!(mesh::Mesh, set_name::String, nids...)
+function add_node_to_node_set!(mesh::Mesh, set_name, nids...)
     if !haskey(mesh.node_sets, set_name)
         mesh.node_sets[set_name] = Set{Int64}()
     end
@@ -56,7 +59,7 @@ function add_elements!(mesh::Mesh, elements::Dict{Int64, Tuple{Symbol, Vector{In
     end
 end
 
-function add_element_to_element_set!(mesh::Mesh, set_name::String, elids...)
+function add_element_to_element_set!(mesh::Mesh, set_name, elids...)
     if !haskey(mesh.element_sets, set_name)
         mesh.element_sets[set_name] = Set{Int64}()
     end
@@ -84,38 +87,45 @@ function filter_by_element_id(mesh::Mesh, element_ids::Vector{Int64})
     return mesh2
 end
 
-function filter_by_element_set(mesh::Mesh, set_name::String)
+function filter_by_element_set(mesh::Mesh, set_name)
     filter_by_element_id(mesh::Mesh, collect(mesh.element_sets[set_name]))
 end
 
-function create_elements(mesh::Mesh)
-    elements = [Element(JuliaFEM.(mesh.element_types[elid]), elcon) for (elid, elcon) in mesh.elements]
+function create_elements(mesh::Mesh; element_type=nothing)
+    element_ids = collect(keys(mesh.elements))
+    if element_type != nothing
+        filter!(id -> mesh.element_types[id] == element_type, element_ids)
+    end
+    elements = [Element(JuliaFEM.(mesh.element_types[id]), mesh.elements[id]) for id in element_ids]
     update!(elements, "geometry", mesh.nodes)
     return elements
 end
 
-function create_elements(mesh::Mesh, element_sets::String...)
-    elements = Element[]
-    for element_set in element_sets
-        new_elements = create_elements(filter_by_element_set(mesh, element_set))
-        elements = [elements; new_elements]
+function create_elements(mesh::Mesh, element_sets::Symbol...; element_type=nothing)
+    if isempty(element_sets)
+        element_ids = collect(keys(mesh.elements))
+    else
+        element_ids = Set{Int64}()
+        for set_name in element_sets
+            element_ids = union(element_ids, mesh.element_sets[set_name])
+        end
     end
+
+    if element_type != nothing
+        filter!(id -> mesh.element_types[id] == element_type, element_ids)
+    end
+
+    elements = [Element(JuliaFEM.(mesh.element_types[id]), mesh.elements[id]) for id in element_ids]
+    update!(elements, "geometry", mesh.nodes)
     return elements
 end
 
-function create_elements(mesh::Mesh, element_type::Symbol)
-    elements = Element[]
-    for (elid, elcon) in mesh.elements
-        eltype = mesh.element_types[elid]
-        eltype == element_type || continue
-        element = Element(JuliaFEM.(eltype), elcon)
-        update!(element, "geometry", mesh.nodes)
-        push!(elements, element)
-    end
-    return elements
+function create_elements(mesh::Mesh, element_sets::AbstractString...; element_type=nothing)
+    element_sets = map(parse, element_sets)
+    return create_elements(mesh, element_sets...; element_type=element_type)
 end
 
-""" find npts nearest nodes form mesh and return id numbers as list. """
+""" find npts nearest nodes from mesh and return id numbers as list. """
 function find_nearest_nodes(mesh::Mesh, coords::Vector, npts=1)
     dist = Dict{Int64, Float64}()
     for (nid, c) in mesh.nodes

@@ -3,7 +3,7 @@
 
 using JuliaFEM
 using JuliaFEM.Preprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "test tet4 + volume load" begin
     X1 = [2.0, 3.0, 4.0]

@@ -3,7 +3,7 @@
 
 using JuliaFEM
 using JuliaFEM.Postprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 testdata = """\
 <?xml version="1.0" encoding="utf-8"?>

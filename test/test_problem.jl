@@ -2,7 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "test initialize field problem" begin
     el = Element(Seg2, [1, 2])
@@ -11,8 +11,9 @@ using JuliaFEM.Test
     initialize!(pr)
     @test haskey(el, "temperature")
     # one timestep in field "temperature"
-    @test length(el("temperature")) == 1
     @test length(el["temperature"]) == 1
+    # this way we access to field at default time t=0.0, it's different than ^!
+    @test length(el("temperature")) == 2 
     # length of single increment
     @test length(el("temperature", 0.0)) == 2
     @test length(last(el, "temperature").data) == 2

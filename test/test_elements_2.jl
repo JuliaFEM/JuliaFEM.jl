@@ -1,5 +1,8 @@
+# This file is a part of JuliaFEM.
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+
 using JuliaFEM
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "inverse isoparametric mapping" begin
     el = Element(Quad4, [1, 2, 3, 4])

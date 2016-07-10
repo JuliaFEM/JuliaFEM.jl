@@ -3,7 +3,7 @@
 
 using JuliaFEM
 using JuliaFEM.Preprocess
-using JuliaFEM.Test
+using JuliaFEM.Testing
 
 @testset "test 2d nonlinear elasticity with surface load" begin
     meshfile = "/geometry/2d_block/BLOCK_1elem.med"

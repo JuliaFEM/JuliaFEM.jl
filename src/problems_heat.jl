@@ -44,8 +44,8 @@ https://en.wikipedia.org/wiki/Thermal_diffusivity
 https://en.wikipedia.org/wiki/Volumetric_heat_capacity
 """
 type Heat <: FieldProblem
-    formulation :: String
-    store_fields :: Vector{String}
+    formulation :: AbstractString
+    store_fields :: Vector{Symbol}
 end
 
 function Heat()
@@ -85,8 +85,17 @@ function assemble!{E<:Heat3DVolumeElements}(assembly::Assembly, problem::Problem
             k = element("$field_name thermal conductivity", ip, time)
             K += w*k*dN'*dN
         end
+        if haskey(element, "thermal conductivity")
+            dN = element(ip, time, Val{:Grad})
+            k = element("thermal conductivity", ip, time)
+            K += w*k*dN'*dN
+        end
         if haskey(element, "$field_name load")
             f = element("$field_name load", ip, time)
+            fq += w*N'*f
+        end
+        if haskey(element, "heat source")
+            f = element("heat source", ip, time)
             fq += w*N'*f
         end
     end
@@ -141,9 +150,19 @@ function assemble!{E<:Heat3DSurfaceElements}(assembly::Assembly, problem::Proble
             q = element("$field_name flux", ip, time)
             fq += w*N'*q
         end
-        if haskey(element, "$field_name heat transfer coefficient")
+        if haskey(element, "heat flux")
+            q = element("heat flux", ip, time)
+            fq += w*N'*q
+        end
+        if haskey(element, "$field_name heat transfer coefficient") && haskey(element, "$field_name external temperature")
             h = element("$field_name heat transfer coefficient", ip, time)
             Tu = element("$field_name external temperature", ip, time)
+            K += w*h*N'*N
+            fq += w*N'*h*Tu
+        end
+        if haskey(element, "heat transfer coefficient") && haskey(element, "external temperature")
+            h = element("heat transfer coefficient", ip, time)
+            Tu = element("external temperature", ip, time)
             K += w*h*N'*N
             fq += w*N'*h*Tu
         end
@@ -178,8 +197,17 @@ function assemble!{E<:Heat2DVolumeElements}(assembly::Assembly, problem::Problem
             k = element("$field_name thermal conductivity", ip, time)
             K += w*k*dN'*dN
         end
+        if haskey(element, "thermal conductivity")
+            dN = element(ip, time, Val{:Grad})
+            k = element("thermal conductivity", ip, time)
+            K += w*k*dN'*dN
+        end
         if haskey(element, "$field_name load")
             f = element("$field_name load", ip, time)
+            fq += w*N'*f
+        end
+        if haskey(element, "heat source")
+            f = element("heat source", ip, time)
             fq += w*N'*f
         end
     end
@@ -202,6 +230,22 @@ function assemble!{E<:Heat2DSurfaceElements}(assembly::Assembly, problem::Proble
         if haskey(element, "$field_name flux")
             g = element("$field_name flux", ip, time)
             fq += w*N'*g
+        end
+        if haskey(element, "heat flux")
+            g = element("heat flux", ip, time)
+            fq += w*N'*g
+        end
+        if haskey(element, "$field_name heat transfer coefficient") && haskey(element, "$field_name external temperature")
+            h = element("$field_name heat transfer coefficient", ip, time)
+            Tu = element("$field_name external temperature", ip, time)
+            K += w*h*N'*N
+            fq += w*N'*h*Tu
+        end
+        if haskey(element, "heat transfer coefficient") && haskey(element, "external temperature")
+            h = element("heat transfer coefficient", ip, time)
+            Tu = element("external temperature", ip, time)
+            K += w*h*N'*N
+            fq += w*N'*h*Tu
         end
     end
     T = vec(element[field_name](time))
