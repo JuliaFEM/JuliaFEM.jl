@@ -50,4 +50,3 @@ end
     @test mesh.surfaces[:LOAD][1] == (16, :S1)
     @test mesh.surface_types[:LOAD] == :ELEMENT
 end
-

@@ -145,7 +145,7 @@ export Postprocessor
 # other JuliaFEM ecosystem and solves problem.
 module Abaqus
 include("abaqus.jl")
-export abaqus_read_model
+export abaqus_read_model, abaqus_run_model, abaqus_read_results, abaqus_run_test
 end
 
 """ JuliaFEM testing routines. """

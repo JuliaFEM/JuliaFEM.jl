@@ -2,7 +2,10 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 importall Base
+
+using JuliaFEM
 using JuliaFEM.Preprocess
+using JuliaFEM.Postprocess
 
 global const ABAQUS_SECTIONS = [
     "HEADING", "NODE", "ELEMENT", "SOLID SECTION",
@@ -339,6 +342,16 @@ function determine_problem_dimension(model, element_set_name)
     return 3
 end
 
+function get_element_section(model, element_set_name)
+    sections = filter(s -> s.element_set == element_set_name, model.properties)
+    length(sections) == 1 || error("Multiple sections found for element set $element_set_name")
+    return sections[1]
+end
+
+function get_material(model, material_name)
+    return model.materials[material_name]
+end
+
 function call(model::Model)
     info("Starting JuliaFEM-ABAQUS solver.")
     # 1. create field problems and add elements
@@ -349,11 +362,28 @@ function call(model::Model)
         problem_dimension = determine_problem_dimension(model, element_set_name)
         problem = Problem(problem_type, problem_name, problem_dimension)
         problem.elements = create_elements(model.mesh, element_set_name)
-        section = get_element_section(element_set_name)
-        material = get_material(section.material)
-        update!(problem, material)
+        section = get_element_section(model, element_set_name)
+        material = get_material(model, section.material)
+        for mp in material.properties
+            if isa(mp, Elastic)
+                update!(problem.elements, "youngs modulus", mp.E)
+                update!(problem.elements, "poissons ratio", mp.nu)
+            end
+        end
         push!(field_problems, problem)
     end
+
+    child_element = Dict(
+        :Tet4 => :Tri3,
+        :Tet10 => :Tet6)
+
+    foobar = Dict(
+        :Tet4 => Dict(
+            :S1 => [1, 2, 3],
+            :S2 => [1, 4, 2],
+            :S3 => [2, 4, 3],
+            :S4 => [3, 4, 1]))
+
     # 2. loop steps
     for step in model.steps
         boundary_problems = []
@@ -362,25 +392,80 @@ function call(model::Model)
                 problem = Problem(Dirichlet, "fix nodes", 3, "displacement")
                 for (bc_name, dof) in bc.data
                     nodes = model.mesh.node_sets[bc_name]
-                    for node in nodes
-                        fix_node!(problem, node => dof)
-                    end
+                    elements = [Element(Poi1, [id]) for id in nodes]
+                    update!(elements, "displacement $dof", 0.0)
+                    update!(elements, "geometry", model.mesh.nodes)
+                    push!(problem, elements)
                 end
                 push!(boundary_problems, problem)
             end
             if isa(bc, DSLoad)
-                problem = Problem(Elasticity, "pressure load", 3, "displacement")
+                problem = Problem(Elasticity, "pressure load", 3)
                 for (bc_name, bc_type, pressure) in bc.data
-                    elements = create_elements_from_surface_set(bc_name)
+                    bc_type == :P || error("bc_type = $bc_type != :P")
+                    elements = []
+                    for (element_id, side) in model.mesh.surfaces[bc_name]
+                        parent_element = model.mesh.elements[element_id]
+                        parent_element_type = model.mesh.element_types[element_id]
+                        lcon = foobar[parent_element_type][side]
+                        boundary_element_type = child_element[parent_element_type]
+                        gcon = parent_element[lcon]
+                        info("parent element $parent_element_type, boundary element = $boundary_element_type, side $side, gcon = $gcon")
+                        boundary_element = Element(JuliaFEM.(boundary_element_type), gcon)
+                        push!(elements, boundary_element)
+                    end
+                    update!(elements, "geometry", model.mesh.nodes)
                     update!(elements, "surface pressure", pressure)
-                    problem.elements = [problem.elements; elements]
+                    push!(problem, elements)
                 end
                 push!(boundary_problems, problem)
             end
         end
-        all_problems = [problems; boundary_problems]
-        solver = Solver(solver_type, solver_description, all_problems...)
+
+        all_problems = [field_problems; boundary_problems]
+        #solver_type = determine_solver_type(model, step)
+        solver_type = Linear
+        solver_description = "Step"
+        solver = Solver(solver_type, solver_description)
+        push!(solver, all_problems...)
         solver()
     end
+    return true
 end
 
+function abaqus_run_model(fn)
+    model = abaqus_read_model(fn)
+    model()
+end
+
+function abaqus_run_test(name; print_test_file=false)
+    # get test file
+    fn = tempdir()*"/$name.inp"
+    if !isfile(fn)
+        # if file does not exist, attempt to download it if ABAQUS_TEST_URL is set
+        if haskey(ENV, "ABAQUS_TEST_URL")
+            url = ENV["ABAQUS_TEST_URL"]*"/$name.inp"
+            info("Downloading test from url $url")
+            download(url, fn)
+        else
+            # otherwise give up, no testing possible this time
+            info("""
+            File $fn not found and ABAQUS_TEST_URL not set, unable to download file.
+            To access Abaqus test files, set environment variable ABAQUS_TEST_URL to
+            point url to Abaqus verification book. Typically the address is something
+            like `http://myurl.com:<port>/books/eif`, so you need to set
+            `export ABAQUS_TEST_URL=http://myurl.com:<port>/books/eif` to your .bashrc
+            file to make tests working.""")
+            return false
+        end
+    end
+    if print_test_file
+        println(repeat("-", 80))
+        println(readall(fn))
+        println(repeat("-", 80))
+    end
+    abaqus_run_model(fn)
+end
+
+function abaqus_read_results
+end

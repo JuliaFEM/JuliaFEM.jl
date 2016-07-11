@@ -1,10 +1,13 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-import Base: parse
+importall Base
 
 element_has_nodes(::Type{Val{:C3D4}}) = 4
 element_has_type( ::Type{Val{:C3D4}}) = :Tet4
+
+element_has_nodes(::Type{Val{:C3D8}}) = 8
+element_has_type( ::Type{Val{:C3D8}}) = :Hex8
 
 element_has_nodes(::Type{Val{:C3D10}}) = 10
 element_has_type(::Type{Val{:C3D10}}) = :Tet10
@@ -19,6 +22,9 @@ element_has_type( ::Type{Val{:S3}}) = :Tri3
 
 element_has_nodes(::Type{Val{:STRI65}}) = 6
 element_has_type(::Type{Val{:STRI65}}) = :Tri6
+
+element_has_nodes(::Type{Val{:CPS4}}) = 4
+element_has_type(::Type{Val{:CPS4}}) = :Quad4
 
 """
 Checks for if line is a comment line or just empty
