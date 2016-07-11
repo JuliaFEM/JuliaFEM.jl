@@ -245,7 +245,14 @@ function solve!(K, C1, C2, D, f, g, u, la, ::Type{Val{1}}; F=nothing, debug=fals
     try
         u[B] = lufact(C2[nz,B]) \ full(g[nz])
     catch
-        error("solver #1 failed to solve boundary dofs (you should not see this message).")
+        info("solver #1 failed to solve boundary dofs (you should not see this message).")
+        info("# nz = $(length(nz))")
+        info("# A = $(length(A))")
+        info("# B = $(length(B))")
+        info("# I = $(length(I))")
+        info("nz = $nz")
+        info("B = $B")
+        rethrow()
     end
 
     # solve interior domain using LDLt factorization
