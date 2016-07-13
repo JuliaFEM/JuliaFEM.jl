@@ -537,23 +537,35 @@ function process_output_request(model::Model, solver::Solver, output_request::Ab
                                 ::Type{Val{:NODE}}, ::Type{Val{:PRINT}})
     data = output_request.data
     options = output_request.options
-    info("nodal output request with data $data and options $options")
-    code_mapping = Dict(:U => "displacement", :COORD => "geometry")
-    abbr_mapping = Dict(:U => :U, :COORD => :COOR) # ..?
+    code_mapping = Dict(
+        :COORD => "geometry",
+        :U => "displacement",
+        :CF => "concentrated force",
+        :RF => "reaction force")
+    abbr_mapping = Dict(:COORD => :COOR)
     for row in data
+        info(repeat("-", 80))
+        codes = join(row, ", ")
+        info("*NODE OUTPUT request, with fields $codes")
+        if length(options) != 0
+            info("Additional options: $options")
+        end
+        info(repeat("-", 80))
         tables = Any[]
         for code in row
             haskey(code_mapping, code) || continue
             for problem in model.problems
                 field_name = code_mapping[code]
-                abbr = abbr_mapping[code]
+                abbr = get(abbr_mapping, code, code)
                 table = problem(DataFrame, field_name, abbr, solver.time)
                 push!(tables, table)
             end
         end
         length(tables) != 0 || continue
         results = join(tables..., on=:id, kind=:outer)
+        println()
         println(results)
+        println()
     end
 end
 
@@ -590,6 +602,9 @@ function call(model::Model)
         all_problems = [model.problems; boundary_problems; step_problems]
         push!(solver, all_problems...)
         solver()
+        info(repeat("-", 80))
+        info("Simulation ready, processing output requests")
+        info(repeat("-", 80))
         # 3.3 postprocessing based on output requests
         for output_request in step.output_requests
             process_output_request(model, solver, output_request)
