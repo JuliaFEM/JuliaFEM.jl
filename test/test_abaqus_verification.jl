@@ -7,6 +7,11 @@ using JuliaFEM.Postprocess
 using JuliaFEM.Abaqus
 using JuliaFEM.Testing
 
+# to turn on automatic file download, set
+# ENV["ABAQUS_DOWNLOAD_URL"] = http://<domain>:2080/v2016/books/eif
+# if don't want to download all stuff to current directory,
+# set also e.g. ENV["ABAQUS_DOWNLOAD_DIR"] = "/tmp"
+
 #=
 test_name = "ecs4sfs1"
 @testset "$test_name" begin
@@ -16,10 +21,12 @@ end
 =#
 
 @testset "ec38sfs2" begin
-    abaqus_run_test("ec38sfs2"; print_test_file=true) || return
-    #=
-    results = abaqus_read_results("ec38sfs2")
-    side = get_results(results, "SECTION"; name="side")
+    return_code = abaqus_run_model("ec38sfs2"; fetch=true, verbose=true)
+    return_code == 0 || return
+    @test return_code == 0
+#=
+    xdmf = abaqus_open_results("ec38sfs2")
+    side, opts = read_result(xdmf, "SECTION/side")
     @test isapprox(side["SOFM"], 3464.0)
     @test isapprox(side["SOF1"], 2000.0)
     @test isapprox(side["SOF2"], 2000.0)
@@ -32,5 +39,5 @@ end
     @test isapprox(side["SOCF1"], 2/3)
     @test isapprox(side["SOCF2"], 2/3)
     @test isapprox(side["SOCF3"], 1/6)
-    =#
+=#
 end

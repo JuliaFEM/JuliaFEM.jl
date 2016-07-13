@@ -6,6 +6,7 @@ importall Base
 using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
+using LightXML
 
 ### Model definitions for ABAQUS data model
 
@@ -17,6 +18,8 @@ abstract AbstractBoundaryCondition
 abstract AbstractOutputRequest
 
 type Model
+    path :: AbstractString
+    name :: AbstractString
     mesh :: Mesh
     materials :: Dict{Symbol, AbstractMaterial}
     properties :: Vector{AbstractProperty}
@@ -211,7 +214,9 @@ end
 
 function abaqus_read_model(fn; read_mesh=true)
 
-    model = Model(Mesh(), Dict(), Vector(), Vector(), Vector(), Vector())
+    model_path = dirname(fn)
+    model_name = first(splitext(basename(fn)))
+    model = Model(model_path, model_name, Mesh(), Dict(), [], [], [], [])
 
     if read_mesh
         model.mesh = abaqus_read_mesh(fn)
@@ -230,7 +235,6 @@ function abaqus_read_model(fn; read_mesh=true)
         end
     end
     close(fid)
-
     maybe_close_section!(model, state)
 
     return model
@@ -503,27 +507,27 @@ function get_child_element(element_type::Symbol, element_side::Symbol,
             :P6 => (:Quad4, [4, 8, 5, 1]))
         )
 
-    if !haskey(element_mapping, element_type)
-        error("Unable to find child element for element of type $element_type for side $element_side, check mapping.")
+        if !haskey(element_mapping, element_type)
+            error("Unable to find child element for element of type $element_type for side $element_side, check mapping.")
+        end
+
+        if !haskey(element_mapping[element_type], element_side)
+            error("Unable to find child element side mapping for element of type $element_type for side $element_side, check mapping.")
+        end
+
+        child_element, child_element_lconn = element_mapping[element_type][element_side]
+        child_element_gconn = element_connectivity[child_element_lconn]
+        return child_element, child_element_lconn, child_element_gconn
     end
 
-    if !haskey(element_mapping[element_type], element_side)
-        error("Unable to find child element side mapping for element of type $element_type for side $element_side, check mapping.")
+    function determine_solver_type(model::Model, step::AbstractStep)
+        # FIXME
+        return Linear
     end
 
-    child_element, child_element_lconn = element_mapping[element_type][element_side]
-    child_element_gconn = element_connectivity[child_element_lconn]
-    return child_element, child_element_lconn, child_element_gconn
-end
-
-function determine_solver_type(model::Model, step::AbstractStep)
-    # FIXME
-    return Linear
-end
-
-function process_output_request(model::Model, solver::Solver, output_request::AbstractOutputRequest)
-    kind = Val{output_request.kind}
-    target = Val{output_request.target}
+    function process_output_request(model::Model, solver::Solver, output_request::AbstractOutputRequest)
+        kind = Val{output_request.kind}
+        target = Val{output_request.target}
     process_output_request(model, solver, output_request, kind, target)
 end
 
@@ -534,20 +538,22 @@ function process_output_request(model::Model, solver::Solver, output_request::Ab
     data = output_request.data
     options = output_request.options
     info("nodal output request with data $data and options $options")
+    code_mapping = Dict(:U => "displacement", :COORD => "geometry")
+    abbr_mapping = Dict(:U => :U, :COORD => :COOR) # ..?
     for row in data
+        tables = Any[]
         for code in row
+            haskey(code_mapping, code) || continue
             for problem in model.problems
-                if code == :U
-                    vals = problem("displacement", solver.time)
-                    node_ids = sort(collect(keys(vals)))
-                    u1 = [vals[id][1] for id in node_ids]
-                    u2 = [vals[id][2] for id in node_ids]
-                    u3 = [vals[id][3] for id in node_ids]
-                    d = DataFrame(; id=node_ids, u1=u1, u2=u2, u3=u3)
-                    println(d)
-                end
+                field_name = code_mapping[code]
+                abbr = abbr_mapping[code]
+                table = problem(DataFrame, field_name, abbr, solver.time)
+                push!(tables, table)
             end
         end
+        length(tables) != 0 || continue
+        results = join(tables..., on=:id, kind=:outer)
+        println(results)
     end
 end
 
@@ -590,53 +596,76 @@ function call(model::Model)
         end
     end
 
-    return true
+    return 0
 end
 
-function abaqus_read_results
+function abaqus_download(name)
+    fn = "$name.inp"
+    if !haskey(ENV, "ABAQUS_DOWNLOAD_URL")
+        info("""
+        ABAQUS input file $fn not found and ABAQUS_DOWNLOAD_URL not set, unable to
+        download file. To enable automatic model downloading, set environment variable
+        ABAQUS_URL to point url to models.""")
+        return 1
+    end
+    url = ENV["ABAQUS_DOWNLOAD_URL"]
+    if haskey(ENV, "ABAQUS_DOWNLOAD_DIR")
+        fn = rstrip(ENV["ABAQUS_DOWNLOAD_DIR"], '/') * "/" * fn
+    end
+    if !isfile(fn)
+        info("Downloading model $name from $url to $fn")
+        download("$url/$name.inp", fn)
+    end
+    return 0
+end
+
+""" Return input file name. """
+function abaqus_input_file_name(name)
+    fn = "$name.inp"
+    isfile(fn) && return fn
+    if haskey(ENV, "ABAQUS_DOWNLOAD_DIR")
+        fn = rstrip(ENV["ABAQUS_DOWNLOAD_DIR"], '/') * "/" * fn
+    end
+    isfile(fn) && return fn
+    return ""
+end
+
+function abaqus_input_file_path(name)
+    return dirname(abaqus_input_file_name(name))
+end
+
+function abaqus_open_results(name)
+    path = abaqus_input_file_path(name)
+    result_file = "$path/$name.xmf"
+    return XDMF(result_file)
 end
 
 ### JuliaFEM-ABAQUS interface entry point
 
-""" Run ABAQUS .inp file. """
-function abaqus_run_model(fn)
-    model = abaqus_read_model(fn)
-    model()
-end
+"""
+Run ABAQUS model. If input file is not found, attempt to fetch it from internet
+if fetch is set to true and ABAQUS_DOWNLOAD_URL is set. Return exit code 0 if
+execution of model is success.
+"""
+function abaqus_run_model(name; fetch=false, verbose=false)
 
-"""
-Run ABAQUS .inp file. This function can be used to run some abaqus inp file
-with the following extra feature: if file is not found from temporary directory,
-attempt to download if from internet, if environment variable ABAQUS_TEST_URL is
-set. This can be used to verify JuliaFEM code using well known ABAQUS test cases,
-if they are found from company intranet and are accessible using wget / curl.
-"""
-function abaqus_run_test(name; print_test_file=false)
-    # get test file
-    fn = tempdir()*"/$name.inp"
-    if !isfile(fn)
-        # if file does not exist, attempt to download it if ABAQUS_TEST_URL is set
-        if haskey(ENV, "ABAQUS_TEST_URL")
-            url = ENV["ABAQUS_TEST_URL"]*"/$name.inp"
-            info("Downloading test from url $url")
-            download(url, fn)
-        else
-            # otherwise give up, no testing possible this time
-            info("""
-            File $fn not found and ABAQUS_TEST_URL not set, unable to download file.
-            To access Abaqus test files, set environment variable ABAQUS_TEST_URL to
-            point url to Abaqus verification book. Typically the address is something
-            like `http://myurl.com:<port>/books/eif`, so you need to set
-            `export ABAQUS_TEST_URL=http://myurl.com:<port>/books/eif` to your .bashrc
-            file to make tests working.""")
-            return false
-        end
+    if !isfile("$name.inp") && fetch
+        status = abaqus_download(name)
+        status == 0 || return status # download failed
     end
-    if print_test_file
+
+    fn = abaqus_input_file_name(name)
+
+    if verbose
+        println(repeat("-", 80))
+        println("Running ABAQUS model $name from file $fn")
         println(repeat("-", 80))
         println(readall(fn))
         println(repeat("-", 80))
     end
-    abaqus_run_model(fn)
+
+    model = abaqus_read_model(fn)
+    status = model()
+    return status
 end
 

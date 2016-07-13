@@ -1,8 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using LightXML
 using JuliaFEM
+using LightXML
 
 # element codes: http://www.paraview.org/pipermail/paraview/2013-July/028859.html
 # > from  ./VTK/ThirdParty/xdmf2/vtkxdmf2/libsrc/XdmfTopology.h
