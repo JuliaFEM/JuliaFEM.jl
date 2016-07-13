@@ -4,6 +4,48 @@
 importall Base
 
 using JuliaFEM
+using DataFrames
+using HDF5
+using LightXML
+
+import HDF5: h5read, h5write
+
+function h5read{T<:DataFrame}(::Type{T}, filename, name::ByteString)
+    raw_data = h5read(filename, name)
+    index = raw_data["index"]
+    column_names = raw_data["column_names"]
+    column_names = map(parse, column_names)
+    n, m = size(raw_data["data"])
+    data = Any[index]
+    for i=1:m
+        push!(data, raw_data["data"][:,i])
+    end
+    return DataFrame(data, column_names)
+end
+
+function h5write(filename, name::ByteString, data::DataFrame)
+    column_names = DataFrames._names(data)
+    column_names = map(string, column_names)
+    index = convert(Vector, data[:,1])
+    data = convert(Matrix, data[:,2:end])
+    h5write(filename, "$name/column_names", column_names)
+    h5write(filename, "$name/index", index)
+    h5write(filename, "$name/data", data)
+end
+
+function convert(::Type{AbstractString}, df::DataFrame)
+    fn = tempname()
+    writetable(fn, df)
+    return readall(fn)
+end
+
+function convert(::Type{DataFrame}, dfs::AbstractString)
+    fn = tempname()
+    fid = open(fn, "w")
+    write(fid, dfs)
+    close(fid)
+    return readtable(fn)
+end
 
 """
 Calculate field values to nodal points from Gauss points using least-squares fitting.
