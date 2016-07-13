@@ -188,7 +188,7 @@ function initialize!(problem::Problem, time=0.0)
 end
 
 """ Update problem solution vector for assembly. """
-function update_assembly!(problem, u, la)
+function update_assembly!(problem, u, la; verbose=false)
 
     assembly = get_assembly(problem)
 
@@ -209,15 +209,15 @@ function update_assembly!(problem, u, la)
     assembly.u_prev = copy(assembly.u)
     assembly.la_prev = copy(assembly.la)
     if get_formulation_type(problem) == :total
-        info("$(problem.name): total formulation, replacing solution vector with new values")
+        verbose && info("$(problem.name): total formulation, replacing solution vector with new values")
         assembly.u = u
         assembly.la = la
     elseif get_formulation_type(problem) == :incremental
-        info("$(problem.name): incremental formulation, adding increment to solution vector")
+        verbose && info("$(problem.name): incremental formulation, adding increment to solution vector")
         assembly.u += u
         assembly.la = la
     elseif get_formulation_type(problem) == :forwarddiff
-        info("$(problem.name): forwarddiff formulation, adding increment to solution vector and reaction force vector")
+        verbose && info("$(problem.name): forwarddiff formulation, adding increment to solution vector and reaction force vector")
         assembly.u += u
         assembly.la += la
     else

@@ -5,7 +5,6 @@ using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
 using JuliaFEM.Testing
-using JLD
 
 function JuliaFEM.get_model(::Type{Val{Symbol("test 2d linear elasticity with surface + volume load")}})
     meshfile = "/geometry/2d_block/BLOCK_1elem.med"
@@ -51,10 +50,15 @@ end
     E = 288.0
     nu = 1/3
     u3_expected = f/E*[-nu, 1] + g/(2*E)*[-nu, 1]
-    u3 = reshape(block.assembly.u, 2, 4)[:,3]
-    info("u3 = $u3")
+
+    results = block(DataFrame, "displacement", :U, 0.0)
+    println(results)
+    u3 = results[:N3, [:U1, :U2]]
+    info("(u1,u2) at node 3")
+    info(u3)
     @test isapprox(u3, u3_expected)
 
+#=
     info("strain")
     for ip in get_integration_points(block.elements[1])
         eps = ip("strain")
@@ -79,6 +83,8 @@ end
     # TODO: to postprocess
     #@test isapprox(stress[1], [0.0, g, 0.0])
     #@test isapprox(strain[1], [u3[1], u3[2], 0.0])
+=#
+
 end
 
 #= TODO: to other file

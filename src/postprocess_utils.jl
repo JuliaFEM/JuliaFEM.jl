@@ -47,6 +47,31 @@ function convert(::Type{DataFrame}, dfs::AbstractString)
     return readtable(fn)
 end
 
+function getindex(df::DataFrame, ids::Vector{Symbol}, cols::Vector{Symbol})
+    rows = Int64[find(df[:id] .== id)[1] for id in ids]
+    return df[rows, cols]
+end
+
+function getindex(df::DataFrame, id::Symbol, col::Symbol)
+    return getindex(df, [id], [col])
+end
+
+function getindex(df::DataFrame, id::Symbol, cols::Vector{Symbol})
+    return getindex(df, [id], cols)
+end
+
+function getindex(df::DataFrame, ids::Vector{Symbol}, col::Symbol)
+    return getindex(df, ids, [col])
+end
+
+function vec(df::DataFrame)
+    return vec(convert(Matrix{Float64}, df))
+end
+
+function isapprox(d1::DataFrame, d2::Vector)
+    return isapprox(vec(d1), d2)
+end
+
 """
 Calculate field values to nodal points from Gauss points using least-squares fitting.
 """
@@ -184,6 +209,23 @@ function call(problem::Problem, field_name::AbstractString, time::Float64=0.0)
         end
     end
     return f
+end
+
+function call(problem::Problem, ::Type{DataFrame}, field_name::AbstractString,
+              abbreviation::Symbol, time::Float64=0.0)
+    u = problem(field_name, time)
+    node_ids = collect(keys(u))
+    column_names = [:id]
+    n = length(u[first(node_ids)])
+    index = [Symbol("N$id") for id in node_ids]
+    result = Any[index]
+    for dof=1:n
+        push!(result, [u[id][dof] for id in node_ids])
+        push!(column_names, Symbol("$abbreviation$dof"))
+    end
+    df = DataFrame(result, column_names)
+    sort!(df, cols=[:id])
+    return df
 end
 
 """ Interpolate field from a set of elements. """

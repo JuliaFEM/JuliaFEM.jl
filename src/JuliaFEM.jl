@@ -138,6 +138,7 @@ export calc_nodal_values!,
        calculate_second_moment_of_mass
 include("postprocess_xdmf.jl")
 export XDMF, xdmf_new_result!, xdmf_save_field!, xdmf_save!
+export DataFrame
 end
 export Postprocessor
 
@@ -145,7 +146,7 @@ export Postprocessor
 # other JuliaFEM ecosystem and solves problem.
 module Abaqus
 include("abaqus.jl")
-export abaqus_read_model, abaqus_run_model, abaqus_read_results, abaqus_run_test
+export abaqus_read_model, abaqus_run_model, abaqus_open_results
 end
 
 """ JuliaFEM testing routines. """
