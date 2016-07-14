@@ -65,7 +65,8 @@ export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
        get_unknown_field_name, get_formulation_type, get_problems,
        get_field_problems, get_boundary_problems,
        get_field_assembly, get_boundary_assembly,
-       initialize!, create_projection, eliminate_interior_dofs
+       initialize!, create_projection, eliminate_interior_dofs,
+       is_field_problem, is_boundary_problem
 include("solvers_modal.jl")
 export Modal
 
@@ -135,7 +136,8 @@ export calc_nodal_values!,
        copy_field!,
        calculate_area,
        calculate_center_of_mass,
-       calculate_second_moment_of_mass
+       calculate_second_moment_of_mass,
+       extract
 include("postprocess_xdmf.jl")
 export XDMF, xdmf_new_result!, xdmf_save_field!, xdmf_save!
 export DataFrame

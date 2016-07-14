@@ -408,8 +408,12 @@ function update!(solver::Solver, u::Vector, la::Vector; show_info=true)
     show_info && info("Updating problems ...")
     t0 = Base.time()
     for problem in solver.problems
-        u_new, la_new = update_assembly!(problem, u, la)
-        update_elements!(problem, u_new, la_new)
+        assembly = get_assembly(problem)
+        elements = get_elements(problem)
+        # update solution, first for assembly (u,la) ...
+        update!(problem, assembly, u, la)
+        # .. and then from assembly (u,la) to elements
+        update!(problem, assembly, elements, solver.time)
     end
     t1 = round(Base.time()-t0, 2)
     show_info && info("Updated problems in $t1 seconds.")

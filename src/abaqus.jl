@@ -6,7 +6,6 @@ importall Base
 using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
-using LightXML
 
 ### Model definitions for ABAQUS data model
 
@@ -265,8 +264,9 @@ end
 typealias BOUNDARY_CONDITIONS Union{BOUNDARY, CLOAD, DLOAD, DSLOAD}
 
 @register_abaqus_keyword("NODE PRINT")
+@register_abaqus_keyword("EL PRINT")
 @register_abaqus_keyword("SECTION PRINT")
-typealias OUTPUT_REQUESTS Union{NODE_PRINT, SECTION_PRINT}
+typealias OUTPUT_REQUESTS Union{NODE_PRINT, EL_PRINT, SECTION_PRINT}
 
 ## Properties
 
@@ -391,7 +391,7 @@ end
 """ Dirichlet boundary condition. """
 function create_boundary_problem(model::Model, bc::AbstractBoundaryCondition, ::BOUNDARY; verbose=true)
     dim = determine_problem_dimension(model)
-    problem = Problem(Dirichlet, "Dirichlet bc *BOUNDARY", dim, "displacement")
+    problem = Problem(Dirichlet, "Dirichlet boundary *BOUNDARY", dim, "displacement")
     for row in bc.data
 
         if isa(row[1], AbstractString) # node set given
@@ -462,7 +462,7 @@ function create_boundary_problem(model::Model, bc::AbstractBoundaryCondition, ::
 
         child_element = Element(JuliaFEM.(child_element_type), child_element_connectivity)
         update!(child_element, "geometry", model.mesh.nodes)
-        update!(child_element, "surface pressure", pressure)
+        update!(child_element, "surface pressure", -pressure)
         push!(problem.elements, child_element)
     end
     return problem
@@ -472,13 +472,18 @@ end
 function create_boundary_problem(model::Model, bc::AbstractBoundaryCondition, ::CLOAD; verbose=false)
     dim = determine_problem_dimension(model)
     problem = Problem(Elasticity, "Concentrated load *CLOAD", dim)
-    for row in bc.data
-        node, dof, load = row
+    nodes = sort(unique([row[1] for row in bc.data]))
+    elements = Dict()
+    for node in nodes
         element = Element(Poi1, [node])
         update!(element, "geometry", model.mesh.nodes)
-        update!(element, "displacement traction force $dof", load)
-        push!(problem.elements, element)
+        elements[node] = element
     end
+    for row in bc.data
+        node, dof, load = row
+        update!(elements[node], "concentrated force $dof", load)
+    end
+    problem.elements = collect(values(elements))
     return problem
 end
 
@@ -531,8 +536,6 @@ function get_child_element(element_type::Symbol, element_side::Symbol,
     process_output_request(model, solver, output_request, kind, target)
 end
 
-using DataFrames
-
 function process_output_request(model::Model, solver::Solver, output_request::AbstractOutputRequest,
                                 ::Type{Val{:NODE}}, ::Type{Val{:PRINT}})
     data = output_request.data
@@ -546,7 +549,7 @@ function process_output_request(model::Model, solver::Solver, output_request::Ab
     for row in data
         info(repeat("-", 80))
         codes = join(row, ", ")
-        info("*NODE OUTPUT request, with fields $codes")
+        info("*NODE PRINT request, with fields $codes")
         if length(options) != 0
             info("Additional options: $options")
         end
@@ -554,15 +557,56 @@ function process_output_request(model::Model, solver::Solver, output_request::Ab
         tables = Any[]
         for code in row
             haskey(code_mapping, code) || continue
-            for problem in model.problems
-                field_name = code_mapping[code]
-                abbr = get(abbr_mapping, code, code)
-                table = problem(DataFrame, field_name, abbr, solver.time)
-                push!(tables, table)
-            end
+            field_name = code_mapping[code]
+            abbr = get(abbr_mapping, code, code)
+            table = solver(DataFrame, field_name, abbr, solver.time)
+            push!(tables, table)
         end
         length(tables) != 0 || continue
-        results = join(tables..., on=:id, kind=:outer)
+        results = join(tables..., on=:NODE, kind=:outer)
+        sort!(results, cols=[:NODE])
+        println()
+        println(results)
+        println()
+    end
+end
+
+function process_output_request(model::Model, solver::Solver, output_request::AbstractOutputRequest,
+                                ::Type{Val{:EL}}, ::Type{Val{:PRINT}})
+    data = output_request.data
+    options = output_request.options
+    code_mapping = Dict(
+        :COORD => "geometry",
+        :S => "stress",
+        :E => "strain")
+    abbr_mapping = Dict(:COORD => :COOR)
+    for row in data
+        info(repeat("-", 80))
+        codes = join(row, ", ")
+        info("*EL PRINT request, with fields $codes")
+        if length(options) != 0
+            info("Additional options: $options")
+        end
+        info(repeat("-", 80))
+        tables = Any[]
+        for code in row
+            haskey(code_mapping, code) || continue
+            field_name = code_mapping[code]
+            abbr = get(abbr_mapping, code, code)
+            table = solver(DataFrame, solver.time, Val{code})
+            push!(tables, table)
+        end
+        length(tables) != 0 || continue
+        results = first(tables)
+        if length(tables) > 1
+            for i=2:length(tables)
+                results = join(results, tables[i], on=:ELEMENT, kind=:outer)
+            end
+        end
+        sort!(results, cols=[:ELEMENT, :IP])
+        # filter out elements with id -1, they are automatically created boundary elements
+        fel = find(results[:ELEMENT] .!= Symbol("E-1"))
+        results = results[fel, :]
         println()
         println(results)
         println()

@@ -530,6 +530,7 @@ function assemble{El<:Elasticity3DSurfaceElements}(problem::Problem{Elasticity},
     Kg = zeros(dim*nnodes, dim*nnodes)
     f = zeros(dim*nnodes)
 
+    has_concentrated_forces = false
     for ip in get_integration_points(element)
         detJ = element(ip, time, Val{:detJ})
         w = ip.weight*detJ
@@ -543,6 +544,11 @@ function assemble{El<:Elasticity3DSurfaceElements}(problem::Problem{Elasticity},
                 T = element("displacement traction force $i", ip, time)
                 f[i:dim:end] += w*vec(T*N)
             end
+            if haskey(element, "concentrated force $i")
+                has_concentrated_forces = true
+                T = element("concentrated force $i", ip, time)
+                f[i:dim:end] += w*vec(T*N)
+            end
         end
         if haskey(element, "surface pressure")
             J = element(ip, time, Val{:Jacobian})'
@@ -552,6 +558,9 @@ function assemble{El<:Elasticity3DSurfaceElements}(problem::Problem{Elasticity},
             p = -element("surface pressure", ip, time)
             f += w*p*vec(n*N)
         end
+    end
+    if has_concentrated_forces
+        update!(element, "concentrated force", time => Any[f])
     end
     return Km, Kg, f
 end
@@ -710,3 +719,32 @@ end
 
 
 =#
+
+function call(problem::Problem, element::Element, ip, time::Float64, ::Type{Val{:E}})
+    haskey(element, "displacement") || return nothing
+    gradu = element("displacement", ip, time, Val{:Grad})
+    eps = 0.5*(gradu + gradu')
+    return eps
+end
+
+function call(problem::Problem, element::Element, ip, time::Float64, ::Type{Val{:S}})
+    haskey(element, "displacement") || return nothing
+    props = problem.properties
+    eps = problem(element, ip, time, Val{:E})
+    eps == nothing && return nothing
+    E = element("youngs modulus", ip, time)
+    nu = element("poissons ratio", ip, time)
+    mu = E/(2.0*(1.0+nu))
+    la = E*nu/((1.0+nu)*(1.0-2.0*nu))
+    if props.formulation in [:plane_stress, :plane_strain]
+        la = 2.0*la*mu/(la+2.0*mu)
+    end
+    S = la*trace(eps)*I + 2.0*mu*eps
+    return S
+end
+
+function call(problem::Problem, element::Element, ip, time::Float64, ::Type{Val{:COORD}})
+    haskey(element, "geometry") || return nothing
+    return element("geometry", ip, time)
+end
+
