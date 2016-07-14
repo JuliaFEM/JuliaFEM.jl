@@ -6,3 +6,4 @@ HDF5
 JLD
 Compat
 DataFrames
+Formatting
