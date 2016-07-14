@@ -7,7 +7,8 @@ using JuliaFEM
 using DataFrames
 using HDF5
 using LightXML
-using StringUtils
+using Formatting
+#using StringUtils # not in metadata
 
 import HDF5: h5read, h5write
 
@@ -68,8 +69,9 @@ end
 
 """ A more appropriate representation for floats in results. """
 function DataFrames.ourshowcompact(io::IO, x::Float64)
-    print(io, u"\% 0.4E(x)")
-    return
+    #print(io, u"\% 0.4E(x)")
+    #return
+    print(io, sprintf1("% 0.4E", x))
 end
 
 """
