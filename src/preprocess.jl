@@ -91,13 +91,21 @@ function filter_by_element_set(mesh::Mesh, set_name)
     filter_by_element_id(mesh::Mesh, collect(mesh.element_sets[set_name]))
 end
 
+function create_element(mesh::Mesh, id::Int)
+    connectivity = mesh.elements[id]
+    element_type = JuliaFEM.(mesh.element_types[id])
+    element = Element(element_type, connectivity)
+    update!(element, "geometry", mesh.nodes)
+    element.id = id
+    return element
+end
+
 function create_elements(mesh::Mesh; element_type=nothing)
     element_ids = collect(keys(mesh.elements))
     if element_type != nothing
         filter!(id -> mesh.element_types[id] == element_type, element_ids)
     end
-    elements = [Element(JuliaFEM.(mesh.element_types[id]), mesh.elements[id]) for id in element_ids]
-    update!(elements, "geometry", mesh.nodes)
+    elements = [create_element(mesh, id) for id in element_ids]
     return elements
 end
 
@@ -115,8 +123,7 @@ function create_elements(mesh::Mesh, element_sets::Symbol...; element_type=nothi
         filter!(id -> mesh.element_types[id] == element_type, element_ids)
     end
 
-    elements = [Element(JuliaFEM.(mesh.element_types[id]), mesh.elements[id]) for id in element_ids]
-    update!(elements, "geometry", mesh.nodes)
+    elements = [create_element(mesh, id) for id in element_ids]
     return elements
 end
 

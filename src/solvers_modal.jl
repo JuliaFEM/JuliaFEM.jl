@@ -101,21 +101,23 @@ function call(solver::Solver{Modal}; show_info=true, debug=false)
     info("Eigenvalues computed in $t1 seconds. Eigenvalues: $om2")
 
     for i=1:length(om2)
+        freq = real(sqrt(om2[i])/(2.0*pi))
         u = props.eigvecs[:,i]
         field_dim = get_unknown_field_dimension(solver)
         field_name = get_unknown_field_name(solver)
-        nnodes = round(Int, length(u)/field_dim)
-        solution = reshape(u, field_dim, nnodes)
+        if field_dim != 1
+            nnodes = round(Int, length(u)/field_dim)
+            u = reshape(u, field_dim, nnodes)
+            u = Vector{Float64}[u[:,i] for i in 1:nnodes]
+        end
         for problem in get_problems(solver)
-            local_sol = Dict{Int64, Vector{Float64}}()
-            for node_id in get_connectivity(problem)
-                local_sol[node_id] = solution[:, node_id]
+            for element in get_elements(problem)
+                connectivity = get_connectivity(element)
+                update!(element, field_name, freq => u[connectivity])
             end
-            freq = real(sqrt(om2[i])/(2.0*pi))
-            update!(problem, field_name, freq => local_sol)
         end
     end
-    
+
     return true
 end
 

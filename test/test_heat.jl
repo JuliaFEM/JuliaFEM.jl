@@ -58,7 +58,8 @@ end
     el2 = Element(Seg2, [1, 2])
     update!(el2, "geometry", X)
     # linear ramp from 0 -> 6 in time 0 -> 1
-    update!(el2, "temperature flux", 0.0 => 0.0, 1.0 => 6.0)
+    update!(el2, "temperature flux", 0.0 => 0.0)
+    update!(el2, "temperature flux", 1.0 => 6.0)
 
     # define heat problem and push elements to problem
     problem = Problem(Heat, "one element heat problem", 1)

@@ -106,6 +106,7 @@ end
     @test isapprox(fb, 1.0)
 end
 
+#= unnecessary feature 
 @testset "add two time dependent fields to element at once" begin
     el = Element(Seg2, [1, 2])
     update!(el, "foo1", 1.0 => 1.0)
@@ -113,6 +114,7 @@ end
     update!(el, "foo2", 1.0 => 1.0, 2.0 => 2.0)
     @test isapprox(el("foo1", 1.5), el("foo2", 1.5))
 end
+=#
 
 @testset "add elements to elements" begin
     el1 = Element(Seg2, [1, 2])

@@ -141,63 +141,53 @@ function get_assembly(problem)
     return problem.assembly
 end
 
-""" Initialize unknown field ready for nonlinear iterations, i.e.,
-    take last known value and set it as a initial quess for next
-    time increment.
-"""
-function initialize!(problem::Problem, time=0.0)
+
+""" Initialize element ready for calculation. """
+function initialize!(problem::Problem, element::Element, time::Float64)
     field_name = get_unknown_field_name(problem)
     field_dim = get_unknown_field_dimension(problem)
-    for element in get_elements(problem)
-        gdofs = get_gdofs(problem, element)
-        if haskey(element, field_name)
-            # if field is found, copy last known solution to new time as initial guess
-            field = last(element[field_name])
-            if !isa(field, TimeVariantField)
-                info("Unable to initialize field $field_name for problem, is not time variant?")
-                continue
-            end
+    nnodes = length(element)
 
-            if !isapprox(field.time, time)
-                last_data = copy(last(element[field_name]).data)
-                push!(element[field_name], time => last_data)
-            end
-        else # if field not found at all, initialize new zero field.
-            data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
-            element[field_name] = (time => data)
+    # initialize primary field
+    if !haskey(element, field_name)
+        if field_dim == 1
+            update!(element, field_name, time => zeros(nnodes))
+        else
+            update!(element, field_name, time => [zeros(field_dim) for i=1:nnodes])
         end
     end
-    # if this is boundary problem and not dirichlet problem, initialize field
-    # for primary variable too
+
+    # if boundary problem, initialize field for main problem too
     is_boundary_problem(problem) || return
-    #is_dirichlet_problem(problem) && return
     field_name = get_parent_field_name(problem)
-    for element in get_elements(problem)
-        gdofs = get_gdofs(problem, element)
-        if haskey(element, field_name)
-            # if field is found, copy last known solution to new time as initial guess
-            if !isapprox(last(element[field_name]).time, time)
-                last_data = copy(last(element[field_name]).data)
-                push!(element[field_name], time => last_data)
-            end
-        else # if field not found at all, initialize new zero field.
-            data = Vector{Float64}[zeros(field_dim) for i in 1:length(element)]
-            element[field_name] = (time => data)
+    if !haskey(element, field_name)
+        if field_dim == 1
+            update!(element, field_name, time => zeros(nnodes))
+        else
+            update!(element, field_name, time => [zeros(field_dim) for i=1:nnodes])
         end
     end
 end
 
-""" Update problem solution vector for assembly. """
-function update_assembly!(problem, u, la; verbose=false)
+function initialize!(problem::Problem, time::Float64=0.0)
+    for element in get_elements(problem)
+        initialize!(problem, element, time)
+    end
+end
 
-    assembly = get_assembly(problem)
+""" Update problem solution vector for assembly. """
+function update!(problem::Problem, assembly::Assembly, u::Vector, la::Vector; verbose=false)
 
     # resize & fill with zeros vectors if length mismatch with current solution
+
     if length(u) != length(assembly.u)
+        info("resizing solution vector u")
         resize!(assembly.u, length(u))
         fill!(assembly.u, 0.0)
     end
+
     if length(la) != length(assembly.la)
+        info("resizing lagrange multipliers vector u")
         resize!(assembly.la, length(la))
         fill!(assembly.la, 0.0)
     end
@@ -228,47 +218,54 @@ function update_assembly!(problem, u, la; verbose=false)
     # calculate change of norm
     assembly.u_norm_change = norm(assembly.u - assembly.u_prev)
     assembly.la_norm_change = norm(assembly.la - assembly.la_prev)
-    #return assembly.u_norm_change, assembly.la_norm_change
     return assembly.u, assembly.la
 end
 
-""" Update solutions to elements.
+""" Return global solution (u, la) for problem.
 
 Notes
 -----
-This assumes that element is properly initialized so that last known field data
-is from current time. For boundary problems solution is updated from lambda vector
-and for field problems from actual solution vector.
+If length of solution vector != number of nodes, i.e. field dimension is 
+something other than 1, reshape vectors so it's length matches to the
+number of nodes so that one can easily get nodal results.
 """
-function update_elements!{P<:FieldProblem}(problem::Problem{P}, u, la)
-    field_name = get_unknown_field_name(problem)
+function get_global_solution(problem::Problem, assembly::Assembly)
+    u = assembly.u
+    la = assembly.la
     field_dim = get_unknown_field_dimension(problem)
-    nnodes = round(Int, length(u)/field_dim)
-    solution = reshape(u, field_dim, nnodes)
-    for element in get_elements(problem)
-        connectivity = get_connectivity(element) # node ids
-        local_sol = Vector{Float64}[solution[:, node_id] for node_id in connectivity]
-        last(element[field_name]).data = local_sol
+    if field_dim == 1
+        return u, la
+    else
+        nnodes = round(Int, length(u)/field_dim)
+        u = reshape(u, field_dim, nnodes)
+        u = Vector{Float64}[u[:,i] for i in 1:nnodes]
+        la = reshape(la, field_dim, nnodes)
+        la = Vector{Float64}[la[:,i] for i in 1:nnodes]
+        return u, la
     end
 end
-function update_elements!{P<:BoundaryProblem}(problem::Problem{P}, u, la)
+
+""" Update solution from assebly to elements. """
+function update!{P<:FieldProblem}(problem::Problem{P}, assembly::Assembly, elements::Vector{Element}, time::Float64)
+    u, la = get_global_solution(problem, assembly)
     field_name = get_unknown_field_name(problem)
-    field_dim = get_unknown_field_dimension(problem)
-    nnodes = round(Int, length(u)/field_dim)
-    solution = reshape(la, field_dim, nnodes)
-    for element in get_elements(problem)
-        connectivity = get_connectivity(element) # node ids
-        local_sol = Vector{Float64}[solution[:, node_id] for node_id in connectivity]
-        last(element[field_name]).data = local_sol
+    # update solution u for elements
+    for element in elements
+        connectivity = get_connectivity(element)
+        update!(element, field_name, time => u[connectivity])
     end
-    # if boundary problem is not dirichlet, update also data of main problem
-    # is_dirichlet_problem(problem) && return
-    field_name = get_parent_field_name(problem)
-    solution = reshape(u, field_dim, nnodes)
-    for element in get_elements(problem)
-        connectivity = get_connectivity(element) # node ids
-        local_sol = Vector{Float64}[solution[:, node_id] for node_id in connectivity]
-        last(element[field_name]).data = local_sol
+end
+
+function update!{P<:BoundaryProblem}(problem::Problem{P}, assembly::Assembly, elements::Vector{Element}, time::Float64)
+    u, la = get_global_solution(problem, assembly)
+    parent_field_name = get_parent_field_name(problem) # displacement
+    field_name = get_unknown_field_name(problem) # reaction force
+    # update solution u and reaction force λ for boundary elements
+    for element in elements
+        connectivity = get_connectivity(element)
+        update!(element, parent_field_name, time => u[connectivity])
+        # FIXME
+        update!(element, field_name, time => -la[connectivity])
     end
 end
 
@@ -276,12 +273,16 @@ function get_elements(problem::Problem)
     return problem.elements
 end
 
+function get_assembly(problem::Problem)
+    return problem.assembly
+end
+
 function length(problem::Problem)
     return length(problem.elements)
 end
 
-function update!(problem::Problem, field_name, field)
-    update!(problem.elements, field_name, field)
+function update!(problem::Problem, field_name::AbstractString, data)
+    update!(problem.elements, field_name::AbstractString, data)
 end
 
 """ Return the dimension of the unknown field of this problem. """
@@ -380,3 +381,4 @@ function find_nodes_by_dofs(dim, dofs)
     end
     return nodes
 end
+

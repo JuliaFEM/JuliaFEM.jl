@@ -7,9 +7,15 @@ using JuliaFEM.Postprocess
 using JuliaFEM.Testing
 
 #=
-- solve 2d plane stress problem with known solution
-- test postprocessing of nodal fields: (geometry, displacement
-  reaction force, concentrated force)
+- solve 2d plane stress problem with known solution:
+    surface traction force in 2d
+    volume load in 2d
+    reaction force
+- test postprocessing of nodal fields:
+    geometry
+    displacement
+    reaction force
+    concentrated force
 =#
 @testset "test 2d linear elasticity with surface + volume load" begin
     meshfile = "/geometry/2d_block/BLOCK_1elem.med"
@@ -42,7 +48,12 @@ using JuliaFEM.Testing
     update!(bc_sym_13, "displacement 2", 0.0)
 
     solver = LinearSolver(block, traction, bc_sym_23, bc_sym_13)
+#   assemble!(solver)
+#   dump(full(bc_sym_23.assembly.C1))
     solver()
+
+    info("u = ", block.assembly.u)
+    info("λ = ", block.assembly.la)
 
     f = 288.0
     g = 576.0
@@ -51,40 +62,41 @@ using JuliaFEM.Testing
     u3_expected = f/E*[-nu, 1] + g/(2*E)*[-nu, 1]
 
     # fetch nodal results X + u and join them into one table using DataFrames
-    X = block(DataFrame, "geometry", :COOR, 0.0)
-    u = block(DataFrame, "displacement", :U, 0.0)
-    results = join(X, u, on=:id, kind=:outer)
+    X = solver(DataFrame, "geometry", :COOR)
+    u = solver(DataFrame, "displacement", :U)
+    la = solver(DataFrame, "reaction force", :RF)
+    f = solver(DataFrame, "concentrated force", :CF)
+    results = join(X, u, on=:NODE, kind=:outer)
+    results = join(results, la, on=:NODE, kind=:outer)
+    length(f) != 0 && (results = join(results, f, on=:NODE, kind=:outer))
+    sort!(results, cols=[:NODE])
     println(results)
 
-    u3 = results[:N3, [:U1, :U2]]
+    u3 = extract(results, NODE=:N3, :U1, :U2)
     @test isapprox(u3, u3_expected)
 
-#=
-    info("strain")
-    for ip in get_integration_points(block.elements[1])
-        eps = ip("strain")
-        @printf "%i | %8.3f %8.3f | %8.3f %8.3f %8.3f\n" ip.id ip.coords[1] ip.coords[2] eps[1] eps[2] eps[3]
-        # TODO: to postprocess ...?
-        #@test isapprox(eps, [u3[1], u3[2], 0.0])
-    end
+    # element details
+    el = first(block.elements)
+    S1 = block(el, [0.0, 0.0], 0.0, Val{:S})
+    S1 = S1[[1,4,2]]
+    E1= block(el, [0.0, 0.0], 0.0, Val{:E})
+    E1 = E1[[1,4,2]]
+    C1 = block(el, [0.0, 0.0], 0.0, Val{:COORD})
+    info("strain = $E1, stress = $S1, at $C1")
+    @test isapprox(E1, [-2/3, 2.0, 0.0])
+    @test isapprox(S1, [0.0, 576.0, 0.0])
+    @test isapprox(C1, [0.5, 0.5])
 
-    info("stress")
-    for ip in get_integration_points(block.elements[1])
-        sig = ip("stress")
-        @printf "%i | %8.3f %8.3f | %8.3f %8.3f %8.3f\n" ip.id ip.coords[1] ip.coords[2] sig[1] sig[2] sig[3]
-        # TODO: to postprocess
-        #@test isapprox(sig, [0.0, g, 0.0])
-    end
+    S1 = block(DataFrame, 0.0, Val{:S})
+    E1 = block(DataFrame, 0.0, Val{:E})
+    C1 = block(DataFrame, 0.0, Val{:COORD})
 
-    calc_nodal_values!(block.elements, "strain", 3, 0.0)
-    calc_nodal_values!(block.elements, "stress", 3, 0.0)
-    info(block.elements[1]["stress"](0.0))
-    node_ids, strain = get_nodal_vector(block.elements, "strain", 0.0)
-    node_ids, stress = get_nodal_vector(block.elements, "stress", 0.0)
-    # TODO: to postprocess
-    #@test isapprox(stress[1], [0.0, g, 0.0])
-    #@test isapprox(strain[1], [u3[1], u3[2], 0.0])
-=#
+    println(S1)
+    println(E1)
+    println(C1)
+
+    S = solver(DataFrame, 0.0, Val{:S})
+    println(S)
 
 end
 

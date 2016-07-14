@@ -122,7 +122,7 @@ end
     slaves = get_slave_elements(contact)
     node_ids, la = get_nodal_vector(slaves, "reaction force", 0.0)
     node_ids, n = get_nodal_vector(slaves, "normal", 0.0)
-    pres = [dot(ni, lai) for (ni, lai) in zip(n, la)]
+    pres = [dot(ni, -lai) for (ni, lai) in zip(n, la)]
     #@test isapprox(maximum(pres), 4060.010799583303)
     # 12 % error in maximum pressure
     @test isapprox(maximum(pres), 3585.0; rtol = 12.0e-2)
@@ -137,7 +137,7 @@ end
             n = sel("normal", ip, time)
             t = Q'*n
             la = sel("reaction force", ip, time)
-            Rn += w*dot(n, la)
+            Rn += w*dot(n, -la)
             Rt += w*dot(t, la)
         end
     end

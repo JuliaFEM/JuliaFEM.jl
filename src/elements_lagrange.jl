@@ -22,6 +22,10 @@ function get_basis(element::Element{Poi1}, ip, time)
     return [1]
 end
 
+function get_dbasis(element::Element{Poi1}, ip, time)
+    return [0]
+end
+
 function call(element::Element{Poi1}, ip, time::Float64, ::Type{Val{:detJ}})
     return 1.0
 end

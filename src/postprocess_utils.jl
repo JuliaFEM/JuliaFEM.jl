@@ -7,6 +7,7 @@ using JuliaFEM
 using DataFrames
 using HDF5
 using LightXML
+using StringUtils
 
 import HDF5: h5read, h5write
 
@@ -47,21 +48,14 @@ function convert(::Type{DataFrame}, dfs::AbstractString)
     return readtable(fn)
 end
 
-function getindex(df::DataFrame, ids::Vector{Symbol}, cols::Vector{Symbol})
-    rows = Int64[find(df[:id] .== id)[1] for id in ids]
-    return df[rows, cols]
-end
-
-function getindex(df::DataFrame, id::Symbol, col::Symbol)
-    return getindex(df, [id], [col])
-end
-
-function getindex(df::DataFrame, id::Symbol, cols::Vector{Symbol})
-    return getindex(df, [id], cols)
-end
-
-function getindex(df::DataFrame, ids::Vector{Symbol}, col::Symbol)
-    return getindex(df, ids, [col])
+function extract(df::DataFrame, args...; kwargs...)
+    result = copy(df)
+    for (k,v) in kwargs
+        rows = find(df[k] .== v)
+        result = result[rows, :]
+    end
+    foo = Symbol[si for si in args]
+    return result[foo]
 end
 
 function vec(df::DataFrame)
@@ -70,6 +64,12 @@ end
 
 function isapprox(d1::DataFrame, d2::Vector)
     return isapprox(vec(d1), d2)
+end
+
+""" A more appropriate representation for floats in results. """
+function DataFrames.ourshowcompact(io::IO, x::Float64)
+    print(io, u"\% 0.4E(x)")
+    return
 end
 
 """
@@ -201,9 +201,13 @@ end
 function call(problem::Problem, field_name::AbstractString, time::Float64=0.0)
     f = Dict()
     for element in get_elements(problem)
+        haskey(element, field_name) || continue
         for (c, v) in zip(get_connectivity(element), element(field_name, time))
             if haskey(f, c)
-                @assert isapprox(f[c], v)
+                if !isapprox(f[c], v)
+                    info("several values for single node when returning field $field_name")
+                    info("already have: $(f[c]), and trying to set $v")
+                end
             end
             f[c] = v
         end
@@ -211,11 +215,10 @@ function call(problem::Problem, field_name::AbstractString, time::Float64=0.0)
     return f
 end
 
-function call(problem::Problem, ::Type{DataFrame}, field_name::AbstractString,
-              abbreviation::Symbol, time::Float64=0.0)
-    u = problem(field_name, time)
+function to_dataframe(u::Dict, abbreviation::Symbol)
+    length(u) != 0 || return DataFrame()
     node_ids = collect(keys(u))
-    column_names = [:id]
+    column_names = [:NODE]
     n = length(u[first(node_ids)])
     index = [Symbol("N$id") for id in node_ids]
     result = Any[index]
@@ -224,8 +227,90 @@ function call(problem::Problem, ::Type{DataFrame}, field_name::AbstractString,
         push!(column_names, Symbol("$abbreviation$dof"))
     end
     df = DataFrame(result, column_names)
-    sort!(df, cols=[:id])
+    sort!(df, cols=[:NODE])
     return df
+end
+
+function call(problem::Problem, ::Type{DataFrame}, field_name::AbstractString,
+              abbreviation::Symbol, time::Float64=0.0)
+    u = problem(field_name, time)
+    return to_dataframe(u, abbreviation)
+end
+
+function call(solver::Solver, ::Type{DataFrame}, field_name::AbstractString,
+              abbreviation::Symbol, time::Float64=0.0)
+    u = Dict()
+    for problem in get_problems(solver)
+        u = merge(u, problem(field_name, time))
+    end
+    return to_dataframe(u, abbreviation)
+end
+
+function get_components(n, m)
+    if n == m
+        if n == 1
+            return Vector{Int}[[1,1]]
+        end
+        if n == 2
+            return Vector{Int}[[1,1], [2,2], [1,2]]
+        elseif n == 3
+            return Vector{Int}[[1,1], [2,2], [3,3], [1,2], [1,3], [2,3]]
+        else
+            error("get_components, n=$n, m=$m!")
+        end
+    end
+end
+
+""" Return T in integration points. """
+function call{T}(problem::Problem, ::Type{DataFrame}, element::Element, time::Float64,
+                 ::Type{Val{T}})
+    column_names = [:ELEMENT, :IP]
+    ips = get_integration_points(element)
+    field = Any[problem(element, ip, time, Val{T}) for ip in ips]
+    # FIXME, handle better ..?
+    first(field) == nothing && return DataFrame()
+    m = length(field)
+    n = length(first(field))
+    result = Any[]
+    push!(result, [Symbol("E$(element.id)") for i=1:m])
+    push!(result, [Symbol("P$i") for i=1:m])
+    is_tensor_field = isa(first(field), Matrix)
+    if is_tensor_field
+        n, m = size(first(field))
+        components = get_components(n, m)
+        for (j, k) in components
+            push!(column_names, Symbol("$T$j$k"))
+            push!(result, [S[j,k] for S in field])
+        end
+    else
+        components = collect(1:n)
+        for j in components
+            push!(column_names, Symbol("$T$j"))
+            push!(result, [S[j] for S in field])
+        end
+    end
+    df = DataFrame(result, column_names)
+    sort!(df, cols=[:IP])
+end
+
+function call{T}(problem::Problem, ::Type{DataFrame}, time::Float64, ::Type{Val{T}})
+    tables = [problem(DataFrame, element, time, Val{T}) for element in get_elements(problem)]
+    results = [tables...;]
+    return results
+end
+
+function call{T}(solver::Solver, ::Type{DataFrame}, time::Float64, ::Type{Val{T}})
+    problems = get_problems(solver)
+    tables = Any[]
+    for problem in get_problems(solver)
+        try
+            push!(tables, problem(DataFrame, time, Val{T}))
+        catch
+            warn("Unable to obtain results $T for problem $(problem.name)")
+        end
+    end
+    results = [tables...;]
+    return results
 end
 
 """ Interpolate field from a set of elements. """

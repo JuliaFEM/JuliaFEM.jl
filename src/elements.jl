@@ -168,11 +168,13 @@ function update!(element::Element, field_name::AbstractString, datas::Union{Real
     end
 end
 
-function update!(element::Element, field_name, datas::Pair...)
+#=
+function update!(element::Element, field_name, data::Pair...)
     for data in datas
         update!(element, field_name, data)
     end
 end
+=#
 
 function update!(element::Element, field_name, data::Pair{Float64, Vector{Any}})
     if haskey(element, field_name)
@@ -183,6 +185,14 @@ function update!(element::Element, field_name, data::Pair{Float64, Vector{Any}})
 end
 
 function update!(element::Element, field_name, data::Pair{Float64, Vector{Int64}})
+    if haskey(element, field_name)
+        update!(element[field_name], data)
+    else
+        element[field_name] = data
+    end
+end
+
+function update!(element::Element, field_name, data::Pair{Float64, Vector{Float64}})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
