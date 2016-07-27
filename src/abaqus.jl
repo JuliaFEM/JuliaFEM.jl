@@ -672,7 +672,7 @@ function abaqus_download(name)
         fn = rstrip(ENV["ABAQUS_DOWNLOAD_DIR"], '/') * "/" * fn
     end
     if !isfile(fn)
-        info("Downloading model $name from $url to $fn")
+        info("Downloading model $name ...")
         download("$url/$name.inp", fn)
     end
     return 0

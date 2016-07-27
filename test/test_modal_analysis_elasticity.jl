@@ -40,10 +40,29 @@ Fixed-fixed solution is ωᵢ = λᵢ²√(EI/ρA) , where λᵢ = cosh(λᵢℓ
 2:  7.853204624095838
 3: 10.995607838001671
 
+Youngs modulus is tuned such that lowest eigenfrequency matches 1.0
+
+5 lowest eigenfrequencies using Code Aster and Tet4 elements:
+numéro    fréquence (HZ)     norme d'erreur
+    1       1.19789E+00        2.20137E-12
+    2       1.20179E+00        1.99034E-12
+    3       3.07391E+00        3.29226E-13
+    4       3.08812E+00        2.91550E-13
+    5       4.87370E+00        2.95986E-13
+
+5 lowest eigenfrequencies using Code Aster and Tet10 elements:
+numéro    fréquence (HZ)     norme d'erreur
+    1       9.65942E-01        1.54950E-11
+    2       9.66160E-01        1.62712E-11
+    3       2.52127E+00        2.06544E-12
+    4       2.52187E+00        1.77970E-12
+    5       3.48584E+00        9.96170E-13
+
+
 [1] De Silva, Clarence W. Vibration: fundamentals and practice. CRC press, 2006, p.355
 =#
 
-@testset "long rod under point load" begin
+@testset "long rod natural frequencies" begin
     mesh_file = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
     mesh = aster_read_mesh(mesh_file, "CYLINDER_20_TET10")
 #   for (id, coords) in mesh.nodes
@@ -51,7 +70,8 @@ Fixed-fixed solution is ωᵢ = λᵢ²√(EI/ρA) , where λᵢ = cosh(λᵢℓ
 #   end
     body = Problem(Elasticity, "rod", 3)
     body.elements = create_elements(mesh, "CYLINDER")
-    E = 50475.44814745859
+    #E = 50475.44814745859
+    E = 50475.5
     rho = 1.0
     update!(body.elements, "youngs modulus", E)
     update!(body.elements, "poissons ratio", 0.3)
@@ -121,13 +141,27 @@ Fixed-fixed solution is ωᵢ = λᵢ²√(EI/ρA) , where λᵢ = cosh(λᵢℓ
     info("freq_a = $freq_a")
 
     solver = Solver(Modal, body, fixed1, fixed2)
+    solver.properties.nev = 5
     solver()
-    freqs = keys(body["displacement"])
+    freqs_jf = sqrt(solver.properties.eigvals)/(2.0*pi)
+    # with Tet4 elements
+    #freqs_ca = [1.19789E+00, 1.20179E+00, 3.07391E+00, 3.08813E+00, 4.87370E+00]
+    # with Tet10 elements
+    freqs_ca = [9.65942E-01, 9.66160E-01, 2.52127E+00, 2.52187E+00, 3.48584E+00]
 
-    rtol1 = norm(freq_sa - freqs[2])/max(freq_sa, freqs[2])
-    rtol2 = norm(freq_a - freqs[2])/max(freq_a, freqs[2])
+    # looks that juliafem results are more close to 1.0, maybe different integration order
+    rtol1 = norm(freq_sa - freqs_jf[1])/max(freq_sa, freqs_jf[1])
+    rtol2 = norm(freq_a - freqs_jf[1])/max(freq_a, freqs_jf[1])
     info("rtol 1 = $rtol1, rtol 2 = $rtol2")
-    @test rtol2 < 1.0e-2
+    passed = true
+    for (f1, f2) in zip(freqs_jf, freqs_ca)
+        rtol = norm(f1-f2) / max(f1,f2)
+        @printf "JF: %8.5e | CA: %8.5e | rtol: %8.5e\n" f1 f2 rtol
+        passed &= (rtol < 3.0e-2)
+    end
+    @test rtol2 < 3.0e-2
+    @test passed
+
 #=
     result = XDMF()
     for (i, freq) in enumerate(freqs)
@@ -138,5 +172,34 @@ Fixed-fixed solution is ωᵢ = λᵢ²√(EI/ρA) , where λᵢ = cosh(λᵢℓ
     end
     xdmf_save!(result, "/tmp/rod_nf.xmf")
 =#
+
+end
+
+@testset "eigenvalues of cube (tet4)" begin
+    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
+    mesh = aster_read_mesh(meshfile, "CUBE_TET4")
+    cube = Problem(mesh, Elasticity, "CUBE", 3)
+    update!(cube.elements, "youngs modulus", 10000.0)
+    update!(cube.elements, "poissons ratio", 0.3)
+    update!(cube.elements, "density", 10.0)
+    sym23 = create_elements(mesh, "FACE231")
+    update!(sym23, "displacement 1", 0.0)
+    sym13 = create_elements(mesh, "FACE131")
+    update!(sym13, "displacement 2", 0.0)
+    sym12 = create_elements(mesh, "FACE121")
+    update!(sym12, "displacement 3", 0.0)
+    bcs = Problem(Dirichlet, "bcs", 3, "displacement")
+    bcs.elements = [sym23; sym13; sym12]
+    solver = Solver(Modal)
+    solver.properties.nev = 5
+    push!(solver, cube, bcs)
+    solver()
+    freqs_jf = sqrt(solver.properties.eigvals)/(2.0*pi)
+    freqs_ca = [3.73724E+00, 3.73724E+00, 4.93519E+00, 6.59406E+00, 7.65105E+00]
+    for (f1, f2) in zip(freqs_jf, freqs_ca)
+        rtol = norm(f1-f2) / max(f1,f2)
+        @printf "JF: %8.5e | CA: %8.5e | rtol: %8.5e\n" f1 f2 rtol
+        @test rtol < 1.0e-5
+    end
 end
 

@@ -165,6 +165,18 @@ function reorder_element_connectivity!(mesh::Mesh, mapping::Dict{Symbol, Vector{
     end
 end
 
+function JuliaFEM.Problem{P<:FieldProblem}(mesh::Mesh, ::Type{P}, name::AbstractString, dimension::Int64)
+    problem = Problem{P}(name, dimension, "none", [], Dict(), Assembly(), P())
+    problem.elements = create_elements(mesh, name)
+    return problem
+end
+
+function JuliaFEM.Problem{P<:BoundaryProblem}(mesh::Mesh, ::Type{P}, name, dimension, parent_field_name)
+    problem = Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), P())
+    problem.elements = create_elements(mesh, name)
+    return problem
+end
+
 """
 Swap surface element connectivity s.t. normals point outward
 """

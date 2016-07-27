@@ -130,7 +130,7 @@ function calc_nodal_values!(elements::Vector, field_name, field_dim, time;
     end
 end
 
-function calc_nodal_values!(problem::Problem, field_name, field_dim, time)
+function calc_nodal_values!(problem::Problem, field_name::AbstractString, field_dim::Int, time::Float64)
     # after all, it's just a mass matrix ...
 #   isempty(problem.assembly.M) && assemble!(problem, time, Val{:mass_matrix}; density=1.0, dual_basis=false, dim=1)
 #   M = sparse(problem.assembly.M)
@@ -141,7 +141,7 @@ end
 """
 Return node ids + vector of values 
 """
-function get_nodal_vector(elements, field_name, time)
+function get_nodal_vector(elements::Vector, field_name::AbstractString, time::Float64)
     f = Dict()
     for element in elements
         for (c, v) in zip(get_connectivity(element), element[field_name](time))
@@ -332,6 +332,18 @@ function call(problem::Problem, field_name::AbstractString, X::Vector, time::Flo
         if inside(element, X, time)
             xi = get_local_coordinates(element, X, time)
             return element(field_name, xi, time, Val{:Grad})
+        end
+    end
+    return fillna
+end
+
+function call(solver::Solver, field_name::AbstractString, X::Vector, time::Float64; fillna=NaN)
+    for problem in get_problems(solver)
+        for element in get_elements(problem)
+            if inside(element, X, time)
+                xi = get_local_coordinates(element, X, time)
+                return element(field_name, xi, time)
+            end
         end
     end
     return fillna
