@@ -86,6 +86,21 @@ function get_cells(P, C)
     info("indices = $indices")
 end
 
+""" Test does P contain q. """
+function contains{T}(P::Vector{T}, q::T; check_is_close=true, rtol=1.0e-5)
+    if q in P
+        return true
+    end
+    if check_is_close
+        for p in P
+            if isapprox(p, q; rtol=rtol)
+                return true
+            end
+        end
+    end
+    return false
+end
+
 function get_polygon_clip(xs, xm, n; debug=false)
     # objective: search does line xm1 - xm2 clip xs
     nm = length(xm)
@@ -103,7 +118,7 @@ function get_polygon_clip(xs, xm, n; debug=false)
     # 2. test is slave point inside master, if yes, add to clip
     for i=1:ns
         if vertex_inside_polygon(xs[i], xm)
-            xs[i] in P && continue
+            contains(P, xs[i]) && continue
             debug && info("2. $(xs[i]) inside M -> push")
             push!(P, xs[i])
         end
@@ -126,7 +141,7 @@ function get_polygon_clip(xs, xm, n; debug=false)
             q = xs1 + t*(xs2 - xs1)
             #info("t=$t, q=$q, q ∈ xm ? $(vertex_inside_polygon(q, xm))")
             if vertex_inside_polygon(q, xm)
-                q in P && continue
+                contains(P, q) && continue
                 debug && info("3. $q inside M -> push")
                 push!(P, q)
             end

@@ -147,3 +147,12 @@ end
 #   @test isapprox(calculate_volume("PYRAMID_PYRAMID13_1", :Pyramid13, ?))
 end
 
+@testset "get nodal field from aster file" begin
+    fn = Pkg.dir("JuliaFEM") * "/test/testdata/rings.rmed"
+    medfile = JuliaFEM.Preprocess.RMEDFile(fn)
+    temp = JuliaFEM.Preprocess.aster_read_data(medfile, "TEMP")
+    info("temp = $temp")
+    # more like functional testing, results are what they are,
+    # we're happy to just have some results
+    @test true
+end

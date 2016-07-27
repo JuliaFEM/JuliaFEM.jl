@@ -163,6 +163,12 @@ function get_nonzero_columns(A::Union{SparseMatrixCOO, Matrix})
     return get_nonzero_columns(sparse(A))
 end
 
+function get_nonzeros(C::Union{SparseMatrixCSC, Matrix})
+    nz1 = get_nonzero_rows(C)
+    nz2 = get_nonzero_columns(C)
+    return (nz1, nz2)
+end
+
 function size(A::SparseMatrixCOO)
     isempty(A) && return (0, 0)
     return maximum(A.I), maximum(A.J)
@@ -173,7 +179,7 @@ function size(A::SparseMatrixCOO, idx::Int)
 end
 
 """ Matrix norm. Automatically convert to dense when asking for 2-norm for small matrices. """
-function Base.norm(A::SparseMatrixCOO, p=Inf; maxdim=1000)
+function norm(A::SparseMatrixCOO, p=Inf; maxdim=1000)
     dim = size(A, 1)
     if p == 2 && dim > maxdim
         info("Assembly norm: dim = $dim > $maxdim and p=$p, not making dense matrices for operation.")

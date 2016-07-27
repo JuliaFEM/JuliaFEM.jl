@@ -115,7 +115,8 @@ include("preprocess_aster_reader.jl")
 export aster_create_elements, parse_aster_med_file, is_aster_mail_keyword,
        parse_aster_header, aster_parse_nodes, aster_renumber_nodes!,
        aster_renumber_elements!, aster_combine_meshes, aster_read_mesh,
-       filter_by_element_set, filter_by_element_id, MEDFile
+       filter_by_element_set, filter_by_element_id, MEDFile, aster_read_data,
+       aster_read_mesh_names, aster_read_node_sets, aster_read_nodes, RMEDFile
 end
 
 function get_mesh(mesh_name::AbstractString, args...; kwargs...)

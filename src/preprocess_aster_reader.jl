@@ -55,19 +55,17 @@ function parse(mesh, ::Type{Val{:CODE_ASTER_MAIL}})
 end
 
 
-"""
-Code Aster binary file (.med), which is exported from SALOME.
-"""
+""" Code Aster binary file (.med). """
 type MEDFile
     data :: Dict
 end
 
 function MEDFile(fn)
-    MEDFile(h5read(fn, "/"))
+    return MEDFile(h5read(fn, "/"))
 end
 
 function get_mesh_names(med::MEDFile)
-    return collect(keys(med.data["FAS"]))
+    return sort(collect(keys(med.data["FAS"])))
 end
 
 function get_nodes(med::MEDFile, nsets, mesh_name)
@@ -91,6 +89,13 @@ end
 
 function get_node_sets(med::MEDFile, mesh_name)
     ns = Dict{Int64, Symbol}(0 => :NALL)
+    if !haskey(med.data["FAS"], mesh_name)
+        warn("Mesh $mesh_name not found from med file.")
+        meshes = get_mesh_names(med)
+        all_meshes = join(meshes, ", ")
+        warn("Available meshes: $all_meshes")
+        error("Mesh $mesh_name not found.")
+    end
     haskey(med.data["FAS"][mesh_name], "NOEUD") || return ns
     nsets = med.data["FAS"][mesh_name]["NOEUD"]
     for nset in keys(nsets)
@@ -250,4 +255,63 @@ function aster_read_mesh(fn, mesh_name=nothing; reorder_element_connectivity=tru
     return mesh
 end
 
-# TODO: refactor and remove obsolete stuff.
+""" Code Aster result file (.rmed). """
+type RMEDFile
+    data :: Dict
+end
+
+function RMEDFile(fn)
+    return RMEDFile(h5read(fn, "/"))
+end
+
+""" Return nodes from result med file. """
+function aster_read_nodes(rmed::RMEDFile)
+    increments = keys(rmed.data["ENS_MAA"]["MAIL"])
+    @assert length(increments) == 1
+    increment = first(increments)
+    nodes = rmed.data["ENS_MAA"]["MAIL"][increment]["NOE"]
+    node_names = nodes["NOM"]
+    node_coords = nodes["COO"]
+    nnodes = length(node_names)
+    dim = round(Int, length(node_coords)/nnodes)
+    node_coords = reshape(node_coords, nnodes, dim)'
+    stripper(node_name) = strip(ascii(pointer(convert(Vector{UInt8}, node_name))))
+    node_names = map(stripper, node_names)
+    # INFO: quite safe assumption is that id is in node name, i.e. N1 => 1, N123 => 123
+    node_id(node_name) = parse(matchall(r"\d+", node_name)[1])
+    node_ids = map(node_id, node_names)
+    nodes = Dict([j => node_coords[:,j] for j in node_ids])
+    return nodes
+end
+
+""" Read nodal field from rmed file. """
+function aster_read_data(rmed::RMEDFile, field_name; field_type=:NODE,
+                         info_fields=true, node_ids=nothing)
+
+    if contains(field_name, "ELGA")
+        field_type = :GAUSS
+    end
+
+    if node_ids == nothing
+        nodes = aster_read_nodes(rmed)
+        node_ids = sort(collect(keys(nodes)))
+    end
+
+    if info_fields
+        field_names = keys(rmed.data["CHA"])
+        all_fields = join(field_names, ", ")
+        info("results: $all_fields")
+    end
+
+    chdata = rmed.data["CHA"]["RESU____$field_name"]
+    @assert length(chdata) == 1
+    increment = chdata[first(keys(chdata))]
+    if field_type == :NODE
+        data = increment["NOE"]["MED_NO_PROFILE_INTERNAL"]["CO"]
+        results = Dict([j => data[j] for j in node_ids])
+    else
+        error("Unable to read result of type $field_type: not implemented")
+    end
+    return results
+end
+

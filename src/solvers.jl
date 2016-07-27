@@ -217,6 +217,19 @@ function create_projection(C::SparseMatrixCSC, g; S=nothing, tol=1.0e-12)
     return P, h
 end
 
+""" Assume C is invertible. """
+function create_projection(C, g, ::Type{Val{:invertible}})
+    nz1, nz2 = get_nonzeros(C)
+    P = spzeros(size(C)...)
+    for j=1:size(C,1)
+        j in nz1 && continue
+        P[j,j] = 1.0
+    end
+    v = lufact(C[nz1,nz2]) \ full(g[nz1])
+    return P, v
+end
+
+
 
 """
 Solve linear system using LDLt factorization (SuiteSparse). This version
@@ -332,20 +345,34 @@ function solve_linear_system(solver::Solver; F=nothing, empty_assemblies_before_
 end
 
 """ Default assembler for solver. """
-function assemble!(solver::Solver; show_info=true)
+function assemble!(solver::Solver; show_info=true, timing=true)
     show_info && info("Assembling problems ...")
     t0 = Base.time()
+    assembly_times = Dict()
     nproblems = 0
     ndofs = 0
     for problem in solver.problems
+        t00 = Base.time()
         empty!(problem.assembly)
         assemble!(problem, solver.time)
         nproblems += 1
-        ndofs = max(ndofs, size(problem.assembly.K, 2))
+        Ks = size(problem.assembly.K, 2)
+        Cs = size(problem.assembly.C1, 2)
+        ndofs = max(ndofs, Ks, Cs)
+        t11 = Base.time()
+        assembly_times[problem.name] = t11-t00
     end
     solver.ndofs = ndofs
     t1 = round(Base.time()-t0, 2)
     show_info && info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
+    if timing
+        info("Assembly times:")
+        for (i, problem) in enumerate(solver.problems)
+            pn = problem.name
+            pt = round(assembly_times[pn], 2)
+            info("$i $pn $pt")
+        end
+    end
 end
 
 function get_unknown_fields(solver::Solver)
