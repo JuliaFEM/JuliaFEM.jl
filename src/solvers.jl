@@ -4,24 +4,25 @@
 abstract AbstractSolver
 
 type Solver{S<:AbstractSolver}
-    name :: AbstractString # some descriptive name for problem
-    time :: Float64        # current time
+    name :: AbstractString       # some descriptive name for problem
+    time :: Float64              # current time
     problems :: Vector{Problem}
-    norms :: Vector{Tuple}  # solution norms for convergence studies
-    ndofs :: Int        # number of degrees of freedom in problem
+    norms :: Vector{Tuple}       # solution norms for convergence studies
+    ndofs :: Int                 # number of degrees of freedom in problem
+    io :: Nullable{ModelIO}      # input/output handle
     properties :: S
 end
 
 
 function Solver{S<:AbstractSolver}(::Type{S}, name="solver", properties...)
     variant = S(properties...)
-    solver = Solver{S}(name, 0.0, [], [], 0, variant)
+    solver = Solver{S}(name, 0.0, [], [], 0, nothing, variant)
     return solver
 end
 
 function Solver{S<:AbstractSolver}(::Type{S}, problems::Problem...)
     variant = S()
-    solver = Solver{S}("$(S)Solver", 0.0, [], [], 0, variant)
+    solver = Solver{S}("$(S)Solver", 0.0, [], [], 0, nothing, variant)
     push!(solver.problems, problems...)
     return solver
 end
@@ -430,6 +431,44 @@ function initialize!(solver::Solver; show_info=true)
     show_info && info("Initialized problems in $t1 seconds.")
 end
 
+function get_all_elements(solver::Solver)
+    elements = [get_elements(problem) for problem in get_problems(solver)]
+    return [elements...;]
+end
+
+function get_element_type{E}(element::Element{E})
+    return E
+end
+
+function get_element_id{E}(element::Element{E})
+    return element.id
+end
+
+function is_element_type{E}(element::Element{E}, element_type)
+    return is(E, element_type)
+end
+
+function filter_by_element_type(element_type, elements)
+    return filter(element -> is_element_type(element, element_type), elements)
+end
+
+function call(solver::Solver, field_name::AbstractString, time::Float64)
+    fields = [problem(field_name, time) for problem in get_problems(solver)]
+    return merge(fields...)
+end
+
+function get_temporal_collection(mio::ModelIO)
+    grid = find_element(mio.xdmf, "Grid")
+    if grid == nothing
+        info("Xdmf: creating new temporal collection")
+        domain = new_child(mio.xdmf, "Domain")
+        grid = new_child(domain, "Grid")
+        set_attribute(grid, "CollectionType", "Temporal")
+        set_attribute(grid, "GridType", "Collection")
+    end
+    return grid
+end
+
 """ Default update for solver. """
 function update!(solver::Solver, u::Vector, la::Vector; show_info=true)
     show_info && info("Updating problems ...")
@@ -442,6 +481,86 @@ function update!(solver::Solver, u::Vector, la::Vector; show_info=true)
         # .. and then from assembly (u,la) to elements
         update!(problem, assembly, elements, solver.time)
     end
+
+    # if io is attached to solver, update hdf / xml also
+    if !isnull(solver.io)
+        io = get(solver.io)
+        xdmf = io.xdmf
+        temporal_collection = get_temporal_collection(io)
+        frame = new_child(temporal_collection, "Grid")
+        time_item = new_child(frame, "Time")
+        set_attribute(time_item, "Value", solver.time)
+
+        # save geometry
+        X = solver("geometry", solver.time)
+        node_ids = sort(collect(keys(X)))
+        geometry = hcat([X[nid] for nid in node_ids]...)
+        put!(io, "/Node IDs", node_ids)
+        path = "/Geometry"
+        put!(io, path, geometry)
+        dataitem = get_dataitem(io, path, geometry)
+
+        ndim, nnodes = size(geometry)
+        geom_type = ndim == 2 ? "XY" : "XYZ"
+        geom = new_child(frame, "Geometry")
+        set_attribute(geom, "Type", geom_type)
+        add_child(geom, dataitem)
+
+        # save topology
+        all_elements = get_all_elements(solver)
+        nelements = length(all_elements)
+        element_types = unique(map(get_element_type, all_elements))
+
+        element_mapping = Dict(
+            "Quad4" => "Quadrilateral",
+            "Seg2" => "Polyline",
+            )
+
+        for element_type in element_types
+            elements = filter_by_element_type(element_type, all_elements)
+            sort!(elements, by=get_element_id)
+            element_ids = map(get_element_id, elements)
+            element_conn = map(get_connectivity, elements)
+            element_conn = transpose(hcat(element_conn...)) - 1
+            element_code = split(string(element_type), ".")[end]
+            put!(io, "/Topology/$element_code/Element IDs", element_ids)
+            path = "/Topology/$element_code/Connectivity"
+            put!(io, path, element_conn)
+            dataitem = get_dataitem(io, path, element_conn)
+            topology = new_child(frame, "Topology")
+            set_attribute(topology, "TopologyType", element_mapping[element_code])
+            set_attribute(topology, "NumberOfElements", length(elements))
+            add_child(topology, dataitem)
+        end
+
+        # save solved fields
+        time = "Time $(solver.time)"
+        unknown_field_name = get_unknown_field_name(solver)
+        U = solver(unknown_field_name, solver.time)
+        node_ids2 = sort(collect(keys(U)))
+
+        @assert node_ids == node_ids2
+        ndim = length(U[first(node_ids)])
+        field_type = ndim == 1 ? "Scalar" : "Vector"
+        field_center = "Node"
+        if ndim == 2
+            for nid in node_ids
+                U[nid] = [U[nid]; 0.0]
+            end
+            ndim = 3
+        end
+        U = hcat([U[nid] for nid in node_ids]...)
+        unknown_field_name = ucfirst(unknown_field_name)
+        path = "/Results/$time/Nodal Fields/$unknown_field_name"
+        put!(io, path, U)
+        dataitem = get_dataitem(io, path, U)
+        attribute = new_child(frame, "Attribute")
+        set_attribute(attribute, "Name", unknown_field_name)
+        set_attribute(attribute, "Center", field_center)
+        add_child(attribute, dataitem)
+        save!(io)
+    end
+
     t1 = round(Base.time()-t0, 2)
     show_info && info("Updated problems in $t1 seconds.")
 end
@@ -685,4 +804,3 @@ function Postprocessor(name::AbstractString, problems::Problem...)
     solver.name = name
     return solver
 end
-

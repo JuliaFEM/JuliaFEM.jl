@@ -8,6 +8,21 @@ module JuliaFEM
 
 importall Base
 
+module Testing
+
+    if VERSION >= v"0.5-"
+        using Base.Test
+    else
+        using BaseTestNext
+    end
+
+    export @test, @testset, @test_throws
+
+end
+
+include("io.jl")
+export ModelIO
+
 include("fields.jl")
 export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment
 include("types.jl")  # data types: Point, IntegrationPoint, ...
@@ -15,7 +30,8 @@ export AbstractPoint, Point, IntegrationPoint, IP, Node
 
 ### ELEMENTS ###
 include("elements.jl") # common element routines
-export Node, AbstractElement, Element, update!, get_connectivity, get_basis, get_dbasis, inside, get_local_coordinates
+export Node, AbstractElement, Element, update!, get_connectivity, get_basis,
+       get_dbasis, inside, get_local_coordinates
 include("elements_lagrange.jl") # Continuous Galerkin (Lagrange) elements
 export get_reference_coordinates, get_interpolation_polynomial
 export Poi1,
@@ -35,7 +51,7 @@ include("integrate.jl")  # default integration points for elements
 export get_integration_points
 
 include("sparse.jl")
-export add!, SparseMatrixCOO, get_nonzero_rows
+export add!, SparseMatrixCOO, get_nonzero_rows, get_nonzero_columns
 
 include("problems.jl") # common problem routines
 export Problem, AbstractProblem, FieldProblem, BoundaryProblem,
@@ -78,11 +94,8 @@ include("problems_mortar.jl")
 include("problems_mortar_2d.jl")
 include("problems_mortar_3d.jl")
 include("problems_mortar_2d_autodiff.jl")
-export calculate_normals,
-       calculate_normals!,
-       project_from_slave_to_master,
-       project_from_master_to_slave,
-       Mortar, get_slave_elements,
+export calculate_normals, calculate_normals!, project_from_slave_to_master,
+       project_from_master_to_slave, Mortar, get_slave_elements,
        get_polygon_clip
 
 ### Mortar methods, contact mechanics extension ###
@@ -92,22 +105,11 @@ include("problems_contact_3d.jl")
 include("problems_contact_2d_autodiff.jl")
 export Contact
 
-#=
-module API
-include("api.jl")
-# export ....
-end
-=#
-
 module Preprocess
 include("preprocess.jl")
-export create_elements, Mesh,
-       add_node!, add_nodes!,
-       add_element!, add_elements!,
-       add_element_to_element_set!,
-       add_node_to_node_set!,
-       find_nearest_nodes,
-       reorder_element_connectivity!
+export create_elements, Mesh, add_node!, add_nodes!, add_element!,
+       add_elements!, add_element_to_element_set!, add_node_to_node_set!,
+       find_nearest_nodes, reorder_element_connectivity!
 include("preprocess_abaqus_reader.jl")
 export parse_abaqus, parse_section, parse_element_section,
        abaqus_read_mesh, abaqus_read_model
@@ -130,50 +132,21 @@ end
 export get_mesh, get_model
 
 module Postprocess
+
 include("postprocess_utils.jl")
-export calc_nodal_values!, 
-       get_nodal_vector,
-       get_nodal_dict,
-       copy_field!,
-       calculate_area,
-       calculate_center_of_mass,
-       calculate_second_moment_of_mass,
-       extract
+export calc_nodal_values!, get_nodal_vector, get_nodal_dict, copy_field!,
+       calculate_area, calculate_center_of_mass,
+       calculate_second_moment_of_mass, extract
+
 include("postprocess_xdmf.jl")
-export XDMF, xdmf_new_result!, xdmf_save_field!, xdmf_save!
-export DataFrame
+export XDMF, xdmf_new_result!, xdmf_save_field!, xdmf_save!, DataFrame
+
 end
 export Postprocessor
 
-# This connects model from preprocess_abaqus_reader to 
-# other JuliaFEM ecosystem and solves problem.
 module Abaqus
 include("abaqus.jl")
 export abaqus_read_model, abaqus_run_model, abaqus_open_results
 end
 
-""" JuliaFEM testing routines. """
-module Testing
-if VERSION >= v"0.5-"
-    using Base.Test
-else
-    using BaseTestNext
-end
-
-export @test, @testset, @test_throws
-#include("test.jl")
-end
-
-#=
-module MaterialModels
-include("vonmises.jl")
-end
-=#
-
-#=
-module Interfaces
-include("interfaces.jl")
-end
-=#
-
-end # module
+end #
