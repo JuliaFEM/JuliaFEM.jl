@@ -139,7 +139,7 @@ function calc_nodal_values!(problem::Problem, field_name::AbstractString, field_
 end
 
 """
-Return node ids + vector of values 
+Return node ids + vector of values
 """
 function get_nodal_vector(elements::Vector, field_name::AbstractString, time::Float64)
     f = Dict()
@@ -201,17 +201,22 @@ end
 
 """ Return field calculated to nodal points for elements in problem p. """
 function call(problem::Problem, field_name::AbstractString, time::Float64=0.0)
-    f = Dict()
+    f = nothing
     for element in get_elements(problem)
         haskey(element, field_name) || continue
         for (c, v) in zip(get_connectivity(element), element(field_name, time))
+            if f == nothing
+                f = Dict(c => v)
+                continue
+            end
             if haskey(f, c)
                 if !isapprox(f[c], v)
                     info("several values for single node when returning field $field_name")
                     info("already have: $(f[c]), and trying to set $v")
                 end
+            else
+                f[c] = v
             end
-            f[c] = v
         end
     end
     return f
@@ -428,4 +433,3 @@ function getindex(problem::Problem, field_name::AbstractString)
     end
     return DVTV(increments)
 end
-
