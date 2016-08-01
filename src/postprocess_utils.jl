@@ -246,9 +246,12 @@ end
 
 function call(solver::Solver, ::Type{DataFrame}, field_name::AbstractString,
               abbreviation::Symbol, time::Float64=0.0)
-    u = Dict()
-    for problem in get_problems(solver)
-        u = merge(u, problem(field_name, time))
+    fields = [problem(field_name, time) for problem in get_problems(solver)]
+    fields = filter(f -> f != nothing, fields)
+    if length(fields) != 0
+        u = merge(fields...)
+    else
+        u = Dict()
     end
     return to_dataframe(u, abbreviation)
 end

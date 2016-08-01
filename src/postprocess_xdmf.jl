@@ -192,4 +192,3 @@ end
 function xdmf_save!(xdmf, filename)
     save_file(xdmf.xdoc, filename)
 end
-

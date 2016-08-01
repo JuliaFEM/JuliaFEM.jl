@@ -9,7 +9,7 @@ type Solver{S<:AbstractSolver}
     problems :: Vector{Problem}
     norms :: Vector{Tuple}       # solution norms for convergence studies
     ndofs :: Int                 # number of degrees of freedom in problem
-    io :: Nullable{ModelIO}      # input/output handle
+    xdmf :: Nullable{Xdmf}       # input/output handle
     properties :: S
 end
 
@@ -457,15 +457,17 @@ function call(solver::Solver, field_name::AbstractString, time::Float64)
     return merge(fields...)
 end
 
-function get_temporal_collection(mio::ModelIO)
-    grid = find_element(mio.xdmf, "Grid")
-    if grid == nothing
+function get_temporal_collection(xdmf::Xdmf)
+    domain = find_element(xdmf.xml, "Domain")
+    grid = nothing
+    if domain == nothing
         info("Xdmf: creating new temporal collection")
-        domain = new_child(mio.xdmf, "Domain")
+        domain = new_child(xdmf.xml, "Domain")
         grid = new_child(domain, "Grid")
         set_attribute(grid, "CollectionType", "Temporal")
         set_attribute(grid, "GridType", "Collection")
     end
+    grid = find_element(domain, "Grid")
     return grid
 end
 
@@ -473,6 +475,7 @@ end
 function update!(solver::Solver, u::Vector, la::Vector; show_info=true)
     show_info && info("Updating problems ...")
     t0 = Base.time()
+
     for problem in solver.problems
         assembly = get_assembly(problem)
         elements = get_elements(problem)
@@ -483,27 +486,21 @@ function update!(solver::Solver, u::Vector, la::Vector; show_info=true)
     end
 
     # if io is attached to solver, update hdf / xml also
-    if !isnull(solver.io)
-        io = get(solver.io)
-        xdmf = io.xdmf
-        temporal_collection = get_temporal_collection(io)
+    if !isnull(solver.xdmf)
+        xdmf = get(solver.xdmf)
+        temporal_collection = get_temporal_collection(xdmf)
         frame = new_child(temporal_collection, "Grid")
-        time_item = new_child(frame, "Time")
-        set_attribute(time_item, "Value", solver.time)
+        new_child(frame, "Time", Dict("Value" => solver.time))
 
         # save geometry
         X = solver("geometry", solver.time)
         node_ids = sort(collect(keys(X)))
         geometry = hcat([X[nid] for nid in node_ids]...)
-        put!(io, "/Node IDs", node_ids)
-        path = "/Geometry"
-        put!(io, path, geometry)
-        dataitem = get_dataitem(io, path, geometry)
-
         ndim, nnodes = size(geometry)
         geom_type = ndim == 2 ? "XY" : "XYZ"
-        geom = new_child(frame, "Geometry")
-        set_attribute(geom, "Type", geom_type)
+        dataitem = new_dataitem(xdmf, "/Node IDs", node_ids)
+        geom = new_child(frame, "Geometry", Dict("Type" => geom_type))
+        dataitem = new_dataitem(xdmf, "/Geometry", geometry)
         add_child(geom, dataitem)
 
         # save topology
@@ -511,10 +508,21 @@ function update!(solver::Solver, u::Vector, la::Vector; show_info=true)
         nelements = length(all_elements)
         element_types = unique(map(get_element_type, all_elements))
 
-        element_mapping = Dict(
-            "Quad4" => "Quadrilateral",
+        xdmf_element_mapping = Dict(
             "Seg2" => "Polyline",
-            )
+            "Tri3" => "Triangle",
+            "Quad4" => "Quadrilateral",
+            "Tet4" => "Tetrahedron",
+            "Pyramid5" => "Pyramid",
+            "Wedge6" => "Wedge",
+            "Hex8" => "Hexahedron",
+            "Seg3" => "Edge_3",
+            "Tri6" => "Tri_6",
+            "Quad8" => "Quad_8",
+            "Tet10" => "Tet_10",
+            "Pyramid13" => "Pyramid_13",
+            "Wedge15" => "Wedge_15",
+            "Hex20" => "Hex_20")
 
         for element_type in element_types
             elements = filter_by_element_type(element_type, all_elements)
@@ -523,12 +531,10 @@ function update!(solver::Solver, u::Vector, la::Vector; show_info=true)
             element_conn = map(get_connectivity, elements)
             element_conn = transpose(hcat(element_conn...)) - 1
             element_code = split(string(element_type), ".")[end]
-            put!(io, "/Topology/$element_code/Element IDs", element_ids)
-            path = "/Topology/$element_code/Connectivity"
-            put!(io, path, element_conn)
-            dataitem = get_dataitem(io, path, element_conn)
+            dataitem = new_dataitem(xdmf, "/Topology/$element_code/Element IDs", element_ids)
+            dataitem = new_dataitem(xdmf, "/Topology/$element_code/Connectivity", element_conn)
             topology = new_child(frame, "Topology")
-            set_attribute(topology, "TopologyType", element_mapping[element_code])
+            set_attribute(topology, "TopologyType", xdmf_element_mapping[element_code])
             set_attribute(topology, "NumberOfElements", length(elements))
             add_child(topology, dataitem)
         end
@@ -551,14 +557,12 @@ function update!(solver::Solver, u::Vector, la::Vector; show_info=true)
         end
         U = hcat([U[nid] for nid in node_ids]...)
         unknown_field_name = ucfirst(unknown_field_name)
-        path = "/Results/$time/Nodal Fields/$unknown_field_name"
-        put!(io, path, U)
-        dataitem = get_dataitem(io, path, U)
+        dataitem = new_dataitem(xdmf, "/Results/$time/Nodal Fields/$unknown_field_name", U)
         attribute = new_child(frame, "Attribute")
         set_attribute(attribute, "Name", unknown_field_name)
         set_attribute(attribute, "Center", field_center)
         add_child(attribute, dataitem)
-        save!(io)
+        save!(xdmf)
     end
 
     t1 = round(Base.time()-t0, 2)
