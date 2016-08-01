@@ -21,7 +21,7 @@ module Testing
 end
 
 include("io.jl")
-export ModelIO
+export Xdmf, h5file, xmffile, has_child, get_child, new_dataitem
 
 include("fields.jl")
 export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment
