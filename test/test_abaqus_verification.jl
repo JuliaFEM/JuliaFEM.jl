@@ -6,6 +6,7 @@ using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
 using JuliaFEM.Abaqus
 using JuliaFEM.Testing
+using DataFrames
 
 # to turn on automatic file download, set
 # ENV["ABAQUS_DOWNLOAD_URL"] = "http://<domain>:2080/v2016/books/eif"
@@ -47,8 +48,32 @@ end
       @testset "1.3.3 Three-dimensional solid elements" begin
         @testset "C3D8 elements." begin
           abaqus_run_test("ec38sfs2") || return
+          res = abaqus_open_results("ec38sfs2")
+
+node_output1 = wsv"""
+NODE           U1          U2          U3          COOR1       COOR2       COOR3
+1     -2.0000E-33 -2.0000E-33 -2.0000E-33          0.000       0.000       0.000
+2     -2.6667E-05 -1.0000E-33 -1.7333E-04          2.000       0.000       0.000
+3     -2.0000E-04 -2.6667E-05 -1.7333E-04          2.000       2.000       0.000
+4     -1.7333E-04 -2.6667E-05 -1.0000E-33          0.000       2.000       0.000
+5     -3.6777E-48 -8.6667E-05 -1.3333E-05          0.000       0.000       1.000
+6     -2.6667E-05 -8.6667E-05 -1.8667E-04          2.000       0.000       1.000
+7     -2.0000E-04 -1.1333E-04 -1.8667E-04          2.000       2.000       1.000
+8     -1.7333E-04 -1.1333E-04 -1.3333E-05          0.000       2.000       1.000
+"""
+
+node_output_2 = wsv"""
+NODE          RF1         RF2         RF3            CF1         CF2         CF3
+1        1500.000    1500.000    1000.000          0.000       0.000       0.000
+2           0.000     500.000       0.000       1500.000       0.000       0.000
+3           0.000       0.000       0.000        500.000     500.000   -1000.000
+4           0.000       0.000       0.000        500.000    1500.000       0.000
+5        -500.000       0.000       0.000          0.000    -500.000    1000.000
+6           0.000       0.000       0.000       -500.000   -1500.000       0.000
+7           0.000       0.000       0.000      -1500.000   -1500.000   -1000.000
+8           0.000       0.000       0.000      -1500.000    -500.000       0.000
+"""
           #= to check also results:
-          xdmf = abaqus_open_results("ec38sfs2")
           side, opts = read_result(xdmf, "SECTION/side")
           @test isapprox(side["SOFM"], 3464.0)
           @test isapprox(side["SOF1"], 2000.0)
@@ -68,4 +93,3 @@ end
     end
   end
 end
-

@@ -97,9 +97,22 @@ end
 function Field{T}(data::Pair{Float64, T}...)
     return DCTV([Increment{T}(d[1], d[2]) for d in data])
 end
-
+#=
 function Field{T}(data::Pair{Float64, Vector{T}}...)
     return DVTV([Increment{Vector{T}}(d[1], d[2]) for d in data])
+end
+
+function Field{T}(data::Pair{Float64, Dict{Int64, T}}...)
+    return DVTV([Increment{Dict{Int64, T}}(d[1], d[2]) for d in data])
+end
+=#
+
+function Field{T<:Union{Vector, Dict}}(data::Pair{Float64, T}...)
+    return DVTV([Increment{T}(d[1], d[2]) for d in data])
+end
+
+function Field(data::Dict)
+    return DVTI(data)
 end
 
 function convert{T}(::Type{DCTV}, data::Pair{Real, Vector{T}}...)
@@ -222,11 +235,11 @@ function Base.(:*)(N::Matrix, f::DCTI)
 end
 
 
-#  
+#
 #   Multiply DVTI field with another vector T. Vector length
 #   must match to the field length and this can be used mainly
 #   for interpolation purposes, i.e., u = ∑ Nᵢuᵢ
-#  
+#
 function Base.(:*)(T::Vector, f::DVTI)
     @assert length(T) == length(f)
     return sum([T[i]*f[i] for i=1:length(f)])
@@ -429,4 +442,8 @@ end
 """ Return time vector from time variable field. """
 function keys(field::DVTV)
     return Float64[increment.time for increment in field]
+end
+
+function setindex!(field::Field, val, idx::Int64)
+    field.data[idx] = val
 end

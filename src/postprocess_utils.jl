@@ -199,28 +199,6 @@ function copy_field!(src_problem::Problem, dst_problem::Problem, field_name, tim
     copy_field!(src_problem.elements, dst_problem.elements, field_name, time)
 end
 
-""" Return field calculated to nodal points for elements in problem p. """
-function call(problem::Problem, field_name::AbstractString, time::Float64=0.0)
-    f = nothing
-    for element in get_elements(problem)
-        haskey(element, field_name) || continue
-        for (c, v) in zip(get_connectivity(element), element(field_name, time))
-            if f == nothing
-                f = Dict(c => v)
-                continue
-            end
-            if haskey(f, c)
-                if !isapprox(f[c], v)
-                    info("several values for single node when returning field $field_name")
-                    info("already have: $(f[c]), and trying to set $v")
-                end
-            else
-                f[c] = v
-            end
-        end
-    end
-    return f
-end
 
 function to_dataframe(u::Dict, abbreviation::Symbol)
     length(u) != 0 || return DataFrame()
@@ -418,21 +396,4 @@ function calculate_second_moment_of_mass(problem::Problem, X=[0.0, 0.0, 0.0], ti
         end
     end
     return I
-end
-
-function getindex(problem::Problem, field_name::AbstractString)
-    info("fetching result $field_name")
-    timeframes = []
-    for frame in first(problem.elements)[field_name].data
-        push!(timeframes, frame.time)
-    end
-    info("time frames: $timeframes")
-    conn = get_connectivity(problem)
-    increments = Increment[]
-    for time in timeframes
-        p = problem(field_name, time)
-        data = [p[id] for id in conn]
-        push!(increments, Increment(time, data))
-    end
-    return DVTV(increments)
 end

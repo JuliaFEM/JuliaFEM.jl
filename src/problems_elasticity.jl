@@ -4,7 +4,7 @@
 """ Elasticity equations.
 
 Field equation is:
-    
+
     m∂²u/∂t² = ∇⋅σ - b
 
 Weak form is: find u∈U such that ∀v in V
@@ -151,7 +151,7 @@ function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, 
         # cauchy_stress = F'*stress*F/det(F)
         # cauchy_stress = [cauchy_stress[1,1]; cauchy_stress[2,2]; cauchy_stress[1,2]]
         # update!(ip, "cauchy stress", time => cauchy_stress)
-        
+
         # material stiffness end
 
         if props.geometric_stiffness
@@ -170,13 +170,13 @@ function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, 
             S2[2,2] = stress_vec[2]
             S2[1,2] = S2[2,1] = stress_vec[3]
             S2[3:4,3:4] = S2[1:2,1:2]
-            
+
             Kg += w*BNL'*S2*BNL # geometric stiffness
 
         end
 
         # rhs, internal and external load
-        
+
         f -= w*BL'*stress_vec
 
         if haskey(element, "displacement load")
@@ -747,4 +747,3 @@ function call(problem::Problem, element::Element, ip, time::Float64, ::Type{Val{
     haskey(element, "geometry") || return nothing
     return element("geometry", ip, time)
 end
-

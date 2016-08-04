@@ -32,7 +32,7 @@ using JuliaFEM.Testing
     update!(block.elements, "displacement load 2", 576.0)
 
     # traction
-    traction = Problem(Elasticity, "BLOCK", 2)
+    traction = Problem(Elasticity, "TRACTION", 2)
     traction.properties.formulation = :plane_stress
     traction.properties.finite_strain = false
     traction.properties.geometric_stiffness = false
@@ -48,8 +48,6 @@ using JuliaFEM.Testing
     update!(bc_sym_13, "displacement 2", 0.0)
 
     solver = LinearSolver(block, traction, bc_sym_23, bc_sym_13)
-#   assemble!(solver)
-#   dump(full(bc_sym_23.assembly.C1))
     solver()
 
     info("u = ", block.assembly.u)
@@ -98,6 +96,19 @@ using JuliaFEM.Testing
     S = solver(DataFrame, 0.0, Val{:S})
     println(S)
 
+    info(solver("displacement", 0.0))
+    solver()
+    info(solver("displacement", 0.0))
+    u = solver("displacement", 0.0)[3]
+    info("u3 = $u")
+    @test isapprox(u, u3_expected)
+
+    info("calling nonlinear solver")
+    solver2 = NonlinearSolver(block, traction, bc_sym_23, bc_sym_13)
+    solver2()
+    u = solver2("displacement", 0.0)[3]
+    info("nlsolver u3 = $u, expected = $u3_expected")
+    @test isapprox(u, u3_expected; rtol=1.0e-5)
 end
 
 #= TODO: to other file

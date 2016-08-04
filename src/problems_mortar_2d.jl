@@ -175,7 +175,7 @@ function assemble!(problem::Problem{Mortar}, time::Float64, ::Type{Val{1}}, ::Ty
                 n_s = N1*n1 # normal direction in gauss point
                 xi_m = project_from_slave_to_master(master_element, X_s, n_s, time)
                 N2 = vec(get_basis(master_element, xi_m, time))
-                X_m = N2*X2 
+                X_m = N2*X2
                 De += w*Phi*N1'
                 Me += w*Phi*N2'
                 if props.adjust
@@ -194,7 +194,7 @@ function assemble!(problem::Problem{Mortar}, time::Float64, ::Type{Val{1}}, ::Ty
             # add contribution to contact virtual work
             sdofs = get_gdofs(problem, slave_element)
             mdofs = get_gdofs(problem, master_element)
-            
+
             for i=1:field_dim
                 lsdofs = sdofs[i:field_dim:end]
                 lmdofs = mdofs[i:field_dim:end]
@@ -210,4 +210,3 @@ function assemble!(problem::Problem{Mortar}, time::Float64, ::Type{Val{1}}, ::Ty
     end # slave elements done, contact virtual work ready
 
 end
-

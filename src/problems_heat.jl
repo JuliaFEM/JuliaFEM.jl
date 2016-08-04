@@ -253,4 +253,3 @@ function assemble!{E<:Heat2DSurfaceElements}(assembly::Assembly, problem::Proble
     add!(assembly.K, gdofs, gdofs, K)
     add!(assembly.f, gdofs, fq)
 end
-

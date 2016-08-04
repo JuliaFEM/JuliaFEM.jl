@@ -8,8 +8,8 @@ abstract MixedProblem <: AbstractProblem
 
 """
 General linearized problem to solve
-    (K₁+K₂)*Δu +   C1.T*λ = f₁+f₂
-         C2*Δu +      D*λ = g
+    (K₁+K₂)Δu  +   C1*Δλ = f₁+f₂
+         C2Δu  +    D*Δλ = g
 """
 type Assembly
 
@@ -19,7 +19,7 @@ type Assembly
     K :: SparseMatrixCOO   # stiffness matrix
     Kg :: SparseMatrixCOO  # geometric stiffness matrix
     f :: SparseMatrixCOO   # force vector
-    fg :: SparseMatrixCOO  # 
+    fg :: SparseMatrixCOO  #
 
     # for boundary assembly
     C1 :: SparseMatrixCOO
@@ -90,6 +90,7 @@ type Problem{P<:AbstractProblem}
     elements :: Vector{Element}
     dofmap :: Dict{Element, Vector{Int64}} # connects element local dofs to global dofs
     assembly :: Assembly
+    fields :: Dict{AbstractString, Field}
     properties :: P
 end
 
@@ -104,10 +105,10 @@ julia> prob2 = Problem(Elasticity, 3)
 
 """
 function Problem{P<:FieldProblem}(::Type{P}, name::AbstractString, dimension::Int64)
-    return Problem{P}(name, dimension, "none", [], Dict(), Assembly(), P())
+    return Problem{P}(name, dimension, "none", [], Dict(), Assembly(), Dict(), P())
 end
 function Problem{P<:FieldProblem}(::Type{P}, dimension::Int64)
-    return Problem{P}("$P problem", dimension, "none", [], Dict(), Assembly(), P())
+    return Problem{P}("$P problem", dimension, "none", [], Dict(), Assembly(), Dict(), P())
 end
 
 """ Construct a new boundary problem.
@@ -117,16 +118,16 @@ Examples
 Create Dirichlet boundary problem for vector-valued (dim=3) elasticity problem.
 
 julia> bc1 = Problem(Dirichlet, "support", 3, "displacement")
-
+solver.
 """
 function Problem{P<:BoundaryProblem}(::Type{P}, name, dimension, parent_field_name)
-    return Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), P())
+    return Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), Dict(), P())
 end
 function Problem{P<:BoundaryProblem}(::Type{P}, main_problem::Problem)
     name = "$P problem"
     dimension = get_unknown_field_dimension(main_problem)
     parent_field_name = get_unknown_field_name(main_problem)
-    return Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), P())
+    return Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), Dict(), P())
 end
 
 function get_formulation_type{P<:FieldProblem}(problem::Problem{P})
@@ -198,6 +199,7 @@ function update!(problem::Problem, assembly::Assembly, u::Vector, la::Vector; ve
     # incremental formulation we solve KΔu = f and u = u + Δu
     assembly.u_prev = copy(assembly.u)
     assembly.la_prev = copy(assembly.la)
+
     if get_formulation_type(problem) == :total
         verbose && info("$(problem.name): total formulation, replacing solution vector with new values")
         assembly.u = u
@@ -225,7 +227,7 @@ end
 
 Notes
 -----
-If length of solution vector != number of nodes, i.e. field dimension is 
+If length of solution vector != number of nodes, i.e. field dimension is
 something other than 1, reshape vectors so it's length matches to the
 number of nodes so that one can easily get nodal results.
 """
@@ -282,7 +284,48 @@ function length(problem::Problem)
 end
 
 function update!(problem::Problem, field_name::AbstractString, data)
+    if haskey(problem.fields, field_name)
+        update!(problem.fields[field_name], field_name::AbstractString, data)
+    else
+        problem.fields[field_name] = Field(data)
+    end
     update!(problem.elements, field_name::AbstractString, data)
+end
+
+function haskey(problem::Problem, field_name::AbstractString)
+    return haskey(problem.fields, field_name)
+end
+
+function getindex(problem::Problem, field_name::AbstractString)
+    return problem.fields[field_name]
+end
+
+""" Return field calculated to nodal points for elements in problem p. """
+function call(problem::Problem, field_name::AbstractString, time::Float64=0.0)
+    if haskey(problem, field_name)
+        return problem[field_name](time)
+    end
+    f = nothing
+    for element in get_elements(problem)
+        haskey(element, field_name) || continue
+        for (c, v) in zip(get_connectivity(element), element(field_name, time))
+            if f == nothing
+                f = Dict(c => v)
+                continue
+            end
+            if haskey(f, c)
+                if !isapprox(f[c], v)
+                    info("several values for single node when returning field $field_name")
+                    info("already have: $(f[c]), and trying to set $v")
+                end
+            else
+                f[c] = v
+            end
+        end
+    end
+    f == nothing && return f
+    update!(problem, field_name, time => f)
+    return f
 end
 
 """ Return the dimension of the unknown field of this problem. """
@@ -381,4 +424,3 @@ function find_nodes_by_dofs(dim, dofs)
     end
     return nodes
 end
-
