@@ -22,6 +22,42 @@ function haskey(x::XMLElement, key::AbstractString)
     return has_child(x, key) || has_attribute(x, key)
 end
 
+function has_child(x::XMLElement, child_name::AbstractString)
+    return get_child(x, child_name) != nothing
+end
+
+function get_attribute(x::XMLElement, attr_name::AbstractString)
+    attr = attribute(x, attr_name)
+    numeric = tryparse(Int64, attr)
+    isnull(numeric) && (numeric = tryparse(Float64, attr))
+    isnull(numeric) && return attr
+    return get(numeric)
+end
+
+function new_child(xparent::XMLElement, name::AbstractString, attrs::Dict)
+    x = new_child(xparent, name)
+    for (k, v) in attrs
+        x[k] = v
+    end
+    return x
+end
+
+function new_child(xparent::XMLElement, name::AbstractString, attrs::Pair...)
+    x = new_child(xparent, name)
+    for (k, v) in attrs
+        x[k] = v
+    end
+    return x
+end
+
+""" Basic traverse support, so that it's possible to find data from xml using
+path syntax e.g. /foo/bar[2]/baz[@Name=Frame 1]/DataItem. If several elements
+with same name exists in tree, pick first by default and next ones can be picked
+using [] syntax or [@attr=value] syntax, see [1] for details. For last item use
+[end].
+
+[1] http://www.xdmf.org/index.php/XDMF_Model_and_Format
+"""
 function get_child(x::XMLElement, child_name::AbstractString)
     '/' in child_name && return nothing
     m = match(r"(\w+)\[(.+)\]", child_name)
@@ -52,18 +88,6 @@ function get_child(x::XMLElement, child_name::AbstractString)
     throw("Unable to parse: $(m[2])")
 end
 
-function has_child(x::XMLElement, child_name::AbstractString)
-    return get_child(x, child_name) != nothing
-end
-
-function get_attribute(x::XMLElement, attr_name::AbstractString)
-    attr = attribute(x, attr_name)
-    numeric = tryparse(Int64, attr)
-    isnull(numeric) && (numeric = tryparse(Float64, attr))
-    isnull(numeric) && return attr
-    return get(numeric)
-end
-
 function getindex(x::XMLElement, attr_name::AbstractString)
     attr_name = strip(attr_name, '/')
     child = get_child(x, attr_name)
@@ -80,22 +104,6 @@ function getindex(x::XMLElement, attr_name::AbstractString)
     else
         throw(KeyError(attr_name))
     end
-end
-
-function new_child(xparent::XMLElement, name::AbstractString, attrs::Dict)
-    x = new_child(xparent, name)
-    for (k, v) in attrs
-        x[k] = v
-    end
-    return x
-end
-
-function new_child(xparent::XMLElement, name::AbstractString, attrs::Pair...)
-    x = new_child(xparent, name)
-    for (k, v) in attrs
-        x[k] = v
-    end
-    return x
 end
 
 type Xdmf

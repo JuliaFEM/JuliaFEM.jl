@@ -10,19 +10,21 @@ type Solver{S<:AbstractSolver}
     norms :: Vector{Tuple}       # solution norms for convergence studies
     ndofs :: Int                 # number of degrees of freedom in problem
     xdmf :: Nullable{Xdmf}       # input/output handle
+    initialized :: Bool
+    u :: Vector{Float64}
+    la :: Vector{Float64}
     properties :: S
 end
 
 
 function Solver{S<:AbstractSolver}(::Type{S}, name="solver", properties...)
     variant = S(properties...)
-    solver = Solver{S}(name, 0.0, [], [], 0, nothing, variant)
+    solver = Solver{S}(name, 0.0, [], [], 0, nothing, false, [], [], variant)
     return solver
 end
 
 function Solver{S<:AbstractSolver}(::Type{S}, problems::Problem...)
-    variant = S()
-    solver = Solver{S}("$(S)Solver", 0.0, [], [], 0, nothing, variant)
+    solver = Solver(S, "$(S)Solver")
     push!(solver.problems, problems...)
     return solver
 end
@@ -237,13 +239,13 @@ Solve linear system using LDLt factorization (SuiteSparse). This version
 requires that final system is symmetric and positive definite, so boundary
 conditions are first eliminated before solution.
 """
-function solve!(K, C1, C2, D, f, g, u, la, ::Type{Val{1}}; F=nothing, debug=false)
+function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{1}}; debug=false)
 
-    nnz(D) == 0 || return F, false
+    nnz(D) == 0 || return false
     nz = get_nonzero_rows(C2)
     B = get_nonzero_rows(C2')
     # C2^-1 exists or this doesn't work
-    length(nz) == length(B) || return F, false
+    length(nz) == length(B) || return false
 
     A = get_nonzero_rows(K)
     I = setdiff(A, B)
@@ -270,38 +272,30 @@ function solve!(K, C1, C2, D, f, g, u, la, ::Type{Val{1}}; F=nothing, debug=fals
     end
 
     # solve interior domain using LDLt factorization
-    if F == nothing
-        F = ldltfact(K[I,I])
-    end
+    F = ldltfact(K[I,I])
     u[I] = F \ (f[I] - K[I,B]*u[B])
     # solve lambda
     la[B] = lufact(C1[B,nz]) \ full(f[B] - K[B,I]*u[I] - K[B,B]*u[B])
 
-    return F, true
+    return true
 end
 
 """
 Solve linear system using LU factorization (UMFPACK). This version solves
 directly the saddle point problem without elimination of boundary conditions.
 """
-function solve!(K, C1, C2, D, f, g, u, la, ::Type{Val{2}}; F=nothing)
+function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{2}})
     # construct global system Ax = b and solve using lufact (UMFPACK)
     A = [K C1'; C2  D]
     b = [f; g]
-    nz = get_nonzero_rows(A)
-    x = zeros(length(b))
-    if F == nothing
-        F = lufact(A[nz,nz])
-    end
-    x[nz] = F \ full(b[nz])
-    ndofs = size(K, 1)
-    u[:] = x[1:ndofs]
-    la[:] = x[ndofs+1:end]
-    return F, true
+    x = lufact(A) \ full(b)
+    u[:] = x[1:solver.ndofs]
+    la[:] = x[solver.ndofs+1:end]
+    return true
 end
 
 """ Default linear system solver for solver. """
-function solve_linear_system(solver::Solver; F=nothing, empty_assemblies_before_solution=true, show_info=true)
+function solve!(solver::Solver; empty_assemblies_before_solution=true, show_info=true)
     show_info && info("Solving problems ...")
     t0 = Base.time()
 
@@ -317,6 +311,11 @@ function solve_linear_system(solver::Solver; F=nothing, empty_assemblies_before_
     K = 1/2*(K + K')
     M = 1/2*(M + M')
 
+    nz = ones(solver.ndofs)
+    nz[get_nonzero_rows(C2)] = 0.0
+    nz[get_nonzero_rows(D)] = 0.0
+    D += spdiagm(nz)
+
     # free up some memory before solution
     for problem in get_problems(solver)
         if empty_assemblies_before_solution
@@ -327,22 +326,25 @@ function solve_linear_system(solver::Solver; F=nothing, empty_assemblies_before_
         gc()
     end
 
-    u = zeros(solver.ndofs)
-    la = zeros(solver.ndofs)
-
+    ndofs = solver.ndofs
+    u = zeros(ndofs)
+    la = zeros(ndofs)
     status = false
     i = 0
     for i in [1, 2]
-        F, status = solve!(K, C1, C2, D, f, g, u, la, Val{i}; F=F)
+        status = solve!(solver, K, C1, C2, D, f, g, u, la, Val{i})
         status && break
     end
     status || error("Failed to solve linear system!")
-
     t1 = round(Base.time()-t0, 2)
     norms = (norm(u), norm(la))
     show_info && info("Solved problems in $t1 seconds using solver $i. Solution norms = $norms.")
     push!(solver.norms, norms)
-    return F, u, la
+
+    solver.u = u
+    solver.la = la
+
+    return
 end
 
 """ Default assembler for solver. """
@@ -398,7 +400,11 @@ end
 
 """ Default initializer for solver. """
 function initialize!(solver::Solver; show_info=true)
-    show_info && info("Initializing problems ...")
+    if solver.initialized
+        show_info && info("initialize!(): solver already initialized")
+        return
+    end
+    show_info && info("Initializing solver ...")
     problems = get_problems(solver)
     length(problems) != 0 || error("Empty solver, add problems to solver using push!")
     t0 = Base.time()
@@ -419,16 +425,18 @@ function initialize!(solver::Solver; show_info=true)
     info("Total number of nodes in problems: $nnodes")
     maxdof = maximum(nnodes)*field_dim
     info("# of max dof (=size of solution vector) is $maxdof")
-    u = zeros(maxdof)
-    la = zeros(maxdof)
+    solver.u = zeros(maxdof)
+    solver.la = zeros(maxdof)
     # TODO: this could be used to initialize elements too...
+    # TODO: cannot initialize to zero always, construct vector from elements.
     for problem in problems
-        problem.assembly.u = u
-        problem.assembly.la = la
+        problem.assembly.u = zeros(maxdof)
+        problem.assembly.la = zeros(maxdof)
         # initialize(problem, ....)
     end
     t1 = round(Base.time()-t0, 2)
-    show_info && info("Initialized problems in $t1 seconds.")
+    show_info && info("Initialized solver in $t1 seconds.")
+    solver.initialized = true
 end
 
 function get_all_elements(solver::Solver)
@@ -472,7 +480,10 @@ function get_temporal_collection(xdmf::Xdmf)
 end
 
 """ Default update for solver. """
-function update!(solver::Solver, u::Vector, la::Vector; show_info=true)
+function update!{S}(solver::Solver{S}; show_info=true)
+    u = solver.u
+    la = solver.la
+
     show_info && info("Updating problems ...")
     t0 = Base.time()
 
@@ -487,87 +498,104 @@ function update!(solver::Solver, u::Vector, la::Vector; show_info=true)
 
     # if io is attached to solver, update hdf / xml also
     if !isnull(solver.xdmf)
-        xdmf = get(solver.xdmf)
-        temporal_collection = get_temporal_collection(xdmf)
-        frame = new_child(temporal_collection, "Grid")
-        new_child(frame, "Time", Dict("Value" => solver.time))
-
-        # save geometry
-        X = solver("geometry", solver.time)
-        node_ids = sort(collect(keys(X)))
-        geometry = hcat([X[nid] for nid in node_ids]...)
-        ndim, nnodes = size(geometry)
-        geom_type = ndim == 2 ? "XY" : "XYZ"
-        dataitem = new_dataitem(xdmf, "/Node IDs", node_ids)
-        geom = new_child(frame, "Geometry", Dict("Type" => geom_type))
-        dataitem = new_dataitem(xdmf, "/Geometry", geometry)
-        add_child(geom, dataitem)
-
-        # save topology
-        all_elements = get_all_elements(solver)
-        nelements = length(all_elements)
-        element_types = unique(map(get_element_type, all_elements))
-
-        xdmf_element_mapping = Dict(
-            "Seg2" => "Polyline",
-            "Tri3" => "Triangle",
-            "Quad4" => "Quadrilateral",
-            "Tet4" => "Tetrahedron",
-            "Pyramid5" => "Pyramid",
-            "Wedge6" => "Wedge",
-            "Hex8" => "Hexahedron",
-            "Seg3" => "Edge_3",
-            "Tri6" => "Tri_6",
-            "Quad8" => "Quad_8",
-            "Tet10" => "Tet_10",
-            "Pyramid13" => "Pyramid_13",
-            "Wedge15" => "Wedge_15",
-            "Hex20" => "Hex_20")
-
-        for element_type in element_types
-            elements = filter_by_element_type(element_type, all_elements)
-            sort!(elements, by=get_element_id)
-            element_ids = map(get_element_id, elements)
-            element_conn = map(get_connectivity, elements)
-            element_conn = transpose(hcat(element_conn...)) - 1
-            element_code = split(string(element_type), ".")[end]
-            dataitem = new_dataitem(xdmf, "/Topology/$element_code/Element IDs", element_ids)
-            dataitem = new_dataitem(xdmf, "/Topology/$element_code/Connectivity", element_conn)
-            topology = new_child(frame, "Topology")
-            set_attribute(topology, "TopologyType", xdmf_element_mapping[element_code])
-            set_attribute(topology, "NumberOfElements", length(elements))
-            add_child(topology, dataitem)
-        end
-
-        # save solved fields
-        time = "Time $(solver.time)"
-        unknown_field_name = get_unknown_field_name(solver)
-        U = solver(unknown_field_name, solver.time)
-        node_ids2 = sort(collect(keys(U)))
-
-        @assert node_ids == node_ids2
-        ndim = length(U[first(node_ids)])
-        field_type = ndim == 1 ? "Scalar" : "Vector"
-        field_center = "Node"
-        if ndim == 2
-            for nid in node_ids
-                U[nid] = [U[nid]; 0.0]
-            end
-            ndim = 3
-        end
-        U = hcat([U[nid] for nid in node_ids]...)
-        unknown_field_name = ucfirst(unknown_field_name)
-        dataitem = new_dataitem(xdmf, "/Results/$time/Nodal Fields/$unknown_field_name", U)
-        attribute = new_child(frame, "Attribute")
-        set_attribute(attribute, "Name", unknown_field_name)
-        set_attribute(attribute, "Center", field_center)
-        add_child(attribute, dataitem)
-        save!(xdmf)
+        update_xdmf!(solver)
     end
 
     t1 = round(Base.time()-t0, 2)
     show_info && info("Updated problems in $t1 seconds.")
 end
+
+function update_xdmf!{S}(solver::Solver{S}; show_info=true)
+    xdmf = get(solver.xdmf)
+    temporal_collection = get_temporal_collection(xdmf)
+
+    frame = new_element("Grid")
+    new_child(frame, "Time", Dict("Value" => solver.time))
+
+    # save geometry
+    X = solver("geometry", solver.time)
+    node_ids = sort(collect(keys(X)))
+    geometry = hcat([X[nid] for nid in node_ids]...)
+    ndim, nnodes = size(geometry)
+    geom_type = ndim == 2 ? "XY" : "XYZ"
+    dataitem = new_dataitem(xdmf, "/Node IDs", node_ids)
+    geom = new_child(frame, "Geometry", Dict("Type" => geom_type))
+    dataitem = new_dataitem(xdmf, "/Geometry", geometry)
+    add_child(geom, dataitem)
+
+    # save topology
+    all_elements = get_all_elements(solver)
+    nelements = length(all_elements)
+    element_types = unique(map(get_element_type, all_elements))
+
+    xdmf_element_mapping = Dict(
+        "Seg2" => "Polyline",
+        "Tri3" => "Triangle",
+        "Quad4" => "Quadrilateral",
+        "Tet4" => "Tetrahedron",
+        "Pyramid5" => "Pyramid",
+        "Wedge6" => "Wedge",
+        "Hex8" => "Hexahedron",
+        "Seg3" => "Edge_3",
+        "Tri6" => "Tri_6",
+        "Quad8" => "Quad_8",
+        "Tet10" => "Tet_10",
+        "Pyramid13" => "Pyramid_13",
+        "Wedge15" => "Wedge_15",
+        "Hex20" => "Hex_20")
+
+    for element_type in element_types
+        elements = filter_by_element_type(element_type, all_elements)
+        sort!(elements, by=get_element_id)
+        element_ids = map(get_element_id, elements)
+        element_conn = map(get_connectivity, elements)
+        element_conn = transpose(hcat(element_conn...)) - 1
+        element_code = split(string(element_type), ".")[end]
+        dataitem = new_dataitem(xdmf, "/Topology/$element_code/Element IDs", element_ids)
+        dataitem = new_dataitem(xdmf, "/Topology/$element_code/Connectivity", element_conn)
+        topology = new_child(frame, "Topology")
+        set_attribute(topology, "TopologyType", xdmf_element_mapping[element_code])
+        set_attribute(topology, "NumberOfElements", length(elements))
+        add_child(topology, dataitem)
+    end
+
+    # save solved fields
+    unknown_field_name = get_unknown_field_name(solver)
+    U = solver(unknown_field_name, solver.time)
+    node_ids2 = sort(collect(keys(U)))
+
+    @assert node_ids == node_ids2
+    ndim = length(U[first(node_ids)])
+    field_type = ndim == 1 ? "Scalar" : "Vector"
+    field_center = "Node"
+    if ndim == 2
+        for nid in node_ids
+            U[nid] = [U[nid]; 0.0]
+        end
+        ndim = 3
+    end
+    U = hcat([U[nid] for nid in node_ids]...)
+    unknown_field_name = ucfirst(unknown_field_name)
+    time = solver.time
+    path = ""
+    if S == Nonlinear
+        iteration = solver.properties.iteration
+        path = "/Results/Time $time/Iteration $iteration/Nodal Fields/$unknown_field_name"
+    elseif S == Linear
+        path = "/Results/Time $time/Nodal Fields/$unknown_field_name"
+    end
+    dataitem = new_dataitem(xdmf, path, U)
+    attribute = new_child(frame, "Attribute")
+    set_attribute(attribute, "Name", unknown_field_name)
+    set_attribute(attribute, "Center", field_center)
+    set_attribute(attribute, "AttributeType", field_type)
+    add_child(attribute, dataitem)
+    if (S == Linear) || ((S == Nonlinear) && has_converged(solver))
+        add_child(temporal_collection, frame)
+    end
+    save!(xdmf)
+end
+
 
 ### Nonlinear quasistatic solver
 
@@ -580,7 +608,7 @@ type Nonlinear <: AbstractSolver
 end
 
 function Nonlinear()
-    solver = Nonlinear(0, 1, 20, 5.0e-5, true)
+    solver = Nonlinear(0, 1, 10, 5.0e-5, true)
     return solver
 end
 
@@ -646,12 +674,10 @@ function call(solver::Solver{Nonlinear}; show_info=true)
 
         # 2.1 update linearized assemblies
         assemble!(solver)
-
         # 2.2 call solver for linearized system
-        F, u, la = solve_linear_system(solver)
-
+        solve!(solver)
         # 2.3 update solution back to elements
-        update!(solver, u, la)
+        update!(solver)
 
         # 2.4 check convergence
         if has_converged(solver)
@@ -713,7 +739,7 @@ function assemble!(solver::Solver{Linear}; show_info=true)
     show_info && info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
 end
 
-function call(solver::Solver{Linear}; F=nothing, show_info=true, return_factorization=true)
+function call(solver::Solver{Linear}; show_info=true)
     t0 = Base.time()
     show_info && info(repeat("-", 80))
     show_info && info("Starting linear solver")
@@ -721,13 +747,10 @@ function call(solver::Solver{Linear}; F=nothing, show_info=true, return_factoriz
     show_info && info(repeat("-", 80))
     initialize!(solver)
     assemble!(solver)
-    F, u, la = solve_linear_system(solver; F=F, empty_assemblies_before_solution=false)
-    update!(solver, u, la)
+    solve!(solver)
+    update!(solver)
     t1 = round(Base.time()-t0, 2)
     show_info && info("Linear solver ready in $t1 seconds.")
-    if return_factorization
-        return F
-    end
 end
 
 """ Convenience function to call linear solver. """

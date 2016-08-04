@@ -11,10 +11,12 @@ type Element{E<:AbstractElement}
     properties :: E
 end
 
-function Element{E<:AbstractElement}(::Type{E}, connectivity=[], integration_points=[], id=-1, fields=Dict(), properties...)
-    variant = E(properties...)
-    element = Element{E}(id, connectivity, integration_points, fields, variant)
-    return element
+function Element{E<:AbstractElement}(::Type{E}, id::Int64, connectivity::Vector{Int64})
+    return Element{E}(id, connectivity, [], Dict(), E())
+end
+
+function Element{E<:AbstractElement}(::Type{E}, connectivity::Vector{Int64})
+    return Element{E}(-1, connectivity, [], Dict(), E())
 end
 
 function getindex(element::Element, field_name::AbstractString)
@@ -59,9 +61,15 @@ function call(element::Element, ip, time::Float64=0.0)
 end
 
 function call(element::Element, ip, time::Float64, ::Type{Val{:Jacobian}})
-    X = element["geometry"](time)
+    X = element("geometry", time)
     dN = get_dbasis(element, ip, time)
-    J = sum([kron(dN[:,i], X[i]') for i=1:length(X)])
+    nbasis = length(element)
+    if isa(X.data, Vector)
+        J = sum([kron(dN[:,i], X[i]') for i=1:nbasis])
+    else
+        c = get_connectivity(element)
+        J = sum([kron(dN[:,i], X[c[i]]') for i=1:nbasis])
+    end
     return J
 end
 
@@ -122,11 +130,16 @@ function call(element::Element, field::Field, ip, time::Float64)
     field_ = field(time)
     basis = element(ip, time)
     n = length(element)
-    m = length(field_)
-    if n != m
-        error("Error when trying to interpolate field $field at coords $ip and time $time: element length is $n and field length is $m, f = Nᵢfᵢ makes no sense!")
+    if isa(field_.data, Vector)
+        m = length(field_)
+        if n != m
+            error("Error when trying to interpolate field $field at coords $ip and time $time: element length is $n and field length is $m, f = Nᵢfᵢ makes no sense!")
+        end
+        return sum([field_[i]*basis[i] for i=1:n])
+    else
+        c = get_connectivity(element)
+        return sum([field_[c[i]]*basis[i] for i=1:n])
     end
-    return sum([field_[i]*basis[i] for i=1:n])
 end
 
 function size(element::Element, dim)
@@ -145,13 +158,19 @@ As a result element now have time invariant (variable) vector field "geometry" w
 
 """
 function update!(element::Element, field_name, data::Dict)
-    element[field_name] = [data[i] for i in get_connectivity(element)]
+    element[field_name] = Field(data)
+    #element[field_name] = [data[i] for i in get_connectivity(element)]
 end
 
 function update!{K,V}(element::Element, field_name, data::Pair{Float64, Dict{K, V}})
-    time, field_data = data
-    element_data = V[field_data[i] for i in get_connectivity(element)]
-    update!(element, field_name, time => element_data)
+    #time, field_data = data
+    #element_data = V[field_data[i] for i in get_connectivity(element)]
+    #update!(element, field_name, time => element_data)
+    if haskey(element, field_name)
+        update!(element[field_name], data)
+    else
+        element[field_name] = Field(data)
+    end
 end
 
 function update!(element::Element, field_name::AbstractString, datas::Union{Real, Vector, Pair{Float64, Union{Float64, Real, Vector{Any}}}}...)
@@ -321,4 +340,3 @@ function inside{E}(element::Element{E}, X, time)
     xi = get_local_coordinates(element, X, time)
     return inside(E, xi)
 end
-

@@ -3,8 +3,12 @@
 
 using JuliaFEM
 using JuliaFEM.Testing
+using Logging
+Logging.configure(level=DEBUG)
 
-@testset "test updating time dependent fields" begin
+@testset "create and manipulate fields" begin
+
+@testset "updating time dependent fields" begin
     f = Field(0.0 => 1.0)
     @test last(f).time == 0.0
     @test last(f).data == 1.0
@@ -18,16 +22,41 @@ using JuliaFEM.Testing
     @test length(f) == 2
 end
 
-@testset "test updating time invariant fields" begin
+@testset "updating time invariant fields" begin
     f = Field(1.0)
     @test f.data == 1.0
     update!(f, 2.0)
     @test f.data == 2.0
 end
 
-@testset "test field defined using function" begin
+@testset "field defined using function" begin
     g(xi, t) = xi[1]*t
     f = Field(g)
     v = f([1.0], 2.0)
     @test isapprox(v, 2.0)
+end
+
+@testset "dictionary fields" begin
+    f1 = Dict{Int64, Vector{Float64}}(1 => [0.0, 0.0], 2 => [0.0, 0.0])
+    f2 = Dict{Int64, Vector{Float64}}(1 => [1.0, 1.0], 2 => [1.0, 1.0])
+    f = Field(0.0 => f1, 1.0 => f2)
+    debug("field = $f")
+    @test isa(f, DVTV)
+    @test isapprox(f(0.0)[1], [0.0, 0.0])
+    @test isapprox(f(1.0)[2], [1.0, 1.0])
+
+    f = Field(0.0 => f1)
+    update!(f, 1.0 => f2)
+    @test isa(f, DVTV)
+    @test isapprox(f(0.0)[1], [0.0, 0.0])
+    @test isapprox(f(1.0)[2], [1.0, 1.0])
+
+    f = Field(f1)
+    @test isapprox(f(0.0)[1], [0.0, 0.0])
+    @test isapprox(f[1], [0.0, 0.0])
+
+    f = Field(f1)
+    @test isa(f, DVTI)
+end
+
 end

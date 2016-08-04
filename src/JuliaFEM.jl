@@ -1,6 +1,12 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+using Logging
+
+if haskey(ENV, "JULIAFEM_LOGLEVEL")
+    ENV["JULIAFEM_LOGLEVEL"] == "DEBUG" && Logging.configure(level=DEBUG)
+end
+
 """
 This is JuliaFEM -- Finite Element Package
 """
