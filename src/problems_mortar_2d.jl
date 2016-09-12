@@ -68,9 +68,10 @@ function calculate_normals(elements, time, ::Type{Val{1}}; rotate_normals=false)
     tangents = Dict{Int64, Vector{Float64}}()
     for element in elements
         conn = get_connectivity(element)
-        X1 = element("geometry", time)
-        dN = get_dbasis(element, [0.0], time)
-        tangent = vec(sum([kron(dN[:,i], X1[i]') for i=1:length(X1)]))
+        #X1 = element("geometry", time)
+        #dN = get_dbasis(element, [0.0], time)
+        #tangent = vec(sum([kron(dN[:,i], X1[i]') for i=1:length(X1)]))
+        tangent = vec(element([0.0], time, Val{:Jacobian}))
         for nid in conn
             if haskey(tangents, nid)
                 tangents[nid] += tangent
@@ -116,8 +117,8 @@ function assemble!(problem::Problem{Mortar}, time::Float64, ::Type{Val{1}}, ::Ty
     # 1. calculate nodal normals and tangents for slave element nodes j ∈ S
     normals, tangents = calculate_normals(slave_elements, time, Val{1};
                                           rotate_normals=props.rotate_normals)
-    update!(slave_elements, "normal", normals)
-    update!(slave_elements, "tangent", tangents)
+    update!(slave_elements, "normal", time => normals)
+    update!(slave_elements, "tangent", time => tangents)
 
     # 2. loop all slave elements
     for slave_element in slave_elements

@@ -21,6 +21,8 @@ function assemble!(problem::Problem{Contact}, time::Float64,
     update!(slave_elements, "normal", time => normals)
     update!(slave_elements, "tangent", time => tangents)
 
+    Rn = 0.0
+
     # 2. loop all slave elements
     for slave_element in slave_elements
 
@@ -56,8 +58,13 @@ function assemble!(problem::Problem{Contact}, time::Float64,
             u2 = master_element("displacement", time)
             x2 = X2 + u2
 
-            norm(mean(X1) - X2[1]) / norm(X1[2] - X1[1]) < props.distval || continue
-            norm(mean(X1) - X2[2]) / norm(X1[2] - X1[1]) < props.distval || continue
+            if norm(mean(X1) - X2[1]) / norm(X1[2] - X1[1]) > props.distval
+                continue
+            end
+
+            if norm(mean(X1) - X2[2]) / norm(X1[2] - X1[1]) > props.distval
+                continue
+            end
             
             # 3.1 calculate segmentation
             xi1a = project_from_master_to_slave(slave_element, X2[1], time)
@@ -89,7 +96,11 @@ function assemble!(problem::Problem{Contact}, time::Float64,
             # local mortar matrices
             fill!(De, 0.0)
             fill!(Me, 0.0)
-            ge = zeros(field_dim*nsl)
+            Ne = zeros(nsl, 2*nsl)
+            Te = zeros(nsl, 2*nsl)
+            He = zeros(nsl, 2*nsl)
+            ce = zeros(nsl)
+            ge = zeros(nsl)
             for ip in get_integration_points(slave_element, 3)
                 detJ = slave_element(ip, time, Val{:detJ})
                 w = ip.weight*detJ*l
@@ -97,40 +108,56 @@ function assemble!(problem::Problem{Contact}, time::Float64,
                 xi_s = dot([1/2*(1-xi); 1/2*(1+xi)], xi1)
                 N1 = vec(get_basis(slave_element, xi_s, time))
                 Phi = Ae*N1
+
                 # project gauss point from slave element to master element in direction n_s
                 X_s = N1*X1 # coordinate in gauss point
                 n_s = N1*n1 # normal direction in gauss point
+                t_s = N1*t1 # tangent condition in gauss point
+                n_s /= norm(n_s)
+                t_s /= norm(t_s)
                 xi_m = project_from_slave_to_master(master_element, X_s, n_s, time)
                 N2 = vec(get_basis(master_element, xi_m, time))
                 X_m = N2*X2 
-                De += w*Phi*N1'
-                Me += w*Phi*N2'
+
                 u_s = N1*u1
                 u_m = N2*u2
                 x_s = X_s + u_s
                 x_m = X_m + u_m
                 la_s = Phi*la1
-                ge += w*vec((x_m-x_s)*Phi')
+
+                # virtual work
+                De += w*Phi*N1'
+                Me += w*Phi*N2'
+
+                # contact constraints
+                Ne += w*reshape(kron(N1, n_s, Phi), 2, 4)
+                Te += w*reshape(kron(N2, n_s, Phi), 2, 4)
+                He += w*reshape(kron(N1, t_s, Phi), 2, 4)
+                ge += w*Phi*dot(n_s, x_m-x_s)
+                ce += w*N1*dot(n_s, -la_s)
+                Rn += w*dot(n_s, -la_s)
+
                 contact_area += w
                 contact_error += 1/2*w*dot(n_s, x_s-x_m)^2
             end
 
-            # add contribution to contact virtual work
             sdofs = get_gdofs(problem, slave_element)
             mdofs = get_gdofs(problem, master_element)
-            nsldofs = length(sdofs)
-            nmdofs = length(mdofs)
-            D2 = zeros(nsldofs, nsldofs)
-            M2 = zeros(nmdofs, nmdofs)
+
+            # add contribution to contact virtual work
             for i=1:field_dim
-                D2[i:field_dim:end, i:field_dim:end] += De
-                M2[i:field_dim:end, i:field_dim:end] += Me
+                lsdofs = sdofs[i:field_dim:end]
+                lmdofs = mdofs[i:field_dim:end]
+                add!(problem.assembly.C1, lsdofs, lsdofs, De)
+                add!(problem.assembly.C1, lsdofs, lmdofs, -Me)
             end
-            add!(problem.assembly.C1, sdofs, sdofs, D2)
-            add!(problem.assembly.C1, sdofs, mdofs, -M2)
-            add!(problem.assembly.C2, sdofs, sdofs, Q2'*D2)
-            add!(problem.assembly.C2, sdofs, mdofs, -Q2'*M2)
-            add!(problem.assembly.g, sdofs, Q2'*ge)
+
+            # add contribution to contact constraints
+            add!(problem.assembly.C2, sdofs[1:field_dim:end], sdofs, Ne)
+            add!(problem.assembly.C2, sdofs[1:field_dim:end], mdofs, -Te)
+            add!(problem.assembly.D, sdofs[2:field_dim:end], sdofs, He)
+            add!(problem.assembly.g, sdofs[1:field_dim:end], ge)
+            add!(problem.assembly.c, sdofs[1:field_dim:end], ce)
 
         end # master elements done
 
@@ -153,13 +180,22 @@ function assemble!(problem::Problem{Contact}, time::Float64,
     is_slip = Dict{Int64, Int}()
     is_stick = Dict{Int64, Int}()
 
-    g = full(problem.assembly.g)
     la = problem.assembly.la
+    ndofs = length(la)
+    info("contact ndofs: $ndofs")
+    info("Rn = $Rn")
+
+    C1 = sparse(problem.assembly.C1)
+    C2 = sparse(problem.assembly.C2, ndofs, ndofs)
+    D = sparse(problem.assembly.D, ndofs, ndofs)
+    g = full(problem.assembly.g, ndofs, 1)
+    c = full(problem.assembly.c, ndofs, 1)
 
     # active / inactive node detection
     for j in S
         dofs = [2*(j-1)+1, 2*(j-1)+2]
         weighted_gap[j] = g[dofs]
+
         if length(la) != 0
             p = dot(normals[j], la[dofs])
             t = dot(tangents[j], la[dofs])
@@ -167,6 +203,8 @@ function assemble!(problem::Problem{Contact}, time::Float64,
         else
             contact_pressure[j] = [0.0, 0.0]
         end
+
+#       contact_pressure[j] = c[dofs]
         complementarity_condition[j] = contact_pressure[j] - weighted_gap[j]
         if complementarity_condition[j][1] < 0
             is_inactive[j] = 1
@@ -178,6 +216,11 @@ function assemble!(problem::Problem{Contact}, time::Float64,
             is_active[j] = 1
             is_slip[j] = 1
             is_stick[j] = 0
+            _c1 = complementarity_condition[j][1]
+            _c2 = c[dofs]
+            _c3 = contact_pressure[j][1]
+            _c4 = g[dofs]
+            info("active $j: c1 = $_c1, c2 = $_c2, c3 = $_c3, c4 = $_c4")
         end
     end
 
@@ -212,12 +255,9 @@ function assemble!(problem::Problem{Contact}, time::Float64,
 
     # solve variational inequality
     
-    C1 = sparse(problem.assembly.C1)
-    ndofs = size(C1, 1)
-    C2 = sparse(problem.assembly.C2)
-    D = spzeros(ndofs, ndofs)
 
     # constitutive modelling in tangent direction, frictionless contact
+    #=
     for j in S
         dofs = [2*(j-1)+1, 2*(j-1)+2]
         if (is_active[j] == 1) && (is_slip[j] == 1)
@@ -227,6 +267,7 @@ function assemble!(problem::Problem{Contact}, time::Float64,
             D[dofs[2], dofs] = tangents[j]
         end
     end
+    =#
 
     # remove inactive nodes from assembly
     for j in S
