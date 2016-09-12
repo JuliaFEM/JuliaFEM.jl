@@ -158,19 +158,19 @@ As a result element now have time invariant (variable) vector field "geometry" w
 
 """
 function update!(element::Element, field_name, data::Dict)
-    element[field_name] = Field(data)
-    #element[field_name] = [data[i] for i in get_connectivity(element)]
+    #element[field_name] = Field(data)
+    element[field_name] = [data[i] for i in get_connectivity(element)]
 end
 
 function update!{K,V}(element::Element, field_name, data::Pair{Float64, Dict{K, V}})
-    #time, field_data = data
-    #element_data = V[field_data[i] for i in get_connectivity(element)]
-    #update!(element, field_name, time => element_data)
-    if haskey(element, field_name)
-        update!(element[field_name], data)
-    else
-        element[field_name] = Field(data)
-    end
+    time, field_data = data
+    element_data = V[field_data[i] for i in get_connectivity(element)]
+    update!(element, field_name, time => element_data)
+    #if haskey(element, field_name)
+    #    update!(element[field_name], data)
+    #else
+    #    element[field_name] = Field(data)
+    #end
 end
 
 function update!(element::Element, field_name::AbstractString, datas::Union{Real, Vector, Pair{Float64, Union{Float64, Real, Vector{Any}}}}...)

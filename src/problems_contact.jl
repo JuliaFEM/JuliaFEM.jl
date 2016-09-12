@@ -19,6 +19,7 @@ type Contact <: BoundaryProblem
     use_forwarddiff :: Bool
     minimum_active_set_size :: Int
     distval :: Float64
+    remove_from_set :: Bool # allow removal of non-potential contact pairs
     store_fields :: Vector{AbstractString}
 end
 
@@ -26,7 +27,7 @@ function Contact()
     default_fields = ["element area", "contact area", "weighted gap",
         "contact pressure", "active nodes", "inactive nodes", "stick nodes",
         "slip nodes", "complementarity condition", "contact error"]
-    return Contact(-1, false, false, false, true, false, 0, 5.0, default_fields)
+    return Contact(-1, false, false, false, true, false, 0, 5.0, false, default_fields)
 end
 
 function get_unknown_field_name(problem::Problem{Contact})
