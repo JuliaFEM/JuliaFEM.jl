@@ -109,6 +109,7 @@ include("problems_contact.jl")
 include("problems_contact_2d.jl")
 include("problems_contact_3d.jl")
 include("problems_contact_2d_autodiff.jl")
+#include("problems_contact_3d_autodiff.jl")
 export Contact
 
 module Preprocess

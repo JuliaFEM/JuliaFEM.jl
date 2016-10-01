@@ -11,11 +11,11 @@ type Element{E<:AbstractElement}
     properties :: E
 end
 
-function Element{E<:AbstractElement}(::Type{E}, id::Int64, connectivity::Vector{Int64})
+function Element{E<:AbstractElement}(::Type{E}, id::Int64, connectivity=[])
     return Element{E}(id, connectivity, [], Dict(), E())
 end
 
-function Element{E<:AbstractElement}(::Type{E}, connectivity::Vector{Int64})
+function Element{E<:AbstractElement}(::Type{E}, connectivity=[])
     return Element{E}(-1, connectivity, [], Dict(), E())
 end
 
@@ -44,11 +44,11 @@ function setindex!(element::Element, data, field_name)
     element.fields[field_name] = Field(data)
 end
 
-function call(element::Element, field_name)
+function call(element::Element, field_name::AbstractString)
     return element[field_name]
 end
 
-function call(element::Element, field_name, time)
+function call(element::Element, field_name::AbstractString, time::Float64)
     return element[field_name](time)
 end
 
@@ -58,6 +58,31 @@ end
 
 function call(element::Element, ip, time::Float64=0.0)
     return get_basis(element, ip, time)
+end
+
+"""
+Examples
+
+julia> el = Element(Quad4, [1, 2, 3, 4]);
+
+julia> el([0.0, 0.0], 0.0, 1)
+1x4 Array{Float64,2}:
+ 0.25  0.25  0.25  0.25
+
+julia> el([0.0, 0.0], 0.0, 2)
+2x8 Array{Float64,2}:
+ 0.25  0.0   0.25  0.0   0.25  0.0   0.25  0.0 
+ 0.0   0.25  0.0   0.25  0.0   0.25  0.0   0.25
+
+"""
+function call(element::Element, ip, time::Float64, dim::Int)
+    dim == 1 && return get_basis(element, ip, time)
+    Ni = get_basis(element, ip, time)
+    N = zeros(dim, length(element)*dim)
+    for i=1:dim
+        N[i,i:dim:end] += Ni
+    end
+    return N
 end
 
 function call(element::Element, ip, time::Float64, ::Type{Val{:Jacobian}})
@@ -96,15 +121,15 @@ function call(element::Element, field_name::AbstractString, ip, time::Float64, :
     return element(ip, time, Val{:Grad})*element[field_name](time)
 end
 
-function call(element::Element, field::Field, time)
+function call(element::Element, field::Field, time::Float64)
     return field(time)
 end
 
-function call(element::Element, field::DCTI, time)
+function call(element::Element, field::DCTI, time::Float64)
     return field.data
 end
 
-function call(element::Element, field_name::AbstractString, time)
+function call(element::Element, field_name::AbstractString, time::Float64)
     field = element[field_name]
     return element(field, time)
 end
@@ -157,7 +182,7 @@ julia> update!(element, "geometry", data)
 As a result element now have time invariant (variable) vector field "geometry" with data ([0.0, 0.0], [1.0, 2.0]).
 
 """
-function update!(element::Element, field_name, data::Dict)
+function update!(element::Element, field_name::AbstractString, data::Dict)
     #element[field_name] = Field(data)
     element[field_name] = [data[i] for i in get_connectivity(element)]
 end
@@ -195,7 +220,7 @@ function update!(element::Element, field_name, data::Pair...)
 end
 =#
 
-function update!(element::Element, field_name, data::Pair{Float64, Vector{Any}})
+function update!(element::Element, field_name::AbstractString, data::Pair{Float64, Vector{Any}})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
@@ -203,7 +228,7 @@ function update!(element::Element, field_name, data::Pair{Float64, Vector{Any}})
     end
 end
 
-function update!(element::Element, field_name, data::Pair{Float64, Vector{Int64}})
+function update!(element::Element, field_name::AbstractString, data::Pair{Float64, Vector{Int64}})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
@@ -211,7 +236,7 @@ function update!(element::Element, field_name, data::Pair{Float64, Vector{Int64}
     end
 end
 
-function update!(element::Element, field_name, data::Pair{Float64, Vector{Float64}})
+function update!(element::Element, field_name::AbstractString, data::Pair{Float64, Vector{Float64}})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
@@ -219,7 +244,7 @@ function update!(element::Element, field_name, data::Pair{Float64, Vector{Float6
     end
 end
 
-function update!(element::Element, field_name, data::Pair{Float64, Vector{Vector{Float64}}})
+function update!(element::Element, field_name::AbstractString, data::Pair{Float64, Vector{Vector{Float64}}})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
@@ -227,7 +252,7 @@ function update!(element::Element, field_name, data::Pair{Float64, Vector{Vector
     end
 end
 
-function update!(element::Element, field_name, data::Pair{Float64, Float64})
+function update!(element::Element, field_name::AbstractString, data::Pair{Float64, Float64})
     if haskey(element, field_name)
         update!(element[field_name], data)
     else
@@ -257,22 +282,22 @@ function update!(element::Element, datas::Pair...)
     end
 end
 
-function update!(element::Element, field_name, data::Function)
+function update!(element::Element, field_name::AbstractString, data::Function)
     element[field_name] = data
 end
 
-function update!(element::Element, field_name, field::Field)
+function update!(element::Element, field_name::AbstractString, field::Field)
     element[field_name] = field
 end
 
-function update!(elements::Vector, field_name, data)
+function update!(elements::Vector, field_name::AbstractString, data)
     for element in elements
         update!(element, field_name, data)
     end
 end
 
 """ Check existence of field. """
-function haskey(element::Element, field_name)
+function haskey(element::Element, field_name::AbstractString)
     haskey(element.fields, field_name)
 end
 
