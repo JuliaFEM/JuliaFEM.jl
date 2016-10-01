@@ -105,7 +105,7 @@ function get_polygon_clip(xs, xm, n; debug=false)
     # objective: search does line xm1 - xm2 clip xs
     nm = length(xm)
     ns = length(xs)
-    P = Vector{Float64}[]
+    P = Vector{Number}[]
 
     # 1. test is master point inside slave, if yes, add to clip
     for i=1:nm

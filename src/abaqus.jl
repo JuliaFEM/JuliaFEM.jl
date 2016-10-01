@@ -603,7 +603,7 @@ function process_output_request(model::Model, solver::Solver, output_request::Ab
                 results = join(results, tables[i], on=:ELEMENT, kind=:outer)
             end
         end
-        sort!(results, cols=[:ELEMENT, :IP])
+        #sort!(results; cols=[:ELEMENT, :IP])
         # filter out elements with id -1, they are automatically created boundary elements
         fel = find(results[:ELEMENT] .!= Symbol("E-1"))
         results = results[fel, :]

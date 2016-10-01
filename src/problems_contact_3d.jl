@@ -12,7 +12,7 @@ function create_orthogonal_basis(n)
 end
 
 """
-Frictionless 2d small sliding contact.
+Frictionless 3d small sliding contact.
 
 problem
 time
@@ -33,7 +33,7 @@ function assemble!(problem::Problem{Contact}, time::Float64,
     # 1. calculate nodal normals and tangents for slave element nodes j ∈ S
     normals = calculate_normals(slave_elements, time, Val{2};
                                 rotate_normals=props.rotate_normals)
-    update!(slave_elements, "normal", normals)
+    update!(slave_elements, "normal", time => normals)
 
     # 2. loop all slave elements
     for (slave_num, slave_element) in enumerate(slave_elements)
@@ -43,14 +43,29 @@ function assemble!(problem::Problem{Contact}, time::Float64,
         u1 = slave_element("displacement", time)
         la = slave_element("reaction force", time)
         n1 = slave_element("normal", time)
-        t11, t21 = create_orthogonal_basis(n1[1])
-        t12, t22 = create_orthogonal_basis(n1[2])
-        t13, t23 = create_orthogonal_basis(n1[3])
-        Q1_ = [n1[1] t11 t21]
-        Q2_ = [n1[2] t12 t22]
-        Q3_ = [n1[3] t13 t23]
-        Z = zeros(3, 3)
-        Q3 = [Q1_ Z Z; Z Q2_ Z; Z Z Q3_]
+        if nsl == 3
+            t11, t21 = create_orthogonal_basis(n1[1])
+            t12, t22 = create_orthogonal_basis(n1[2])
+            t13, t23 = create_orthogonal_basis(n1[3])
+            Q1_ = [n1[1] t11 t21]
+            Q2_ = [n1[2] t12 t22]
+            Q3_ = [n1[3] t13 t23]
+            Z = zeros(3, 3)
+            Q3 = [Q1_ Z Z; Z Q2_ Z; Z Z Q3_]
+        elseif nsl == 4
+            t11, t21 = create_orthogonal_basis(n1[1])
+            t12, t22 = create_orthogonal_basis(n1[2])
+            t13, t23 = create_orthogonal_basis(n1[3])
+            t14, t24 = create_orthogonal_basis(n1[4])
+            Q1_ = [n1[1] t11 t21]
+            Q2_ = [n1[2] t12 t22]
+            Q3_ = [n1[3] t13 t23]
+            Q4_ = [n1[4] t14 t24]
+            Z = zeros(3, 3)
+            Q3 = [Q1_ Z Z Z; Z Q2_ Z Z; Z Z Q3_ Z; Z Z Z Q4_]
+        else
+            error("nsl = $nsl")
+        end
         contact_area = 0.0
         contact_error = 0.0
 
@@ -64,15 +79,19 @@ function assemble!(problem::Problem{Contact}, time::Float64,
             update!(slave_element, "element area", time => element_area)
         end
 
-        if slave_num == 1
-            info("First slave element area = $element_area")
-            info("NT basis of first slave element")
-            dump(Q3)
-        end
+#       if slave_num == 1
+#           info("First slave element area = $element_area")
+#           info("NT basis of first slave element")
+#           dump(Q3)
+#       end
 
         # project slave nodes to auxiliary plane (x0, Q)
         #xi = get_reference_element_midpoint(slave_element)
-        xi = [1/3, 1/3]
+        if nsl == 3
+            xi = [1/3, 1/3]
+        else
+            xi = [1/4, 1/4]
+        end
         N = vec(get_basis(slave_element, xi, time))
         x0 = N*X1
         n0 = N*n1
@@ -151,7 +170,7 @@ function assemble!(problem::Problem{Contact}, time::Float64,
             nsldofs = length(sdofs)
             nmdofs = length(mdofs)
             D3 = zeros(nsldofs, nsldofs)
-            M3 = zeros(nmdofs, nmdofs)
+            M3 = zeros(nsldofs, nmdofs)
             for i=1:field_dim
                 D3[i:field_dim:end, i:field_dim:end] += De
                 M3[i:field_dim:end, i:field_dim:end] += Me
@@ -180,8 +199,14 @@ function assemble!(problem::Problem{Contact}, time::Float64,
     is_slip = Dict{Int64, Int}()
     is_stick = Dict{Int64, Int}()
 
-    g = full(problem.assembly.g)
     la = problem.assembly.la
+    ndofs = length(la)
+    
+    C1 = sparse(problem.assembly.C1, ndofs, ndofs)
+    C2 = sparse(problem.assembly.C2, ndofs, ndofs)
+    D = sparse(problem.assembly.D, ndofs, ndofs)
+    g = full(problem.assembly.g, ndofs, 1)
+    c = full(problem.assembly.c, ndofs, 1)
 
     # active / inactive node detection
     for j in S
@@ -233,26 +258,23 @@ function assemble!(problem::Problem{Contact}, time::Float64,
         update!(slave_elements, "slip nodes", time => is_slip)
     end
 
+    #=
     info("# | active | inactive | stick | slip | gap | pres | comp")
     for j in S
         str1 = "$j | $(is_active[j]) | $(is_inactive[j]) | $(is_stick[j]) | $(is_slip[j]) | "
         str2 = "$(round(weighted_gap[j], 3)) | $(round(contact_pressure[j], 3)) | $(round(complementarity_condition[j], 3))"
         info(str1 * str2)
     end
+    =#
 
     # solve variational inequality
-    
-    C1 = sparse(problem.assembly.C1)
-    ndofs = size(C1, 1)
-    C2 = sparse(problem.assembly.C2)
-    D = spzeros(ndofs, ndofs)
 
     # constitutive modelling in tangent direction, frictionless contact
     for j in S
         dofs = [3*(j-1)+1, 3*(j-1)+2, 3*(j-1)+3]
         tdofs = dofs[[2,3]]
         if (is_active[j] == 1) && (is_slip[j] == 1)
-            info("$j is in active/slip, removing tangential constraints $tdofs")
+#           info("$j is in active/slip, removing tangential constraints $tdofs")
             C2[tdofs,:] = 0.0
             g[tdofs] = 0.0
             normal = normals[j]
@@ -266,7 +288,7 @@ function assemble!(problem::Problem{Contact}, time::Float64,
     for j in S
         dofs = [3*(j-1)+1, 3*(j-1)+2, 3*(j-1)+3]
         if is_inactive[j] == 1
-            info("$j is inactive, removing dofs $dofs")
+#           info("$j is inactive, removing dofs $dofs")
             C1[dofs,:] = 0.0
             C2[dofs,:] = 0.0
             D[dofs,:] = 0.0

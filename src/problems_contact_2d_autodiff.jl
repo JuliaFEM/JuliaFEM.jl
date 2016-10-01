@@ -121,11 +121,20 @@ function assemble!(problem::Problem{Contact}, time::Float64,
             X_el = element("geometry", time)
             u_el = Field(Vector[u[:,i] for i in conn])
             x_el = X_el + u_el
+            #=
             for ip in get_integration_points(element, 3)
                 dN = get_dbasis(element, ip, time)
                 N = element(ip, time)
                 t = sum([kron(dN[:,i], x_el[i]') for i=1:length(x_el)])
                 normals[:, conn] += ip.weight*Q*t'*N
+            end
+            =#
+            dN = get_dbasis(element, [0.0], time)
+            t = sum([kron(dN[:,i], x_el[i]') for i=1:length(x_el)])
+            n = Q*t'
+            n /= norm(n)
+            for c in conn
+                normals[:,c] += n
             end
         end
         for i in 1:size(normals,2)

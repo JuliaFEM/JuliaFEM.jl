@@ -677,3 +677,6 @@ function inside(::Union{Type{Tri3}, Type{Tri6}, Type{Tri7}, Type{Tet4}, Type{Tet
     return all(xi .>= 0.0) && (sum(xi) <= 1.0)
 end
 
+function get_reference_coordinates{E}(element::Element{E})
+    get_reference_coordinates(E)
+end

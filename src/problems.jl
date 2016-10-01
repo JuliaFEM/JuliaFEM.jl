@@ -284,11 +284,11 @@ function length(problem::Problem)
 end
 
 function update!(problem::Problem, field_name::AbstractString, data)
-    if haskey(problem.fields, field_name)
-        update!(problem.fields[field_name], field_name::AbstractString, data)
-    else
-        problem.fields[field_name] = Field(data)
-    end
+    #if haskey(problem.fields, field_name)
+    #    update!(problem.fields[field_name], field_name::AbstractString, data)
+    #else
+    #    problem.fields[field_name] = Field(data)
+    #end
     update!(problem.elements, field_name::AbstractString, data)
 end
 
@@ -302,9 +302,9 @@ end
 
 """ Return field calculated to nodal points for elements in problem p. """
 function call(problem::Problem, field_name::AbstractString, time::Float64=0.0)
-    if haskey(problem, field_name)
-        return problem[field_name](time)
-    end
+    #if haskey(problem, field_name)
+    #    return problem[field_name](time)
+    #end
     f = nothing
     for element in get_elements(problem)
         haskey(element, field_name) || continue
@@ -323,8 +323,8 @@ function call(problem::Problem, field_name::AbstractString, time::Float64=0.0)
             end
         end
     end
-    f == nothing && return f
-    update!(problem, field_name, time => f)
+    #f == nothing && return f
+    #update!(problem, field_name, time => f)
     return f
 end
 
