@@ -151,12 +151,11 @@ function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, 
             params = plastic_def["params"]
             (stress_last, strain_last) = get_internal_params(element.dev, ip.id, Val{:planestress})
             dstrain_vec = strain_vec - strain_last
+            stress_vec = [0.0, 0.0, 0.0]
             Dtan = [0.0 0.0 0.0;
                     0.0 0.0 0.0;
                     0.0 0.0 0.0]
-
-            calculate_stress!(stress_last, dstrain_vec, D, params, Dtan)
-            stress_vec = stress_last
+            calculate_stress!(stress_vec, stress_last, dstrain_vec, D, params, Dtan)
         else
             stress_vec = D * ([1.0, 1.0, 2.0] .* strain_vec)
             Dtan = D
@@ -169,7 +168,7 @@ function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, 
         :stress12 in props.store_fields && update!(ip, "stress12", time => stress_vec[3])
 
         Km += w*BL'*Dtan*BL
-
+        
         # stress = [stress_vec[1] stress_vec[3]; stress_vec[3] stress_vec[2]]
         # cauchy_stress = F'*stress*F/det(F)
         # cauchy_stress = [cauchy_stress[1,1]; cauchy_stress[2,2]; cauchy_stress[1,2]]
