@@ -71,6 +71,14 @@ typealias Elasticity2DVolumeElements Union{Tri3, Tri6, Quad4, Quad8, Quad9}
 typealias Elasticity3DSurfaceElements Union{Poi1, Tri3, Tri6, Quad4, Quad8, Quad9}
 typealias Elasticity3DVolumeElements Union{Tet4, Wedge6, Hex8, Tet10, Hex20, Hex27}
 
+function get_internal_params(params, ip_id, ::Type{Val{:planestress}})
+    if !(ip_id in keys(params))
+        params[ip_id] = Dict{Any, Any}()
+        params[ip_id]["last_stress"] = [0.0,0.0,0.0]
+        params[ip_id]["last_strain"] = [0.0,0.0,0.0]
+    end
+    return (params[ip_id]["last_stress"], params[ip_id]["last_strain"])
+end
 
 """ Elasticity equations for 2d cases. """
 function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, element::Element{El}, time, ::Type{Val{:plane}})
@@ -137,7 +145,22 @@ function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, 
             error("unknown plane formulation: $(props.formulation)")
         end
         # calculate stress
-        stress_vec = D * ([1.0, 1.0, 2.0] .* strain_vec)
+        if "plasticity" in keys(element.dev)
+            plastic_def = element.dev["plasticity"]
+            calculate_stress! = plastic_def["stress"]
+            params = plastic_def["params"]
+            (stress_last, strain_last) = get_internal_params(element.dev, ip.id, Val{:planestress})
+            dstrain_vec = strain_vec - strain_last
+            Dtan = [0.0 0.0 0.0;
+                    0.0 0.0 0.0;
+                    0.0 0.0 0.0]
+
+            calculate_stress!(stress_last, dstrain_vec, D, params, Dtan)
+            stress_vec = stress_last
+        else
+            stress_vec = D * ([1.0, 1.0, 2.0] .* strain_vec)
+            Dtan = D
+        end
 
         :strain in props.store_fields && update!(ip, "strain", time => strain_vec)
         :stress in props.store_fields && update!(ip, "stress", time => stress_vec)
@@ -145,7 +168,7 @@ function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, 
         :stress22 in props.store_fields && update!(ip, "stress22", time => stress_vec[2])
         :stress12 in props.store_fields && update!(ip, "stress12", time => stress_vec[3])
 
-        Km += w*BL'*D*BL
+        Km += w*BL'*Dtan*BL
 
         # stress = [stress_vec[1] stress_vec[3]; stress_vec[3] stress_vec[2]]
         # cauchy_stress = F'*stress*F/det(F)

@@ -9,14 +9,15 @@ type Element{E<:AbstractElement}
     integration_points :: Vector{IP}
     fields :: Dict{AbstractString, Field}
     properties :: E
+    dev :: Dict{Any, Any}
 end
 
 function Element{E<:AbstractElement}(::Type{E}, id::Int64, connectivity=[])
-    return Element{E}(id, connectivity, [], Dict(), E())
+    return Element{E}(id, connectivity, [], Dict(), E(), Dict{Any, Any}())
 end
 
 function Element{E<:AbstractElement}(::Type{E}, connectivity=[])
-    return Element{E}(-1, connectivity, [], Dict(), E())
+    return Element{E}(-1, connectivity, [], Dict(), E(), Dict{Any, Any}())
 end
 
 function getindex(element::Element, field_name::AbstractString)
@@ -71,7 +72,7 @@ julia> el([0.0, 0.0], 0.0, 1)
 
 julia> el([0.0, 0.0], 0.0, 2)
 2x8 Array{Float64,2}:
- 0.25  0.0   0.25  0.0   0.25  0.0   0.25  0.0 
+ 0.25  0.0   0.25  0.0   0.25  0.0   0.25  0.0
  0.0   0.25  0.0   0.25  0.0   0.25  0.0   0.25
 
 """
