@@ -23,7 +23,7 @@ function inv3(P::Matrix)
     return 1/(a*A + b*B + c*C)*[A B C; D E F; G H I]
 end
 
-function vertex_inside_polygon(q, P; atol=1.0e-6)
+function vertex_inside_polygon(q, P; atol=1.0e-3)
     N = length(P)
     angle = 0.0
     for i=1:N
@@ -56,14 +56,18 @@ function calculate_centroid(P)
     return C
 end
 
-function get_cells(P, C)
+function get_cells(P, C; allow_quads=false)
     N = length(P)
     cells = Vector[]
     # shared edge etc.
     N < 3 && return cells
-    # trivial case, polygon already triangle / quadrangle
-    #N == 3 && return Vector[P]
-    #N == 4 && return Vector[P]
+    # trivial cases, polygon already triangle / quadrangle
+    if N == 3
+        return Vector[P]
+    end
+    if N == 4 && allow_quads
+        return Vector[P]
+    end
     #V = sum([cross(P[i], P[mod(i,N)+1]) for i=1:N])
     #A = 1/2*abs(dot(n, V))
     #info("A = $A")
@@ -87,7 +91,7 @@ function get_cells(P, C)
 end
 
 """ Test does P contain q. """
-function contains{T}(P::Vector{T}, q::T; check_is_close=true, rtol=1.0e-5)
+function contains{T}(P::Vector{T}, q::T; check_is_close=true, rtol=1.0e-4)
     if q in P
         return true
     end
@@ -105,7 +109,7 @@ function get_polygon_clip(xs, xm, n; debug=false)
     # objective: search does line xm1 - xm2 clip xs
     nm = length(xm)
     ns = length(xs)
-    P = Vector{Number}[]
+    P = Vector[]
 
     # 1. test is master point inside slave, if yes, add to clip
     for i=1:nm
@@ -152,7 +156,7 @@ function get_polygon_clip(xs, xm, n; debug=false)
 end
 
 function project_vertex_to_surface{E}(p::Vector, x0::Vector, n0::Vector,
-    element::Element{E}, x::DVTI, time::Real; max_iterations::Int=10, iter_tol::Float64=1.0e-9)
+    element::Element{E}, x::DVTI, time::Real; max_iterations::Int=10, iter_tol::Float64=1.0e-6)
     basis(xi) = get_basis(element, xi, time)
     dbasis(xi) = get_dbasis(element, xi, time)
     f(theta) = basis(theta[1:2])*x - theta[3]*n0 - p

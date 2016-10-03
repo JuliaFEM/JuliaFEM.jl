@@ -19,7 +19,8 @@ function cross2(a, b)
 end
 
 function get_slave_elements(problem::Problem)
-    filter(el -> haskey(el, "master elements"), get_elements(problem))
+    cond(el) = haskey(el, "master elements") || haskey(el, "potential master elements")
+    return filter(cond, get_elements(problem))
 end
 
 function project_from_master_to_slave{E<:MortarElements2D}(slave_element::Element{E}, x2, time)

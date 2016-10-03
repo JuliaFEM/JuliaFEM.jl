@@ -17,9 +17,14 @@ type Contact <: BoundaryProblem
     friction :: Bool
     dual_basis :: Bool
     use_forwarddiff :: Bool
+    forwarddiff_assemble_in_pieces :: Bool
     minimum_active_set_size :: Int
     distval :: Float64
     remove_from_set :: Bool # allow removal of non-potential contact pairs
+    allow_quads :: Bool
+    remove_nodes :: Vector{Int}
+    always_in_contact :: Bool
+    update_contact_pairing :: Bool
     store_fields :: Vector{AbstractString}
 end
 
@@ -27,7 +32,22 @@ function Contact()
     default_fields = ["element area", "contact area", "weighted gap",
         "contact pressure", "active nodes", "inactive nodes", "stick nodes",
         "slip nodes", "complementarity condition", "contact error"]
-    return Contact(-1, false, false, false, true, false, 0, 5.0, false, default_fields)
+    return Contact(
+        -1,      # dimension
+        false,   # rotate_normals
+        false,   # finite_sliding
+        false,   # friciton
+        true,    # dual basis
+        false,   # use forwarddiff
+        false,   # when using forwarddiff, assemble interface in pieces
+        0,       # minimum active set size
+        5.0,     # distance value for contact detection
+        false,   # allow removal of non-potential contact pairs
+        false,   # allow quadrangles in contact discretization
+        [],      # remove these nodes always from set
+        false,   # mainly for debugging, do not remove inactive nodes
+        true,    # update contact pairing on each loop
+        default_fields)
 end
 
 function get_unknown_field_name(problem::Problem{Contact})
