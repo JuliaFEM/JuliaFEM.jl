@@ -23,7 +23,8 @@ using JuliaFEM.Testing
     update!(element, "geometry", nodes)
     update!(element, "youngs modulus", 288.0)
     update!(element, "poissons ratio", 1/3)
-    element.dev["plasticity"] = Dict{Any, Any}("stress" => JuliaFEM.plastic_von_mises!,
+    element.dev["plasticity"] = Dict{Any, Any}("stress" => JuliaFEM.ideal_plasticity!,
+                                                "yield_surface" => Val{:von_mises},
                                                "params" => Dict("yield_stress" => 175.0))
     push!(block, element)
 
