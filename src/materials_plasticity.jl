@@ -115,5 +115,7 @@ function ideal_plasticity!(stress_new, stress_last, dstrain_vec, D, params, Dtan
         dfds = dfds_(stress_new)
         Dtan[:,:] = Dc - (Dc * dfds * dfds' * Dc) / (dfds' * Dc * dfds)[1]
 
+        println("equivalent stress")
+        println(equivalent_stress(stress_new, type_))
     end
 end

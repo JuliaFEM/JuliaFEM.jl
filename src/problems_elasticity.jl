@@ -108,7 +108,6 @@ function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, 
         w = ip.weight*detJ
         N = element(ip, time)
         dN = element(ip, time, Val{:Grad})
-
         # kinematics
 
         gradu = element("displacement", ip, time, Val{:Grad})
@@ -413,7 +412,6 @@ end
 
 """ Elasticity equations, 3d nonlinear. """
 function assemble{El<:Elasticity3DVolumeElements}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum}})
-
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
     nnodes = length(element)
@@ -501,6 +499,7 @@ function assemble{El<:Elasticity3DVolumeElements}(problem::Problem{Elasticity}, 
             Dtan = D
         end
 
+        println(round(stress_vec, 4))
         :strain in props.store_fields && update!(ip, "strain", time => strain_vec)
         :stress in props.store_fields && update!(ip, "stress", time => stress_vec)
         :stress11 in props.store_fields && update!(ip, "stress11", time => stress_vec[1])
