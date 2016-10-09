@@ -1,5 +1,6 @@
 
-#using PyPlot
+using PyPlot
+using JuliaFEM
 using JuliaFEM.Testing
 #using JuliaFEM.MaterialModels: stiffnessTensor, calculate_stress, State
 #using JuliaFEM.MaterialModels: stiffnessTensorPlaneStress
@@ -13,7 +14,14 @@ function test_von_mises_3D_basic()
     E = 200.0e3
     nu =  0.3
     ν = 0.3
-    C = stiffnessTensor(E, ν)
+    nu = 0.3
+    C = E/((1.0+nu)*(1.0-2.0*nu)) * [
+        1.0-nu nu nu 0.0 0.0 0.0
+        nu 1.0-nu nu 0.0 0.0 0.0
+        nu nu 1.0-nu 0.0 0.0 0.0
+        0.0 0.0 0.0 0.5-nu 0.0 0.0
+        0.0 0.0 0.0 0.0 0.5-nu 0.0
+        0.0 0.0 0.0 0.0 0.0 0.5-nu]
 
     strain_tot = zeros(Float64, (steps, 6))
     strain_tot2 = zeros(Float64, (steps, 6))
@@ -49,34 +57,23 @@ function test_von_mises_3D_basic()
         a[3, 2] = b[4]
     end
 
-    mat = State(C, stress_y, zeros(Float64, 6), zeros(Float64, 6))
-
     info("Starting calculation")
     tic()
-    #=
-    for i=1:steps
-        strain_new = reshape(strain_tot[i, :, :], (6, 1))
-        dstrain = strain_new - mat.strain
-        calculate_stress!(dstrain, mat, Val{:vonMises})
-        mat.strain += vec(dstrain)
-        push!(ss, mat.stress[1])
-        push!(ee, mat.strain[1])
-
-        fill_tensor(eig_stress, mat.stress)
-        eig_vals[i, :] = sort(eigvals(eig_stress))
-    end
-    =#
-    stress = zeros(Float64, 6)
+    params = Dict("yield_stress" => stress_y)
+    stress_new = zeros(Float64, 6)
+    stress_last = zeros(Float64, 6)
     strain = zeros(Float64, 6)
+    Dtan = zeros(6,6)
     for i=1:steps
         strain_new = reshape(strain_tot[i, :, :], (6, 1))
         dstrain = strain_new - strain
-        calculate_stress!(dstrain, stress, C, stress_y, Val{:vonMises})
-        strain = vec(strain_new)
+        JuliaFEM.plastic_von_mises!(stress_new, stress_last, dstrain, C, params, Dtan, Val{:type_3d})
+        strain[:] = vec(strain_new)[:]
         push!(ss, stress[1])
         push!(ee, strain[1])
-        fill_tensor(eig_stress, stress)
+        fill_tensor(eig_stress, stress_new)
         eig_vals[i, :] = sort(eigvals(eig_stress))
+        stress_last[:] = stress_new[:]
     end
 
     toc()
@@ -119,8 +116,8 @@ function test_von_mises_3D_basic()
 
 
     info("Calculation finished")
-    #PyPlot.plot(ee, ss)
-    #=
+    # plot3D(ee, ss)
+
     plot3D(eig_vals[:, 1], eig_vals[:, 2], eig_vals[:, 3], color="red")
     PyPlot.title("Stress path and von Mises yield surface")
     PyPlot.xlabel("Eig Stress 1")
@@ -128,18 +125,21 @@ function test_von_mises_3D_basic()
     PyPlot.zlabel("Eig Stress 3")
     PyPlot.grid()
     PyPlot.show()
-    =#
+
 end
 
 function test_von_mises_planestress_basic()
 
     steps = 1000
-    strain_max = 0.003
-    num_cycles = 5
-    E = 200.0e3
-    nu =  0.3
+    strain_max = 0.004
+    num_cycles = 1.
+    E = 200000.
+    nu = 0.3
     ν = 0.3
-    C = stiffnessTensorPlaneStress(E, ν)
+    C = E/((1+nu)*(1-2*nu)) .* [
+        1-nu   nu 0
+        nu   1-nu 0
+        0    0    (1-2*nu)/2]
 
     strain_tot = zeros(Float64, (steps, 3))
 
@@ -151,7 +151,7 @@ function test_von_mises_planestress_basic()
     strain_last = zeros(Float64, (3))
     strain_p = zeros(Float64, (3))
     stress = zeros(Float64, (3, 1))
-    stress_y =  200.0
+    stress_y =  400
     ss = Float64[]
     ee = Float64[]
 
@@ -161,50 +161,39 @@ function test_von_mises_planestress_basic()
 
     eig_stress = zeros(Float64, (3, 3))
     eig_vals = zeros(Float64, (steps, 3))
-    #mat = State(C, stress_y, zeros(Float64, 6), zeros(Float64, 6))
 
     info("Starting calculation")
     tic()
-    #=
-    for i=1:steps
-        strain_new = reshape(strain_tot[i, :, :], (6, 1))
-        dstrain = strain_new - mat.strain
-        calculate_stress!(dstrain, mat, Val{:vonMises})
-        mat.strain += vec(dstrain)
-        push!(ss, mat.stress[1])
-        push!(ee, mat.strain[1])
 
-        fill_tensor(eig_stress, mat.stress)
-        eig_vals[i, :] = sort(eigvals(eig_stress))
-    end
-    =#
-    stress = zeros(Float64, 3)
+    stress_new = zeros(Float64, 3)
+    stress_last = zeros(Float64, 3)
     strain = zeros(Float64, 3)
+    strain_last = zeros(Float64, 3)
+    params = Dict("yield_stress" => stress_y)
+    #Dtan = C
+    Dtan = zeros(3,3)
     for i=1:steps
-        strain_new = reshape(strain_tot[i, :, :], (3, 1))
+        println("last stress: ", round(stress_last, 2))
+        strain_new = vec(strain_tot[i, :, :])
         dstrain = strain_new - strain
-        stress_inc, lambda = calculate_stress(dstrain,
-                                              stress,
-                                              C,
-                                              stress_y,
-                                              Val{:vonMises},
-                                              Val{:PlaneStressElasticPlasticProblem})
-        stress += stress_inc
-        strain = vec(strain_new)
-        s1, s2, t12  = stress
+        println("analytical stress: ", round((C * strain_new)', 2))
+
+        JuliaFEM.plastic_von_mises!(stress_new, stress_last, dstrain, C, params, Dtan, Val{:type_2d})
+        strain[:] = vec(strain_new)[:]
+        s1, s2, t12  = stress_new
         se1 = (s1 + s2)/2 + sqrt(((s1 - s2)/2)^2 + t12^2)
         se2 = (s1 + s2)/2 - sqrt(((s1 - s2)/2)^2 + t12^2)
         push!(ss, se1)
         push!(ee, se2)
+        stress_last[:] = stress_new[:]
     end
-
     toc()
 
     function vm_upper(a, c)
         vals = f(a[1], a[2], c)
         vm(vals[1], vals[2], 200)
     end
-    vm(a,b) = sqrt(a^2 - a*b + b^2) - 200
+    vm(a,b) = sqrt(a^2 - a*b + b^2) - stress_y
     f(m,c) = [600*cos(c) 600*sin(c)].*m
     x_vals = []
     max_iter = 100
@@ -229,15 +218,12 @@ function test_von_mises_planestress_basic()
         push!(x_vals, s11)
         push!(y_vals, s22)
     end
-    #=
-    PyPlot.plot(x_vals, y_vals)
-    PyPlot.plot(ee, ss)
-    PyPlot.grid()
-    PyPlot.show()
-    =#
+
+    plot(x_vals, y_vals)
+    plot(ee, ss)
+    show()
 end
 
-# test_von_mises_3D_basic()
+test_von_mises_3D_basic()
 
-#test_von_mises_planestress_basic()
-
+# test_von_mises_planestress_basic()

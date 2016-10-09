@@ -67,6 +67,9 @@ export Problem, AbstractProblem, FieldProblem, BoundaryProblem,
 include("problems_elasticity.jl")
 export Elasticity
 
+include("materials_plasticity.jl")
+export plastic_von_mises
+
 include("problems_dirichlet.jl")
 export Dirichlet
 
