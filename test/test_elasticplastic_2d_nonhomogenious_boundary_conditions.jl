@@ -23,9 +23,13 @@ using JuliaFEM.Testing
     update!(element, "geometry", nodes)
     update!(element, "youngs modulus", 288.0)
     update!(element, "poissons ratio", 1/3)
-    element.dev["plasticity"] = Dict{Any, Any}("stress" => JuliaFEM.ideal_plasticity!,
-                                                "yield_surface" => Val{:von_mises},
-                                               "params" => Dict("yield_stress" => 175.0))
+
+    plastic_parameters = Dict{Any, Any}("type" => JuliaFEM.ideal_plasticity!,
+                                        "yield_surface" => Val{:von_mises},
+                                        "params" => Dict("yield_stress" => 175.0))
+    to_integ_points = Dict()
+    map(x-> to_integ_points[x] = plastic_parameters, get_connectivity(element))
+    update!(element, "plasticity", to_integ_points)
     push!(block, element)
 
     # boundary conditions
@@ -40,6 +44,7 @@ using JuliaFEM.Testing
     push!(bc, bel1, bel2, bel3)
 
     solver = NonlinearSolver("solve block problem")
+    solver.time = 1.0
     push!(solver, block, bc)
     solver()
 
