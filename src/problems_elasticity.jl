@@ -510,7 +510,9 @@ function assemble{El<:Elasticity3DVolumeElements}(problem::Problem{Elasticity}, 
             0.0 0.0 0.0 0.0 0.5-nu 0.0
             0.0 0.0 0.0 0.0 0.0 0.5-nu]
 
-        if "plasticity" in keys(element.dev)
+        element_keys = get_keys(element)
+
+            if "plasticity" in element_keys
             plastic_def = element.dev["plasticity"]
             calculate_stress! = plastic_def["stress"]
             params = plastic_def["params"]
@@ -530,7 +532,6 @@ function assemble{El<:Elasticity3DVolumeElements}(problem::Problem{Elasticity}, 
             Dtan = D
         end
 
-        println(round(stress_vec, 4))
         :strain in props.store_fields && update!(ip, "strain", time => strain_vec)
         :stress in props.store_fields && update!(ip, "stress", time => stress_vec)
         :stress11 in props.store_fields && update!(ip, "stress11", time => stress_vec[1])

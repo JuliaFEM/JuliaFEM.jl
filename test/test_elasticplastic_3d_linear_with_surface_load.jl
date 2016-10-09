@@ -21,10 +21,13 @@ using JuliaFEM.Testing
     update!([element1], "youngs modulus", 200e3)
     update!([element1], "poissons ratio", 0.3)
 
-    element1.dev["plastdicity"] = Dict{Any, Any}("stress" => JuliaFEM.ideal_plasticity!,
-                                                "yield_surface" => Val{:von_mises},
-                                                "params" => Dict("yield_stress" => 500.0))
-
+    plastic_parameters = Dict{Any, Any}("type" => JuliaFEM.ideal_plasticity!,
+                                        "yield_surface" => Val{:von_mises},
+                                        "params" => Dict("yield_stress" => 175.0))
+    to_integ_points = Dict()
+    map(x-> to_integ_points[x] = plastic_parameters, get_connectivity(element))
+    update!(element, "plasticity", to_integ_points)
+    
     elasticity_problem = Problem(Elasticity, "solve continuum block", 3)
     elasticity_problem.properties.finite_strain = false
     elasticity_problem.properties.geometric_stiffness = false
