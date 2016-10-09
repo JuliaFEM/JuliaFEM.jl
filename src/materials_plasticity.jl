@@ -72,7 +72,7 @@ function radial_return(params, dstrain, D, stress_y, stress_base, yield_surface_
     [vec(function_1); function_2]
 end
 
-function ideal_plasticity!(stress_new, stress_last, dstrain_vec, D, params, Dtan, yield_surface_, type_)
+function ideal_plasticity!(stress_new, stress_last, dstrain_vec, D, params, Dtan, yield_surface_, time, dt, type_)
     # Test stress
     dstress = vec(D * dstrain_vec)
     stress_trial = stress_last + dstress
@@ -115,7 +115,5 @@ function ideal_plasticity!(stress_new, stress_last, dstrain_vec, D, params, Dtan
         dfds = dfds_(stress_new)
         Dtan[:,:] = Dc - (Dc * dfds * dfds' * Dc) / (dfds' * Dc * dfds)[1]
 
-        println("equivalent stress")
-        println(equivalent_stress(stress_new, type_))
     end
 end

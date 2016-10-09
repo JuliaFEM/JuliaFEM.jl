@@ -9,15 +9,14 @@ type Element{E<:AbstractElement}
     integration_points :: Vector{IP}
     fields :: Dict{AbstractString, Field}
     properties :: E
-    dev :: Dict{Any, Any}
 end
 
 function Element{E<:AbstractElement}(::Type{E}, id::Int64, connectivity=[])
-    return Element{E}(id, connectivity, [], Dict(), E(), Dict{Any, Any}())
+    return Element{E}(id, connectivity, [], Dict(), E())
 end
 
 function Element{E<:AbstractElement}(::Type{E}, connectivity=[])
-    return Element{E}(-1, connectivity, [], Dict(), E(), Dict{Any, Any}())
+    return Element{E}(-1, connectivity, [], Dict(), E())
 end
 
 function getindex(element::Element, field_name::AbstractString)
