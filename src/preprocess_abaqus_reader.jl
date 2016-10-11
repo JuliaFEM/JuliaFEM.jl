@@ -168,7 +168,11 @@ function parse_section(model, lines, key, idx_start, idx_end, ::Type{Val{:SURFAC
     data = Vector{Tuple{Int64, Symbol}}()
     for line in lines[idx_start + 1: idx_end]
         empty_or_comment_line(line) && continue
-        m = match(r"(?P<element_id>\d+),.+(?P<element_side>S\d+).*", line)
+        m = match(r"(?P<element_id>\d+),.*(?P<element_side>S\d+).*", line)
+        if isa(m, Void)
+            warn("read_abaqus, parsing surface: line $line")
+            continue
+        end
         element_id = parse(Int, m[:element_id])
         element_side = Symbol(m[:element_side])
         push!(data, (element_id, element_side))
