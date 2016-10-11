@@ -71,6 +71,35 @@ typealias Elasticity2DVolumeElements Union{Tri3, Tri6, Quad4, Quad8, Quad9}
 typealias Elasticity3DSurfaceElements Union{Poi1, Tri3, Tri6, Quad4, Quad8, Quad9}
 typealias Elasticity3DVolumeElements Union{Tet4, Wedge6, Hex8, Tet10, Hex20, Hex27}
 
+function initialize_internal_params!(params, ip, ::Type{Val{:type_2d}})
+    param_keys = keys(params)
+    all_keys = ip.fields.keys
+    ip_fields = filter(x->isdefined(all_keys, x), collect(1:length(all_keys)))
+
+    if !("params_initialized" in ip_fields)
+        for key in param_keys
+            update!(ip, key, 0.0 => params[key])
+        end
+        update!(ip, "stress", 0.0 => [0.0,0.0,0.0])
+        update!(ip, "strain", 0.0 => [0.0,0.0,0.0])
+        update!(ip, "prev_time", 0.0 => 0.0)
+        update!(ip, "params_initialized", 0.0 => true)
+    end
+end
+
+function get_keys(element)
+    all_keys = element.fields.keys
+    idx = filter(x->isdefined(all_keys, x), collect(1:length(all_keys)))
+    map(x -> all_keys[x], idx)
+end
+
+function initialize_internal_params!(params, ip_id, ::Type{Val{:type_3d}})
+    if !(ip_id in keys(params))
+        params[ip_id] = Dict{Any, Any}()
+        params[ip_id]["last_stress"] = [0.0,0.0,0.0,0.0,0.0,0.0]
+        params[ip_id]["last_strain"] = [0.0,0.0,0.0,0.0,0.0,0.0]
+    end
+end
 
 """ Elasticity equations for 2d cases. """
 function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, element::Element{El}, time, ::Type{Val{:plane}})
@@ -83,6 +112,7 @@ function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, 
     Km = zeros(dim*nnodes, dim*nnodes)
     Kg = zeros(dim*nnodes, dim*nnodes)
     f = zeros(dim*nnodes)
+    Dtan = zeros(3,3)
 
     for ip in get_integration_points(element)
 
@@ -90,7 +120,6 @@ function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, 
         w = ip.weight*detJ
         N = element(ip, time)
         dN = element(ip, time, Val{:Grad})
-
         # kinematics
 
         gradu = element("displacement", ip, time, Val{:Grad})
@@ -129,15 +158,45 @@ function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, 
                 nu  1.0 0.0
                 0.0 0.0 (1.0-nu)/2.0]
         elseif props.formulation == :plane_strain
-            D = E/((1+nu)*(1-2*nu)) .* [
-                1-nu   nu 0
-                nu   1-nu 0
-                0    0    (1-2*nu)/2]
+            D = E/((1.0+nu)*(1.0-2.0*nu)) .* [
+                1.0-nu      nu               0.0
+                    nu  1.0-nu               0.0
+                   0.0     0.0  (1.0-2.0*nu)/2.0]
         else
             error("unknown plane formulation: $(props.formulation)")
         end
+
         # calculate stress
-        stress_vec = D * ([1.0, 1.0, 2.0] .* strain_vec)
+        element_keys = get_keys(element)
+
+        if "plasticity" in element_keys
+            plastic_def = element("plasticity")[ip.id]
+
+            calculate_stress! = plastic_def["type"]
+            yield_surface_ = plastic_def["yield_surface"]
+            params = plastic_def["params"]
+
+            initialize_internal_params!(params, ip, Val{:type_2d})
+
+            if time == 0.0
+                error("Given step time = $(time). Please select time > 0.0")
+            end
+
+            t_last = ip("prev_time", time)
+            update!(ip, "prev_time", time => t_last)
+
+            dt = time - t_last
+
+            stress_last = ip("stress", t_last)
+            strain_last = ip("strain", t_last)
+
+            dstrain_vec = strain_vec - strain_last
+            stress_vec = [0.0, 0.0, 0.0]
+            calculate_stress!(stress_vec, stress_last, dstrain_vec, D, params, Dtan, yield_surface_, time, dt, Val{:type_2d})
+        else
+            stress_vec = D * ([1.0, 1.0, 2.0] .* strain_vec)
+            Dtan[:,:] = D[:,:]
+        end
 
         :strain in props.store_fields && update!(ip, "strain", time => strain_vec)
         :stress in props.store_fields && update!(ip, "stress", time => stress_vec)
@@ -145,7 +204,8 @@ function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, 
         :stress22 in props.store_fields && update!(ip, "stress22", time => stress_vec[2])
         :stress12 in props.store_fields && update!(ip, "stress12", time => stress_vec[3])
 
-        Km += w*BL'*D*BL
+        Km += w*BL'*Dtan*BL
+
 
         # stress = [stress_vec[1] stress_vec[3]; stress_vec[3] stress_vec[2]]
         # cauchy_stress = F'*stress*F/det(F)
@@ -383,7 +443,6 @@ end
 
 """ Elasticity equations, 3d nonlinear. """
 function assemble{El<:Elasticity3DVolumeElements}(problem::Problem{Elasticity}, element::Element{El}, time::Real, ::Type{Val{:continuum}})
-
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
     nnodes = length(element)
@@ -450,7 +509,28 @@ function assemble{El<:Elasticity3DVolumeElements}(problem::Problem{Elasticity}, 
             0.0 0.0 0.0 0.5-nu 0.0 0.0
             0.0 0.0 0.0 0.0 0.5-nu 0.0
             0.0 0.0 0.0 0.0 0.0 0.5-nu]
-        stress_vec = D * ([1.0, 1.0, 1.0, 2.0, 2.0, 2.0].*strain_vec)
+
+        element_keys = get_keys(element)
+
+            if "plasticity" in element_keys
+            plastic_def = element.dev["plasticity"]
+            calculate_stress! = plastic_def["stress"]
+            params = plastic_def["params"]
+            yield_surface_ = plastic_def["yield_surface"]
+            (stress_last, strain_last) = get_internal_params(element.dev, ip.id, Val{:type_3d})
+            dstrain_vec = strain_vec - strain_last
+            stress_vec = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            Dtan = [0.0 0.0 0.0 0.0 0.0 0.0;
+                    0.0 0.0 0.0 0.0 0.0 0.0;
+                    0.0 0.0 0.0 0.0 0.0 0.0
+                    0.0 0.0 0.0 0.0 0.0 0.0;
+                    0.0 0.0 0.0 0.0 0.0 0.0;
+                    0.0 0.0 0.0 0.0 0.0 0.0]
+            calculate_stress!(stress_vec, stress_last, dstrain_vec, D, params, Dtan, yield_surface_, Val{:type_3d})
+        else
+            stress_vec = D * ([1.0, 1.0, 1.0, 2.0, 2.0, 2.0].*strain_vec)
+            Dtan = D
+        end
 
         :strain in props.store_fields && update!(ip, "strain", time => strain_vec)
         :stress in props.store_fields && update!(ip, "stress", time => stress_vec)
@@ -461,8 +541,7 @@ function assemble{El<:Elasticity3DVolumeElements}(problem::Problem{Elasticity}, 
         :stress23 in props.store_fields && update!(ip, "stress23", time => stress_vec[5])
         :stress13 in props.store_fields && update!(ip, "stress13", time => stress_vec[6])
 
-        Km += w*BL'*D*BL
-
+        Km += w*BL'*Dtan*BL
         # material stiffness end
 
         if props.geometric_stiffness
