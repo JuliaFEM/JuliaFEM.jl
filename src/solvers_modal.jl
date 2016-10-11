@@ -54,52 +54,24 @@ function call(solver::Solver{Modal}; show_info=true, debug=false, bc_invertible=
 
     tic()
 
-    if bc_invertible
-        P, h = create_projection(C1, g, Val{:invertible})
+    nboundary_problems = length(get_boundary_problems(solver))
+
+    if nboundary_problems != 0
+        if bc_invertible
+            P, h = create_projection(C1, g, Val{:invertible})
+        else
+            P, h = create_projection(C1, g)
+        end
     else
-        P, h = create_projection(C1, g)
+        P = speye(size(K, 1))
     end
+
     K_red = P'*K*P
     M_red = P'*M*P
+
     # make sure matrices are symmetric
     K_red = 1/2*(K_red + K_red')
     M_red = 1/2*(M_red + M_red')
-
-#=
-    ndim = size(C1,1)
-    nz = get_nonzero_rows(C1)
-    nz = setdiff(collect(1:ndim), nz)
-    g = zeros(ndim)
-    P = spzeros(ndim, ndim)
-    for j in nz
-        P[j,j] = 1.0
-    end
-    K_red = P'*K*P
-    M_red = P'*M*P
-    # make sure matrices are symmetric
-    K_red = 1/2*(K_red + K_red')
-    M_red = 1/2*(M_red + M_red')
-
-    #=
-    K_red = K[nz,nz]
-    M_red = M[nz,nz]
-    # make sure matrices are symmetric
-    K_red = 1/2*(K_red + K_red')
-    M_red = 1/2*(M_red + M_red')
-    =#
-
-    #=
-    K_red = copy(K)
-    M_red = copy(M)
-    for j=1:size(K_red)
-        j in nz && continue
-        K_red[j,:] = 0.0
-        K_red[:,j] = 0.0
-        M_red[j,:] = 0.0
-        M_red[:,j] = 0.0
-    end
-    =#
-=#
 
     t1 = round(toq(), 2)
     info("Eliminated dirichlet boundaries in $t1 seconds.")
