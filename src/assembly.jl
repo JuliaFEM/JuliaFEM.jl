@@ -83,6 +83,7 @@ function assemble!(problem::Problem, time=0.0; auto_initialize=true)
     if method_exists(assemble_posthook!, Tuple{typeof(problem), Float64})
         assemble_posthook!(problem, time)
     end
+    return true
 end
 
 function assemble!(problem::Problem, time::Real, ::Type{Val{:mass_matrix}}; density=0.0, dual_basis=false, dim=0)
