@@ -57,6 +57,9 @@ function call(solver::Solver{Modal}; show_info=true, debug=false,
 
     if !(P == nothing)
         info("using custom P")
+        info("size of P = ", size(P))
+        info("size of K = ", size(K))
+        info("size of M = ", size(M))
         K_red = P'*K*P
         M_red = P'*M*P
     elseif nboundary_problems != 0
@@ -141,7 +144,6 @@ function call(solver::Solver{Modal}; show_info=true, debug=false,
     end
     t1 = round(toq(), 2)
 
-#=    
     for i=1:length(om2)
         freq = real(sqrt(om2[i])/(2.0*pi))
         u = props.eigvecs[:,i]
@@ -159,7 +161,8 @@ function call(solver::Solver{Modal}; show_info=true, debug=false,
             end
         end
     end
-=#
+
+    update_xdmf!(solver)
 
     return true
 end
@@ -168,90 +171,90 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
     xdmf = get(solver.xdmf)
     temporal_collection = get_temporal_collection(xdmf)
 
-    frame = new_element("Grid")
-    new_child(frame, "Time", Dict("Value" => solver.time))
+    om2 = solver.properties.eigvals
+    freqs = real(sqrt(om2))/(2.0*pi)
 
-    # save geometry
-    X = solver("geometry", solver.time)
-    node_ids = sort(collect(keys(X)))
-    geometry = hcat([X[nid] for nid in node_ids]...)
-    ndim, nnodes = size(geometry)
-    geom_type = ndim == 2 ? "XY" : "XYZ"
-    dataitem = new_dataitem(xdmf, "/Node IDs", node_ids)
-    geom = new_child(frame, "Geometry", Dict("Type" => geom_type))
-    dataitem = new_dataitem(xdmf, "/Geometry", geometry)
-    add_child(geom, dataitem)
+    for (j, freq) in enumerate(freqs)
+        info("Saving frequency $(round(freq, 3))")
 
-    # save topology
-    all_elements = get_all_elements(solver)
-    nelements = length(all_elements)
-    element_types = unique(map(get_element_type, all_elements))
+        frame = new_element("Grid")
+        new_child(frame, "Time", Dict("Value" => freq))
 
-    xdmf_element_mapping = Dict(
-        "Seg2" => "Polyline",
-        "Tri3" => "Triangle",
-        "Quad4" => "Quadrilateral",
-        "Tet4" => "Tetrahedron",
-        "Pyramid5" => "Pyramid",
-        "Wedge6" => "Wedge",
-        "Hex8" => "Hexahedron",
-        "Seg3" => "Edge_3",
-        "Tri6" => "Tri_6",
-        "Quad8" => "Quad_8",
-        "Tet10" => "Tet_10",
-        "Pyramid13" => "Pyramid_13",
-        "Wedge15" => "Wedge_15",
-        "Hex20" => "Hex_20")
+        # create dataitem for geometry
+        X = solver("geometry", freq)
+        node_ids = sort(collect(keys(X)))
+        geometry = hcat([X[nid] for nid in node_ids]...)
+        ndim, nnodes = size(geometry)
+        geom_type = ndim == 2 ? "XY" : "XYZ"
+        dataitem = new_dataitem(xdmf, "/Node IDs", node_ids)
+        dataitem = new_dataitem(xdmf, "/Geometry", geometry)
+        geom = new_child(frame, "Geometry", Dict("Type" => geom_type))
+        add_child(geom, dataitem)
 
-    for element_type in element_types
-        elements = filter_by_element_type(element_type, all_elements)
-        sort!(elements, by=get_element_id)
-        element_ids = map(get_element_id, elements)
-        element_conn = map(get_connectivity, elements)
-        element_conn = transpose(hcat(element_conn...)) - 1
-        element_code = split(string(element_type), ".")[end]
-        dataitem = new_dataitem(xdmf, "/Topology/$element_code/Element IDs", element_ids)
-        dataitem = new_dataitem(xdmf, "/Topology/$element_code/Connectivity", element_conn)
-        topology = new_child(frame, "Topology")
-        set_attribute(topology, "TopologyType", xdmf_element_mapping[element_code])
-        set_attribute(topology, "NumberOfElements", length(elements))
-        add_child(topology, dataitem)
-    end
+        # create dataitem for topology
+        all_elements = get_all_elements(solver)
+        nelements = length(all_elements)
+        element_types = unique(map(get_element_type, all_elements))
 
-    # save solved fields
-    unknown_field_name = get_unknown_field_name(solver)
-    U = solver(unknown_field_name, solver.time)
-    node_ids2 = sort(collect(keys(U)))
+        xdmf_element_mapping = Dict(
+            "Seg2" => "Polyline",
+            "Tri3" => "Triangle",
+            "Quad4" => "Quadrilateral",
+            "Tet4" => "Tetrahedron",
+            "Pyramid5" => "Pyramid",
+            "Wedge6" => "Wedge",
+            "Hex8" => "Hexahedron",
+            "Seg3" => "Edge_3",
+            "Tri6" => "Tri_6",
+            "Quad8" => "Quad_8",
+            "Tet10" => "Tet_10",
+            "Pyramid13" => "Pyramid_13",
+            "Wedge15" => "Wedge_15",
+            "Hex20" => "Hex_20")
 
-    @assert node_ids == node_ids2
-    ndim = length(U[first(node_ids)])
-    field_type = ndim == 1 ? "Scalar" : "Vector"
-    field_center = "Node"
-    if ndim == 2
-        for nid in node_ids
-            U[nid] = [U[nid]; 0.0]
+        for element_type in element_types
+            elements = filter_by_element_type(element_type, all_elements)
+            sort!(elements, by=get_element_id)
+            element_ids = map(get_element_id, elements)
+            element_conn = map(get_connectivity, elements)
+            element_conn = transpose(hcat(element_conn...)) - 1
+            element_code = split(string(element_type), ".")[end]
+            dataitem = new_dataitem(xdmf, "/Topology/$element_code/Element IDs", element_ids)
+            dataitem = new_dataitem(xdmf, "/Topology/$element_code/Connectivity", element_conn)
+            topology = new_child(frame, "Topology")
+            set_attribute(topology, "TopologyType", xdmf_element_mapping[element_code])
+            set_attribute(topology, "NumberOfElements", length(elements))
+            add_child(topology, dataitem)
         end
-        ndim = 3
-    end
-    U = hcat([U[nid] for nid in node_ids]...)
-    unknown_field_name = ucfirst(unknown_field_name)
-    time = solver.time
-    path = ""
-    if S == Nonlinear
-        iteration = solver.properties.iteration
-        path = "/Results/Time $time/Iteration $iteration/Nodal Fields/$unknown_field_name"
-    elseif S == Linear
-        path = "/Results/Time $time/Nodal Fields/$unknown_field_name"
-    end
-    dataitem = new_dataitem(xdmf, path, U)
-    attribute = new_child(frame, "Attribute")
-    set_attribute(attribute, "Name", unknown_field_name)
-    set_attribute(attribute, "Center", field_center)
-    set_attribute(attribute, "AttributeType", field_type)
-    add_child(attribute, dataitem)
-    if (S == Linear) || ((S == Nonlinear) && has_converged(solver))
+
+        # save solved fields
+        unknown_field_name = get_unknown_field_name(solver)
+        U = solver(unknown_field_name, freq)
+        node_ids2 = sort(collect(keys(U)))
+
+        @assert node_ids == node_ids2
+        ndim = length(U[first(node_ids)])
+        field_type = ndim == 1 ? "Scalar" : "Vector"
+        field_center = "Node"
+        if ndim == 2
+            for nid in node_ids
+                U[nid] = [U[nid]; 0.0]
+            end
+            ndim = 3
+        end
+        U = hcat([U[nid] for nid in node_ids]...)
+        unknown_field_name = ucfirst(unknown_field_name)
+        path = "/Results/Frequency $freq/Nodal Fields/$unknown_field_name"
+        dataitem = new_dataitem(xdmf, path, U)
+        attribute = new_child(frame, "Attribute")
+        set_attribute(attribute, "Name", unknown_field_name)
+        set_attribute(attribute, "Center", field_center)
+        set_attribute(attribute, "AttributeType", field_type)
+        add_child(attribute, dataitem)
         add_child(temporal_collection, frame)
     end
+
+    info("Saving Xdmf")
     save!(xdmf)
 end
 
