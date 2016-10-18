@@ -161,7 +161,7 @@ end
 function new_dataitem{T,N}(xdmf::Xdmf, path::AbstractString, data::Array{T,N}; format="HDF")
     dataitem = new_element("DataItem")
     datatype = replace("$T", "64", "")
-    dimensions = join(size(data), " ")
+    dimensions = join(reverse(size(data)), " ")
     set_attribute(dataitem, "DataType", datatype)
     set_attribute(dataitem, "Dimensions", dimensions)
     set_attribute(dataitem, "Format", format)
