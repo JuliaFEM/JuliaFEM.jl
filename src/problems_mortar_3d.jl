@@ -299,6 +299,25 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
                 update!(virtual_element, "geometry", cell)
                 #x_cell = Field(cell)
 
+                # construct bi-orthogonal basis
+                nnodes = length(slave_element)
+                if props.dual_basis
+                    De = zeros(nnodes, nnodes)
+                    Me = zeros(nnodes, nnodes)
+                    for ip in get_integration_points(virtual_element, 3)
+                        x_gauss = virtual_element("geometry", ip, time)
+                        xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
+                        detJ = virtual_element(ip, time, Val{:detJ})
+                        w = ip.weight*detJ
+                        N1 = vec(get_basis(slave_element, xi_s, time))
+                        De += w*diagm(vec(N1))
+                        Me += w*N1*N1'
+                    end
+                    Ae = De*inv(Me)
+                else
+                    Ae = eye(nnodes)
+                end
+
                 # 5. loop integration point of integration cell
                 for ip in get_integration_points(virtual_element, 3)
                     N = vec(get_basis(virtual_element, ip, time))
@@ -328,14 +347,15 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
                     # add contributions
                     N1 = vec(get_basis(slave_element, xi_s, time))
                     N2 = vec(get_basis(master_element, xi_m, time))
-                    De += w*N1*N1'
-                    Me += w*N1*N2'
+                    Phi = Ae*N1
+                    De += w*Phi*N1'
+                    Me += w*Phi*N2'
                     if props.adjust
                         u1 = slave_element("displacement", time)
                         u2 = master_element("displacement", time)
                         x_s = N1*(X1+u1)
                         x_m = N2*(X2+u2)
-                        ge += w*vec((x_m-x_s)*N1')
+                        ge += w*vec((x_m-x_s)*Phi')
                     end
                     area += w
                 end # integration points done
