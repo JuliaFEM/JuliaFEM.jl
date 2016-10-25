@@ -503,6 +503,11 @@ function get_child_element(element_type::Symbol, element_side::Symbol,
             :S2 => (:Tri3, [1, 4, 2]),
             :S3 => (:Tri3, [2, 4, 3]),
             :S4 => (:Tri3, [3, 4, 1])),
+        :Tet10 => Dict(
+            :S1 => (:Tri6, [1, 5, 2, 6, 3, 7]),
+            :S2 => (:Tri6, [1, 8, 4, 9, 2, 5]),
+            :S3 => (:Tri6, [2, 9, 4, 10, 3, 6]),
+            :S4 => (:Tri6, [3, 10, 4, 8, 1, 7])),
         :Hex8 => Dict(
             :P1 => (:Quad4, [1, 2, 3, 4]),
             :P2 => (:Quad4, [5, 8, 7, 6]),

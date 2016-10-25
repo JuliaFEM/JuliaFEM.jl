@@ -44,7 +44,7 @@ function parse_section(model, lines, key::Symbol, idx_start,
     definition = lines[idx_start]
     for line in lines[idx_start + 1: idx_end]
         if !(empty_or_comment_line(line))
-            m = matchall(r"[-0-9.]+", line)
+            m = matchall(r"[-0-9.eE]+", line)
             node_id = parse(Int, m[1])
             coords = float(m[2:end])
             model["nodes"][node_id] = coords
