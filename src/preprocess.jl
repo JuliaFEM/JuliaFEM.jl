@@ -132,6 +132,29 @@ function create_elements(mesh::Mesh, element_sets::AbstractString...; element_ty
     return create_elements(mesh, element_sets...; element_type=element_type)
 end
 
+""" 
+This function gerates surface elements from solid elements
+
+slave = create_surface_elements(mesh, :slave_surf) 
+master = create_surface_elements(mesh, :master_surf) 
+"""
+function create_surface_elements(mesh::Mesh, surface_name::Symbol)
+   elements = []
+   for (parent_element_id, parent_element_side) in mesh.surfaces[surface_name]
+       parent_element_type = mesh.element_types[parent_element_id]
+       parent_element_connectivity = mesh.elements[parent_element_id]
+
+       child_element_type, child_element_lconn, child_element_connectivity =
+           get_child_element(parent_element_type, parent_element_side,
+           parent_element_connectivity)
+
+       child_element = Element(JuliaFEM.(child_element_type), child_element_connectivity)
+       push!(elements, child_element)
+   end
+   update!(elements, "geometry", mesh.nodes)
+   return elements
+end
+
 """ find npts nearest nodes from mesh and return id numbers as list. """
 function find_nearest_nodes(mesh::Mesh, coords::Vector, npts=1)
     dist = Dict{Int64, Float64}()
