@@ -119,7 +119,7 @@ module Preprocess
 include("preprocess.jl")
 export create_elements, Mesh, add_node!, add_nodes!, add_element!,
        add_elements!, add_element_to_element_set!, add_node_to_node_set!,
-       find_nearest_nodes, reorder_element_connectivity!, create_surface_elements
+       find_nearest_nodes, reorder_element_connectivity!
 include("preprocess_abaqus_reader.jl")
 export parse_abaqus, parse_section, parse_element_section,
        abaqus_read_mesh, abaqus_read_model
@@ -156,7 +156,7 @@ export Postprocessor
 
 module Abaqus
 include("abaqus.jl")
-export abaqus_read_model, abaqus_run_model, abaqus_open_results
+export abaqus_read_model, abaqus_run_model, abaqus_open_results, create_surface_elements
 end
 
 end #

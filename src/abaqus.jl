@@ -733,3 +733,27 @@ function abaqus_run_model(name; fetch=false, verbose=false)
     return status
 end
 
+
+""" 
+This function gerates surface elements from solid elements
+
+slave = create_surface_elements(mesh, :slave_surf) 
+master = create_surface_elements(mesh, :master_surf) 
+"""
+function create_surface_elements(mesh::Mesh, surface_name::Symbol)
+   elements = []
+   for (parent_element_id, parent_element_side) in mesh.surfaces[surface_name]
+       parent_element_type = mesh.element_types[parent_element_id]
+       parent_element_connectivity = mesh.elements[parent_element_id]
+
+       child_element_type, child_element_lconn, child_element_connectivity =
+           get_child_element(parent_element_type, parent_element_side,
+           parent_element_connectivity)
+
+       child_element = Element(JuliaFEM.(child_element_type), child_element_connectivity)
+       push!(elements, child_element)
+   end
+   update!(elements, "geometry", mesh.nodes)
+   return elements
+end
+

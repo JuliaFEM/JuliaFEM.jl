@@ -3,6 +3,7 @@
 
 using JuliaFEM
 using JuliaFEM.Preprocess
+using JuliaFEM.Abaqus
 using JuliaFEM.Testing
 
 @testset "read inp file" begin
@@ -51,4 +52,6 @@ end
     @test mesh.surfaces[:LOAD][1] == (16, :S1)
     @test mesh.surface_types[:LOAD] == :ELEMENT
     @test length(Set(map(size, values(mesh.nodes)))) == 1
+    elements = create_surface_elements(mesh,:LOAD)
+    @test get_connectivity(elements[1]) == [8,9,10]
 end
