@@ -49,4 +49,5 @@ end
     @test length(mesh.surfaces[:LOAD]) == 2
     @test mesh.surfaces[:LOAD][1] == (16, :S1)
     @test mesh.surface_types[:LOAD] == :ELEMENT
+    @test length(Set(map(size, values(mesh.nodes)))) == 1
 end
