@@ -161,10 +161,11 @@ function parse_section(model, lines, key, idx_start, idx_end, ::Type{Val{:SURFAC
     info("Parsing surface")
     #definition = uppercase(lines[idx_start])
     definition = lines[idx_start]
-    has_set_def = match(r"TYPE=([\w\_\-]+),.*NAME=([\w\_\-]+)", definition) 
+    #has_set_def = match(r"TYPE=([\w\_\-]+),.*NAME=([\w\_\-]+)", definition) 
+    has_set_def = Dict(map(y -> lowercase(y[1]) => y[2], map(x -> split(x, "="), matchall(r"([\w\_\-]+[ ]*=[ ]*[\w\_\-]+)", definition)))) 
     has_set_def != nothing || return
-    set_type = Symbol(has_set_def[1])
-    set_name = Symbol(has_set_def[2])
+    set_type = Symbol(has_set_def["type"])
+    set_name = Symbol(has_set_def["name"])
     data = Vector{Tuple{Int64, Symbol}}()
     for line in lines[idx_start + 1: idx_end]
         empty_or_comment_line(line) && continue

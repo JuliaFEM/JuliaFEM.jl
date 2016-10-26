@@ -46,6 +46,7 @@ end
     @test haskey(mesh.node_sets, :SYM12)
     @test haskey(mesh.element_sets, :CUBE)
     @test haskey(mesh.surfaces, :LOAD)
+    @test haskey(mesh.surfaces, :ORDER)
     @test length(mesh.surfaces[:LOAD]) == 2
     @test mesh.surfaces[:LOAD][1] == (16, :S1)
     @test mesh.surface_types[:LOAD] == :ELEMENT
