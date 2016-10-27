@@ -82,6 +82,16 @@ function assemble!(problem::Problem, element::Element, time=0.0)
     assemble!(problem.assembly, problem, element, time)
 end
 
+### Mortar methods ###
+include("problems_mortar.jl")
+include("problems_mortar_2d.jl")
+include("problems_mortar_3d.jl")
+include("problems_mortar_2d_autodiff.jl")
+export calculate_normals, calculate_normals!, project_from_slave_to_master,
+       project_from_master_to_slave, Mortar, get_slave_elements,
+       get_polygon_clip
+
+
 ### ASSEMBLY + SOLVE ###
 include("assembly.jl")
 include("solvers_utils.jl")
@@ -97,15 +107,6 @@ export Modal
 
 include("optics.jl")
 export find_intersection, calc_reflection, calc_normal
-
-### Mortar methods ###
-include("problems_mortar.jl")
-include("problems_mortar_2d.jl")
-include("problems_mortar_3d.jl")
-include("problems_mortar_2d_autodiff.jl")
-export calculate_normals, calculate_normals!, project_from_slave_to_master,
-       project_from_master_to_slave, Mortar, get_slave_elements,
-       get_polygon_clip
 
 ### Mortar methods, contact mechanics extension ###
 include("problems_contact.jl")
