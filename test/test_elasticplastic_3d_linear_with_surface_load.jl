@@ -16,22 +16,23 @@ using JuliaFEM.Testing
     7 => [1.0, 1.0, 1.0],
     8 => [0.0, 1.0, 1.0])
 
-    element1 = Element(Hex8, [1, 2, 3, 4, 5, 6, 7, 8])
-    update!([element1], "geometry", nodes)
-    update!([element1], "youngs modulus", 200e3)
-    update!([element1], "poissons ratio", 0.3)
+    element = Element(Hex8, [1, 2, 3, 4, 5, 6, 7, 8])
+    update!([element], "geometry", nodes)
+    update!([element], "youngs modulus", 200e3)
+    update!([element], "poissons ratio", 1/3)
 
     plastic_parameters = Dict{Any, Any}("type" => JuliaFEM.ideal_plasticity!,
                                         "yield_surface" => Val{:von_mises},
-                                        "params" => Dict("yield_stress" => 175.0))
+                                        "params" => Dict("yield_stress" => 400.0))
     to_integ_points = Dict()
     map(x-> to_integ_points[x] = plastic_parameters, get_connectivity(element))
     update!(element, "plasticity", to_integ_points)
-    
+
     elasticity_problem = Problem(Elasticity, "solve continuum block", 3)
     elasticity_problem.properties.finite_strain = false
     elasticity_problem.properties.geometric_stiffness = false
-    push!(elasticity_problem, element1)
+    push!(elasticity_problem.properties.store_fields, :plastic_strain)
+    push!(elasticity_problem, element)
 
     bc = Element(Quad4, [1,4,8,5])
     update!([bc], "geometry", nodes)
@@ -48,12 +49,13 @@ using JuliaFEM.Testing
     push!(boundary_motion, disp)
 
     solver = NonlinearSolver("solve block problem")
+    solver.time = 1.0
     push!(solver, elasticity_problem)
     push!(solver, boundary_problem)
     push!(solver, boundary_motion)
     solver()
 
-    disp = element1("displacement", [1.0, 1.0, 1.0], 0.0)
+    disp = element("displacement", [1.0, 1.0, 1.0], 1.0)
     info("displacement at tip: $disp")
     u_expected = 2.0 * [-1/3, -1/3, 1.0]
     # @test isapprox(disp, u_expected)
