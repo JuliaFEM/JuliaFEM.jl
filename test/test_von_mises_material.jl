@@ -64,17 +64,17 @@ function test_von_mises_3D_basic()
     stress_last = zeros(Float64, 6)
     strain = zeros(Float64, 6)
     Dtan = zeros(6,6)
-    for i=1:steps
-        strain_new = reshape(strain_tot[i, :, :], (6, 1))
-        dstrain = strain_new - strain
-        JuliaFEM.plastic_von_mises!(stress_new, stress_last, dstrain, C, params, Dtan, Val{:type_3d})
-        strain[:] = vec(strain_new)[:]
-        push!(ss, stress[1])
-        push!(ee, strain[1])
-        fill_tensor(eig_stress, stress_new)
-        eig_vals[i, :] = sort(eigvals(eig_stress))
-        stress_last[:] = stress_new[:]
-    end
+    #for i=1:steps
+    #    strain_new = reshape(strain_tot[i, :, :], (6, 1))
+    #    dstrain = strain_new - strain
+    #    JuliaFEM.plastic_von_mises!(stress_new, stress_last, dstrain, C, params, Dtan, Val{:type_3d})
+    #    strain[:] = vec(strain_new)[:]
+    #    push!(ss, stress[1])
+    #    push!(ee, strain[1])
+    #    fill_tensor(eig_stress, stress_new)
+    #    eig_vals[i, :] = sort(eigvals(eig_stress))
+    #    stress_last[:] = stress_new[:]
+    #end
 
     toc()
     # ================ Plotting =================== #
@@ -117,6 +117,66 @@ function test_von_mises_3D_basic()
 
     info("Calculation finished")
     # plot3D(ee, ss)
+
+
+    # plot the surface
+    xx = zeros(10, 10)
+    yy = zeros(10, 10)
+
+    for i=1:10
+        for j=1:10
+            xx[i, j] = (i - 5) * 100
+            yy[i, j] = (j - 5) * 100
+        end
+    end
+
+    # calculate corresponding z
+    z = zeros(10, 10)
+    for i=1:10
+        for j=1:10
+            z[i, j] = 1
+        end
+    end
+
+    # ==================================================================
+    # plot the surface
+    plot_surface(xx, yy, z, color="blue")
+
+    stress_y =  200.0
+
+    function vm_upper(a, c)
+        vals = f(a[1], a[2], c)
+        vm(vals[1], vals[2], 200)
+    end
+    vm(a,b) = sqrt(a^2 - a*b + b^2) - stress_y
+    f(m,c) = [600*cos(c) 600*sin(c)].*m
+    x_vals = []
+    max_iter = 100
+    y_vals = []
+    for i=0:0.1:(2*pi+0.3)
+        wf(x) = f(x, i)
+        t = 0.01
+        step = 2
+        merkki = -1
+        s11, s22 = wf(t)
+        ii = 0
+        while (abs(vm(s11, s22)) > 1e-7) && ii < max_iter
+            val = vm(s11, s22)
+            if sign(val) != merkki
+                merkki *= -1
+                step *= -0.5
+            end
+            t += step
+            s11, s22 = wf(t)
+            ii += 1
+        end
+        push!(x_vals, s11)
+        push!(y_vals, s22)
+    end
+    plot(x_vals, y_vals, zeros(length(y_vals)), color="yellow")
+    axis("equal")
+    # ==================================================================
+
 
     plot3D(eig_vals[:, 1], eig_vals[:, 2], eig_vals[:, 3], color="red")
     PyPlot.title("Stress path and von Mises yield surface")
