@@ -205,7 +205,7 @@ function get_integration_points(element::TetrahedralElement, ::Type{Val{4}})
     w2 = (2665.0 - 14.0*sqrt(15.0))/226800.0
     w3 = (2665.0 + 14.0*sqrt(15.0))/226800.0
     w4 = 5.0/567.0
-    weights = [w1, w2, w2, w2, w2, w3, w3, w3, w3, w4, w4, w4, w4, w4]
+    weights = [w1, w2, w2, w2, w2, w3, w3, w3, w3, w4, w4, w4, w4, w4, w4]
     points = Vector{Float64}[
         [a, a, a],
         [b1, b1, b1],
