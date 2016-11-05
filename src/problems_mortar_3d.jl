@@ -365,6 +365,9 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
             # 6. add contribution to contact virtual work
             sdofs = get_gdofs(problem, slave_element)
             mdofs = get_gdofs(problem, master_element)
+            if problem.properties.dual_basis
+                De[abs(De) .< 1.0e-11] = 0
+            end
             
             for i=1:field_dim
                 lsdofs = sdofs[i:field_dim:end]
