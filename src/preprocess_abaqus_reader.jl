@@ -162,8 +162,9 @@ function parse_section(model, lines, key, idx_start, idx_end, ::Type{Val{:SURFAC
     #definition = uppercase(lines[idx_start])
     definition = lines[idx_start]
     #has_set_def = match(r"TYPE=([\w\_\-]+),.*NAME=([\w\_\-]+)", definition) 
-    has_set_def = Dict(map(y -> lowercase(y[1]) => y[2], map(x -> split(x, "="), matchall(r"([\w\_\-]+[ ]*=[ ]*[\w\_\-]+)", definition)))) 
+    has_set_def = Dict(map(y -> lowercase(strip(y[1])) => strip(y[2]), map(x -> split(x, "="), matchall(r"([\w\_\-]+[ ]*=[ ]*[\w\_\-]+)", definition)))) 
     has_set_def != nothing || return
+    info(has_set_def)
     set_type = Symbol(has_set_def["type"])
     set_name = Symbol(has_set_def["name"])
     data = Vector{Tuple{Int64, Symbol}}()
