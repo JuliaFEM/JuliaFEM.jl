@@ -24,15 +24,15 @@ function Modal(nev=10, which=:SM)
 end
 
 """ Eliminate Dirichlet boundary condition from matrices K, M. """
-function eliminate_boundary_conditions!(K_red, M_red, problem::Problem{Dirichlet})
-    K = sparse(problem.assembly.K)
-    C1 = sparse(problem.assembly.C1)
-    C2 = sparse(problem.assembly.C2)
-    D = sparse(problem.assembly.D)
-    f = sparse(problem.assembly.f)
-    g = sparse(problem.assembly.g)
-    Kg = sparse(problem.assembly.Kg)
-    fg = sparse(problem.assembly.fg)
+function eliminate_boundary_conditions!(K_red, M_red, problem::Problem{Dirichlet}, ndim::Int)
+    K = sparse(problem.assembly.K, ndim, ndim)
+    C1 = sparse(problem.assembly.C1, ndim, ndim)
+    C2 = sparse(problem.assembly.C2, ndim, ndim)
+    D = sparse(problem.assembly.D, ndim, ndim)
+    f = sparse(problem.assembly.f, ndim, 1)
+    g = sparse(problem.assembly.g, ndim, 1)
+    Kg = sparse(problem.assembly.Kg, ndim, ndim)
+    fg = sparse(problem.assembly.fg, ndim, ndim)
     # only homogenenous boundary condition u=0 is implemented at the moment.
     @assert nnz(K) == 0
     @assert nnz(D) == 0
@@ -43,7 +43,7 @@ function eliminate_boundary_conditions!(K_red, M_red, problem::Problem{Dirichlet
     @assert C1 == C2
     @assert isdiag(C1)
     nz = get_nonzero_rows(C1)
-    info("bc $(problem.name): $(length(nz)) nonzeros")
+    info("bc $(problem.name): $(length(nz)) nonzeros, $nz")
     K_red[nz,:] = 0.0
     K_red[:,nz] = 0.0
     M_red[nz,:] = 0.0
@@ -51,10 +51,10 @@ function eliminate_boundary_conditions!(K_red, M_red, problem::Problem{Dirichlet
 end
 
 """ Given data vector, return slave displacements. """
-function calc_projection(problem::Problem{Mortar})
+function calc_projection(problem::Problem{Mortar}, ndim::Int)
 
-    C1 = sparse(problem.assembly.C1)
-    C2 = sparse(problem.assembly.C2)
+    C1 = sparse(problem.assembly.C1, ndim, ndim)
+    C2 = sparse(problem.assembly.C2, ndim, ndim)
 
     @assert nnz(sparse(problem.assembly.K)) == 0
     @assert nnz(sparse(problem.assembly.D)) == 0
@@ -111,10 +111,10 @@ end
 """ Eliminate mesh tie constraints from matrices K, M. """
 function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
                                         M_red::SparseMatrixCSC,
-                                        problem::Problem{Mortar})
+                                        problem::Problem{Mortar}, ndim::Int)
 
-    C1 = sparse(problem.assembly.C1)
-    C2 = sparse(problem.assembly.C2)
+    C1 = sparse(problem.assembly.C1, ndim, ndim)
+    C2 = sparse(problem.assembly.C2, ndim, ndim)
 
     @assert nnz(sparse(problem.assembly.K)) == 0
     @assert nnz(sparse(problem.assembly.D)) == 0
@@ -184,8 +184,9 @@ function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
 end
 
 function call(solver::Solver{Modal}; show_info=true, debug=false,
-    bc_invertible=false, P=nothing, symmetric=true,
-              empty_assemblies_before_solution=true)
+              bc_invertible=false, P=nothing, symmetric=true,
+              empty_assemblies_before_solution=true, dense=false,
+	      real_eigenvalues=true, positive_eigenvalues=true)
     show_info && info(repeat("-", 80))
     show_info && info("Starting natural frequency solver")
     show_info && info("Increment time t=$(round(solver.time, 3))")
@@ -197,6 +198,7 @@ function call(solver::Solver{Modal}; show_info=true, debug=false,
         K += Kg
     end
 
+    dim = size(K, 1)
     tic()
 
     nboundary_problems = length(get_boundary_problems(solver))
@@ -210,7 +212,7 @@ function call(solver::Solver{Modal}; show_info=true, debug=false,
     else
         info("Eliminate boundary conditions from system.")
         for boundary_problem in get_boundary_problems(solver)
-            eliminate_boundary_conditions!(K_red, M_red, boundary_problem)
+            eliminate_boundary_conditions!(K_red, M_red, boundary_problem, dim)
         end
     end
 
@@ -225,6 +227,8 @@ function call(solver::Solver{Modal}; show_info=true, debug=false,
         gc()
     end
 
+    SparseArrays.droptol!(K_red, 1.0e-12)
+    SparseArrays.droptol!(M_red, 1.0e-12)
     nz = get_nonzero_rows(K_red)
     K_red = K_red[nz,nz]
     M_red = M_red[nz,nz]
@@ -241,7 +245,8 @@ function call(solver::Solver{Modal}; show_info=true, debug=false,
     end
 
     tic()
-    om = nothing
+ 
+    om2 = nothing
     X = nothing
 
     if symmetric
@@ -253,9 +258,14 @@ function call(solver::Solver{Modal}; show_info=true, debug=false,
     info("is M symmetric? ", issym(M_red))
     info("is K positive definite? ", isposdef(K_red))
     info("is M positive definite? ", isposdef(M_red))
+
+    if dense
+        K_red = full(K_red)
+	M_red = full(M_red)
+    end
+
     try
         om2, X = eigs(K_red, M_red; nev=props.nev, which=props.which)
-        om = sqrt(om2)
     catch
         info("failed to calculate eigenvalues")
         info("reduced system")
@@ -283,6 +293,19 @@ function call(solver::Solver{Modal}; show_info=true, debug=false,
         #info("M 'skewness' (max(abs(M - M'))) = ", m1)
         rethrow()
     end
+    
+    t1 = round(toq(), 2)
+    info("Eigenvalues computed in $t1 seconds. Squared eigenvalues: $om2")
+
+    if real_eigenvalues
+        om2 = real(om2)
+    end
+
+    if positive_eigenvalues
+        om2[om2 .< 0.0] = 0.0
+    end
+ 
+    om = sqrt(om2)
 
     props.eigvals = om
     props.eigvecs = zeros(ndofs, length(om))
@@ -290,13 +313,12 @@ function call(solver::Solver{Modal}; show_info=true, debug=false,
         props.eigvecs[nz,i] = X[:,i]
         for problem in get_boundary_problems(solver)
             isa(problem, Problem{Mortar}) || continue
-            S, M, P = calc_projection(problem)
+            S, M, P = calc_projection(problem, dim)
+	    # us = P*um
             props.eigvecs[S,i] = P*props.eigvecs[M,i]
         end
     end
 
-    t1 = round(toq(), 2)
-    info("Eigenvalues computed in $t1 seconds. Eigenvalues: $om")
 
 #=
     for i=1:length(om)
@@ -407,7 +429,8 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
         add_child(temporal_collection, frame)
 
         mode = zeros(X)
-        mode_ = reshape(solver.properties.eigvecs[:,j], ndim, nnodes)
+	mode_ = solver.properties.eigvecs[:,j]
+        mode_ = reshape(mode_, ndim, round(Int, length(mode_)/ndim))
         for nid in node_ids
             loc = nid_mapping[nid]
             mode[:,loc] = mode_[:,nid]
@@ -417,7 +440,8 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
         field_center = "Node"
         unknown_field_name = get_unknown_field_name(solver)
         unknown_field_name = ucfirst(unknown_field_name)
-        path = "/Results/Frequency $freq/Nodal Fields/$unknown_field_name"
+	freqn = freqs[j]
+        path = "/Results/Frequency $freqn/Nodal Fields/$unknown_field_name"
         dataitem = new_dataitem(xdmf, path, mode)
         attribute = new_child(frame, "Attribute")
         set_attribute(attribute, "Name", unknown_field_name)
