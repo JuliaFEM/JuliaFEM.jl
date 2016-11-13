@@ -625,7 +625,7 @@ function process_output_request(model::Model, solver::Solver, output_request::Ab
     info("SECTION PRINT output request, with data $data and options $options")
 end
 
-function call(model::Model)
+function (model::Model)()
     info("Starting JuliaFEM-ABAQUS solver.")
 
     # 1. create field problems and add elements
@@ -750,7 +750,7 @@ function create_surface_elements(mesh::Mesh, surface_name::Symbol)
            get_child_element(parent_element_type, parent_element_side,
            parent_element_connectivity)
 
-       child_element = Element(JuliaFEM.(child_element_type), child_element_connectivity)
+       child_element = Element(getfield(JuliaFEM, child_element_type), child_element_connectivity)
        push!(elements, child_element)
    end
    update!(elements, "geometry", mesh.nodes)

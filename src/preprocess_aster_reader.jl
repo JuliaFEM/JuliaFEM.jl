@@ -60,7 +60,7 @@ type MEDFile
     data :: Dict
 end
 
-function MEDFile(fn)
+function MEDFile(fn::String)
     return MEDFile(h5read(fn, "/"))
 end
 
@@ -116,7 +116,7 @@ function get_element_sets(med::MEDFile, mesh_name)
     for elset in keys(elsets)
         k = split(elset, '_')
         elset_id = parse(Int, k[2])
-        elset_name = ascii(pointer(convert(Vector{UInt8}, elsets[elset]["GRO"]["NOM"][1])))
+        elset_name = ascii(unsafe_string(pointer(convert(Vector{UInt8}, elsets[elset]["GRO"]["NOM"][1]))))
         es[elset_id] = Symbol(elset_name)
     end
     return es
@@ -260,7 +260,7 @@ type RMEDFile
     data :: Dict
 end
 
-function RMEDFile(fn)
+function RMEDFile(fn::String)
     return RMEDFile(h5read(fn, "/"))
 end
 
@@ -280,7 +280,7 @@ function aster_read_nodes(rmed::RMEDFile)
     # INFO: quite safe assumption is that id is in node name, i.e. N1 => 1, N123 => 123
     node_id(node_name) = parse(matchall(r"\d+", node_name)[1])
     node_ids = map(node_id, node_names)
-    nodes = Dict([j => node_coords[:,j] for j in node_ids])
+    nodes = Dict(j => node_coords[:,j] for j in node_ids)
     return nodes
 end
 
@@ -308,7 +308,7 @@ function aster_read_data(rmed::RMEDFile, field_name; field_type=:NODE,
     increment = chdata[first(keys(chdata))]
     if field_type == :NODE
         data = increment["NOE"]["MED_NO_PROFILE_INTERNAL"]["CO"]
-        results = Dict([j => data[j] for j in node_ids])
+        results = Dict(j => data[j] for j in node_ids)
     else
         error("Unable to read result of type $field_type: not implemented")
     end

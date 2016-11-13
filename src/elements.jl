@@ -44,19 +44,40 @@ function setindex!(element::Element, data, field_name)
     element.fields[field_name] = Field(data)
 end
 
-function call(element::Element, field_name::AbstractString)
+""" Return a Field object from element.
+
+Examples
+--------
+>>> element = Element(Seg2, [1, 2])
+>>> data = Dict(1 => 1.0, 2 => 2.0)
+>>> update!(element, "my field", data)
+>>> element("my field")
+
+"""
+function (element::Element)(field_name::String)
     return element[field_name]
 end
 
-function call(element::Element, field_name::AbstractString, time::Float64)
+""" Return a Field object from element and interpolate in time direction.
+
+Examples
+--------
+>>> element = Element(Seg2, [1, 2])
+>>> data1 = Dict(1 => 1.0, 2 => 2.0)
+>>> data2 = Dict(1 => 2.0, 2 => 3.0)
+>>> update!(element, "my field", 0.0 => data1, 1.0 => data2)
+>>> element("my field", 0.5)
+
+"""
+function (element::Element)(field_name::String, time::Float64)
     return element[field_name](time)
 end
 
-function last(element::Element, field_name::AbstractString)
+function last(element::Element, field_name::String)
     return last(element[field_name])
 end
 
-function call(element::Element, ip, time::Float64=0.0)
+function (element::Element)(ip, time::Float64=0.0)
     return get_basis(element, ip, time)
 end
 
@@ -75,7 +96,7 @@ julia> el([0.0, 0.0], 0.0, 2)
  0.0   0.25  0.0   0.25  0.0   0.25  0.0   0.25
 
 """
-function call(element::Element, ip, time::Float64, dim::Int)
+function (element::Element)(ip, time::Float64, dim::Int)
     dim == 1 && return get_basis(element, ip, time)
     Ni = get_basis(element, ip, time)
     N = zeros(dim, length(element)*dim)
@@ -85,7 +106,7 @@ function call(element::Element, ip, time::Float64, dim::Int)
     return N
 end
 
-function call(element::Element, ip, time::Float64, ::Type{Val{:Jacobian}})
+function (element::Element)(ip, time::Float64, ::Type{Val{:Jacobian}})
     X = element("geometry", time)
     dN = get_dbasis(element, ip, time)
     nbasis = length(element)
@@ -98,7 +119,7 @@ function call(element::Element, ip, time::Float64, ::Type{Val{:Jacobian}})
     return J
 end
 
-function call(element::Element, ip, time::Float64, ::Type{Val{:detJ}})
+function (element::Element)(ip, time::Float64, ::Type{Val{:detJ}})
     J = element(ip, time, Val{:Jacobian})
     n, m = size(J)
     if n == m  # volume element
@@ -112,46 +133,41 @@ function call(element::Element, ip, time::Float64, ::Type{Val{:detJ}})
     end
 end
 
-function call(element::Element, ip, time::Float64, ::Type{Val{:Grad}})
+function (element::Element)(ip, time::Float64, ::Type{Val{:Grad}})
     J = element(ip, time, Val{:Jacobian})
     return inv(J)*get_dbasis(element, ip, time)
 end
 
-function call(element::Element, field_name::AbstractString, ip, time::Float64, ::Type{Val{:Grad}})
+function (element::Element)(field_name::String, ip, time::Float64, ::Type{Val{:Grad}})
     return element(ip, time, Val{:Grad})*element[field_name](time)
 end
 
-function call(element::Element, field::Field, time::Float64)
+function (element::Element)(field::Field, time::Float64)
     return field(time)
 end
 
-function call(element::Element, field::DCTI, time::Float64)
+function (element::Element)(field::DCTI, time::Float64)
     return field.data
 end
 
-function call(element::Element, field_name::AbstractString, time::Float64)
-    field = element[field_name]
-    return element(field, time)
-end
-
-function call(element::Element, field_name::AbstractString, ip, time::Float64)
+function (element::Element)(field_name::String, ip, time::Float64)
     field = element[field_name]
     return element(field, ip, time)
 end
 
-function call(element::Element, field::DCTI, ip, time::Float64)
+function (element::Element)(field::DCTI, ip, time::Float64)
     return field.data
 end
 
-function call(element::Element, field::DCTV, ip, time::Float64)
+function (element::Element)(field::DCTV, ip, time::Float64)
     return field(time).data
 end
 
-function call(element::Element, field::CVTV, ip, time::Float64)
+function (element::Element)(field::CVTV, ip, time::Float64)
     return field(ip, time)
 end
 
-function call(element::Element, field::Field, ip, time::Float64)
+function (element::Element)(field::Field, ip, time::Float64)
     field_ = field(time)
     basis = element(ip, time)
     n = length(element)

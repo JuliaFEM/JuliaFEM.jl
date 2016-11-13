@@ -216,7 +216,7 @@ function create_projection(C::SparseMatrixCSC, g; S=nothing, tol=1.0e-12)
     resize!(P, n, m)
     resize!(h, n, 1)
     P = speye(n) - P
-    SparseMatrix.droptol!(P, tol)
+    droptol!(P, tol)
     return P, h
 end
 
@@ -468,8 +468,16 @@ function filter_by_element_type(element_type, elements)
     return filter(element -> is_element_type(element, element_type), elements)
 end
 
-function call(solver::Solver, field_name::AbstractString, time::Float64)
-    fields = [problem(field_name, time) for problem in get_problems(solver)]
+function (solver::Solver)(field_name::AbstractString, time::Float64)
+    fields = []
+    for problem in get_problems(solver)
+        field = problem(field_name, time)
+        if length(field) == 0
+            warn("no field $field_name found for problem $(problem.name)")
+        else
+            push!(fields, field)
+        end
+    end
     return merge(fields...)
 end
 
@@ -666,7 +674,7 @@ function Base.showerror(io::IO, exception::NonlinearConvergenceError)
 end
 
 """ Default solver for quasistatic nonlinear problems. """
-function call(solver::Solver{Nonlinear}; show_info=true)
+function (solver::Solver{Nonlinear})(; show_info=true)
 
     properties = solver.properties
 
@@ -747,7 +755,7 @@ function assemble!(solver::Solver{Linear}; show_info=true)
     show_info && info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
 end
 
-function call(solver::Solver{Linear}; show_info=true)
+function (solver::Solver{Linear})(; show_info=true)
     t0 = Base.time()
     show_info && info(repeat("-", 80))
     show_info && info("Starting linear solver")
@@ -807,7 +815,7 @@ function assemble!(solver::Solver{Postprocessor}; show_info=true)
     show_info && info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
 end
 
-function call(solver::Solver{Postprocessor}; show_info=true)
+function (solver::Solver{Postprocessor})(; show_info=true)
     t0 = Base.time()
     show_info && info(repeat("-", 80))
     show_info && info("Starting postprocessor")

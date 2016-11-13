@@ -273,8 +273,8 @@ function assemble!(problem::Problem{Contact}, time::Float64,
     b = calculate_interface(x)
     A = sparse(A)
     b = sparse(b)
-    SparseMatrix.droptol!(A, 1.0e-12)
-    SparseMatrix.droptol!(b, 1.0e-12)
+    SparseArrays.droptol!(A, 1.0e-9)
+    SparseArrays.droptol!(b, 1.0e-9)
 
     ndofs = round(Int, length(x)/2)
     K = A[1:ndofs,1:ndofs]

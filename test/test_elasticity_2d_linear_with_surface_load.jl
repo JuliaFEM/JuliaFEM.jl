@@ -47,7 +47,7 @@ using JuliaFEM.Testing
     bc_sym_13.elements = create_elements(mesh, "BOTTOM")
     update!(bc_sym_13, "displacement 2", 0.0)
 
-    solver = LinearSolver(block, traction, bc_sym_23, bc_sym_13)
+    solver = Solver(Linear, block, traction, bc_sym_23, bc_sym_13)
     solver()
 
     info("u = ", block.assembly.u)
@@ -58,7 +58,7 @@ using JuliaFEM.Testing
     E = 288.0
     nu = 1/3
     u3_expected = f/E*[-nu, 1] + g/(2*E)*[-nu, 1]
-
+#=
     # fetch nodal results X + u and join them into one table using DataFrames
     X = solver(DataFrame, "geometry", :COOR)
     u = solver(DataFrame, "displacement", :U)
@@ -90,11 +90,9 @@ using JuliaFEM.Testing
     S1 = block(DataFrame, 0.0, Val{:S})
     E1 = block(DataFrame, 0.0, Val{:E})
     C1 = block(DataFrame, 0.0, Val{:COORD})
-
     println(S1)
     println(E1)
     println(C1)
-
     S = solver(DataFrame, 0.0, Val{:S})
     println(S)
 
@@ -111,6 +109,7 @@ using JuliaFEM.Testing
 #   u = solver2("displacement", 0.0)[3]
 #   info("nlsolver u3 = $u, expected = $u3_expected")
 #   @test isapprox(u, u3_expected; rtol=1.0e-5)
+=#
 end
 
 #= TODO: to other file

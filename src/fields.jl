@@ -38,7 +38,7 @@ function Base.getindex{T}(increment::Increment{Vector{T}}, i::Int64)
     return increment.data[i]
 end
 
-function Base.(:*)(d, increment::Increment)
+function Base.:*(d, increment::Increment)
     return d*increment.data
 end
 
@@ -49,11 +49,11 @@ type Basis
     dbasis :: Function
 end
 
-function call(basis::Basis, xi::Vector)
+function (basis::Basis)(xi::Vector)
     basis.basis(xi)
 end
 
-function call(basis::Basis, xi::Vector, ::Type{Val{:grad}})
+function (basis::Basis)(xi::Vector, ::Type{Val{:grad}})
     basis.dbasis(xi)
 end
 
@@ -170,10 +170,6 @@ function push!(field::DVTV, data::Pair)
     push!(field.data, data)
 end
 
-function getindex(field::DVTV, i::Int64)
-    return field.data[i]
-end
-
 function getindex(field::DVTI, i::Int64)
     return field.data[i]
 end
@@ -218,19 +214,19 @@ for op = (:+, :*, :/, :-)
     @eval ($op)(k::Number, field::DCTI) = ($op)(field.data, k)
 end
 
-function Base.(:+)(f1::DVTI, f2::DVTI)
+function Base.:+(f1::DVTI, f2::DVTI)
     return DVTI(f1.data + f2.data)
 end
 
-function Base.(:-)(f1::DVTI, f2::DVTI)
+function Base.:-(f1::DVTI, f2::DVTI)
     return DVTI(f1.data - f2.data)
 end
 
-function Base.(:*){T<:Real}(c::T, field::DVTI)
+function Base.:*{T<:Real}(c::T, field::DVTI)
     return DVTI(c*field.data)
 end
 
-function Base.(:*)(N::Matrix, f::DCTI)
+function Base.:*(N::Matrix, f::DCTI)
     return f.data*N'
 end
 
@@ -240,7 +236,7 @@ end
 #   must match to the field length and this can be used mainly
 #   for interpolation purposes, i.e., u = ∑ Nᵢuᵢ
 #
-function Base.(:*)(T::Vector, f::DVTI)
+function Base.:*(T::Vector, f::DVTI)
     @assert length(T) == length(f)
     return sum([T[i]*f[i] for i=1:length(f)])
 end
@@ -311,19 +307,19 @@ end
 
 ### Accessing continuous fields
 
-function call(field::CVTI, xi::Vector)
+function (field::CVTI)(xi::Vector)
     return field.data(xi)
 end
 
-function call(field::CVTV, xi, time::Float64)
+function (field::CVTV)(xi, time::Float64)
     return field.data(xi, time)
 end
 
-function call(field::CVTI, xi::Vector, ::Type{Val{:Grad}})
+function (field::CVTI)(xi::Vector, ::Type{Val{:Grad}})
     return field.data(xi, Val{:Grad})
 end
 
-function call(field::CCTV, time::Float64)
+function (field::CCTV)(time::Float64)
     return field.data(time)
 end
 
@@ -334,21 +330,21 @@ end
 ### Interpolation
 
 """ Interpolate time-invariant field in time direction. """
-function call(field::DVTI, time::Float64)
+function (field::DVTI)(time::Float64)
     return field
 end
-function call(field::DCTI, time::Float64)
+function (field::DCTI)(time::Float64)
     return field
 end
-function call(field::CVTI, time::Float64)
+function (field::CVTI)(time::Float64)
     return field.data()
 end
-function call(field::CCTI, time::Float64)
+function (field::CCTI)(time::Float64)
     return field.data()
 end
 
 """ Interpolate constant time-variant field in time direction. """
-function call(field::DCTV, time::Real)
+function (field::DCTV)(time::Real)
     time < first(field).time && return DCTI(first(field).data)
     time > last(field).time && return DCTI(last(field).data)
     for i=reverse(1:length(field))
@@ -368,7 +364,7 @@ function call(field::DCTV, time::Real)
     error("interpolate DCTV: unknown failure when interpolating $(field.data) for time $time")
 end
 
-function call(field::DVTV, time::Float64)
+function (field::DVTV)(time::Float64)
     time < first(field).time && return DVTI(first(field).data)
     time > last(field).time && return DVTI(last(field).data)
     for i=reverse(1:length(field))
@@ -389,17 +385,17 @@ function call(field::DVTV, time::Float64)
 end
 
 """ Interpolate constant field in spatial dimension. """
-function call(basis::CVTI, field::DCTI, xi::Vector)
+function (basis::CVTI)(field::DCTI, xi::Vector)
     return field.data
 end
 
 """ Interpolate variable field in spatial dimension. """
-function call(basis::CVTI, values::DVTI, xi::Vector)
+function (basis::CVTI)(values::DVTI, xi::Vector)
     N = basis(xi)
     return sum([N[i]*values[i] for i=1:length(N)])
 end
 
-function call(basis::CVTI, geometry::DVTI, xi::Vector, ::Type{Val{:grad}})
+function (basis::CVTI)(geometry::DVTI, xi::Vector, ::Type{Val{:grad}})
     dbasis = basis(xi, Val{:grad})
 #    J = sum([dbasis[:,i]*geometry[i]' for i=1:length(geometry)])
     J = sum([kron(dbasis[:,i], geometry[i]') for i=1:length(geometry)])
@@ -408,18 +404,18 @@ function call(basis::CVTI, geometry::DVTI, xi::Vector, ::Type{Val{:grad}})
     return grad
 end
 
-function call(basis::CVTI, geometry::DVTI, values::DVTI, xi::Vector, ::Type{Val{:grad}})
+function (basis::CVTI)(geometry::DVTI, values::DVTI, xi::Vector, ::Type{Val{:grad}})
     grad = basis(geometry, xi, Val{:grad})
 #    gradf = sum([grad[:,i]*values[i]' for i=1:length(geometry)])'
     gradf = sum([kron(grad[:,i], values[i]') for i=1:length(values)])'
     return length(gradf) == 1 ? gradf[1] : gradf
 end
 
-function call(basis::CVTI, xi::Vector, time::Number)
+function (basis::CVTI)(xi::Vector, time::Number)
     basis(xi)
 end
 
-function Base.(:*)(grad::Matrix, field::DVTI)
+function Base.:*(grad::Matrix, field::DVTI)
     return sum([kron(grad[:,i], field[i]') for i=1:length(field)])'
 end
 

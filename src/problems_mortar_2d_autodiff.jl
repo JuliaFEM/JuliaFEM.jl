@@ -237,8 +237,8 @@ function assemble!(problem::Problem{Mortar}, time::Float64, ::Type{Val{1}}, ::Ty
 
     A = sparse(A)
     b = sparse(b)
-    SparseMatrix.droptol!(A, 1.0e-12)
-    SparseMatrix.droptol!(b, 1.0e-12)
+    SparseArrays.droptol!(A, 1.0e-12)
+    SparseArrays.droptol!(b, 1.0e-12)
 
     K = A[1:ndofs,1:ndofs]
     C1 = transpose(A[1:ndofs,ndofs+1:end])
@@ -507,8 +507,8 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}})
 
     A = sparse(A)
     b = sparse(b)
-    SparseMatrix.droptol!(A, 1.0e-12)
-    SparseMatrix.droptol!(b, 1.0e-12)
+    SparseArrays.droptol!(A, 1.0e-12)
+    SparseArrays.droptol!(b, 1.0e-12)
 
     K = A[1:ndofs,1:ndofs]
     C1 = transpose(A[1:ndofs,ndofs+1:end])

@@ -12,7 +12,6 @@ element_has_type( ::Type{Val{:C3D8}}) = :Hex8
 element_has_nodes(::Type{Val{:C3D10}}) = 10
 element_has_type(::Type{Val{:C3D10}}) = :Tet10
 
-element_has_nodes(::Type{Val{:C3D10}}) = 10
 element_has_nodes(::Type{Val{:C3D20}}) = 20
 
 element_has_nodes(::Type{Val{:C3D20E}}) = 20
