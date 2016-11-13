@@ -29,7 +29,7 @@ function haskey(point::Point, field_name)
     return haskey(point.fields, field_name)
 end
 
-function call(point::Point, field_name, time=0.0)
+function (point::Point)(field_name, time=0.0)
     point.fields[field_name](time).data
 end
 

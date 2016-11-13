@@ -12,7 +12,7 @@ using Formatting
 
 import HDF5: h5read, h5write
 
-function h5read{T<:DataFrame}(::Type{T}, filename, name::ByteString)
+function h5read{T<:DataFrame}(::Type{T}, filename, name::String)
     raw_data = h5read(filename, name)
     index = raw_data["index"]
     column_names = raw_data["column_names"]
@@ -25,7 +25,7 @@ function h5read{T<:DataFrame}(::Type{T}, filename, name::ByteString)
     return DataFrame(data, column_names)
 end
 
-function h5write(filename, name::ByteString, data::DataFrame)
+function h5write(filename, name::String, data::DataFrame)
     column_names = DataFrames._names(data)
     column_names = map(string, column_names)
     index = convert(Vector, data[:,1])
@@ -216,13 +216,13 @@ function to_dataframe(u::Dict, abbreviation::Symbol)
     return df
 end
 
-function call(problem::Problem, ::Type{DataFrame}, field_name::AbstractString,
+function (problem::Problem)(::Type{DataFrame}, field_name::AbstractString,
               abbreviation::Symbol, time::Float64=0.0)
     u = problem(field_name, time)
     return to_dataframe(u, abbreviation)
 end
 
-function call(solver::Solver, ::Type{DataFrame}, field_name::AbstractString,
+function (solver::Solver)(::Type{DataFrame}, field_name::AbstractString,
               abbreviation::Symbol, time::Float64=0.0)
     fields = [problem(field_name, time) for problem in get_problems(solver)]
     fields = filter(f -> f != nothing, fields)
@@ -249,9 +249,9 @@ function get_components(n, m)
     end
 end
 
+#=
 """ Return T in integration points. """
-function call{T}(problem::Problem, ::Type{DataFrame}, element::Element, time::Float64,
-                 ::Type{Val{T}})
+function call{T}(problem::Problem, ::Type{DataFrame}, element::Element, time::Float64, ::Type{Val{T}})
     column_names = [:ELEMENT, :IP]
     ips = get_integration_points(element)
     field = Any[problem(element, ip, time, Val{T}) for ip in ips]
@@ -300,9 +300,10 @@ function call{T}(solver::Solver, ::Type{DataFrame}, time::Float64, ::Type{Val{T}
     results = [tables...;]
     return results
 end
+=#
 
 """ Interpolate field from a set of elements. """
-function call(problem::Problem, field_name::AbstractString, X::Vector, time::Float64=0.0; fillna=NaN)
+function (problem::Problem)(field_name::AbstractString, X::Vector, time::Float64=0.0; fillna=NaN)
     for element in get_elements(problem)
         if inside(element, X, time)
             xi = get_local_coordinates(element, X, time)
@@ -313,7 +314,7 @@ function call(problem::Problem, field_name::AbstractString, X::Vector, time::Flo
 end
 
 """ Interpolate field from a set of elements. """
-function call(problem::Problem, field_name::AbstractString, X::Vector, time::Float64, ::Type{Val{:Grad}}; fillna=NaN)
+function (problem::Problem)(field_name::AbstractString, X::Vector, time::Float64, ::Type{Val{:Grad}}; fillna=NaN)
     for element in get_elements(problem)
         if inside(element, X, time)
             xi = get_local_coordinates(element, X, time)
@@ -323,7 +324,7 @@ function call(problem::Problem, field_name::AbstractString, X::Vector, time::Flo
     return fillna
 end
 
-function call(solver::Solver, field_name::AbstractString, X::Vector, time::Float64; fillna=NaN)
+function (solver::Solver)(field_name::AbstractString, X::Vector, time::Float64; fillna=NaN)
     for problem in get_problems(solver)
         for element in get_elements(problem)
             if inside(element, X, time)

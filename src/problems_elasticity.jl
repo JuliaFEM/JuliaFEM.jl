@@ -834,14 +834,14 @@ end
 
 =#
 
-function call(problem::Problem, element::Element, ip, time::Float64, ::Type{Val{:E}})
+function (problem::Problem)(element::Element, ip, time::Float64, ::Type{Val{:E}})
     haskey(element, "displacement") || return nothing
     gradu = element("displacement", ip, time, Val{:Grad})
     eps = 0.5*(gradu + gradu')
     return eps
 end
 
-function call(problem::Problem, element::Element, ip, time::Float64, ::Type{Val{:S}})
+function (problem::Problem)(element::Element, ip, time::Float64, ::Type{Val{:S}})
     haskey(element, "displacement") || return nothing
     props = problem.properties
     eps = problem(element, ip, time, Val{:E})
@@ -857,7 +857,7 @@ function call(problem::Problem, element::Element, ip, time::Float64, ::Type{Val{
     return S
 end
 
-function call(problem::Problem, element::Element, ip, time::Float64, ::Type{Val{:COORD}})
+function (problem::Problem)(element::Element, ip, time::Float64, ::Type{Val{:COORD}})
     haskey(element, "geometry") || return nothing
     return element("geometry", ip, time)
 end

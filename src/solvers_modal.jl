@@ -24,7 +24,9 @@ function Modal(nev=10, which=:SM)
 end
 
 """ Eliminate Dirichlet boundary condition from matrices K, M. """
-function eliminate_boundary_conditions!(K_red, M_red, problem::Problem{Dirichlet}, ndim::Int)
+function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
+                                        M_red::SparseMatrixCSC,
+                                        problem::Problem{Dirichlet}, ndim::Int)
     K = sparse(problem.assembly.K, ndim, ndim)
     C1 = sparse(problem.assembly.C1, ndim, ndim)
     C2 = sparse(problem.assembly.C2, ndim, ndim)
@@ -64,7 +66,7 @@ function calc_projection(problem::Problem{Mortar}, ndim::Int)
     @assert nnz(sparse(problem.assembly.g)) == 0
 
     @assert C1 == C2
-    @assert problem.properties.dual_basis == true
+    #@assert problem.properties.dual_basis == true
     @assert problem.properties.adjust == false
 
     # determine master and slave dofs
@@ -96,13 +98,15 @@ function calc_projection(problem::Problem{Mortar}, ndim::Int)
     # Construct matrix P = D^-1*M
     D_ = C2[S,S]
     M_ = -C2[S,M]
+    P = nothing
+
     if !isdiag(D_)
-        info("D is not diagonal, is dual basis used?")
-        println(D_)
+        warn("D is not diagonal, is dual basis used? This might take a long time.")
+        P = ldltfact(1/2*(D_ + D_')) \ M_
+    else
+        P = D_ \ M_
     end
-    @assert isdiag(D_)
-    P = D_ \ M_
-    info("Projection P ready.")
+    info("Matrix P ready.")
 
     return S, M, P
 end
@@ -124,7 +128,7 @@ function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
     @assert nnz(sparse(problem.assembly.g)) == 0
 
     @assert C1 == C2
-    @assert problem.properties.dual_basis == true
+    #@assert problem.properties.dual_basis == true
     @assert problem.properties.adjust == false
 
     info("Eliminating mesh tie constraint $(problem.name) using static condensation")
@@ -160,30 +164,64 @@ function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
     # Construct matrix P = D^-1*M
     D_ = C2[S,S]
     M_ = -C2[S,M]
-    if !isdiag(D_)
-        info("D is not diagonal, is dual basis used?")
-        println(D_)
-    end
-    @assert isdiag(D_)
-    P = D_ \ M_
-    info("Projection P ready.")
 
-    K_red[N,M] += K_red[N,S]*P
-    K_red[M,N] += P'*K_red[S,N]
-    K_red[M,M] += P'*K_red[S,S]*P
+    P = nothing
+    if !isdiag(D_)
+        warn("D is not diagonal, is dual basis used? This might take a long time.")
+        P = ldltfact(1/2*(D_ + D_')) \ M_
+    else
+        P = D_ \ M_
+    end
+    #@assert isdiag(D_)
+    info("Matrix P ready.")
+    Id = ones(ndim)
+    #Id[S] = 0
+    #Id[M] = 0
+    Q = spdiagm(Id)
+    Q[M,S] += P'
+    info("Matrix Q ready.")
+
+    # testing
+    #K_red_orig = copy(K_red)    
+    #K_red[N,M] += K_red[N,S]*P
+    #K_red[M,N] += P'*K_red[S,N]
+    #K_red[M,M] += P'*K_red[S,S]*P
+    #K_red[S,:] = 0.0
+    #K_red[:,S] = 0.0
+    
+    info("K transform")
+    K_red[:,:] = Q*K_red*Q'
     K_red[S,:] = 0.0
     K_red[:,S] = 0.0
-    
-    M_red[N,M] += M_red[N,S]*P
-    M_red[M,N] += P'*M_red[S,N]
-    M_red[M,M] += P'*M_red[S,S]*P
+
+    #K_res = K_red - K_red_2
+    #SparseArrays.droptol!(K_res, 1.0e-9)
+
+    info("K transform ready")
+    #info("Create matrices, M")
+    #info("Sum matricse, M")
+    #M_red_orig = copy(M_red)
+    #M_red[N,M] += M_red[N,S]*P
+    #M_red[M,N] += P'*M_red[S,N]
+    #M_red[M,M] += P'*M_red[S,S]*P
+    #M_red[S,:] = 0.0
+    #M_red[:,S] = 0.0
+    info("M transform")
+    M_red[:,:] = Q*M_red*Q'
     M_red[S,:] = 0.0
     M_red[:,S] = 0.0
+    info("M transform ready")
+ 
+    #M_res = M_red - M_red_2
+    #SparseArrays.droptol!(M_res, 1.0e-9)
+    #info("Diff")
+    #println(K_res)
+    #println(M_res)
 
     return true
 end
 
-function call(solver::Solver{Modal}; show_info=true, debug=false,
+function (solver::Solver{Modal})(; show_info=true, debug=false,
               bc_invertible=false, P=nothing, symmetric=true,
               empty_assemblies_before_solution=true, dense=false,
 	      real_eigenvalues=true, positive_eigenvalues=true)
@@ -227,8 +265,8 @@ function call(solver::Solver{Modal}; show_info=true, debug=false,
         gc()
     end
 
-    SparseArrays.droptol!(K_red, 1.0e-12)
-    SparseArrays.droptol!(M_red, 1.0e-12)
+    SparseArrays.droptol!(K_red, 1.0e-9)
+    SparseArrays.droptol!(M_red, 1.0e-9)
     nz = get_nonzero_rows(K_red)
     K_red = K_red[nz,nz]
     M_red = M_red[nz,nz]
@@ -254,8 +292,8 @@ function call(solver::Solver{Modal}; show_info=true, debug=false,
         M_red = 1/2*(M_red + transpose(M_red))
     end
 
-    info("is K symmetric? ", issym(K_red))
-    info("is M symmetric? ", issym(M_red))
+    info("is K symmetric? ", issymmetric(K_red))
+    info("is M symmetric? ", issymmetric(M_red))
     info("is K positive definite? ", isposdef(K_red))
     info("is M positive definite? ", isposdef(M_red))
 
@@ -362,13 +400,14 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
 
     # 2. save topology
 
-    nid_mapping = Dict([j => i for (i, j) in enumerate(node_ids)])
+    nid_mapping = Dict(j => i for (i, j) in enumerate(node_ids))
     
     all_elements = get_all_elements(solver)
     nelements = length(all_elements)
     element_types = unique(map(get_element_type, all_elements))
 
     xdmf_element_mapping = Dict(
+        "Poi1" => "Polyvertex",
         "Seg2" => "Polyline",
         "Tri3" => "Triangle",
         "Quad4" => "Quadrilateral",
@@ -386,6 +425,7 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
 
     topology = []
     for element_type in element_types
+        info("Xdmf save: element type $element_type")
         elements = filter_by_element_type(element_type, all_elements)
         sort!(elements, by=get_element_id)
         #elements = elements[1:5]
@@ -412,7 +452,7 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
         set_attribute(topology_, "NumberOfElements", length(elements))
         add_child(topology_, dataitem)
         push!(topology, topology_)
-        break
+        #break
     end
 
     # save modes
@@ -442,6 +482,7 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
         unknown_field_name = ucfirst(unknown_field_name)
 	freqn = freqs[j]
         path = "/Results/Frequency $freqn/Nodal Fields/$unknown_field_name"
+        info("Storing data to $path")
         dataitem = new_dataitem(xdmf, path, mode)
         attribute = new_child(frame, "Attribute")
         set_attribute(attribute, "Name", unknown_field_name)

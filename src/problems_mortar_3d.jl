@@ -282,6 +282,11 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
             nm = length(master_element)
             X2 = master_element("geometry", time)
 
+            if norm(mean(X1) - mean(X2)) > problem.properties.distval
+                # elements are "far enough"
+                continue
+            end
+
             # 3.1 project master nodes to auxiliary plane and create polygon clipping
             M = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in X2]
             P = get_polygon_clip(S, M, n0)
@@ -365,9 +370,6 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
             # 6. add contribution to contact virtual work
             sdofs = get_gdofs(problem, slave_element)
             mdofs = get_gdofs(problem, master_element)
-            if problem.properties.dual_basis
-                De[abs(De) .< 1.0e-11] = 0
-            end
             
             for i=1:field_dim
                 lsdofs = sdofs[i:field_dim:end]
@@ -382,6 +384,17 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
         end # master elements done
 
     end # slave elements done, contact virtual work ready
+    
+    if problem.properties.dual_basis
+        tol = 1.0e-9
+        debug && info("Dual basis is used, dropping small values for C1 & C2, tol = $tol")
+        C1 = sparse(problem.assembly.C1)
+        C2 = sparse(problem.assembly.C2)
+        SparseArrays.droptol!(C1, tol)
+        SparseArrays.droptol!(C2, tol)
+        problem.assembly.C1 = C1
+        problem.assembly.C2 = C2
+    end
 
     debug && info("area of interface: $area")
 

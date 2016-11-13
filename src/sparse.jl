@@ -35,7 +35,7 @@ tol
 """
 function sparse(A::SparseMatrixCOO, args...; tol=1.0e-12)
     B = sparse(A.I, A.J, A.V, args...)
-    SparseMatrix.droptol!(B, tol)
+    SparseArrays.droptol!(B, tol)
     return B
 end
 
@@ -67,7 +67,7 @@ function isempty(A::SparseMatrixCOO)
     return isempty(A.I) && isempty(A.J) && isempty(A.V)
 end
 
-function Base.(:+)(A::SparseMatrixCOO, B::SparseMatrixCOO)
+function Base.:+(A::SparseMatrixCOO, B::SparseMatrixCOO)
     if isempty(A)
         return B
     end
