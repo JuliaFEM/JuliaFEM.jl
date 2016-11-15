@@ -334,7 +334,7 @@ function (field::DVTI)(time::Float64)
     return field
 end
 function (field::DCTI)(time::Float64)
-    return field
+    return field.data
 end
 function (field::CVTI)(time::Float64)
     return field.data()

@@ -23,7 +23,7 @@ type Mesh
     element_types :: Dict{Int64, Symbol}
     element_codes :: Dict{Int64, Symbol}
     element_sets :: Dict{Symbol, Set{Int64}}
-    surfaces :: Dict{Symbol, Vector{Tuple{Int64, Symbol}}}
+    surface_sets :: Dict{Symbol, Vector{Tuple{Int64, Symbol}}}
     surface_types :: Dict{Symbol, Symbol}
 end
 

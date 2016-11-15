@@ -423,7 +423,7 @@ function create_boundary_problem(model::Model, bc::AbstractBoundaryCondition, ::
         bc_name, bc_type, pressure = row
         bc_type == :P || error("bc_type = $bc_type != :P")
         elements = []
-        for (parent_element_id, parent_element_side) in model.mesh.surfaces[bc_name]
+        for (parent_element_id, parent_element_side) in model.mesh.surface_sets[bc_name]
             parent_element_type = model.mesh.element_types[parent_element_id]
             parent_element_connectivity = model.mesh.elements[parent_element_id]
 
@@ -742,7 +742,7 @@ master = create_surface_elements(mesh, :master_surf)
 """
 function create_surface_elements(mesh::Mesh, surface_name::Symbol)
    elements = []
-   for (parent_element_id, parent_element_side) in mesh.surfaces[surface_name]
+   for (parent_element_id, parent_element_side) in mesh.surface_sets[surface_name]
        parent_element_type = mesh.element_types[parent_element_id]
        parent_element_connectivity = mesh.elements[parent_element_id]
 

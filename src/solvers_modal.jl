@@ -400,10 +400,11 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
 
     # 2. save topology
 
-    nid_mapping = Dict(j => i for (i, j) in enumerate(node_ids))
+    nid_mapping = Dict(j=>i for (i, j) in enumerate(node_ids))
     
     all_elements = get_all_elements(solver)
     nelements = length(all_elements)
+    info("Saving topology: $nelements elements total.")
     element_types = unique(map(get_element_type, all_elements))
 
     xdmf_element_mapping = Dict(
@@ -425,8 +426,9 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
 
     topology = []
     for element_type in element_types
-        info("Xdmf save: element type $element_type")
         elements = filter_by_element_type(element_type, all_elements)
+        nelements = length(elements)
+        info("Xdmf save: $nelements elements of type $element_type")
         sort!(elements, by=get_element_id)
         #elements = elements[1:5]
         element_ids = map(get_element_id, elements)
@@ -460,13 +462,13 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
     freqs = real(solver.properties.eigvals/(2.0*pi))
     for (j, freq) in enumerate(freqs)
         info("Saving frequency $(round(freq, 3))")
+        
         frame = new_element("Grid")
         new_child(frame, "Time", Dict("Value" => freq))
         add_child(frame, geometry)
         for topo in topology
             add_child(frame, topo)
         end
-        add_child(temporal_collection, frame)
 
         mode = zeros(X)
 	mode_ = solver.properties.eigvecs[:,j]
@@ -478,46 +480,19 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
 
         field_type = ndim == 1 ? "Scalar" : "Vector"
         field_center = "Node"
-        unknown_field_name = get_unknown_field_name(solver)
-        unknown_field_name = ucfirst(unknown_field_name)
-	freqn = freqs[j]
-        path = "/Results/Frequency $freqn/Nodal Fields/$unknown_field_name"
-        info("Storing data to $path")
-        dataitem = new_dataitem(xdmf, path, mode)
-        attribute = new_child(frame, "Attribute")
-        set_attribute(attribute, "Name", unknown_field_name)
-        set_attribute(attribute, "Center", field_center)
-        set_attribute(attribute, "AttributeType", field_type)
-        add_child(attribute, dataitem)
-        add_child(frame, attribute)
-
-        continue
-
-        # save solved fields
-        unknown_field_name = get_unknown_field_name(solver)
-        U = solver(unknown_field_name, freq)
-        node_ids2 = sort(collect(keys(U)))
-
-        @assert node_ids == node_ids2
-        ndim = length(U[first(node_ids)])
-        field_type = ndim == 1 ? "Scalar" : "Vector"
-        field_center = "Node"
-        if ndim == 2
-            for nid in node_ids
-                U[nid] = [U[nid]; 0.0]
-            end
-            ndim = 3
-        end
-        U = hcat([U[nid] for nid in node_ids]...)
-        unknown_field_name = ucfirst(unknown_field_name)
+        unknown_field_name = ucfirst(get_unknown_field_name(solver))
         path = "/Results/Frequency $freq/Nodal Fields/$unknown_field_name"
-        dataitem = new_dataitem(xdmf, path, U)
+        info("Storing data to $path")
         attribute = new_child(frame, "Attribute")
         set_attribute(attribute, "Name", unknown_field_name)
         set_attribute(attribute, "Center", field_center)
         set_attribute(attribute, "AttributeType", field_type)
-        add_child(attribute, dataitem)
-        
+        add_child(attribute, new_dataitem(xdmf, path, mode))
+        add_child(frame, attribute)
+        #add_child(frame, new_dataitem(xdmf, "/foo$j", [1, 2, 3]))
+        #add_child(temporal_collection, new_dataitem(xdmf, "/bar$j", [1, 2, 3]))
+
+        add_child(temporal_collection, frame)
     end
 
     info("Saving Xdmf")
