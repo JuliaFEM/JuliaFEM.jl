@@ -57,7 +57,9 @@ using JuliaFEM.Testing
     g = 576.0
     E = 288.0
     nu = 1/3
+    u3 = block("displacement", 0.0)[3]
     u3_expected = f/E*[-nu, 1] + g/(2*E)*[-nu, 1]
+    @test isapprox(u3, u3_expected)
 #=
     # fetch nodal results X + u and join them into one table using DataFrames
     X = solver(DataFrame, "geometry", :COOR)

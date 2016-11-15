@@ -73,12 +73,12 @@ end
 
 function get_integration_points(element::CartesianSurfaceElement, order::Int64)
     w, xi = get_integration_points(order)
-    [ (w[i]*w[j], [xi[i], xi[j]]) for i=1:order, j=1:order ]
+    vec([(w[i]*w[j], [xi[i], xi[j]]) for i=1:order, j=1:order])
 end
 
 function get_integration_points(element::CartesianVolumeElement, order::Int64)
     w, xi = get_integration_points(order)
-    [ (w[i]*w[j]*w[k], [xi[i], xi[j], xi[k]]) for i=1:order, j=1:order, k=1:order ]
+    vec([(w[i]*w[j]*w[k], [xi[i], xi[j], xi[k]]) for i=1:order, j=1:order, k=1:order])
 end
 
 ### triangular and tetrahedral elements

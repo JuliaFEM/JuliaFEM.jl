@@ -244,7 +244,7 @@ function abaqus_read_mesh(fn)
     for (elset_name, element_ids) in model["elsets"]
         mesh.element_sets[Symbol(elset_name)] = Set(element_ids)
     end
-    mesh.surfaces = model["surfaces"]
+    mesh.surface_sets = model["surfaces"]
     mesh.surface_types = model["surface_types"]
     return mesh
 end

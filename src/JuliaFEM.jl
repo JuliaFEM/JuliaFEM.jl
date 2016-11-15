@@ -1,6 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+# __precompile__()
+
 using Logging
 
 if haskey(ENV, "JULIAFEM_LOGLEVEL")

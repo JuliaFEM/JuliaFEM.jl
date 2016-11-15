@@ -7,7 +7,7 @@ type Element{E<:AbstractElement}
     id :: Int
     connectivity :: Vector{Int}
     integration_points :: Vector{IP}
-    fields :: Dict{AbstractString, Field}
+    fields :: Dict{String, Field}
     properties :: E
 end
 
@@ -298,22 +298,22 @@ function update!(element::Element, datas::Pair...)
     end
 end
 
-function update!(element::Element, field_name::AbstractString, data::Function)
+function update!(element::Element, field_name::String, data::Function)
     element[field_name] = data
 end
 
-function update!(element::Element, field_name::AbstractString, field::Field)
+function update!(element::Element, field_name::String, field::Field)
     element[field_name] = field
 end
 
-function update!(elements::Vector, field_name::AbstractString, data)
+function update!(elements::Vector, field_name::String, data)
     for element in elements
         update!(element, field_name, data)
     end
 end
 
 """ Check existence of field. """
-function haskey(element::Element, field_name::AbstractString)
+function haskey(element::Element, field_name::String)
     haskey(element.fields, field_name)
 end
 
