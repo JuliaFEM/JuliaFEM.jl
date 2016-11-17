@@ -55,3 +55,9 @@ end
     elements = create_surface_elements(mesh,:LOAD)
     @test get_connectivity(elements[1]) == [8,10,9]
 end
+
+@testset "parse nodes from abaqus .inp file to Mesh (NX export)" begin
+    fn = joinpath(Pkg.dir("JuliaFEM"), "test", "testdata","nx_export_problem.inp")
+    mesh = abaqus_read_mesh(fn)
+    @test length(mesh.nodes) == 3
+end
