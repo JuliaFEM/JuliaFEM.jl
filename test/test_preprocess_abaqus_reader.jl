@@ -7,7 +7,7 @@ using JuliaFEM.Abaqus
 using JuliaFEM.Testing
 
 @testset "read inp file" begin
-    model = open(parse_abaqus, Pkg.dir("JuliaFEM")*"/geometry/3d_beam/palkki.inp")
+    model = open(parse_abaqus, joinpath(Pkg.dir("JuliaFEM"),"geometry","3d_beam","palkki.inp"))
     @test length(model["nodes"]) == 298
     @test length(model["elements"]) == 120
     @test length(model["elsets"]["Body1"]) == 120
@@ -36,9 +36,9 @@ end
 end
 
 @testset "parse nodes from abaqus .inp file to Mesh" begin
-    fn = Pkg.dir("JuliaFEM") * "/test/testdata/cube_tet4.inp"
+    fn = joinpath(Pkg.dir("JuliaFEM"), "test", "testdata","cube_tet4.inp")
     mesh = abaqus_read_mesh(fn)
-    info(mesh.surfaces)
+    info(mesh.surface_sets)
     @test length(mesh.nodes) == 10
     @test length(mesh.elements) == 17
     @test haskey(mesh.elements, 1)
@@ -46,12 +46,12 @@ end
     @test mesh.element_types[1] == :Tet4
     @test haskey(mesh.node_sets, :SYM12)
     @test haskey(mesh.element_sets, :CUBE)
-    @test haskey(mesh.surfaces, :LOAD)
-    @test haskey(mesh.surfaces, :ORDER)
-    @test length(mesh.surfaces[:LOAD]) == 2
-    @test mesh.surfaces[:LOAD][1] == (16, :S1)
+    @test haskey(mesh.surface_sets, :LOAD)
+    @test haskey(mesh.surface_sets, :ORDER)
+    @test length(mesh.surface_sets[:LOAD]) == 2
+    @test mesh.surface_sets[:LOAD][1] == (16, :S1)
     @test mesh.surface_types[:LOAD] == :ELEMENT
     @test length(Set(map(size, values(mesh.nodes)))) == 1
     elements = create_surface_elements(mesh,:LOAD)
-    @test get_connectivity(elements[1]) == [8,9,10]
+    @test get_connectivity(elements[1]) == [8,10,9]
 end
