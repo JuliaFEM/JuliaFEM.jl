@@ -145,7 +145,13 @@ function parse_section(model, lines, key, idx_start, idx_end, ::Union{Type{Val{:
             if !(empty_or_comment_line(line))
                 m = matchall(r"[0-9]+", line)
                 set_ids = map(s -> parse(Int, s), m)
-                push!(data, set_ids...)
+                try
+                    push!(data, set_ids...)
+                catch err
+                    if isa(err, MethodError)
+                        warn("Problems with element set creation")
+                    end
+                end
             end
         end
     end
