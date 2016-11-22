@@ -136,16 +136,12 @@ function lsq_fit(elements, field)
     SparseArrays.droptol!(A, 1.0e-6)
     nz = get_nonzero_rows(A)
     dropzeros!(A)
-    #try
-        F = ldltfact(A)
+    F = ldltfact(A)
 
-        x = zeros(size(b)...)
-        x[nz, :] = F \ b[nz, :]
-        nodal_values = Dict(i => vec(x[i,:]) for i=1:size(x,1))
-    #catch
-        err("Problem with zeros or tolerances")
-        dump(nz)
-    #end
+    x = zeros(size(b)...)
+    x[nz, :] = F \ b[nz, :]
+
+    nodal_values = Dict(i => vec(x[i,:]) for i=1:size(x,1))
     return nodal_values
 end
 
