@@ -65,7 +65,7 @@ function create_interface(mesh, slave::Problem, master::Problem)
 end
 
 # start of simulation
-mesh = abaqus_read_mesh("beam_3d_2nd_order_tetra.inp")
+mesh = abaqus_read_mesh("beam_3d_2nd_order_tetra_30mm.inp")
 info("element sets = ", collect(keys(mesh.element_sets)))
 info("surface sets = ", collect(keys(mesh.surface_sets)))
 
@@ -133,12 +133,19 @@ function lsq_fit(elements, field)
     b = sparse(b)
     A = 1/2*(A + A')
     
+    SparseArrays.droptol!(A, 1.0e-6)
     nz = get_nonzero_rows(A)
-    F = ldltfact(A[nz,nz])
+    dropzeros!(A)
+    #try
+        F = ldltfact(A)
 
-    x = zeros(size(b)...)
-    x[nz, :] = F \ b[nz, :]
-    nodal_values = Dict(i => vec(x[i,:]) for i=1:size(x,1))
+        x = zeros(size(b)...)
+        x[nz, :] = F \ b[nz, :]
+        nodal_values = Dict(i => vec(x[i,:]) for i=1:size(x,1))
+    #catch
+        err("Problem with zeros or tolerances")
+        dump(nz)
+    #end
     return nodal_values
 end
 
