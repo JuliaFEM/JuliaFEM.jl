@@ -78,12 +78,24 @@ bc1 = create_bc(mesh, "fixed")
 # load
 load = Problem(Elasticity, "pressure load", 3)
 load.elements = create_surface_elements(mesh, :load)
+nload = length(load.elements)
+info("$nload elements in load surface")
+area = 0.0
+time = 0.0
+for element in load.elements
+    for ip in get_integration_points(element)
+        detJ = element(ip, time, Val{:detJ})
+        area += ip.weight*detJ
+    end
+end
+info("load surface area: $area")
+
 update!(load, "surface pressure", 20.0)
 
 # solution
 isfile("results.h5") && rm("results.h5")
 isfile("results.xmf") && rm("results.xmf")
-solver = Solver(Linear, beam)
+solver = Solver(Linear, beam, load)
 solver.xdmf = Xdmf("results")
 solver()
 close(get(solver.xdmf).hdf)
