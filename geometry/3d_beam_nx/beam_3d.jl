@@ -98,5 +98,75 @@ isfile("results.xmf") && rm("results.xmf")
 solver = Solver(Linear, beam, load)
 solver.xdmf = Xdmf("results")
 solver()
-close(get(solver.xdmf).hdf)
+
+# calculate stresses in integration points and use least-squares fitting to move results to nodes
+
+function get_stress(element, ip, time)
+    haskey(element, "displacement") || return nothing
+    gradu = element("displacement", ip, time, Val{:Grad})
+    eps = 0.5*(gradu' + gradu)
+    E = element("youngs modulus", ip, time)
+    nu = element("poissons ratio", ip, time)
+    mu = E/(2.0*(1.0+nu))
+    la = E*nu/((1.0+nu)*(1.0-2.0*nu))
+    S = la*trace(eps)*I + 2.0*mu*eps
+    return [S[1,1], S[2,2], S[3,3], S[1,2], S[2,3], S[1,3]]
+end
+
+function lsq_fit(elements, field)
+    A = SparseMatrixCOO()
+    b = SparseMatrixCOO()
+    for element in elements
+	gdofs = get_connectivity(element)
+	for ip in get_integration_points(element)
+	    detJ = element(ip, time, Val{:detJ})
+	    w = ip.weight*detJ
+	    N = element(ip, time)
+	    f = field(element, ip, time)
+	    add!(A, gdofs, gdofs, w*kron(N', N))
+	    for i=1:length(f)
+		add!(b, gdofs, w*f[i]*N, i)
+	    end
+	end
+    end
+    A = sparse(A)
+    b = sparse(b)
+    A = 1/2*(A + A')
+    
+    nz = get_nonzero_rows(A)
+    F = ldltfact(A[nz,nz])
+
+    x = zeros(size(b)...)
+    x[nz, :] = F \ b[nz, :]
+    nodal_values = Dict(i => vec(x[i,:]) for i=1:size(x,1))
+    return nodal_values
+end
+
+S = lsq_fit(beam.elements, get_stress)
+
+# store values to xml/h5
+node_ids = sort(collect(keys(S)))
+stress = hcat([S[nid] for nid in node_ids]...)
+
+for (i, nid) in enumerate(node_ids)
+    println("$nid -> $(S[nid])")
+    if i > 3
+        println("...")
+        break
+    end
+end
+
+using JuliaFEM: new_dataitem, new_child, set_attribute, add_child, save!
+
+xdmf = get(solver.xdmf)
+dataitem = new_dataitem(xdmf, "/Results/Time $(solver.time)/Nodal Fields/Stress", stress)
+frame = read(xdmf, "/Domain/Grid/Grid")
+attribute = new_child(frame, "Attribute")
+set_attribute(attribute, "Name", "Stress")
+set_attribute(attribute, "Center", "Node")
+set_attribute(attribute, "AttributeType", "Tensor6")
+add_child(attribute, dataitem)
+
+save!(xdmf)
+close(xdmf.hdf)
 
