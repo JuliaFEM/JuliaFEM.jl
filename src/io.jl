@@ -6,7 +6,7 @@ using LightXML
 importall LightXML
 importall Base
 
-function new_element(name::AbstractString, attrs::Dict)
+function new_element(name::String, attrs::Dict)
     x = new_element(name)
     for (k, v) in attrs
         x[k] = v
@@ -14,19 +14,19 @@ function new_element(name::AbstractString, attrs::Dict)
     return x
 end
 
-function setindex!(x::XMLElement, content::Any, attr_name::AbstractString)
+function setindex!(x::XMLElement, content::Any, attr_name::String)
     set_attribute(x, attr_name, content)
 end
 
-function haskey(x::XMLElement, key::AbstractString)
+function haskey(x::XMLElement, key::String)
     return has_child(x, key) || has_attribute(x, key)
 end
 
-function has_child(x::XMLElement, child_name::AbstractString)
+function has_child(x::XMLElement, child_name::String)
     return get_child(x, child_name) != nothing
 end
 
-function get_attribute(x::XMLElement, attr_name::AbstractString)
+function get_attribute(x::XMLElement, attr_name::String)
     attr = attribute(x, attr_name)
     numeric = tryparse(Int64, attr)
     isnull(numeric) && (numeric = tryparse(Float64, attr))
@@ -34,15 +34,7 @@ function get_attribute(x::XMLElement, attr_name::AbstractString)
     return get(numeric)
 end
 
-function new_child(xparent::XMLElement, name::AbstractString, attrs::Dict)
-    x = new_child(xparent, name)
-    for (k, v) in attrs
-        x[k] = v
-    end
-    return x
-end
-
-function new_child(xparent::XMLElement, name::AbstractString, attrs::Pair...)
+function new_child(xparent::XMLElement, name::String, attrs::Dict)
     x = new_child(xparent, name)
     for (k, v) in attrs
         x[k] = v
@@ -58,7 +50,7 @@ using [] syntax or [@attr=value] syntax, see [1] for details. For last item use
 
 [1] http://www.xdmf.org/index.php/XDMF_Model_and_Format
 """
-function get_child(x::XMLElement, child_name::AbstractString)
+function get_child(x::XMLElement, child_name::String)
     '/' in child_name && return nothing
     m = match(r"(\w+)\[(.+)\]", child_name)
     if m != nothing
@@ -88,13 +80,13 @@ function get_child(x::XMLElement, child_name::AbstractString)
     throw("Unable to parse: $(m[2])")
 end
 
-function getindex(x::XMLElement, attr_name::AbstractString)
+function getindex(x::XMLElement, attr_name::String)
     attr_name = strip(attr_name, '/')
     child = get_child(x, attr_name)
     child == nothing || return child
     has_attribute(x, attr_name) && return get_attribute(x, attr_name)
     if '/' in attr_name
-        items = split(attr_name, '/')
+        items = map(String, split(attr_name, '/'))
         attr_name = first(items)
         length(items) > 1 || throw(KeyError(attr_name))
         haskey(x, attr_name) || throw(KeyError(attr_name))
@@ -107,7 +99,7 @@ function getindex(x::XMLElement, attr_name::AbstractString)
 end
 
 type Xdmf
-    name :: AbstractString
+    name :: String
     xml :: XMLElement
     hdf :: HDF5File
 end
@@ -116,12 +108,12 @@ function new_child(xdmf::Xdmf, args...; kwargs...)
     new_child(xdmf.xml, args...; kwargs...)
 end
 
-function read(xdmf::Xdmf, path::AbstractString)
+function read(xdmf::Xdmf, path::String)
     result = getindex(xdmf.xml, path)
     if endswith(path, "DataItem")
         format = get_attribute(result, "Format")
         @assert format == "HDF"
-        h5file, path = map(ASCIIString, split(content(result), ':'))
+        h5file, path = map(String, split(content(result), ':'))
         h5file = dirname(xdmf.name) * "/" * h5file
         isfile(h5file) || throw("Xdmf: h5 file $h5file not found!")
         return read(xdmf.hdf, path)
@@ -142,7 +134,7 @@ function xmffile(xdmf::Xdmf)
     return xdmf.name*".xmf"
 end
 
-function Xdmf(name::AbstractString)
+function Xdmf(name::String)
     xdmf = new_element("Xdmf")
     set_attribute(xdmf, "xmlns:xi", "http://www.w3.org/2001/XInclude")
     set_attribute(xdmf, "Version", "2.1")
@@ -158,7 +150,7 @@ function save!(xdmf::Xdmf)
     save_file(doc, xmffile(xdmf))
 end
 
-function new_dataitem{T,N}(xdmf::Xdmf, path::AbstractString, data::Array{T,N}; format="HDF")
+function new_dataitem{T,N}(xdmf::Xdmf, path::String, data::Array{T,N}; format="HDF")
     dataitem = new_element("DataItem")
     datatype = replace("$T", "64", "")
     dimensions = join(reverse(size(data)), " ")
