@@ -115,9 +115,11 @@ solver = Solver(Linear, beam, bc1, load)
 solver.xdmf = Xdmf("results")
 solver()
 
-# calculate stresses in integration points and use least-squares fitting to move results to nodes
+# calculate stresses in integration points and use least-squares fitting to
+# extrapolate results to nodes
 
-function get_stress(element, ip, time)
+""" Return stress tensor. """
+function get_stress_tensor(element, ip, time)
     haskey(element, "displacement") || return nothing
     gradu = element("displacement", ip, time, Val{:Grad})
     eps = 0.5*(gradu' + gradu)
@@ -126,9 +128,22 @@ function get_stress(element, ip, time)
     mu = E/(2.0*(1.0+nu))
     la = E*nu/((1.0+nu)*(1.0-2.0*nu))
     S = la*trace(eps)*I + 2.0*mu*eps
+    return S
+end
+
+""" Return stress vector in "ABAQUS" order 11, 22, 33, 12, 23, 13. """
+function get_stress(element, ip, time)
+    S = get_stress_tensor(element, ip, time)
     return [S[1,1], S[2,2], S[3,3], S[1,2], S[2,3], S[1,3]]
 end
 
+""" Return principal stresses. """
+function get_stress_principal(element, ip, time)
+    S = get_stress_tensor(element, ip, time)
+    return sort(eigvals(S))
+end
+
+""" Make least squares fit for some field to nodes. """
 function lsq_fit(elements, field)
     A = SparseMatrixCOO()
     b = SparseMatrixCOO()
@@ -167,28 +182,45 @@ end
 
 xdmf = get(solver.xdmf)
 S = lsq_fit(beam.elements, get_stress)
+#Sp = lsq_fit(beam.elements, get_stress_principal)
 
-# store values to xml/h5
-node_ids = sort(collect(keys(S)))
-stress = hcat([S[nid] for nid in node_ids]...)
-
-for (i, nid) in enumerate(node_ids)
-    println("$nid -> $(S[nid])")
-    if i > 3
-        println("...")
-        break
-    end
+# Calculate principal stresses in nodes
+Sp = Dict()
+for (nid, s) in S
+    # order is: 11, 22, 33, 12, 23, 13
+    stress_tensor = [
+        s[1] s[4] s[6]
+        s[4] s[2] s[5]
+        s[6] s[5] s[3]]
+    Sp[nid] = sort(eigvals(stress_tensor))
 end
 
 using JuliaFEM: new_dataitem, new_child, set_attribute, add_child, save!
 
-dataitem = new_dataitem(xdmf, "/Results/Time $(solver.time)/Nodal Fields/Stress", stress)
-frame = read(xdmf, "/Domain/Grid/Grid")
-attribute = new_child(frame, "Attribute")
-set_attribute(attribute, "Name", "Stress")
-set_attribute(attribute, "Center", "Node")
-set_attribute(attribute, "AttributeType", "Tensor6")
-add_child(attribute, dataitem)
+""" Store values to xml/h5. """
+function add_field_to_xdmf!(xdmf, field_name, path, data::Dict; field_type="Vector")
+    node_ids = sort(collect(keys(data)))
+    info("Storing field $field_name to path $path")
+    println("$path in nodes:")
+    for (i, nid) in enumerate(node_ids)
+        println("$nid -> $(data[nid])")
+        if i > 2
+            println("...")
+            break
+        end
+    end
+    datavec = hcat([data[nid] for nid in node_ids]...)
+    dataitem = new_dataitem(xdmf, path, datavec)
+    frame = read(xdmf, "/Domain/Grid/Grid")
+    attribute = new_child(frame, "Attribute")
+    set_attribute(attribute, "Name", field_name)
+    set_attribute(attribute, "Center", "Node")
+    set_attribute(attribute, "AttributeType", field_type)
+    add_child(attribute, dataitem)
+end
+
+add_field_to_xdmf!(xdmf, "Stress", "/Results/Time $(solver.time)/Nodal Fields/Stress", S; field_type="Tensor6")
+add_field_to_xdmf!(xdmf, "Principal Stress", "/Results/Time $(solver.time)/Nodal Fields/Principal Stress", Sp; field_type="Vector")
 save!(xdmf)
 
 close(xdmf.hdf)
