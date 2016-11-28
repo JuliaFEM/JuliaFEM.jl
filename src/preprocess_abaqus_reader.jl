@@ -38,21 +38,25 @@ Function for parsing nodes from the file
 function parse_section(model, lines, key::Symbol, idx_start,
     idx_end, ::Type{Val{:NODE}})
 
-    info("Parsing nodes")
+    info("Parsing *NODE block between lines $idx_start .. $idx_end")
+    nnodes = 0
     ids = Integer[]
     definition = lines[idx_start]
+    debug("Definition line = $definition")
     for line in lines[idx_start + 1: idx_end]
         if !(empty_or_comment_line(line))
             m = matchall(r"[-0-9.eE+]+", line)
             node_id = parse(Int, m[1])
             coords = float(m[2:end])
             model["nodes"][node_id] = coords
+            nnodes += 1
         end
     end
+    info("$nnodes nodes found")
     has_set_def = match(r"NSET=([\w\_\-]+)", definition) 
     if has_set_def != nothing
       set_name = has_set_def[1]
-      info("Creating nset $set_name")
+      info("Creating node set $set_name")
       model["nsets"][set_name] = ids
   end
 end
@@ -163,13 +167,13 @@ end
 Parse SURFACE keyword
 """
 function parse_section(model, lines, key, idx_start, idx_end, ::Type{Val{:SURFACE}})
-    info("Parsing surface")
+    debug("Parsing surface")
     #definition = uppercase(lines[idx_start])
     definition = lines[idx_start]
     #has_set_def = match(r"TYPE=([\w\_\-]+),.*NAME=([\w\_\-]+)", definition) 
     has_set_def = Dict(map(y -> lowercase(strip(y[1])) => strip(y[2]), map(x -> split(x, "="), matchall(r"([\w\_\-]+[ ]*=[ ]*[\w\_\-]+)", definition)))) 
     has_set_def != nothing || return
-    info(has_set_def)
+    debug(has_set_def)
     set_type = Symbol(has_set_def["type"])
     set_name = Symbol(has_set_def["name"])
     data = Vector{Tuple{Int64, Symbol}}()
@@ -199,7 +203,6 @@ function find_keywords(lines)
             push!(indexes, idx)
         end
     end
-    push!(indexes, length(lines) + 1)
     return indexes
 end
 
@@ -209,6 +212,10 @@ Main function for parsing Abaqus input file.
 function parse_abaqus(fid::IOStream)
     lines = readlines(fid)
     keyword_indexes = find_keywords(lines)
+    nkeyword_indexes = length(keyword_indexes)
+    debug("$nkeyword_indexes keyword indexes found: $keyword_indexes")
+
+    push!(keyword_indexes, length(lines)+1)
     idx_start = keyword_indexes[1]
     keyword_sym::Symbol = :none
     parser::Function = x->()
@@ -220,14 +227,16 @@ function parse_abaqus(fid::IOStream)
     model["surfaces"] = Dict{Symbol, Vector{Tuple{Int64, Symbol}}}()
     model["surface_types"] = Dict{Symbol, Symbol}()
     for idx_end in keyword_indexes[2:end]
-        keyword_line = uppercase(lines[idx_start])
-        keyword = regex_match(r"\s*([\w ]+)", keyword_line, 1)
+        keyword_line = strip(uppercase(lines[idx_start]))
+        keyword = strip(regex_match(r"\s*([\w ]+)", keyword_line, 1))
         k_sym = Symbol(keyword)
         args = Tuple{Dict, Vector{Int}, Symbol, Int, Int, Type{Val{k_sym}}}
         if method_exists(parse_section, args)
             parse_section(model, lines, k_sym, idx_start, idx_end-1, Val{k_sym})
-#       else
-#           warn("Unknown section: $(keyword)")
+        else
+            debug("Unknown section: '$(keyword)'")
+            debug("keyword_line = '$keyword_line'")
+            debug("idx_start = $idx_start, idx_end = $idx_end")
         end
         idx_start = idx_end
     end
