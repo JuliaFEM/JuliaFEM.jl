@@ -64,8 +64,24 @@ function create_interface(mesh, slave::Problem, master::Problem)
     return create_interface(mesh, slave_surface, master_surface)
 end
 
+""" Convert Mesh object from quadratic to linear. """
+function to_linear!(mesh)
+    mapping = Dict(:Tet10 => :Tet4, :Tri6 => :Tri3)
+    nnodes = Dict(:Tet4 => 4, :Tri3 => 3)
+    for elid in keys(mesh.elements)
+        eltype = mesh.element_types[elid]
+        if haskey(mapping, eltype)
+            mesh.element_types[elid] = mapping[eltype]
+            nnodes_new = nnodes[mapping[eltype]]
+            mesh.elements[elid] = mesh.elements[elid][1:nnodes_new]
+        end
+    end
+end
+
 # start of simulation
-mesh = abaqus_read_mesh("beam_3d_2nd_order_tetra_30mm.inp")
+mesh = abaqus_read_mesh("beam_3d_1st_order_tetra_30mm.inp")
+#mesh = abaqus_read_mesh("beam_3d_2nd_order_tetra_30mm.inp")
+#to_linear!(mesh)
 info("element sets = ", collect(keys(mesh.element_sets)))
 info("surface sets = ", collect(keys(mesh.surface_sets)))
 
@@ -95,7 +111,7 @@ update!(load, "surface pressure", 20.0)
 # solution
 isfile("results.h5") && rm("results.h5")
 isfile("results.xmf") && rm("results.xmf")
-solver = Solver(Linear, beam, load)
+solver = Solver(Linear, beam, bc1, load)
 solver.xdmf = Xdmf("results")
 solver()
 
@@ -116,35 +132,40 @@ end
 function lsq_fit(elements, field)
     A = SparseMatrixCOO()
     b = SparseMatrixCOO()
+    volume = 0.0
     for element in elements
-	gdofs = get_connectivity(element)
-	for ip in get_integration_points(element)
-	    detJ = element(ip, time, Val{:detJ})
-	    w = ip.weight*detJ
-	    N = element(ip, time)
-	    f = field(element, ip, time)
-	    add!(A, gdofs, gdofs, w*kron(N', N))
-	    for i=1:length(f)
-		add!(b, gdofs, w*f[i]*N, i)
+        gdofs = get_connectivity(element)
+        # increase integration order by 1 from default
+        for ip in get_integration_points(element, 1)
+	        detJ = element(ip, time, Val{:detJ})
+	        w = ip.weight*detJ
+	        N = element(ip, time)
+	        f = field(element, ip, time)
+	        add!(A, gdofs, gdofs, w*kron(N', N))
+	        for i=1:length(f)
+                add!(b, gdofs, w*f[i]*N, i)
+            end
+            volume += w
 	    end
-	end
     end
+    info("Mass matrix for least-squares fit is assembled. Total volume to fit: $volume")
     A = sparse(A)
     b = sparse(b)
     A = 1/2*(A + A')
     
     SparseArrays.droptol!(A, 1.0e-6)
+    SparseArrays.dropzeros!(A)
     nz = get_nonzero_rows(A)
-    dropzeros!(A)
-    F = ldltfact(A)
+    F = ldltfact(A[nz,nz])
 
     x = zeros(size(b)...)
     x[nz, :] = F \ b[nz, :]
 
-    nodal_values = Dict(i => vec(x[i,:]) for i=1:size(x,1))
+    nodal_values = Dict(i => vec(x[i,:]) for i in nz)
     return nodal_values
 end
 
+xdmf = get(solver.xdmf)
 S = lsq_fit(beam.elements, get_stress)
 
 # store values to xml/h5
@@ -161,7 +182,6 @@ end
 
 using JuliaFEM: new_dataitem, new_child, set_attribute, add_child, save!
 
-xdmf = get(solver.xdmf)
 dataitem = new_dataitem(xdmf, "/Results/Time $(solver.time)/Nodal Fields/Stress", stress)
 frame = read(xdmf, "/Domain/Grid/Grid")
 attribute = new_child(frame, "Attribute")
@@ -169,7 +189,7 @@ set_attribute(attribute, "Name", "Stress")
 set_attribute(attribute, "Center", "Node")
 set_attribute(attribute, "AttributeType", "Tensor6")
 add_child(attribute, dataitem)
-
 save!(xdmf)
+
 close(xdmf.hdf)
 
