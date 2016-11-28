@@ -3,18 +3,23 @@
 
 # __precompile__()
 
-using Logging
-
-if haskey(ENV, "JULIAFEM_LOGLEVEL")
-    ENV["JULIAFEM_LOGLEVEL"] == "DEBUG" && Logging.configure(level=DEBUG)
-end
-
 """
 This is JuliaFEM -- Finite Element Package
 """
 module JuliaFEM
 
 importall Base
+
+using Logging
+
+Logging.configure(level=INFO)
+
+if haskey(ENV, "JULIAFEM_LOGLEVEL")
+    ENV["JULIAFEM_LOGLEVEL"] == "INFO" && Logging.configure(level=INFO)
+    ENV["JULIAFEM_LOGLEVEL"] == "DEBUG" && Logging.configure(level=DEBUG)
+end
+
+export info, debug
 
 module Testing
 

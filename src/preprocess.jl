@@ -95,8 +95,8 @@ function create_element(mesh::Mesh, id::Int)
     connectivity = mesh.elements[id]
     element_type = getfield(JuliaFEM, mesh.element_types[id])
     element = Element(element_type, connectivity)
-    update!(element, "geometry", mesh.nodes)
     element.id = id
+    update!(element, "geometry", mesh.nodes)
     return element
 end
 

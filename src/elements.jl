@@ -198,9 +198,20 @@ julia> update!(element, "geometry", data)
 As a result element now have time invariant (variable) vector field "geometry" with data ([0.0, 0.0], [1.0, 2.0]).
 
 """
-function update!(element::Element, field_name::AbstractString, data::Dict)
+function update!{E}(element::Element{E}, field_name::AbstractString, data::Dict)
     #element[field_name] = Field(data)
-    element[field_name] = [data[i] for i in get_connectivity(element)]
+    element_id = element.id
+    local_connectivity = get_connectivity(element)
+    for i in local_connectivity
+        if !haskey(data, i)
+            ndata = length(data)
+            critical("Unable to set field data $field_name for element $E with
+            id $element_id and connectivity $local_connectivity: no data for
+            node id $i found. Length of data dict = $ndata")
+        end
+    end
+    local_data = [data[i] for i in local_connectivity]
+    element[field_name] = local_data
 end
 
 function update!{K,V}(element::Element, field_name, data::Pair{Float64, Dict{K, V}})
