@@ -79,8 +79,8 @@ function to_linear!(mesh)
 end
 
 # start of simulation
-mesh = abaqus_read_mesh("beam_3d_1st_order_tetra_30mm.inp")
-#mesh = abaqus_read_mesh("beam_3d_2nd_order_tetra_30mm.inp")
+#mesh = abaqus_read_mesh("beam_3d_1st_order_tetra_30mm.inp")
+mesh = abaqus_read_mesh("beam_3d_2nd_order_tetra_30mm.inp")
 #to_linear!(mesh)
 info("element sets = ", collect(keys(mesh.element_sets)))
 info("surface sets = ", collect(keys(mesh.surface_sets)))
@@ -186,13 +186,18 @@ S = lsq_fit(beam.elements, get_stress)
 
 # Calculate principal stresses in nodes
 Sp = Dict()
+Sa = Dict()
+Sm = Dict()
 for (nid, s) in S
     # order is: 11, 22, 33, 12, 23, 13
     stress_tensor = [
         s[1] s[4] s[6]
         s[4] s[2] s[5]
         s[6] s[5] s[3]]
-    Sp[nid] = sort(eigvals(stress_tensor))
+    principle = sort(eigvals(stress_tensor))
+    Sp[nid] = principle
+    Sa[nid] = (maximum(principle) - minimum(principle)) / 2
+    Sm[nid] = (maximum(principle) + minimum(principle)) / 2
 end
 
 using JuliaFEM: new_dataitem, new_child, set_attribute, add_child, save!
@@ -221,6 +226,8 @@ end
 
 add_field_to_xdmf!(xdmf, "Stress", "/Results/Time $(solver.time)/Nodal Fields/Stress", S; field_type="Tensor6")
 add_field_to_xdmf!(xdmf, "Principal Stress", "/Results/Time $(solver.time)/Nodal Fields/Principal Stress", Sp; field_type="Vector")
+add_field_to_xdmf!(xdmf, "Stress Amplitude", "/Results/Time $(solver.time)/Nodal Fields/Stress Amplitude", Sa; field_type="Scalar")
+add_field_to_xdmf!(xdmf, "Mean Stress", "/Results/Time $(solver.time)/Nodal Fields/Mean Stress", Sm; field_type="Scalar")
 save!(xdmf)
 
 close(xdmf.hdf)
