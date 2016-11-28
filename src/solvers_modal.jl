@@ -399,12 +399,10 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
     add_child(geometry, data_geometry)
 
     # 2. save topology
-
-    nid_mapping = Dict(j=>i for (i, j) in enumerate(node_ids))
-    
+    nid_mapping = Dict(j=>i for (i, j) in enumerate(node_ids)) 
     all_elements = get_all_elements(solver)
     nelements = length(all_elements)
-    info("Saving topology: $nelements elements total.")
+    debug("Saving topology: $nelements elements total.")
     element_types = unique(map(get_element_type, all_elements))
 
     xdmf_element_mapping = Dict(
@@ -430,22 +428,9 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
         nelements = length(elements)
         info("Xdmf save: $nelements elements of type $element_type")
         sort!(elements, by=get_element_id)
-        #elements = elements[1:5]
         element_ids = map(get_element_id, elements)
-        #element_conn = map(get_connectivity, elements)
-        #trans = element -> [nid_mapping[j] for j in get_connectivity(element)]
-        #element_conn = map(trans, element_conn)
-        #info("first element, connectivity = $(get_connectivity(first(elements)))")
-        #info("first element, coordinates = $([X_[j] for j in get_connectivity(first(elements))])")
         element_conn = map(element -> [nid_mapping[j]-1 for j in get_connectivity(element)], elements)
-        #info("conn2 = $element_conn")
-        #G1 = vec(first(elements)("geometry", solver.time))
-        #G1 = reshape(G1, 3, 4)
-        #G2 = X[:, first(element_conn)+1]
-        #info("first element, coordinates from geometry field = $G1")
-        #info("first element, coordinates from array = $G2")
         element_conn = hcat(element_conn...)
-        #info(element_conn)
         element_code = split(string(element_type), ".")[end]
         dataitem = new_dataitem(xdmf, "/Topology/$element_code/Element IDs", element_ids)
         dataitem = new_dataitem(xdmf, "/Topology/$element_code/Connectivity", element_conn)
@@ -454,7 +439,6 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
         set_attribute(topology_, "NumberOfElements", length(elements))
         add_child(topology_, dataitem)
         push!(topology, topology_)
-        #break
     end
 
     # save modes
@@ -471,7 +455,7 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
         end
 
         mode = zeros(X)
-	mode_ = solver.properties.eigvecs[:,j]
+        mode_ = solver.properties.eigvecs[:,j]
         mode_ = reshape(mode_, ndim, round(Int, length(mode_)/ndim))
         for nid in node_ids
             loc = nid_mapping[nid]
