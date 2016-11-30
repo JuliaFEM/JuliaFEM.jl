@@ -292,7 +292,11 @@ function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{2}})
     # construct global system Ax = b and solve using lufact (UMFPACK)
     A = [K C1'; C2  D]
     b = [f; g]
-    x = lufact(A) \ full(b)
+    nz1 = get_nonzero_rows(A)
+    nz2 = get_nonzero_columns(A)
+    dim = size(A, 1)
+    x = zeros(dim)
+    x[nz1] = lufact(A[nz1,nz2]) \ full(b[nz1])
     u[:] = x[1:solver.ndofs]
     la[:] = x[solver.ndofs+1:end]
     return true
