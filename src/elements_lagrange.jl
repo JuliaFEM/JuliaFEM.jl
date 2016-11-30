@@ -473,6 +473,56 @@ end
 
 #
 
+type Wedge15 <: AbstractElement
+end
+
+function description(::Type{Wedge15})
+    "15 node prismatic element (wedge)"
+end
+
+function size(element::Element{Wedge15})
+    return (3, 15)
+end
+
+function length(element::Element{Wedge15})
+    return 15
+end
+
+function get_reference_coordinates(::Type{Wedge15})
+    Vector{Float64}[
+        [0.0, 0.0, -1.0], # N1
+        [1.0, 0.0, -1.0], # N2
+        [0.0, 1.0, -1.0], # N3
+        [0.0, 0.0,  1.0], # N4
+        [1.0, 0.0,  1.0], # N5
+        [0.0, 1.0,  1.0], # N6
+        [0.5, 0.0, -1.0], # N7
+        [0.5, 0.5, -1.0], # N8
+        [0.0, 0.5, -1.0], # N9
+        [0.5, 0.0,  1.0], # N10
+        [0.5, 0.5,  1.0], # N11
+        [0.0, 0.5,  1.0], # N12
+        [0.0, 0.0,  0.0], # N13
+        [1.0, 0.0,  0.0], # N14
+        [0.0, 1.0,  0.0]] # N15
+end
+
+function get_interpolation_polynomial(::Type{Wedge15}, x)
+    [
+        1 x[1] x[1]^2 x[2] x[1]*x[2] x[2]^2 x[3] x[1]*x[3] x[1]^2*x[3] x[2]*x[3] x[1]*x[2]*x[3] x[2]^2*x[3] x[3]^2 x[1]*x[3]^2 x[2]*x[3]^2
+    ]
+end
+
+function get_interpolation_polynomial(::Type{Wedge15}, x, ::Type{Val{:partial_derivatives}})
+    [
+        0 1 2*x[1] 0 x[2] 0 0 x[3] 2*x[1]*x[3] 0 x[2]*x[3] 0 0 x[3]^2 0
+        0 0 0 1 x[1] 2*x[2] 0 0 0 x[3] x[1]*x[3] 2*x[2]*x[3] 0 0 x[3]^2
+        0 0 0 0 0 0 1 x[1] x[1]^2 x[2] x[1]*x[2] x[2]^2 2*x[3] 2*x[1]*x[3] 2*x[2]*x[3]
+    ]
+end
+
+#
+
 type Hex8 <: AbstractElement
 end
 
@@ -664,6 +714,7 @@ end
 @create_basis Tet4
 @create_basis Tet10
 @create_basis Wedge6
+@create_basis Wedge15
 @create_basis Hex8
 @create_basis Hex20
 @create_basis Hex27
@@ -680,3 +731,4 @@ end
 function get_reference_coordinates{E}(element::Element{E})
     get_reference_coordinates(E)
 end
+
