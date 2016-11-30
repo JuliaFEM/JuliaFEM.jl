@@ -103,17 +103,30 @@ function get_integration_points(element::TriangularElement, ::Type{Val{2}})
     return zip(weights, points)
 end
 
+#=
+""" Note, this rule is having negative weight. """
 function get_integration_points(element::TriangularElement, ::Type{Val{3}})
-    weights = 0.5*[
-        -0.5625,
-         0.5208333333333333,
-         0.5208333333333333,
-         0.5208333333333333]
+    weights = [-27.0/96.0, 25.0/96.0, 25.0/96.0, 25.0/96.0]
     points = Vector{Float64}[
         [1.0/3.0, 1.0/3.0],
-        [0.2, 0.2],
-        [0.2, 0.6],
-        [0.6, 0.2]]
+        [1.0/5.0, 1.0/5.0],
+        [1.0/5.0, 3.0/5.0],
+        [3.0/5.0, 1.0/5.0]]
+    return zip(weights, points)
+end
+=#
+
+function get_integration_points(element::TriangularElement, ::Type{Val{3}})
+    weights = [
+        1.5902069087198858469718450103758e-01,
+        9.0979309128011415302815498962418e-02,
+        1.5902069087198858469718450103758e-01,
+        9.0979309128011415302815498962418e-02]
+    points = Vector{Float64}[
+        [1.5505102572168219018027159252941e-01, 1.7855872826361642311703513337422e-01],
+        [6.4494897427831780981972840747059e-01, 7.5031110222608118177475598324603e-02],
+        [1.5505102572168219018027159252941e-01, 6.6639024601470138670269327409637e-01],
+        [6.4494897427831780981972840747059e-01, 2.8001991549907407200279599420481e-01]]
     return zip(weights, points)
 end
 
@@ -225,8 +238,9 @@ function get_integration_points(element::TetrahedralElement, ::Type{Val{4}})
     return zip(weights, points)
 end
 
-typealias PrismaticElement Union{Wedge6}
+typealias PrismaticElement Union{Wedge6, Wedge15}
 
+#=
 function get_integration_points(element::PrismaticElement, ::Type{Val{2}})
     weights = 1/6*[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
     points = Vector{Float64}[
@@ -236,6 +250,53 @@ function get_integration_points(element::PrismaticElement, ::Type{Val{2}})
         [0.5, 0.0,  1.0/sqrt(3)],
         [0.0, 0.5,  1.0/sqrt(3)],
         [0.5, 0.5,  1.0/sqrt(3)]]
+    return zip(weights, points)
+end
+=#
+
+# tensor product of triangular element + segment element
+function get_integration_points(element::PrismaticElement, ::Type{Val{2}})
+    weights = 1.0/6.0*[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    points = Vector{Float64}[
+        [2.0/3.0, 1.0/6.0, -1.0/sqrt(3.0)],
+        [1.0/6.0, 2.0/3.0, -1.0/sqrt(3.0)],
+        [1.0/6.0, 1.0/6.0, -1.0/sqrt(3.0)],
+        [2.0/3.0, 1.0/6.0, +1.0/sqrt(3.0)],
+        [1.0/6.0, 2.0/3.0, +1.0/sqrt(3.0)],
+        [1.0/6.0, 1.0/6.0, +1.0/sqrt(3.0)],
+        ]
+    return zip(weights, points)
+end
+
+# tensor product of triangular element + segment element
+function get_integration_points(element::PrismaticElement, ::Type{Val{3}})
+    weights = [
+        5.0/9.0*1.5902069087198858469718450103758e-01,
+        5.0/9.0*9.0979309128011415302815498962418e-02,
+        5.0/9.0*1.5902069087198858469718450103758e-01,
+        5.0/9.0*9.0979309128011415302815498962418e-02,
+        8.0/9.0*1.5902069087198858469718450103758e-01,
+        8.0/9.0*9.0979309128011415302815498962418e-02,
+        8.0/9.0*1.5902069087198858469718450103758e-01,
+        8.0/9.0*9.0979309128011415302815498962418e-02,
+        5.0/9.0*1.5902069087198858469718450103758e-01,
+        5.0/9.0*9.0979309128011415302815498962418e-02,
+        5.0/9.0*1.5902069087198858469718450103758e-01,
+        5.0/9.0*9.0979309128011415302815498962418e-02]
+    points = Vector{Float64}[
+        [1.5505102572168219018027159252941e-01, 1.7855872826361642311703513337422e-01, -sqrt(3.0/5.0)],
+        [6.4494897427831780981972840747059e-01, 7.5031110222608118177475598324603e-02, -sqrt(3.0/5.0)],
+        [1.5505102572168219018027159252941e-01, 6.6639024601470138670269327409637e-01, -sqrt(3.0/5.0)],
+        [6.4494897427831780981972840747059e-01, 2.8001991549907407200279599420481e-01, -sqrt(3.0/5.0)],
+        [1.5505102572168219018027159252941e-01, 1.7855872826361642311703513337422e-01, 0.0],
+        [6.4494897427831780981972840747059e-01, 7.5031110222608118177475598324603e-02, 0.0],
+        [1.5505102572168219018027159252941e-01, 6.6639024601470138670269327409637e-01, 0.0],
+        [6.4494897427831780981972840747059e-01, 2.8001991549907407200279599420481e-01, 0.0],
+        [1.5505102572168219018027159252941e-01, 1.7855872826361642311703513337422e-01, sqrt(3.0/5.0)],
+        [6.4494897427831780981972840747059e-01, 7.5031110222608118177475598324603e-02, sqrt(3.0/5.0)],
+        [1.5505102572168219018027159252941e-01, 6.6639024601470138670269327409637e-01, sqrt(3.0/5.0)],
+        [6.4494897427831780981972840747059e-01, 2.8001991549907407200279599420481e-01, sqrt(3.0/5.0)],
+        ]
     return zip(weights, points)
 end
 
@@ -249,7 +310,7 @@ end
 
 typealias LinearElement Union{Seg2, Tri3, Quad4, Tet4, Wedge6, Hex8}
 
-typealias QuadraticElement Union{Seg3, Tri6, Tri7, Tet10, Quad8, Quad9, Hex20, Hex27}
+typealias QuadraticElement Union{Seg3, Tri6, Tri7, Tet10, Quad8, Quad9, Wedge15, Hex20, Hex27}
 
 function get_integration_order(element::LinearElement)
     return 2
