@@ -240,7 +240,6 @@ end
 
 typealias PrismaticElement Union{Wedge6, Wedge15}
 
-#=
 function get_integration_points(element::PrismaticElement, ::Type{Val{2}})
     weights = 1/6*[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
     points = Vector{Float64}[
@@ -252,9 +251,9 @@ function get_integration_points(element::PrismaticElement, ::Type{Val{2}})
         [0.5, 0.5,  1.0/sqrt(3)]]
     return zip(weights, points)
 end
-=#
 
 # tensor product of triangular element + segment element
+#=
 function get_integration_points(element::PrismaticElement, ::Type{Val{2}})
     weights = 1.0/6.0*[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
     points = Vector{Float64}[
@@ -267,8 +266,10 @@ function get_integration_points(element::PrismaticElement, ::Type{Val{2}})
         ]
     return zip(weights, points)
 end
+=#
 
 # tensor product of triangular element + segment element
+#=
 function get_integration_points(element::PrismaticElement, ::Type{Val{3}})
     weights = [
         5.0/9.0*1.5902069087198858469718450103758e-01,
@@ -296,6 +297,79 @@ function get_integration_points(element::PrismaticElement, ::Type{Val{3}})
         [6.4494897427831780981972840747059e-01, 7.5031110222608118177475598324603e-02, sqrt(3.0/5.0)],
         [1.5505102572168219018027159252941e-01, 6.6639024601470138670269327409637e-01, sqrt(3.0/5.0)],
         [6.4494897427831780981972840747059e-01, 2.8001991549907407200279599420481e-01, sqrt(3.0/5.0)],
+        ]
+    return zip(weights, points)
+end
+=#
+
+#=
+function get_integration_points(element::PrismaticElement, ::Type{Val{2}})
+    weights = 1.0/96.0*[-27.0, 25.0, 25.0, 25.0, -27.0, 25.0, 25.0, 25.0]
+    a = 1.0/sqrt(3.0)
+    points = Vector{Float64}[
+        [1/3, 1/3, -a],
+        [0.6, 0.2, -a],
+        [0.2, 0.6, -a],
+        [0.2, 0.2, -a],
+        [1/3, 1/3,  a],
+        [0.6, 0.2,  a],
+        [0.2, 0.6,  a],
+        [0.2, 0.2,  a]]
+    return zip(weights, points)
+end
+=#
+
+function get_integration_points(element::PrismaticElement, ::Type{Val{3}})
+    alpha = sqrt(3/5)
+    c1 = 5/9
+    c2 = 8/9
+    a = (6+sqrt(15))/21
+    b = (6-sqrt(15))/21
+    weights = [
+        c1*9/80,
+        c1*((155+sqrt(15))/2400),
+        c1*((155+sqrt(15))/2400),
+        c1*((155+sqrt(15))/2400),
+        c1*((155-sqrt(15))/2400),
+        c1*((155-sqrt(15))/2400),
+        c1*((155-sqrt(15))/2400),
+        c2*9/80,
+        c2*((155+sqrt(15))/2400),
+        c2*((155+sqrt(15))/2400),
+        c2*((155+sqrt(15))/2400),
+        c2*((155-sqrt(15))/2400),
+        c2*((155-sqrt(15))/2400),
+        c2*((155-sqrt(15))/2400),
+        c1*9/80,
+        c1*((155+sqrt(15))/2400),
+        c1*((155+sqrt(15))/2400),
+        c1*((155+sqrt(15))/2400),
+        c1*((155-sqrt(15))/2400),
+        c1*((155-sqrt(15))/2400),
+        c1*((155-sqrt(15))/2400),
+    ]
+    points = Vector{Float64}[
+        [1/3, 1/3, -alpha],
+        [a, a, -alpha],
+        [1-2a, a, -alpha],
+        [a, 1-2a, -alpha],
+        [b, b, -alpha],
+        [1-2b, b, -alpha],
+        [b, 1-2b, -alpha],
+        [1/3, 1/3, 0],
+        [a, a, 0],
+        [1-2a, a, 0],
+        [a, 1-2a, 0],
+        [b, b, 0],
+        [1-2b, b, 0],
+        [b, 1-2b, 0],
+        [1/3, 1/3, alpha],
+        [a, a, alpha],
+        [1-2a, a, alpha],
+        [a, 1-2a, alpha],
+        [b, b, alpha],
+        [1-2b, b, alpha],
+        [b, 1-2b, alpha],
         ]
     return zip(weights, points)
 end
