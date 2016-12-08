@@ -223,8 +223,7 @@ end
 
 function (solver::Solver{Modal})(; show_info=true, debug=false,
               bc_invertible=false, P=nothing, symmetric=true,
-              empty_assemblies_before_solution=true, dense=false,
-	      real_eigenvalues=true, positive_eigenvalues=true)
+              empty_assemblies_before_solution=true, dense=false)
     show_info && info(repeat("-", 80))
     show_info && info("Starting natural frequency solver")
     show_info && info("Increment time t=$(round(solver.time, 3))")
@@ -299,7 +298,7 @@ function (solver::Solver{Modal})(; show_info=true, debug=false,
 
     if dense
         K_red = full(K_red)
-	M_red = full(M_red)
+        M_red = full(M_red)
     end
 
     try
@@ -311,72 +310,31 @@ function (solver::Solver{Modal})(; show_info=true, debug=false,
         info("is M symmetric? ", issym(M_red))
         info("is K positive definite? ", isposdef(K_red))
         info("is M positive definite? ", isposdef(M_red))
-	dump(full(K_red[1:10,1:10]))
-	if size(K_red, 1) < 2000
-	    om2 = eigvals(full(K_red))
-	    info("om2 = $om2")
-	end
-        #k1 = maximum(abs(K_red[nz,nz] - K_red[nz,nz]'))
-        #m1 = maximum(abs(M_red[nz,nz] - M_red[nz,nz]'))
-        #info("K 'skewness' (max(abs(K - K'))) = ", k1)
-        #info("M 'skewness' (max(abs(M - M'))) = ", m1)
-        #info("original matrix")
-        #info("is K symmetric? ", issym(K[nz,nz]))
-        #info("is M symmetric? ", issym(M[nz,nz]))
-        #info("is K positive definite? ", isposdef(K[nz,nz]))
-        #info("is M positive definite? ", isposdef(M[nz,nz]))
-        #k1 = maximum(abs(K[nz,nz] - K[nz,nz]'))
-        #m1 = maximum(abs(M[nz,nz] - M[nz,nz]'))
-        #info("K 'skewness' (max(abs(K - K'))) = ", k1)
-        #info("M 'skewness' (max(abs(M - M'))) = ", m1)
+	    dump(full(K_red[1:10,1:10]))
+        if size(K_red, 1) < 2000
+            om2 = eigvals(full(K_red))
+            info("om2 = $om2")
+        end
         rethrow()
     end
     
     t1 = round(toq(), 2)
     info("Eigenvalues computed in $t1 seconds. Squared eigenvalues: $om2")
 
-    if real_eigenvalues
-        om2 = real(om2)
-    end
-
-    if positive_eigenvalues
-        om2[om2 .< 0.0] = 0.0
-    end
- 
-    om = sqrt(om2)
-
-    props.eigvals = om
-    props.eigvecs = zeros(ndofs, length(om))
-    for i=1:length(om)
+    props.eigvals = om2
+    neigvals = length(om2)
+    props.eigvecs = zeros(ndofs, neigvals)
+    for i=1:neigvals
         props.eigvecs[nz,i] = X[:,i]
         for problem in get_boundary_problems(solver)
             isa(problem, Problem{Mortar}) || continue
             S, M, P = calc_projection(problem, dim)
-	    # us = P*um
+            # FIXME: store projection to boundary problem, i.e.
+            # update!(problem, "master-slave projection", time => P)
+	        # us = P*um
             props.eigvecs[S,i] = P*props.eigvecs[M,i]
         end
     end
-
-
-#=
-    for i=1:length(om)
-        freq = real(om[i]/(2.0*pi))
-        u = props.eigvecs[:,i]
-        field_dim = get_unknown_field_dimension(solver)
-        field_name = get_unknown_field_name(solver)
-        if field_dim != 1
-            nnodes = round(Int, length(u)/field_dim)
-            u = reshape(u, field_dim, nnodes)
-            u = Vector{Float64}[u[:,i] for i in 1:nnodes]
-        end
-        for problem in get_problems(solver)
-            for element in get_elements(problem)
-                connectivity = get_connectivity(element)
-                update!(element, field_name, freq => u[connectivity])
-            end
-        end
-    end
-=#
 
     update_xdmf!(solver)
     return true
@@ -384,6 +342,11 @@ function (solver::Solver{Modal})(; show_info=true, debug=false,
 end
 
 function update_xdmf!(solver::Solver{Modal}; show_info=true)
+
+    if maximum(abs(imag(solver.properties.eigvals))) > 1.0e-9
+        error("Writing imaginary eigenvalues for Xdmf not supported.")
+    end
+
     xdmf = get(solver.xdmf)
 
     # geometry
@@ -418,13 +381,17 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
         "Hex20" => "Hex_20")
 
     # save modes
-    
+
     temporal_collection = get_temporal_collection(xdmf)
 
-    freqs = real(solver.properties.eigvals/(2.0*pi))
     unknown_field_name = ucfirst(get_unknown_field_name(solver))
     frames = []
-    for (j, freq) in enumerate(freqs)
+    for (j, eigval) in enumerate(real(solver.properties.eigvals))
+        if eigval < 0.0
+            warn("negative real eigenvalue found, om2=$eigval, setting to zero.")
+            eigval = 0.0
+        end
+        freq = sqrt(eigval)/(2.0*pi)
         path = "/Results/Natural Frequency Analysis/$unknown_field_name/Mode $j"
         info("Creating frequency frame f=$(round(freq, 3)), path=$path")
 
