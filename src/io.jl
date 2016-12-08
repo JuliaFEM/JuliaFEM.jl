@@ -134,11 +134,29 @@ function xmffile(xdmf::Xdmf)
     return xdmf.name*".xmf"
 end
 
-function Xdmf(name::String)
+function Xdmf(name::String; overwrite=false)
     xdmf = new_element("Xdmf")
+    h5file = "$name.h5"
+    xmlfile = "$name.xmf"
+    
+    if isfile(h5file)
+        if overwrite
+            info("Result file $h5file exists, removing old file.")
+        else
+            error("Result file $h5file exists, use Xdmf($name ;overwrite=true) to rewrite results")
+        end
+    end
+    
+    if isfile(xmlfile)
+        if overwrite
+            info("Result file $xmlfile exists, removing old file.")
+        else
+            error("Result file $xmlfile exists, use Xdmf($name ;overwrite=true) to rewrite results")
+        end
+    end
+
     set_attribute(xdmf, "xmlns:xi", "http://www.w3.org/2001/XInclude")
     set_attribute(xdmf, "Version", "2.1")
-    h5file = "$name.h5"
     flag = isfile(h5file) ? "r+" : "w"
     hdf = h5open(h5file, flag)
     return Xdmf(name, xdmf, hdf)
@@ -159,7 +177,9 @@ function new_dataitem{T,N}(xdmf::Xdmf, path::String, data::Array{T,N}; format="H
     set_attribute(dataitem, "Format", format)
     if format == "HDF"
         hdf = basename(h5file(xdmf))
-        if !exists(xdmf.hdf, path)
+        if exists(xdmf.hdf, path)
+            info("Xdmf: $path already existing in h5 file, not overwriting.")
+        else
             write(xdmf.hdf, path, data)
         end
         add_text(dataitem, "$hdf:$path")
@@ -168,3 +188,4 @@ function new_dataitem{T,N}(xdmf::Xdmf, path::String, data::Array{T,N}; format="H
     end
     return dataitem
 end
+
