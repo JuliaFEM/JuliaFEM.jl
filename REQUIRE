@@ -1,4 +1,4 @@
-julia 0.4 
+julia 0.5 
 BaseTestNext
 ForwardDiff
 LightXML
@@ -8,3 +8,4 @@ Compat
 DataFrames
 Formatting
 Logging
+NLsolve
