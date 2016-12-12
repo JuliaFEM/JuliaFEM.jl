@@ -336,7 +336,9 @@ function (solver::Solver{Modal})(; show_info=true, debug=false,
         end
     end
 
-    update_xdmf!(solver)
+    if !isnull(solver.xdmf)
+        update_xdmf!(solver)
+    end
     return true
 
 end
