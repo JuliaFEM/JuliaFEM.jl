@@ -236,25 +236,29 @@ function (solver::Solver{Modal})(; show_info=true, debug=false,
     end
 
     dim = size(K, 1)
-    tic()
 
     nboundary_problems = length(get_boundary_problems(solver))
 
     K_red = K
     M_red = M
+
     if !(P == nothing)
-        info("using custom P")
+        tic()
+        info("Using custom P to make transform K_red = P'*K*P and M_red = P'*M*P")
         K_red = P'*K_red*P
         M_red = P'*M_red*P
-    else
+        t1 = round(toq(), 2)
+        info("Transform ready in $t1 seconds.")
+    elseif nboundary_problems != 0
         info("Eliminate boundary conditions from system.")
         for boundary_problem in get_boundary_problems(solver)
             eliminate_boundary_conditions!(K_red, M_red, boundary_problem, dim)
         end
+        t1 = round(toq(), 2)
+        info("Eliminated boundary conditions in $t1 seconds.")
+    else
+        info("No boundary Dirichlet boundary conditions found for system.")
     end
-
-    t1 = round(toq(), 2)
-    info("Eliminated boundary conditions in $t1 seconds.")
 
     # free up some memory before solution
     if empty_assemblies_before_solution
