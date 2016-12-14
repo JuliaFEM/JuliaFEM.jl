@@ -197,7 +197,7 @@ function project_vertex_to_surface{E}(p::Vector, x0::Vector, n0::Vector,
         theta -= dtheta
     end
 
-    error("project_point_to_surface: did not converge in $max_iterations iterations!")
+    throw(error("project_point_to_surface: did not converge in $max_iterations iterations!"))
 end
 
 function calculate_normals(elements, time, ::Type{Val{2}}; rotate_normals=false)
@@ -292,14 +292,29 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
             P = get_polygon_clip(S, M, n0)
             length(P) < 3 && continue # no clipping or shared edge (no volume)
             check_orientation!(P, n0)
+            N_P = length(P)
+            P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
+            if isapprox(P_area, 0.0)
+                info("Polygon P has zero area: $P_area")
+                continue
+            end
             C0 = calculate_centroid(P)
+            if isnan(C0[1])
+                info("C0 = $C0")
+                info("P = $P")
+                info("S = $S")
+                info("M = $M")
+                info("n0 = $n0")
+                error("Calculation of centroid of polygon clip P failed.")
+            end
 
             De = zeros(nsl, nsl)
             Me = zeros(nsl, nm)
             ge = zeros(field_dim*nsl)
 
             # 4. loop integration cells
-            for cell in get_cells(P, C0)
+            all_cells = get_cells(P, C0)
+            for cell in all_cells
                 virtual_element = Element(Tri3)
                 update!(virtual_element, "geometry", cell)
                 #x_cell = Field(cell)
@@ -310,13 +325,26 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
                     De = zeros(nnodes, nnodes)
                     Me = zeros(nnodes, nnodes)
                     for ip in get_integration_points(virtual_element, 3)
-                        x_gauss = virtual_element("geometry", ip, time)
-                        xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
-                        detJ = virtual_element(ip, time, Val{:detJ})
-                        w = ip.weight*detJ
-                        N1 = vec(get_basis(slave_element, xi_s, time))
-                        De += w*diagm(vec(N1))
-                        Me += w*N1*N1'
+                        x_gauss = nothing
+                        try
+                            x_gauss = virtual_element("geometry", ip, time)
+                            xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
+                            detJ = virtual_element(ip, time, Val{:detJ})
+                            w = ip.weight*detJ
+                            N1 = vec(get_basis(slave_element, xi_s, time))
+                            De += w*diagm(vec(N1))
+                            Me += w*N1*N1'
+                        catch
+                            info("Failed to construct bi-orthogonal basis: cannot project vertex from auxiliary plane back to sufface.")
+                            info("x_gauss = $x_gauss")
+                            info("cell = $cell")
+                            info("C0 = $C0")
+                            info("P = $P")
+                            info("S = $S")
+                            info("M = $M")
+                            info("n0 = $n0")
+                            rethrow()
+                        end
                     end
                     Ae = De*inv(Me)
                 else
@@ -346,8 +374,25 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
                         info("n0 = $n0")
                         error("nan, unable to continue")
                     end
-                    xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
-                    xi_m, alpha = project_vertex_to_surface(x_gauss, x0, n0, master_element, X2, time)
+
+                    xi_s = nothing
+                    xi_m = nothing
+                    alpha = nothing
+
+                    try
+                        xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
+                        xi_m, alpha = project_vertex_to_surface(x_gauss, x0, n0, master_element, X2, time)
+                    catch
+                        info("projecting vertex back to surface has failed.")
+                        info("x_gauss = $x_gauss")
+                        info("cell = $cell")
+                        info("C0 = $C0")
+                        info("P = $P")
+                        info("S = $S")
+                        info("M = $M")
+                        info("n0 = $n0")
+                        rethrow()
+                    end
 
                     # add contributions
                     N1 = vec(get_basis(slave_element, xi_s, time))
