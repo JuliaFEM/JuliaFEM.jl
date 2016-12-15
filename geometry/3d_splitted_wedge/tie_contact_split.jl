@@ -100,10 +100,11 @@ update!(load, "surface pressure", -100.0)
 
 contact = create_interface(mesh, "UPPER_TO_LOWER", "LOWER_TO_UPPER")
 contact.properties.linear_surface_elements = true
-contact.properties.split_quadratic_slave_elements = false
+contact.properties.split_quadratic_slave_elements = true
+contact.properties.split_quadratic_master_elements = true
 
 # solution
 solver = Solver(Linear, lower, upper, bc1, load, contact)
-solver.xdmf = Xdmf("tie_contact"; overwrite=true)
+solver.xdmf = Xdmf("tie_contact_split"; overwrite=true)
 solver()
 
