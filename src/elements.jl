@@ -11,11 +11,13 @@ type Element{E<:AbstractElement}
     properties :: E
 end
 
-function Element{E<:AbstractElement}(::Type{E}, id::Int64, connectivity=[])
-    return Element{E}(id, connectivity, [], Dict(), E())
-end
+""" Construct a new element of type E.
 
-function Element{E<:AbstractElement}(::Type{E}, connectivity=[])
+Examples
+--------
+julia> element = Element(Tri3, [1, 2, 3])
+"""
+function Element{E<:AbstractElement}(::Type{E}, connectivity::Vector{Int})
     return Element{E}(-1, connectivity, [], Dict(), E())
 end
 
