@@ -22,7 +22,13 @@ distval
     charasteristic measure, contact pairs with distance over this value are
     skipped from contact segmentation algorithm
 linear_surface_elements
-    convert quadratic surface elements to linear elements on the fly
+    convert quadratic surface elements to linear elements on the fly, notice
+    that middle nodes are missing Lagrange multipliers
+split_quadratic_slave_elements
+    split quadratic surface elements to several linear sub-elements to get
+    Lagrange multiplier to middle nodes also
+split_quadratic_master_elements
+    split quadratic master elements to several linear sub-elements
 store_fields
     not used
 """
@@ -34,12 +40,14 @@ type Mortar <: BoundaryProblem
     use_forwarddiff :: Bool
     distval :: Float64
     linear_surface_elements :: Bool
+    split_quadratic_slave_elements :: Bool
+    split_quadratic_master_elements :: Bool
     store_fields :: Vector{Symbol}
 end
 
 function Mortar()
     default_fields = []
-    return Mortar(-1, false, false, false, false, Inf, true, default_fields)
+    return Mortar(-1, false, false, false, false, Inf, true, true, true, default_fields)
 end
 
 function get_unknown_field_name(problem::Problem{Mortar})
