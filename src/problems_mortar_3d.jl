@@ -105,7 +105,7 @@ function contains{T}(P::Vector{T}, q::T; check_is_close=true, rtol=1.0e-4)
     return false
 end
 
-function get_polygon_clip(xs, xm, n; debug=false)
+function get_polygon_clip(xs, xm, n)
     # objective: search does line xm1 - xm2 clip xs
     nm = length(xm)
     ns = length(xs)
@@ -114,7 +114,7 @@ function get_polygon_clip(xs, xm, n; debug=false)
     # 1. test is master point inside slave, if yes, add to clip
     for i=1:nm
         if vertex_inside_polygon(xm[i], xs)
-            debug && info("1. $(xm[i]) inside S -> push")
+            debug("1. $(xm[i]) inside S -> push")
             push!(P, xm[i])
         end
     end
@@ -123,7 +123,7 @@ function get_polygon_clip(xs, xm, n; debug=false)
     for i=1:ns
         if vertex_inside_polygon(xs[i], xm)
             contains(P, xs[i]) && continue
-            debug && info("2. $(xs[i]) inside M -> push")
+            debug("2. $(xs[i]) inside M -> push")
             push!(P, xs[i])
         end
     end
@@ -146,7 +146,7 @@ function get_polygon_clip(xs, xm, n; debug=false)
             #info("t=$t, q=$q, q ∈ xm ? $(vertex_inside_polygon(q, xm))")
             if vertex_inside_polygon(q, xm)
                 contains(P, q) && continue
-                debug && info("3. $q inside M -> push")
+                debug("3. $q inside M -> push")
                 push!(P, q)
             end
         end
@@ -155,18 +155,21 @@ function get_polygon_clip(xs, xm, n; debug=false)
     return P
 end
 
+""" Project some vertex p to surface of element E using Newton's iterations. """
 function project_vertex_to_surface{E}(p::Vector, x0::Vector, n0::Vector,
-    element::Element{E}, x::DVTI, time::Real; max_iterations::Int=10, iter_tol::Float64=1.0e-6)
+                                      element::Element{E}, x::DVTI, time::Real;
+                                      max_iterations::Int=10, iter_tol::Float64=1.0e-6)
     basis(xi) = get_basis(element, xi, time)
     dbasis(xi) = get_dbasis(element, xi, time)
+    nnodes = length(element)
     f(theta) = basis(theta[1:2])*x - theta[3]*n0 - p
     L(theta) = inv3([dbasis(theta[1:2])*x -n0])
-#   L2(theta) = inv(ForwardDiff.get_value([dbasis(theta[2:3])*x -n0]))
-    # FIXME: for some reason forwarddiff gives NaN's here.
     theta = zeros(3)
     dtheta = zeros(3)
     for i=1:max_iterations
-        dtheta = L(theta) * f(theta)
+        invA = L(theta)
+        b = f(theta)
+        dtheta = invA * b
         theta -= dtheta
         if norm(dtheta) < iter_tol
             return theta[1:2], theta[3]
@@ -227,12 +230,12 @@ function calculate_normals(elements, time, ::Type{Val{2}}; rotate_normals=false)
     return normals
 end
 
-function check_orientation!(P, n; debug=false)
+function check_orientation!(P, n)
     C = mean(P)
     np = length(P)
     s = [dot(n, cross(P[i]-C, P[mod(i+1,np)+1]-C)) for i=1:np]
     all(s .< 0) && return
-    debug && info("polygon not in ccw order, fixing")
+    debug("polygon not in ccw order, fixing")
     # project points to new orthogonal basis Q and sort there
     t1 = (P[1]-C)/norm(P[1]-C)
     t2 = cross(n, t1)
@@ -246,7 +249,20 @@ function check_orientation!(P, n; debug=false)
     end)
 end
 
-function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{Val{false}}; debug=true)
+function convert_to_linear_element{E}(element::Element{E})
+    debug("No linear convert rule for element $E")
+    return element
+end
+
+function convert_to_linear_element(element::Element{Tri6})
+    debug("converting Tri6 to Tri3")
+    new_element = Element(Tri3, element.connectivity[1:3])
+    new_element.id = element.id
+    new_element.fields = element.fields
+    return new_element
+end
+
+function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{Val{false}})
 
     props = problem.properties
     field_dim = get_unknown_field_dimension(problem)
@@ -257,10 +273,16 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
     # 1. calculate nodal normals and tangents for slave element nodes j ∈ S
     normals = calculate_normals(slave_elements, time, Val{2};
                                 rotate_normals=props.rotate_normals)
-    update!(slave_elements, "normal", normals)
+    update!(slave_elements, "normal", time => normals)
 
     # 2. loop all slave elements
+    first_slave_element = true
+
     for slave_element in slave_elements
+
+        if props.linear_surface_elements
+            slave_element = convert_to_linear_element(slave_element)
+        end
 
         slave_element_nodes = get_connectivity(slave_element)
         nsl = length(slave_element)
@@ -268,15 +290,19 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
         n1 = Field([normals[j] for j in slave_element_nodes])
 
         # project slave nodes to auxiliary plane (x0, Q)
-        #xi = get_reference_element_midpoint(slave_element)
-        xi = [1/3, 1/3]
+        xi = mean(get_reference_coordinates(slave_element))
+        first_slave_element && debug("midpoint xi = $xi")
         N = vec(get_basis(slave_element, xi, time))
         x0 = N*X1
         n0 = N*n1
-        S = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in X1]
+        S = Vector[project_vertex_to_auxiliary_plane(X1[i], x0, n0) for i=1:nsl]
 
         # 3. loop all master elements
         for master_element in slave_element("master elements", time)
+
+            if props.linear_surface_elements
+                master_element = convert_to_linear_element(master_element)
+            end
 
             master_element_nodes = get_connectivity(master_element)
             nm = length(master_element)
@@ -288,12 +314,20 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
             end
 
             # 3.1 project master nodes to auxiliary plane and create polygon clipping
-            M = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in X2]
+            M = Vector[project_vertex_to_auxiliary_plane(X2[i], x0, n0) for i=1:nm]
             P = get_polygon_clip(S, M, n0)
             length(P) < 3 && continue # no clipping or shared edge (no volume)
             check_orientation!(P, n0)
             N_P = length(P)
             P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
+            if first_slave_element
+                debug("Polygon clip info for first slave element:")
+                debug("S = $S")
+                debug("M = $M")
+                debug("P = $P")
+                debug("N_P = $N_P")
+                debug("P_area = $P_area")
+            end
             if isapprox(P_area, 0.0)
                 info("Polygon P has zero area: $P_area")
                 continue
@@ -315,7 +349,7 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
             # 4. loop integration cells
             all_cells = get_cells(P, C0)
             for cell in all_cells
-                virtual_element = Element(Tri3)
+                virtual_element = Element(Tri3, Int[])
                 update!(virtual_element, "geometry", cell)
                 #x_cell = Field(cell)
 
@@ -428,11 +462,13 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
 
         end # master elements done
 
+        first_slave_element = false
+
     end # slave elements done, contact virtual work ready
     
     if problem.properties.dual_basis
         tol = 1.0e-9
-        debug && info("Dual basis is used, dropping small values for C1 & C2, tol = $tol")
+        debug("Dual basis is used, dropping small values for C1 & C2, tol = $tol")
         C1 = sparse(problem.assembly.C1)
         C2 = sparse(problem.assembly.C2)
         SparseArrays.droptol!(C1, tol)
@@ -441,7 +477,7 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
         problem.assembly.C2 = C2
     end
 
-    debug && info("area of interface: $area")
+    debug("area of interface: $area")
 
 end
 
