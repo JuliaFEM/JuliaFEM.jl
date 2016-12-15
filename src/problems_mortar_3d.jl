@@ -250,7 +250,7 @@ function check_orientation!(P, n)
 end
 
 function convert_to_linear_element{E}(element::Element{E})
-    debug("No linear convert rule for element $E")
+    #debug("No linear convert rule for element $E")
     return element
 end
 
@@ -262,6 +262,49 @@ function convert_to_linear_element(element::Element{Tri6})
     return new_element
 end
 
+function split_quadratic_element{E}(element::Element{E}, time::Float64)
+    debug("No split rule for element $E")
+end
+
+function split_quadratic_element(element::Element{Tri6}, time::Float64)
+    debug("Splitting Tri6 to 4 x Tri3")
+    element_maps = Vector{Int}[[1,4,6], [4,5,6], [4,2,5], [6,5,3]]
+    new_elements = Element[]
+    connectivity = get_connectivity(element)
+    for elmap in element_maps
+        new_element = Element(Tri3, connectivity[elmap])
+        X = element("geometry", time)
+        update!(new_element, "geometry", time => X[elmap])
+        u = element("displacement", time)
+        update!(new_element, "displacement", time => u[elmap])
+        #n = element("normal", time)
+        #update!(new_element, "normal", time => n[elmap])
+        if haskey(element, "master elements")
+            update!(new_element, "master elements", time => element("master elements", time))
+        end
+        push!(new_elements, new_element)
+    end
+    return new_elements
+end
+
+function split_quadratic_elements(elements::DVTI, time::Float64)
+    return DVTI(split_quadratic_elements(elements.data, time))
+end
+
+""" Split quadratic surface elements to linear elements.  """
+function split_quadratic_elements(elements::Vector, time::Float64)
+    new_elements = Element[]
+    for element in elements
+        for splitted_element in split_quadratic_element(element, time)
+            push!(new_elements, splitted_element)
+        end
+    end
+    n1 = length(elements)
+    n2 = length(new_elements)
+    info("Splitted $n1 (maybe quadratic) elements to $n2 (linear) sub-elements")
+    return new_elements
+end
+
 function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{Val{false}})
 
     props = problem.properties
@@ -269,6 +312,13 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
     field_name = get_parent_field_name(problem)
     slave_elements = get_slave_elements(problem)
     area = 0.0
+
+    if props.split_quadratic_slave_elements
+        if !props.linear_surface_elements
+            warn("Mortar3D: split_quadratic_surfaces = true and linear_surface_elements = false maybe have unexpected behavior")
+        end
+        slave_elements = split_quadratic_elements(slave_elements, time)
+    end
 
     # 1. calculate nodal normals and tangents for slave element nodes j ∈ S
     normals = calculate_normals(slave_elements, time, Val{2};
@@ -298,7 +348,12 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
         S = Vector[project_vertex_to_auxiliary_plane(X1[i], x0, n0) for i=1:nsl]
 
         # 3. loop all master elements
-        for master_element in slave_element("master elements", time)
+        master_elements = slave_element("master elements", time)
+        if props.split_quadratic_master_elements
+            master_elements = split_quadratic_elements(master_elements, time)
+        end
+
+        for master_element in master_elements
 
             if props.linear_surface_elements
                 master_element = convert_to_linear_element(master_element)
