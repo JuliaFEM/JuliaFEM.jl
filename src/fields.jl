@@ -174,6 +174,10 @@ function getindex(field::DVTI, i::Int64)
     return field.data[i]
 end
 
+function getindex(field::DVTI, I::Array{Int64, 1})
+    return [field.data[i] for i in I]
+end
+
 function getindex(field::DCTV, i::Int64)
     return field.data[i]
 end
