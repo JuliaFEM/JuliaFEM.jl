@@ -231,14 +231,13 @@ function Base.:*(N::Matrix, f::DCTI)
 end
 
 
-#
+
 #   Multiply DVTI field with another vector T. Vector length
 #   must match to the field length and this can be used mainly
 #   for interpolation purposes, i.e., u = ∑ Nᵢuᵢ
-#
 function Base.:*(T::Vector, f::DVTI)
-    @assert length(T) == length(f)
-    return sum([T[i]*f[i] for i=1:length(f)])
+    @assert length(T) <= length(f)
+    return sum([T[i]*f[i] for i=1:length(T)])
 end
 
 function vec(field::DVTI)
@@ -416,7 +415,8 @@ function (basis::CVTI)(xi::Vector, time::Number)
 end
 
 function Base.:*(grad::Matrix, field::DVTI)
-    return sum([kron(grad[:,i], field[i]') for i=1:length(field)])'
+    n, m = size(grad)
+    return sum([kron(grad[:,i], field[i]') for i=1:m])'
 end
 
 function DVTV(data::Pair{Float64, Vector}...)
