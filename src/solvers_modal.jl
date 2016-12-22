@@ -68,32 +68,9 @@ function calc_projection(problem::Problem{Mortar}, ndim::Int)
     @assert C1 == C2
     #@assert problem.properties.dual_basis == true
     @assert problem.properties.adjust == false
-
-    # determine master and slave dofs
-    dim = get_unknown_field_dimension(problem)
-    M = Set{Int64}()
-    S = Set{Int64}()
-    slave_elements = get_slave_elements(problem)
-    master_elements = setdiff(get_elements(problem), slave_elements)
-
-    for element in slave_elements
-        for j in get_connectivity(element)
-            for i=1:dim
-                push!(S, dim*(j-1)+i)
-            end
-        end
-    end
-
-    for element in master_elements
-        for j in get_connectivity(element)
-            for i=1:dim
-                push!(M, dim*(j-1)+i)
-            end
-        end
-    end
-
-    S = sort(collect(S))
-    M = sort(collect(M))
+ 
+    S = get_nonzero_rows(C2)
+    M = setdiff(get_nonzero_columns(C2), S)
 
     # Construct matrix P = D^-1*M
     D_ = C2[S,S]
@@ -133,6 +110,7 @@ function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
 
     info("Eliminating mesh tie constraint $(problem.name) using static condensation")
 
+    #=
     # determine master and slave dofs
     dim = get_unknown_field_dimension(problem)
     M = Set{Int64}()
@@ -158,8 +136,11 @@ function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
 
     S = sort(collect(S))
     M = sort(collect(M))
-    N = setdiff(get_nonzero_rows(K_red), union(S, M))
-    info("#S = $(length(S)), #M = $(length(M)), #N = $(length(N))")
+    =#
+    S = get_nonzero_rows(C2)
+    M = setdiff(get_nonzero_columns(C2), S)
+    #N = setdiff(get_nonzero_rows(K_red), get_nonzero_columns(C2))
+    info("# slave dofs = $(length(S)), # master dofs = $(length(M))")
 
     # Construct matrix P = D^-1*M
     D_ = C2[S,S]
@@ -221,13 +202,21 @@ function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
     return true
 end
 
+"""
+Parameters
+----------
+
+sigma
+    Shift stiffness matrix by adding diagonal term, i.e. K_shifted = K + sigma*I
+"""
 function (solver::Solver{Modal})(; show_info=true, debug=false,
               bc_invertible=false, P=nothing, symmetric=true,
-              empty_assemblies_before_solution=true, dense=false)
-    show_info && info(repeat("-", 80))
-    show_info && info("Starting natural frequency solver")
-    show_info && info("Increment time t=$(round(solver.time, 3))")
-    show_info && info(repeat("-", 80))
+              empty_assemblies_before_solution=true, dense=false,
+              info_matrices=false, sigma=0.0)
+    info(repeat("-", 80))
+    info("Starting natural frequency solver")
+    info("Increment time t=$(round(solver.time, 3))")
+    info(repeat("-", 80))
     initialize!(solver)
     assemble!(solver; with_mass_matrix=true)
     M, K, Kg, f = get_field_assembly(solver)
@@ -250,6 +239,7 @@ function (solver::Solver{Modal})(; show_info=true, debug=false,
         t1 = round(toq(), 2)
         info("Transform ready in $t1 seconds.")
     elseif nboundary_problems != 0
+        tic()
         info("Eliminate boundary conditions from system.")
         for boundary_problem in get_boundary_problems(solver)
             eliminate_boundary_conditions!(K_red, M_red, boundary_problem, dim)
@@ -273,6 +263,11 @@ function (solver::Solver{Modal})(; show_info=true, debug=false,
     nz = get_nonzero_rows(K_red)
     K_red = K_red[nz,nz]
     M_red = M_red[nz,nz]
+
+    if sigma != 0.0
+        info("Adding diagonal term $sigma to stiffness matrix")
+    end
+
     ndofs = solver.ndofs
     props = solver.properties
 
@@ -287,39 +282,62 @@ function (solver::Solver{Modal})(; show_info=true, debug=false,
 
     tic()
  
-    om2 = nothing
-    X = nothing
-
     if symmetric
         K_red = 1/2*(K_red + transpose(K_red))
         M_red = 1/2*(M_red + transpose(M_red))
     end
 
-    info("is K symmetric? ", issymmetric(K_red))
-    info("is M symmetric? ", issymmetric(M_red))
-    info("is K positive definite? ", isposdef(K_red))
-    info("is M positive definite? ", isposdef(M_red))
+    if info_matrices
+        info("is K symmetric? ", issymmetric(K_red))
+        info("is M symmetric? ", issymmetric(M_red))
+        info("is K positive definite? ", isposdef(K_red))
+        info("is M positive definite? ", isposdef(M_red))
+    end
 
     if dense
         K_red = full(K_red)
         M_red = full(M_red)
     end
 
+
+    om2 = nothing
+    X = nothing
+    passed = false
+
     try
-        om2, X = eigs(K_red, M_red; nev=props.nev, which=props.which)
+        om2, X = eigs(K_red + sigma*I, M_red; nev=props.nev, which=props.which)
+        passed = true
     catch
-        info("failed to calculate eigenvalues")
-        info("reduced system")
-        info("is K symmetric? ", issym(K_red))
-        info("is M symmetric? ", issym(M_red))
+        info("failed to calculate eigenvalues for problem. Maybe stiffness matrix is not positive definite, checking...")
+        info("is K symmetric? ", issymmetric(K_red))
+        info("is M symmetric? ", issymmetric(M_red))
         info("is K positive definite? ", isposdef(K_red))
         info("is M positive definite? ", isposdef(M_red))
-	    dump(full(K_red[1:10,1:10]))
+        info("Probably the reason is that stiffness matrix is not positive definite and Cholesky factorization is failing.")
+        info("To work around this problem, use arguments `sigma = <some small value>` when calling solver, i.e.")
+        info("solver(; sigma=1.0e-9")
+        info("Be aware that using sigma shifts eigenvalues up and a bit different results can be expected.")
         if size(K_red, 1) < 2000
+            info("stiffness matrix is small, using dense eigenvalue solver to check eigenvalues ...")
             om2 = eigvals(full(K_red))
-            info("om2 = $om2")
+            info("squared eigenvalues om2 = $om2")
         end
-        rethrow()
+        if sigma != 0.0
+            info("sigma is manually set and did not work, giving up, try increase sigma.")
+            rethrow()
+        end
+    end
+
+    if !passed
+        sigma = 1.0e-9
+        info("Calculation of eigenvalues failed, trying again using sigma value sigma=$sigma")
+        try
+            om2, X = eigs(K_red + sigma*I, M_red; nev=props.nev, which=props.which)
+            passed = true
+        catch
+            info("Failed to calculate eigenvalues with sigma=$sigma, manually set sigma to something larger and try again.")
+            rethrow()
+        end
     end
     
     t1 = round(toq(), 2)
@@ -335,7 +353,7 @@ function (solver::Solver{Modal})(; show_info=true, debug=false,
             S, M, P = calc_projection(problem, dim)
             # FIXME: store projection to boundary problem, i.e.
             # update!(problem, "master-slave projection", time => P)
-	        # us = P*um
+            # us = P*um
             props.eigvecs[S,i] = P*props.eigvecs[M,i]
         end
     end
