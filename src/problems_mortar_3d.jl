@@ -250,12 +250,10 @@ function check_orientation!(P, n)
 end
 
 function convert_to_linear_element{E}(element::Element{E})
-    #debug("No linear convert rule for element $E")
     return element
 end
 
 function convert_to_linear_element(element::Element{Tri6})
-    debug("converting Tri6 to Tri3")
     new_element = Element(Tri3, element.connectivity[1:3])
     new_element.id = element.id
     new_element.fields = element.fields
@@ -263,11 +261,10 @@ function convert_to_linear_element(element::Element{Tri6})
 end
 
 function split_quadratic_element{E}(element::Element{E}, time::Float64)
-    debug("No split rule for element $E")
+    return [element]
 end
 
 function split_quadratic_element(element::Element{Tri6}, time::Float64)
-    debug("Splitting Tri6 to 4 x Tri3")
     element_maps = Vector{Int}[[1,4,6], [4,5,6], [4,2,5], [6,5,3]]
     new_elements = Element[]
     connectivity = get_connectivity(element)
