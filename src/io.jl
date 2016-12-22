@@ -144,7 +144,7 @@ function Xdmf(name::String; overwrite=false)
             info("Result file $h5file exists, removing old file.")
             rm(h5file)
         else
-            error("Result file $h5file exists, use Xdmf($name ;overwrite=true) to rewrite results")
+            error("Result file $h5file exists, use Xdmf($name; overwrite=true) to rewrite results")
         end
     end
     
@@ -153,7 +153,7 @@ function Xdmf(name::String; overwrite=false)
             info("Result file $xmlfile exists, removing old file.")
             rm(xmlfile)
         else
-            error("Result file $xmlfile exists, use Xdmf($name ;overwrite=true) to rewrite results")
+            error("Result file $xmlfile exists, use Xdmf($name; overwrite=true) to rewrite results")
         end
     end
 
