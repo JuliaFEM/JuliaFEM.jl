@@ -1,10 +1,10 @@
 julia 0.5 
 BaseTestNext
 ForwardDiff
-LightXML
-HDF5
-JLD
-Compat
+LightXML 0.4.0
+HDF5 0.7.2
+JLD 0.6.8
+Compat 0.10.0
 DataFrames
 Formatting
 Logging
