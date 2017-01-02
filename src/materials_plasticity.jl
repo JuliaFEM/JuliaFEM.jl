@@ -1,5 +1,4 @@
 using ForwardDiff
-using NLsolve
 
 """
 Creating functions for newton: xₙ₊₁ = xₙ - df⁻¹ * f and initial values
