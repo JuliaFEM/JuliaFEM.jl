@@ -23,11 +23,7 @@ export info, debug
 
 module Testing
 
-    if VERSION >= v"0.5-"
-        using Base.Test
-    else
-        using BaseTestNext
-    end
+    using Base.Test
 
     export @test, @testset, @test_throws
 

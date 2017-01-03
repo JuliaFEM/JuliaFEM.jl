@@ -1,5 +1,4 @@
 julia 0.5 
-BaseTestNext
 ForwardDiff
 LightXML 0.4
 HDF5 0.7
