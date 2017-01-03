@@ -5,6 +5,7 @@ using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Abaqus
 using JuliaFEM.Testing
+using JuliaFEM.Preprocess: element_has_nodes, element_has_type
 
 @testset "read inp file" begin
     model = open(parse_abaqus, joinpath(Pkg.dir("JuliaFEM"),"geometry","3d_beam","palkki.inp"))
@@ -71,11 +72,39 @@ end
 **   Template:  ABAQUS/STANDARD 3D
 **
 *NODE , Nset = nset_csys0
-         1,  2.649428       ,  -21.93735      ,  217.2934       
-         2,  27.54531       ,  1.108443       ,  228.8077 
+         1,  2.649428       ,  -21.93735      ,  217.2934
+         2,  27.54531       ,  1.108443       ,  228.8077
 """
 	fn = tempname() * ".inp"
     open(fn, "w") do fid write(fid, data) end
     mesh = abaqus_read_mesh(fn)
     @test length(mesh.nodes) == 2
+end
+
+@testset "Elemement types and nodes" begin
+    @test element_has_nodes(Val{:C3D4}) == 4
+    @test element_has_type(Val{:C3D4}) == :Tet4
+    @test element_has_nodes(Val{:C3D8}) == 8
+    @test element_has_type(Val{:C3D8}) == :Hex8
+    @test element_has_nodes(Val{:C3D10}) == 10
+    @test element_has_type(Val{:C3D10}) == :Tet10
+    @test element_has_nodes(Val{:C3D20}) == 20
+    @test element_has_nodes(Val{:C3D20E}) == 20
+    @test element_has_nodes(Val{:S3}) == 3
+    @test element_has_type(Val{:S3}) == :Tri3
+    @test element_has_nodes(Val{:STRI65}) == 6
+    @test element_has_type(Val{:STRI65}) == :Tri6
+    @test element_has_nodes(Val{:CPS4}) == 4
+    @test element_has_type(Val{:CPS4}) == :Quad4
+end
+
+@testset "GENERATE keyword" begin
+    data = """
+*NSET, NSET=testgen, GENERATE
+7,13,2
+"""
+    fn = tempname() * ".inp"
+    open(fn, "w") do fid write(fid, data) end
+    mesh = abaqus_read_mesh(fn)
+    @test mesh.node_sets[:testgen] == Set([7,9,13,11])
 end
