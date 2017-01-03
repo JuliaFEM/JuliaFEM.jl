@@ -61,7 +61,8 @@ RESULTS = [2.0, 2.0, 0.5, 0.5, 0.5, 2.0^2, 2.0^2,
 end
 
 SIZES = [(1,2), (1,3), (2,3), (2,6), (2,7), (2,4),
-         (2,8), (2,9), (3,4), (3,10), (3,6)]
+         (2,8), (2,9), (3,4), (3,10), (3,6), (3,8),
+         (3,20), (3,27)]
 
 @testset "element size" begin
     for (T, nod, res) in zip(ALL_ELEMENTS,ALL_ELEMENTS_NODES, SIZES)
