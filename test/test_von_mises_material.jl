@@ -1,11 +1,13 @@
+# This file is a part of JuliaFEM.
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using PyPlot
-using JuliaFEM
-using JuliaFEM.Testing
+#using PyPlot
+#using JuliaFEM
+#using JuliaFEM.Testing
 #using JuliaFEM.MaterialModels: stiffnessTensor, calculate_stress, State
 #using JuliaFEM.MaterialModels: stiffnessTensorPlaneStress
 
-
+#=
 function test_von_mises_3D_basic()
 
     steps = 1000
@@ -287,3 +289,6 @@ end
 test_von_mises_3D_basic()
 
 # test_von_mises_planestress_basic()
+
+=#
+
