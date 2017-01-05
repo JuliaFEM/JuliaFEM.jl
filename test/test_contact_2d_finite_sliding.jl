@@ -1,10 +1,12 @@
+# This file is a part of JuliaFEM.
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+
 using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
 using JuliaFEM.Testing
 
 @testset "2d curved block with frictionless finite sliding contact using forwarddiff" begin
-    # FIXME: needs verification of some other fem software
     meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/block_2d_curved.med"
     mesh = aster_read_mesh(meshfile)
 
@@ -49,10 +51,7 @@ using JuliaFEM.Testing
     normu = norm(contact.assembly.u)
     info("displacement vector norm = $normu")
 
-    # while accurate solution is unknown this is very close to linear solution
-    # sqrt( ((Stress 11 - Stress 22)^2 + (Stress 22 - Stress 33)^2 + (Stress 33-Stress 11)^2 + 6*(Stress 12^2 + Stress 23^2 + Stress 13^2))/2 )
-#   @test isapprox(normu, 0.49745873784105105)
-    @test isapprox(normu, 0.49745872893844145)
+    @test isapprox(normu, 0.4974792662500015; atol=1.0e-5)
 end
 
 #= TODO: Fix test, this is not converging
