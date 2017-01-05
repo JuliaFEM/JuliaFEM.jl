@@ -724,7 +724,7 @@ function abaqus_run_model(name; fetch=false, verbose=false)
         println(repeat("-", 80))
         println("Running ABAQUS model $name from file $fn")
         println(repeat("-", 80))
-        println(readall(fn))
+        println(readstring(fn))
         println(repeat("-", 80))
     end
 
