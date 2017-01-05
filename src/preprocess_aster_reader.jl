@@ -275,7 +275,7 @@ function aster_read_nodes(rmed::RMEDFile)
     nnodes = length(node_names)
     dim = round(Int, length(node_coords)/nnodes)
     node_coords = reshape(node_coords, nnodes, dim)'
-    stripper(node_name) = strip(ascii(pointer(convert(Vector{UInt8}, node_name))))
+    stripper(node_name) = strip(ascii(unsafe_string(pointer(convert(Vector{UInt8}, node_name)))))
     node_names = map(stripper, node_names)
     # INFO: quite safe assumption is that id is in node name, i.e. N1 => 1, N123 => 123
     node_id(node_name) = parse(matchall(r"\d+", node_name)[1])
