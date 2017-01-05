@@ -174,7 +174,7 @@ function parse_section(model, lines, key, idx_start, idx_end, ::Type{Val{:SURFAC
     has_set_def = Dict(map(y -> lowercase(strip(y[1])) => strip(y[2]), map(x -> split(x, "="), matchall(r"([\w\_\-]+[ ]*=[ ]*[\w\_\-]+)", definition)))) 
     has_set_def != nothing || return
     debug(has_set_def)
-    set_type = Symbol(has_set_def["type"])
+    set_type = Symbol(get(has_set_def, "type", "UNKNOWN"))
     set_name = Symbol(has_set_def["name"])
     data = Vector{Tuple{Int64, Symbol}}()
     for line in lines[idx_start + 1: idx_end]
