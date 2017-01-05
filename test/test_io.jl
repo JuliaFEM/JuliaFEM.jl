@@ -31,12 +31,17 @@ end
     grid["GridType"] = "Collection"
 
     frame1 = new_child(grid, "Grid")
-    new_child(frame1, "Time", "Value" => 0.0)
-    X1 = new_child(frame1, "Geometry", Dict("Type" => "XY"))
+    time1 = new_child(frame1, "Time")
+    set_attributes(time1, Dict("Value" => 0.0))
+    X1 = new_child(frame1, "Geometry")
+    set_attributes(X1, Dict("Type" => "XY"))
 
-    frame2 = new_child(grid, "Grid", "Name" => "Frame 2")
-    new_child(frame2, "Time", "Value" => 1.0)
-    X2 = new_child(frame2, "Geometry", "Type" => "XY")
+    frame2 = new_child(grid, "Grid")
+    set_attributes(frame2, Dict("Name" => "Frame 2"))
+    time2 = new_child(frame2, "Time")
+    set_attributes(time2, Dict("Value" => 1.0))
+    X2 = new_child(frame2, "Geometry")
+    set_attributes(X2, Dict("Type" => "XY"))
 
     add_child(grid, frame1)
     add_child(grid, frame2)
@@ -54,6 +59,9 @@ end
     @test isapprox(read(xdmf, "/Domain/Grid/Grid[@Name=Frame 2]/Time/Value"), 1.0)
     @test isapprox(read(xdmf, "/Domain/Grid/Grid[2]/Geometry/DataItem"), [1.0, 2.0])
 end
+
+
+#=
 
 @testset "higher level xdmf" begin
     e1 = Element(Quad4, 1, [1, 2, 3, 4])
@@ -97,8 +105,6 @@ end
         2 => [0.0, 1.0])
     update!(e4, "master elements", [e3])
 end
-
-#=
 
 @testset "save results to disk, linear solver" begin
     X = Dict{Int, Vector{Float64}}(
