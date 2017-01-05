@@ -10,8 +10,14 @@ type SparseMatrixCOO{T<:Real}
     V :: Vector{T}
 end
 
+typealias SparseVectorCOO SparseMatrixCOO
+
 function SparseMatrixCOO()
-    SparseMatrixCOO{Float64}([], [], [])
+    return SparseMatrixCOO{Float64}([], [], [])
+end
+
+function SparseVectorCOO(I::Vector, V::Vector)
+    return SparseVectorCOO(I, ones(I), V)
 end
 
 function convert(::Type{SparseMatrixCOO}, A::SparseMatrixCSC)
@@ -132,7 +138,15 @@ function add!(A::SparseMatrixCOO, dofs::Vector{Int}, data::Array{Float64}, dim::
     append!(A.V, vec(data))
 end
 
-""" Combine (I,J,V) values is possible to reduce memory usage. """
+""" Add SparseVector to SparseVectorCOO. """
+function add!(a::SparseVectorCOO, b::SparseVector)
+    I, V = findnz(b)
+    c = SparseVectorCOO(I, V)
+    append!(a, c)
+    return
+end
+
+""" Combine (I,J,V) values if possible to reduce memory usage. """
 function optimize!(A::SparseMatrixCOO)
     I, J, V = findnz(sparse(A))
     A.I = I
