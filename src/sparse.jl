@@ -178,11 +178,21 @@ function size(A::SparseMatrixCOO, idx::Int)
     return size(A)[idx]
 end
 
+""" Resize sparse matrix A to (higher) dimension n x m. """
+function resize_sparse(A, n, m)
+    return sparse(findnz(A)..., n, m)
+end
+
+""" Resize sparse vector b to (higher) dimension n. """
+function resize_sparsevec(b, n)
+    return sparsevec(findnz(b)..., n)
+end
+
 """ Matrix norm. Automatically convert to dense when asking for 2-norm for small matrices. """
 function norm(A::SparseMatrixCOO, p=Inf; maxdim=1000)
     dim = size(A, 1)
     if p == 2 && dim > maxdim
-        info("Assembly norm: dim = $dim > $maxdim and p=$p, not making dense matrices for operation.")
+        warn("Assembly norm: dim = $dim > $maxdim and p=$p, not making dense matrices for operation.")
         return 0.0
     end
     if p == 2
@@ -192,9 +202,9 @@ function norm(A::SparseMatrixCOO, p=Inf; maxdim=1000)
     end
 end
 
+""" Approximative comparison of two matricse A and B. """
 function isapprox(A::SparseMatrixCOO, B::SparseMatrixCOO)
     A2 = sparse(A)
     B2 = sparse(B, size(A2)...)
     return isapprox(A2, B2)
 end
-

@@ -184,55 +184,6 @@ function get_boundary_assembly(solver::Solver)
     return K, C1, C2, D, f, g
 end
 
-function resize!(A::SparseMatrixCSC, m::Int64, n::Int64)
-    (n == A.n) && (m == A.m) && return
-    @assert n >= A.n
-    @assert m >= A.m
-    append!(A.colptr, A.colptr[end]*ones(Int, m-A.m))
-    A.n = n
-    A.m = m
-end
-
-"""
-Given C and g, construct new basis such that v = P*u + g
-
-Parameters
-----------
-S  set of linearly independent dofs.
-"""
-function create_projection(C::SparseMatrixCSC, g; S=nothing, tol=1.0e-12)
-    n, m = size(C)
-    @assert n == m
-    if S == nothing
-        S = get_nonzero_rows(C)
-    end
-    # FIXME: this creates dense matrices
-    # efficiency / memory usage is a question
-    M = get_nonzero_columns(C)
-    F = qrfact(C[S,:])
-    P = spzeros(n,m)
-    P[:,M] = sparse(F \ full(C[S,M]))
-    h = sparse(F \ full(g[S]))
-    resize!(P, n, m)
-    resize!(h, n, 1)
-    P = speye(n) - P
-    droptol!(P, tol)
-    return P, h
-end
-
-""" Assume C is invertible. """
-function create_projection(C, g, ::Type{Val{:invertible}})
-    nz1, nz2 = get_nonzeros(C)
-    P = spzeros(size(C)...)
-    for j=1:size(C,1)
-        j in nz1 && continue
-        P[j,j] = 1.0
-    end
-    v = lufact(C[nz1,nz2]) \ full(g[nz1])
-    return P, v
-end
-
-
 
 """
 Solve linear system using LDLt factorization (SuiteSparse). This version
