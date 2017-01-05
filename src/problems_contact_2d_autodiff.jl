@@ -225,7 +225,7 @@ function assemble!(problem::Problem{Contact}, time::Float64,
 
                     fc[:,slave_element_nodes] += w*la_s*N1'
                     fc[:,master_element_nodes] -= w*la_s*N2'
-                    gap[1,slave_element_nodes] += w*gn*Phi'
+                    gap[1,slave_element_nodes] += w*gn*Phi
                     #gap[1,slave_element_nodes] += w*gn*N1'
 
                 end # done integrating segment
