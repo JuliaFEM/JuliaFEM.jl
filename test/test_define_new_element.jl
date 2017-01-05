@@ -36,7 +36,7 @@ function size(element::Element{MyQuad4})
 end
 
 @testset "test new element" begin
-    el = Element(MyQuad4)
+    el = Element(MyQuad4, Int[])
     el["geometry"] = Vector{Float64}[[0.0,0.0], [1.0,0.0], [1.0,1.0], [0.0,1.0]]
     el["displacement"] = Vector{Float64}[[0.0,0.0], [0.0,0.0], [1.0,0.0], [0.0,0.0]]
     @test isapprox(el("geometry", [0.0, 0.0], 0.0), [0.5, 0.5])
