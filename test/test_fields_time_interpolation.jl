@@ -6,8 +6,6 @@ using JuliaFEM.Testing
 
 @testset "test interpolation of discrete constant time-variant field" begin
     f = DCTV(0.0 => 0.0, 1.0 => 1.0)
-    # time interpolation of time-variant fields results it's
-    # time-invariant counterpart
     @test isapprox(f(-1.0), DCTI(0.0))
     @test isapprox(f( 0.0), DCTI(0.0))
     @test isapprox(f( 0.3), DCTI(0.3))
