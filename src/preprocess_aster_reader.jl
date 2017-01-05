@@ -101,7 +101,7 @@ function get_node_sets(med::MEDFile, mesh_name)
     for nset in keys(nsets)
         k = split(nset, "_")
         nset_id = parse(Int, k[2])
-        nset_name = ascii(pointer(convert(Vector{UInt8}, nsets[nset]["GRO"]["NOM"][1])))
+        nset_name = ascii(unsafe_string(pointer(convert(Vector{UInt8}, nsets[nset]["GRO"]["NOM"][1]))))
         ns[nset_id] = Symbol(nset_name)
     end
     return ns
