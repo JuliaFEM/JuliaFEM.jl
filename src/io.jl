@@ -69,8 +69,8 @@ function get_child(x::XMLElement, child_name::String)
     m[2] == "end" && return childs[end]
     m2 = match(r"@(.+)=(.+)", m[2])
     m2 == nothing && throw("Unable to parse: $(m[2])")
-    attr_name = m2[1]
-    attr_value = m2[2]
+    attr_name = convert(String, m2[1])
+    attr_value = convert(String, m2[2])
     for child in childs
         has_attribute(child, attr_name) || continue
         if get_attribute(child, attr_name) == attr_value
