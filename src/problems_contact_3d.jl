@@ -86,12 +86,7 @@ function assemble!(problem::Problem{Contact}, time::Float64,
 #       end
 
         # project slave nodes to auxiliary plane (x0, Q)
-        #xi = get_reference_element_midpoint(slave_element)
-        if nsl == 3
-            xi = [1/3, 1/3]
-        else
-            xi = [1/4, 1/4]
-        end
+        xi = mean(get_reference_coordinates(slave_element))
         N = vec(get_basis(slave_element, xi, time))
         x0 = N*X1
         n0 = N*n1
@@ -124,7 +119,7 @@ function assemble!(problem::Problem{Contact}, time::Float64,
 
             # 4. loop integration cells
             for cell in get_cells(P, C0)
-                virtual_element = Element(Tri3)
+                virtual_element = Element(Tri3, Int[])
                 update!(virtual_element, "geometry", cell)
 
                 # 5. loop integration point of integration cell
