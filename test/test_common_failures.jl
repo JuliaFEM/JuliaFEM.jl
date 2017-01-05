@@ -12,11 +12,3 @@ using JuliaFEM.Testing
     # what went wrong
     @test_throws KeyError assemble!(pr, el)
 end
-
-@testset "connectivity information missing" begin
-    el = Element(Quad4)
-    nodes = Vector{Float64}[[0,0],[1,0],[1,1],[0,1]]
-    update!(el, "geometry", nodes)
-    pr = Problem(Elasticity, "problem", 2)
-    @test_throws Exception assemble!(pr, el)
-end
