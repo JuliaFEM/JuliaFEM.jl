@@ -129,25 +129,44 @@ function get_field_assembly(solver::Solver; show_info=true)
     return M, K, Kg, f, fg
 end
 
-""" Posthook for boundary assembly. By default, do nothing. """
-function boundary_assembly_posthook!
+""" Loop through boundary assemblies and check for possible overconstrain situations. """
+function check_for_overconstrained_dofs(solver::Solver)
+    overdetermined = false
+    constrained_dofs = Set{Int}()
+    boundary_problems = get_boundary_problems(solver)
+    for problem in boundary_problems
+        new_constraints = Set(problem.assembly.C2.I)
+        overconstrained_dofs = intersect(constrained_dofs, new_constraints)
+        if length(overconstrained_dofs) != 0
+            overdetermined = true
+            for dof in overconstrained_dofs
+                for problem_ in boundary_problems
+                    new_constraints_ = Set(problem_.assembly.C2.I)
+                    if dof in new_constraints_
+                        warn("overconstrained dof $dof defined in problem $(problem_.name)")
+                    end
+                end
+            end
+        end
+        constrained_dofs = union(constrained_dofs, new_constraints)
+    end
+    if overdetermined
+        error("problem is overconstrained, not continuing to solution.")
+    end
+    return true
 end
 
 """ Return one combined boundary assembly for a set of boundary problems.
 
 Returns
 -------
-C1, C2, D, g :: SparseMatrixCSC
-
-Notes
------
-When some dof is constrained by multiple boundary problems an algorithm is
-launched what tries to do it's best to solve issue. It's far from perfect
-but is able to handle some basic situations occurring in corner nodes and
-crosspoints.
+K, C1, C2, D, f, g :: SparseMatrixCSC
 
 """
 function get_boundary_assembly(solver::Solver)
+
+    check_for_overconstrained_dofs(solver)
+
     ndofs = solver.ndofs
     @assert ndofs != 0
     K = spzeros(ndofs, ndofs)
@@ -164,16 +183,17 @@ function get_boundary_assembly(solver::Solver)
         D_ = sparse(assembly.D, ndofs, ndofs)
         f_ = sparse(assembly.f, ndofs, 1)
         g_ = sparse(assembly.g, ndofs, 1)
-        # check for overconstraint situation and handle it if possible
+
         already_constrained = get_nonzero_rows(C2)
         new_constraints = get_nonzero_rows(C2_)
         overconstrained_dofs = intersect(already_constrained, new_constraints)
         if length(overconstrained_dofs) != 0
             overconstrained_dofs = sort(overconstrained_dofs)
             overconstrained_nodes = find_nodes_by_dofs(problem, overconstrained_dofs)
-            handle_overconstraint_error!(problem, overconstrained_nodes,
-                overconstrained_dofs, C1, C1_, C2, C2_, D, D_, g, g_)
+            warn("in overconstrained nodes $overconstrained_nodes")
+            error("overconstrained dofs, not solving problem.")
         end
+
         K += K_
         C1 += C1_
         C2 += C2_
