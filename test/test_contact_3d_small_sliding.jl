@@ -55,6 +55,6 @@ using JuliaFEM.Testing
     end
     normu = norm(contact.assembly.u)
     info("displacement field norm = $normu")
-    @test isapprox(normu, 0.7417557629004985)
+    @test isapprox(normu, 0.7417568870648232)
 
 end
