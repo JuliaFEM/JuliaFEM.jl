@@ -1,7 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-"""
+""" Modal solver to solve generalized eigenvalue problems Ku = Muλ
+
 Examples
 --------
 
@@ -9,7 +10,6 @@ julia> problems = get_problems()
 julia> solver = Solver(Modal)
 julia> push!(solver, problems...)
 julia> solver()
-
 """
 type Modal <: AbstractSolver
     geometric_stiffness :: Bool
