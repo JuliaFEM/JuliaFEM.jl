@@ -159,7 +159,7 @@ numéro    fréquence (HZ)     norme d'erreur
         @printf "JF: %8.5e | CA: %8.5e | rtol: %8.5e\n" f1 f2 rtol
         passed &= (rtol < 3.0e-2)
     end
-    @test rtol2 < 3.0e-2
+    @test rtol2 < 3.5e-2
     @test passed
 
 #=
