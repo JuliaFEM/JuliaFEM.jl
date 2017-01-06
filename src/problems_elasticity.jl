@@ -766,7 +766,6 @@ end
 #     Plastic material        #
 ###############################
 #=
-include("vonmises.jl")
 abstract PlaneStressLinearElasticPlasticProblem <: LinearElasticityProblem
 
 function PlaneStressLinearElasticPlasticProblem(name="plane stress linear elasticity", dim::Int=2, elements=[])

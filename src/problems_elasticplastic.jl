@@ -1,8 +1,6 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-include("vonmises.jl")
-
 # Elasticity problems
 abstract ElasticPlasticProblem            <: AbstractProblem
 abstract PlaneStressElasticPlasticProblem <: ElasticPlasticProblem
