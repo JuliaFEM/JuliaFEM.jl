@@ -99,7 +99,6 @@ export calculate_normals, calculate_normals!, project_from_slave_to_master,
 
 ### ASSEMBLY + SOLVE ###
 include("assembly.jl")
-include("solvers_utils.jl")
 include("solvers.jl")
 export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
        get_unknown_field_name, get_formulation_type, get_problems,
