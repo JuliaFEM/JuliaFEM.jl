@@ -34,6 +34,7 @@ export Xdmf, h5file, xmffile, has_child, get_child, new_dataitem
 
 include("fields.jl")
 export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment
+
 include("types.jl")  # data types: Point, IntegrationPoint, ...
 export AbstractPoint, Point, IntegrationPoint, IP, Node
 
@@ -41,6 +42,7 @@ export AbstractPoint, Point, IntegrationPoint, IP, Node
 include("elements.jl") # common element routines
 export Node, AbstractElement, Element, update!, get_connectivity, get_basis,
        get_dbasis, inside, get_local_coordinates
+
 include("elements_lagrange.jl") # Continuous Galerkin (Lagrange) elements
 export get_reference_coordinates, get_interpolation_polynomial
 export Poi1,
@@ -163,4 +165,5 @@ include("abaqus.jl")
 export abaqus_read_model, abaqus_run_model, abaqus_open_results, create_surface_elements
 end
 
-end #
+end
+
