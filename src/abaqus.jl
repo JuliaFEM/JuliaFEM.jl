@@ -397,10 +397,10 @@ function create_boundary_problem(model::Model, bc::AbstractBoundaryCondition, ::
         if isa(row[1], AbstractString) # node set given
             nodes = model.mesh.node_sets[bc_name]
         else # single node given
-            nodes = row[1]
+            nodes = [row[1]]
         end
 
-        elements = Element[Element(Poi1, [id]) for id in nodes]
+        elements = [Element(Poi1, [id]) for id in nodes]
         update!(elements, "geometry", model.mesh.nodes)
 
         for dof in row[2]:row[end]
