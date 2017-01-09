@@ -8,8 +8,8 @@ abstract MixedProblem <: AbstractProblem
 
 """
 General linearized problem to solve
-    (K₁+K₂)Δu  +   C1*Δλ = f₁+f₂
-         C2Δu  +    D*Δλ = g
+    (K₁+K₂)Δu  +   C1'*Δλ = f₁+f₂
+         C2Δu  +     D*Δλ = g
 """
 type Assembly
 
@@ -36,6 +36,7 @@ type Assembly
     la_prev :: Vector{Float64}  # previous solution vector u
     la_norm_change :: Real # change of norm in la
 
+    removed_dofs :: Vector{Int64} # manually remove dofs from assembly
 end
 
 function Assembly()
@@ -51,7 +52,8 @@ function Assembly()
         SparseMatrixCOO(),
         SparseMatrixCOO(),
         [], [], Inf,
-        [], [], Inf)
+        [], [], Inf,
+        [])
 end
 
 function empty!(assembly::Assembly)

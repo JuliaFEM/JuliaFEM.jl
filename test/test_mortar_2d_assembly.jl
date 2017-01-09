@@ -84,6 +84,9 @@ end
     bc1 = Problem(Dirichlet, "symmetry dx=0", 2, "displacement")
     push!(bc1, dx1, dx2)
 
+    # remove dof 9 from bc1 to avoid overconstrained problem
+    push!(bc1.assembly.removed_dofs, 9)
+
     # boundary elements for dirichlet dy=0
     dy1 = Element(Seg2, [1, 2])
     update!(dy1, "geometry", X)

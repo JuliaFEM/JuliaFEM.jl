@@ -136,16 +136,22 @@ function check_for_overconstrained_dofs(solver::Solver)
     boundary_problems = get_boundary_problems(solver)
     for problem in boundary_problems
         new_constraints = Set(problem.assembly.C2.I)
+        new_constraints = setdiff(new_constraints, problem.assembly.removed_dofs)
         overconstrained_dofs = intersect(constrained_dofs, new_constraints)
         if length(overconstrained_dofs) != 0
+            warn("problem is overconstrained, finding overconstrained dofs... ")
             overdetermined = true
             for dof in overconstrained_dofs
                 for problem_ in boundary_problems
                     new_constraints_ = Set(problem_.assembly.C2.I)
+                    new_constraints_ = setdiff(new_constraints_, problem_.assembly.removed_dofs)
                     if dof in new_constraints_
                         warn("overconstrained dof $dof defined in problem $(problem_.name)")
                     end
                 end
+                warn("To solve overconstrained situation, remove dofs from problems so that it exists only in one.")
+                warn("To do this, use push! to add dofs to remove to problem.assembly.removed_dofs, e.g.")
+                warn("`push!(bc.assembly.removed_dofs, $dof`)")
             end
         end
         constrained_dofs = union(constrained_dofs, new_constraints)
@@ -183,6 +189,11 @@ function get_boundary_assembly(solver::Solver)
         D_ = sparse(assembly.D, ndofs, ndofs)
         f_ = sparse(assembly.f, ndofs, 1)
         g_ = sparse(assembly.g, ndofs, 1)
+        for dof in assembly.removed_dofs
+            info("$(problem.name): removing dof $dof from assembly")
+            C1_[:,dof] = 0.0
+            C2_[dof,:] = 0.0
+        end
 
         already_constrained = get_nonzero_rows(C2)
         new_constraints = get_nonzero_rows(C2_)
