@@ -199,7 +199,8 @@ function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity}, 
 
             dstrain_vec = strain_vec - strain_last
             stress_vec = [0.0, 0.0, 0.0]
-            calculate_stress!(stress_vec, stress_last, dstrain_vec, D, params, Dtan, yield_surface_, time, dt, Val{:type_2d})
+            pstrain = zeros(3)
+            calculate_stress!(stress_vec, stress_last, dstrain_vec, pstrain, D, params, Dtan, yield_surface_, time, dt, Val{:type_2d})
         else
             stress_vec = D * ([1.0, 1.0, 2.0] .* strain_vec)
             Dtan[:,:] = D[:,:]
