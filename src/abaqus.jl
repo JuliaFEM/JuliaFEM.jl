@@ -400,7 +400,7 @@ function create_boundary_problem(model::Model, bc::AbstractBoundaryCondition, ::
             nodes = row[1]
         end
 
-        elements = [Element(Poi1, [id]) for id in nodes]
+        elements = Element[Element(Poi1, [id]) for id in nodes]
         update!(elements, "geometry", model.mesh.nodes)
 
         for dof in row[2]:row[end]
