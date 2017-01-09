@@ -24,6 +24,10 @@ function convert(::Type{SparseMatrixCOO}, A::SparseMatrixCSC)
     return SparseMatrixCOO(findnz(A)...)
 end
 
+function convert(::Type{SparseVectorCOO}, A::SparseVector)
+    return SparseVectorCOO(findnz(A)...)
+end
+
 function convert(::Type{SparseMatrixCOO}, A::Matrix)
     return SparseMatrixCOO(findnz(A)...)
 end
