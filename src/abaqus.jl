@@ -460,7 +460,7 @@ function create_boundary_problem(model::Model, bc::AbstractBoundaryCondition, ::
         verbose && info("parent element : $parent_element_id, $parent_element_type, $parent_element_connectivity, $parent_element_side")
         verbose && info("child element  : $child_element_type, $child_element_connectivity")
 
-        child_element = Element(JuliaFEM.(child_element_type), child_element_connectivity)
+        child_element = Element(getfield(JuliaFEM, child_element_type), child_element_connectivity)
         update!(child_element, "geometry", model.mesh.nodes)
         update!(child_element, "surface pressure", -pressure)
         push!(problem.elements, child_element)
@@ -593,6 +593,7 @@ function process_output_request(model::Model, solver::Solver, output_request::Ab
             info("Additional options: $options")
         end
         info(repeat("-", 80))
+        #= to be fixed
         tables = Any[]
         for code in row
             haskey(code_mapping, code) || continue
@@ -615,6 +616,7 @@ function process_output_request(model::Model, solver::Solver, output_request::Ab
         println()
         println(results)
         println()
+        =#
     end
 end
 
