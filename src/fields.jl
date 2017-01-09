@@ -24,17 +24,17 @@ type Increment{T}
     data :: T
 end
 
-function Base.convert{T}(::Type{Increment{T}}, data::Pair{Float64,T})
+function convert{T}(::Type{Increment{T}}, data::Pair{Float64,T})
     return Increment{T}(data[1], data[2])
 end
 
-function Base.convert{T}(::Type{Increment{Vector{Vector{T}}}}, data::Pair{Float64, Matrix{T}})
+function convert{T}(::Type{Increment{Vector{Vector{T}}}}, data::Pair{Float64, Matrix{T}})
     time = data[1]
     content = data[2]
     return Increment(time, Vector{T}[content[:,i] for i=1:size(content,2)])
 end
 
-function Base.getindex{T}(increment::Increment{Vector{T}}, i::Int64)
+function getindex{T}(increment::Increment{Vector{T}}, i::Int64)
     return increment.data[i]
 end
 
@@ -127,12 +127,12 @@ julia> t0 = 0.0; t1=1.0; y0 = 0.0; y1 = 1.0
 julia> f = DCTV(t0 => y0, t1 => y1)
 
 """
-function convert{T,v<:Real}(::Type{DCTV}, data::Pair{v, T}...)
+#function convert{T,v<:Real}(::Type{DCTV}, data::Pair{v, T}...)
+#    return DCTV([Increment(d[1],d[2]) for d in data])
+#end
+function DCTV(data::Pair...)
     return DCTV([Increment(d[1],d[2]) for d in data])
 end
-#function Base.convert(::Type{DCTV}, data::Pair{Real, Any}...)
-#    return DCTV([Increment{Vector}(d[1], d[2]) for d in data])
-#end
 
 function Field(func::Function)
     if method_exists(func, Tuple{})
