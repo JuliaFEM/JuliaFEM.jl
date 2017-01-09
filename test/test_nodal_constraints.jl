@@ -4,7 +4,7 @@
 using JuliaFEM
 using JuliaFEM.Testing
 
-function JuliaFEM.get_model(::Type{Val{Symbol("1x1 plane stress quad4 block")}})
+function get_model()
     
     X = Dict{Int, Vector{Float64}}(
         1 => [0.0, 0.0],
@@ -32,6 +32,8 @@ function JuliaFEM.get_model(::Type{Val{Symbol("1x1 plane stress quad4 block")}})
     update!(bc_23.elements, "geometry", X)
     update!(bc_23, "displacement 1", 0.0)
 
+    push!(bc_13.assembly.removed_dofs, 1, 2)
+
     solver = Solver(Nonlinear, "1x1 plane stress quad4 block")
     push!(solver, body, bc_13, bc_23)
 
@@ -44,7 +46,7 @@ end
         2 => [1.0, 0.0],
         3 => [1.0, 1.0],
         4 => [0.0, 1.0])
-    solver = get_model("1x1 plane stress quad4 block")
+    solver = get_model()
     update!(solver["symmetry 13"], "displacement 1", 0.0)
     update!(solver["symmetry 23"], "displacement 2", 0.0)
     nodal_bc = Problem(Dirichlet, "dx=0.5", 2, "displacement")
@@ -53,6 +55,12 @@ end
     update!(nodal_bc, "displacement 1", 0.5)
     update!(nodal_bc, "displacement 2", 0.0)
     push!(solver, nodal_bc)
+    initialize!(solver["symmetry 13"])
+    initialize!(solver["symmetry 23"])
+    assemble!(solver["symmetry 13"])
+    assemble!(solver["symmetry 23"])
+    println(sparse(solver["symmetry 13"].assembly.C2))
+    println(sparse(solver["symmetry 23"].assembly.C2))
     solver()
     pel = nodal_bc.elements[1]
     la = pel("reaction force", [0.0], 0.0)
@@ -67,7 +75,7 @@ end
         2 => [1.0, 0.0],
         3 => [1.0, 1.0],
         4 => [0.0, 1.0])
-    solver = get_model("1x1 plane stress quad4 block")
+    solver = get_model()
     update!(solver["symmetry 13"], "displacement 1", 0.0)
     update!(solver["symmetry 23"], "displacement 2", 0.0)
     point_load = Element(Poi1, [3])
