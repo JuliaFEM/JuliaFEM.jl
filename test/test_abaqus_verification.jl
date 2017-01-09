@@ -48,7 +48,7 @@ end
       @testset "1.3.3 Three-dimensional solid elements" begin
         @testset "C3D8 elements." begin
           abaqus_run_test("ec38sfs2") || return
-          res = abaqus_open_results("ec38sfs2")
+          #res = abaqus_open_results("ec38sfs2")
 
 node_output1 = wsv"""
 NODE           U1          U2          U3          COOR1       COOR2       COOR3
