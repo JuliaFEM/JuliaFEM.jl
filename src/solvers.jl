@@ -274,14 +274,13 @@ Solve linear system using LU factorization (UMFPACK). This version solves
 directly the saddle point problem without elimination of boundary conditions.
 """
 function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{2}})
-    # construct global system Ax = b and solve using lufact (UMFPACK)
+    nz = ones(solver.ndofs)
+    nz[get_nonzero_rows(C2)] = 0.0
+    nz[get_nonzero_rows(D)] = 0.0
+    D += spdiagm(nz)
     A = [K C1'; C2  D]
     b = [f; g]
-    nz1 = get_nonzero_rows(A)
-    nz2 = get_nonzero_columns(A)
-    dim = size(A, 1)
-    x = zeros(dim)
-    x[nz1] = lufact(A[nz1,nz2]) \ full(b[nz1])
+    x = lufact(A) \ full(b)
     u[:] = x[1:solver.ndofs]
     la[:] = x[solver.ndofs+1:end]
     return true
