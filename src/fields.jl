@@ -38,10 +38,6 @@ function getindex{T}(increment::Increment{Vector{T}}, i::Int64)
     return increment.data[i]
 end
 
-function Base.:*(d, increment::Increment)
-    return d*increment.data
-end
-
 ### Basic data structure for continuous field
 
 type Basis
