@@ -30,7 +30,7 @@ module Testing
 end
 
 include("io.jl")
-export Xdmf, h5file, xmffile, has_child, get_child, new_dataitem
+export Xdmf, h5file, xmffile, xdmf_filter, new_dataitem, get_temporal_collection
 
 include("fields.jl")
 export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment
