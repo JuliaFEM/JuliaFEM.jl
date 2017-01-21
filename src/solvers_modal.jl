@@ -420,10 +420,12 @@ function update_xdmf!(solver::Solver{Modal}; show_info=true)
         info("Creating frequency frame f=$(round(freq, 3)), path=$path")
 
         frame = new_element("Grid")
-        new_child(frame, "Time", Dict("Value" => freq))
+        time = new_child(frame, "Time")
+        set_attribute(time, "Value", freq)
 
         # add geometry
-        geometry = new_element("Geometry", Dict("Type" => geom_type))
+        geometry = new_element("Geometry")
+        set_attribute(geometry, "Type", geom_type)
         data_node_ids = new_dataitem(xdmf, "/Node IDs", node_ids)
         data_geometry = new_dataitem(xdmf, "/Geometry", X)
         add_child(geometry, data_geometry)

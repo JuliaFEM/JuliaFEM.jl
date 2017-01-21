@@ -488,20 +488,6 @@ function (solver::Solver)(field_name::AbstractString, time::Float64)
     return merge(fields...)
 end
 
-function get_temporal_collection(xdmf::Xdmf)
-    domain = find_element(xdmf.xml, "Domain")
-    grid = nothing
-    if domain == nothing
-        info("Xdmf: creating new temporal collection")
-        domain = new_child(xdmf.xml, "Domain")
-        grid = new_child(domain, "Grid")
-        set_attribute(grid, "CollectionType", "Temporal")
-        set_attribute(grid, "GridType", "Collection")
-    end
-    grid = find_element(domain, "Grid")
-    return grid
-end
-
 """ Default update for solver. """
 function update!{S}(solver::Solver{S}; show_info=true)
     u = solver.u
@@ -540,7 +526,8 @@ function update_xdmf!{S}(solver::Solver{S}; show_info=true)
     geom_type = (ndim == 2 ? "XY" : "XYZ")
     data_node_ids = new_dataitem(xdmf, "/Node IDs", node_ids)
     data_geometry = new_dataitem(xdmf, "/Geometry", X)
-    geometry = new_element("Geometry", Dict("Type" => geom_type))
+    geometry = new_element("Geometry")
+    set_attribute(geometry, "Type", geom_type)
     add_child(geometry, data_geometry)
 
     # 2. save topology
@@ -588,7 +575,8 @@ function update_xdmf!{S}(solver::Solver{S}; show_info=true)
 
     # 3. save solved field
     frame = new_element("Grid")
-    new_child(frame, "Time", Dict("Value" => solver.time))
+    time = new_child(frame, "Time")
+    set_attribute(time, "Value", solver.time)
     add_child(frame, geometry)
     for topo in topology
         add_child(frame, topo)
