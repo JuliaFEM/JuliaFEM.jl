@@ -8,7 +8,6 @@ function run_tests(; verbose=true)
     maybe_test_files = readdir(Pkg.dir("JuliaFEM")*"/test")
     is_test_file(fn) = startswith(fn, "test_") & endswith(fn, ".jl")
     test_files = filter(is_test_file, maybe_test_files)
-    #test_files = ["test_nodal_constraints.jl"]
 
     verbose && info("Test files:")
     for (i, test_file) in enumerate(test_files)
@@ -33,7 +32,8 @@ end
 run_tests()
 
 #=
-facts("Testing if somebody used print, println(), @sprint in src directory") do
+
+@testset "Testing if somebody used print, println(), @sprint in src directory" begin
   # TODO: make better reqular expression. Currently it will match all print words
   lines_with_print = Dict()
   src_dir = joinpath(Pkg.dir("JuliaFEM"),"src")
@@ -47,10 +47,10 @@ facts("Testing if somebody used print, println(), @sprint in src directory") do
     end
     close(fil)
   end
-  @fact lines_with_print => isempty "Instead of println() use Logging.jl package"
+  @test length(lines_with_print) == 0
 end
 
-facts("Testing if we have non ascii characters in the src files") do
+@testset "Testing if we have non ascii characters in the src files" begin
   # TODO: we should allow Greeck letters in documentation. Thus this test should skip docstrings
   lines_with_non_ascii = []
   src_dir = joinpath(Pkg.dir("JuliaFEM"),"src")
@@ -64,10 +64,12 @@ facts("Testing if we have non ascii characters in the src files") do
     end
     close(fil)
   end
-  @fact lines_with_non_ascii => isempty "non ascii charecters found in src -> test is failing"
+  @test length(lines_with_non_ascii) == 0 # non ascii charecters found in src -> test is failing
 end
 
-facts("Looking the [src,test] folders *.jl files header information") do
+=#
+
+@testset "Looking the [src,test] folders *.jl files header information" begin
   files_no_license = []
   pkg_dir = Pkg.dir("JuliaFEM")
   dirs = ["test";"src"]
@@ -75,7 +77,7 @@ facts("Looking the [src,test] folders *.jl files header information") do
     for file_name in readdir(joinpath(pkg_dir,folder))
       if file_name[end-2:end] == ".jl"
         fil = open(joinpath(pkg_dir,folder,file_name),"r")
-        head = readall(fil)
+        head = readstring(fil)
       else
         continue
       end
@@ -97,26 +99,15 @@ facts("Looking the [src,test] folders *.jl files header information") do
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
   """
-  @fact files_no_license => isempty out_str
-end
 
-#=
-test_files = readdir(Pkg.dir("JuliaFEM")*"/test")
-for test_file in test_files
-  Logging.info("checking is $test_file is real test file")
-  if (startswith(test_file, "test_")) & (endswith(test_file, ".jl"))
-    Logging.info("Running tests from file $test_file")
-    include(test_file)
+  if length(files_no_license) != 0
+      info(out_str)
   end
-end
-=#
 
-# Keep this at the end of this file (include statements above this)
-@Logging.configure(level=DEBUG)
-@debug("Let's print the summary of the tests")
-for dic in FactCheck.getstats()
-  @debug(dic[1], ": ",dic[2])
-end
-=#
+  for line in files_no_license
+      info(line)
+  end
 
+  @test length(files_no_license) == 0
+end
 
