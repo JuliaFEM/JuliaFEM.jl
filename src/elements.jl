@@ -100,7 +100,7 @@ julia> el([0.0, 0.0], 0.0, 2)
 """
 function (element::Element)(ip, time::Float64, dim::Int)
     dim == 1 && return get_basis(element, ip, time)
-    Ni = get_basis(element, ip, time)
+    Ni = vec(get_basis(element, ip, time))
     N = zeros(dim, length(element)*dim)
     for i=1:dim
         N[i,i:dim:end] += Ni

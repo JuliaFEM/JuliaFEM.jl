@@ -124,3 +124,10 @@ end
     @test isa(lst, Vector)
 end
 
+@testset "extend basis" begin
+    el = Element(Quad4, [1, 2, 3, 4])
+    expected = [
+        0.25 0.00 0.25 0.00 0.25 0.00 0.25 0.00
+        0.00 0.25 0.00 0.25 0.00 0.25 0.00 0.25]
+    @test isapprox(el([0.0, 0.0], 0.0, 2), expected)
+end
