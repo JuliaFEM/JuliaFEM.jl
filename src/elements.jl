@@ -144,14 +144,6 @@ function (element::Element)(field_name::String, ip, time::Float64, ::Type{Val{:G
     return element(ip, time, Val{:Grad})*element[field_name](time)
 end
 
-function (element::Element)(field::Field, time::Float64)
-    return field(time)
-end
-
-function (element::Element)(field::DCTI, time::Float64)
-    return field.data
-end
-
 function (element::Element)(field_name::String, ip, time::Float64)
     field = element[field_name]
     return element(field, ip, time)
