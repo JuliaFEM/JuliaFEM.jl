@@ -87,8 +87,12 @@ DESC = ["2 node segment", "3 node segment", "3 node triangle",
         "8 node hexahedral element", "20 node hexahedral element",
         "27 node hexahedral element"]
 
-@testset "element description" begin
-    for (T, res) in zip(ALL_ELEMENTS, DESC)
-        @test description(Type(T)) == res
+@testset "get basic data for element" begin
+    for (element_type, element_nodes) in zip(ALL_ELEMENTS, ALL_ELEMENTS_NODES)
+        element = Element(element_type, element_nodes)
+        element_length = length(element)
+        element_size = size(element)
+        element_description = description(element)
+        info("Element $element_type, description = $element_description, length = $element_length, size = $element_size")
     end
 end

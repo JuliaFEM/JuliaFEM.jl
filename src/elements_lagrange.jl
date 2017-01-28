@@ -1,13 +1,33 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-### 0d element
+global ELEMENT_DESCRIPTIONS = Dict(
+    "Poi1" => "1 node discrete point element",
+    "Seg2" => "2 node linear segment/line element",
+    "Seg3" => "3 node quadratic segment/line element",
+    "Tri3" => "3 node linear triangle element",
+    "Tri6" => "6 node quadratic triangle element",
+    "Tri7" => "7 node quadratic triangle element (has middle node)",
+    "Quad4" => "4 node linear quadrangle element",
+    "Quad8" => "8 node quadratic quadrangle element (Serendip)",
+    "Quad9" => "9 node quadratic quadrangle element",
+    "Tet4" => "4 node linear tetrahedral element",
+    "Tet10" => "10 node quadratic tetrahedral element",
+    "Wedge6" => "6 node linear prismatic element (wedge)",
+    "Wedge15" => "15 node quadratic prismatic element (wedge)",
+    "Hex8" => "8 node linear hexahedral element",
+    "Hex20" => "20 node biquadratic hexahedral element",
+    "Hex27" => "27 node quadratic hexahedral element")
 
-type Poi1 <: AbstractElement
+function description{T}(element::Element{T})
+    element_type = last(split("$T", '.'))
+    return get(ELEMENT_DESCRIPTIONS, element_type, "Unknown element description")
 end
 
-function description(::Type{Poi1})
-    "1 node point"
+### 0d element
+
+
+type Poi1 <: AbstractElement
 end
 
 function size(element::Element{Poi1})
@@ -47,10 +67,6 @@ end
 type Seg2 <: AbstractElement
 end
 
-function description(::Type{Seg2})
-    "2 node segment"
-end
-
 function size(element::Element{Seg2})
     return (1, 2)
 end
@@ -76,10 +92,6 @@ end
 #
 
 type Seg3 <: AbstractElement
-end
-
-function description(::Type{Seg3})
-    "3 node segment"
 end
 
 function size(element::Element{Seg3})
@@ -108,10 +120,6 @@ end
 ### 2d elements
 
 type Tri3 <: AbstractElement
-end
-
-function description(::Type{Tri3})
-    "3 node triangle"
 end
 
 function size(element::Element{Tri3})
@@ -145,10 +153,6 @@ end
 #
 
 type Tri6 <: AbstractElement
-end
-
-function description(::Type{Tri6})
-    "6 node triangle"
 end
 
 function size(element::Element{Tri6})
@@ -185,10 +189,6 @@ end
 #
 
 type Tri7 <: AbstractElement
-end
-
-function description(::Type{Tri7})
-    "7 node triangle"
 end
 
 function size(element::Element{Tri7})
@@ -228,10 +228,6 @@ end
 type Quad4 <: AbstractElement
 end
 
-function description(::Type{Quad4})
-    "4 node quadrangle"
-end
-
 function size(element::Element{Quad4})
     return (2, 4)
 end
@@ -264,10 +260,6 @@ end
 #
 
 type Quad8 <: AbstractElement
-end
-
-function description(::Type{Quad8})
-    "8 node Serendip quadrangle"
 end
 
 function size(element::Element{Quad8})
@@ -306,10 +298,6 @@ end
 #
 
 type Quad9 <: AbstractElement
-end
-
-function description(::Type{Quad9})
-    "9 node quadrangle"
 end
 
 function size(element::Element{Quad9})
@@ -351,10 +339,6 @@ end
 type Tet4 <: AbstractElement
 end
 
-function description(::Type{Tet4})
-    "4 node tetrahedral element"
-end
-
 function size(element::Element{Tet4})
     return (3, 4)
 end
@@ -388,10 +372,6 @@ end
 #
 
 type Tet10 <: AbstractElement
-end
-
-function description(::Type{Tet10})
-    "10 node tetrahedral element"
 end
 
 function size(element::Element{Tet10})
@@ -435,10 +415,6 @@ end
 type Wedge6 <: AbstractElement
 end
 
-function description(::Type{Wedge6})
-    "6 node prismatic element (wedge)"
-end
-
 function size(element::Element{Wedge6})
     return (3, 6)
 end
@@ -474,10 +450,6 @@ end
 #
 
 type Wedge15 <: AbstractElement
-end
-
-function description(::Type{Wedge15})
-    "15 node prismatic element (wedge)"
 end
 
 function size(element::Element{Wedge15})
@@ -526,10 +498,6 @@ end
 type Hex8 <: AbstractElement
 end
 
-function description(::Type{Hex8})
-    "8 node hexahedral element"
-end
-
 function size(element::Element{Hex8})
     return (3, 8)
 end
@@ -567,10 +535,6 @@ end
 #
 
 type Hex20 <: AbstractElement
-end
-
-function description(::Type{Hex20})
-    "20 node hexahedral element"
 end
 
 function size(element::Element{Hex20})
@@ -622,10 +586,6 @@ end
 ###
 
 type Hex27 <: AbstractElement
-end
-
-function description(::Type{Hex27})
-    "27 node hexahedral element"
 end
 
 function size(element::Element{Hex27})
