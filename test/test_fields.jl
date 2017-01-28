@@ -98,6 +98,11 @@ end
         @test isapprox(f(1.0), 3.0)
         @test isapprox(f(2.0), 3.0)
     end
+
+    # create several time steps at once
+    f = DCTV(0.0 => 1.0, 1.0 => 2.0)
+    @test isapprox(f(0.5), 1.5)
+
 end
 
 @testset "discrete, variable, time-variant field" begin
@@ -123,14 +128,32 @@ end
         @test isapprox(f(1.0), [3.0, 4.0])
         @test isapprox(f(2.0), [3.0, 4.0])
     end
+
+    # create several time steps at once
+    f = DVTV(0.0 => [1.0, 2.0], 1.0 => [2.0, 3.0])
+    @test isapprox(f(0.5), [1.5, 2.5])
 end
 
-#=
-@testset "field defined using function" begin
-    g(xi, t) = xi[1]*t
-    f = Field(g)
-    v = f([1.0], 2.0)
-    @test isapprox(v, 2.0)
+@testset "continuous, constant, time-invariant field" begin
+    f = Field(() -> 2.0)
+    @test isapprox(f([1.0], 2.0), 2.0)
+
+end
+
+@testset "continuous, constant, time variant field" begin
+    f = Field((time::Float64) -> 2.0*time)
+    @test isapprox(f([1.0], 2.0), 4.0)
+
+end
+
+@testset "continuous, variable, time invariant field" begin
+    f = Field((xi::Vector) -> sum(xi))
+    @test isapprox(f([1.0, 2.0], 2.0), 3.0)
+end
+
+@testset "continuous, variable, time variant field" begin
+    f = Field((xi::Vector, t::Float64) -> xi[1]*t)
+    @test isapprox(f([1.0], 2.0), 2.0)
 end
 
 @testset "dictionary fields" begin
@@ -154,5 +177,3 @@ end
     f = Field(f1)
     @test isa(f, DVTI)
 end
-=#
-
