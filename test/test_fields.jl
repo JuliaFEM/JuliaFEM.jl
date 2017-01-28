@@ -14,6 +14,7 @@ using JuliaFEM.Testing
     @test f.data == 1.0
     @test f == DCTI(1.0)
     @test isapprox(f, DCTI(1.0))
+    @test isapprox(f, 1.0)
     @test 2*f == 2.0 # multiply by constant
     @test f(1.0) == 1.0 # time interpolation
     @test isapprox([2.0]''*f, 2.0) # wanted behavior?
@@ -51,26 +52,33 @@ end
     @test isapprox(f(1.0), [2.0, 3.0])
 
     # spatial interpolation of vector valued variable field
-    f2 = DVTI(Vector{Float64}[[1.0, 2.0], [3.0, 4.0]])
+    f2 = DVTI(Vector[[1.0, 2.0], [3.0, 4.0]])
+    @test isapprox(f2[1], [1.0, 2.0])
+    @test isapprox(f2[2], [3.0, 4.0])
     @test length(f2) == 2
     @test isapprox(N*f2, [1.0, 2.0] + [6.0, 8.0])
 
+    # iteration of DVTI field
+    s = zeros(2)
+    for j in f2
+        s += j
+    end
+    @test isapprox(s, [4.0, 6.0])
+
     @test vec(f2) == [1.0, 2.0, 3.0, 4.0]
     @test isapprox([1.0 2.0]*f, [8.0]'')
-end
-    
-#@test isa(DVTI(), DVTI)
-    #@test isa(DCTV(), DCTV)
-    #@test isa(DVTV(), DVTV)
-    # continous fields
-    #@test isa(CCTI(), CCTI)
-    #@test isa(CVTI(), CVTI)
-    #@test isa(CCTV(), CCTV)
-    #@test isa(CVTV(), CVTV)
 
-#=
-@testset "updating time dependent fields" begin
+    new_data = [2.0, 3.0, 4.0, 5.0]
+    f4 = similar(f2, new_data)
+    @test isa(f4, DVTI)
+    @test isapprox(f4.data[1], [2.0, 3.0])
+    @test isapprox(f4.data[2], [4.0, 5.0])
+end
+
+@testset "discrete, constant, time-variant field" begin
+    @test isa(DCTV(), DCTV)
     f = Field(0.0 => 1.0)
+    @test isa(f, DCTV)
     @test last(f).time == 0.0
     @test last(f).data == 1.0
     update!(f, 0.0 => 2.0)
@@ -81,15 +89,43 @@ end
     @test last(f).time == 1.0
     @test last(f).data == 3.0
     @test length(f) == 2
+
+    @testset "interpolation in time direction" begin
+        @test isa(f(0.0), DCTI) # converts to time-invariant after time interpolation
+        @test isapprox(f(-1.0), 2.0)
+        @test isapprox(f(0.0), 2.0)
+        @test isapprox(f(0.5), 2.5)
+        @test isapprox(f(1.0), 3.0)
+        @test isapprox(f(2.0), 3.0)
+    end
 end
 
-@testset "updating time invariant fields" begin
-    f = Field(1.0)
-    @test f.data == 1.0
-    update!(f, 2.0)
-    @test f.data == 2.0
+@testset "discrete, variable, time-variant field" begin
+    @test isa(DVTV(), DVTV)
+    f = Field(0.0 => [1.0, 2.0])
+    @test isa(f, DVTV)
+    @test last(f).time == 0.0
+    @test last(f).data == [1.0, 2.0]
+    update!(f, 0.0 => [2.0, 3.0])
+    @test last(f).time == 0.0
+    @test last(f).data == [2.0, 3.0]
+    @test length(f) == 1
+    update!(f, 1.0 => [3.0, 4.0])
+    @test last(f).time == 1.0
+    @test last(f).data == [3.0, 4.0]
+    @test length(f) == 2
+    
+    @testset "interpolation in time direction" begin
+        @test isa(f(0.0), DVTI) # converts to time-invariant after time interpolation
+        @test isapprox(f(-1.0), [2.0, 3.0])
+        @test isapprox(f(0.0), [2.0, 3.0])
+        @test isapprox(f(0.5), [2.5, 3.5])
+        @test isapprox(f(1.0), [3.0, 4.0])
+        @test isapprox(f(2.0), [3.0, 4.0])
+    end
 end
 
+#=
 @testset "field defined using function" begin
     g(xi, t) = xi[1]*t
     f = Field(g)

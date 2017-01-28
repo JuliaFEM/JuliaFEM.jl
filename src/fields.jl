@@ -81,8 +81,16 @@ function ==(x::DCTI, y::DCTI)
     return ==(x.data, y.data)
 end
 
+function ==(x::DCTI, y)
+    return ==(x.data, y)
+end
+
 function isapprox(x::DCTI, y::DCTI)
     isapprox(x.data, y.data)
+end
+
+function isapprox(x::DCTI, y)
+    isapprox(x.data, y)
 end
 
 """ "Spatial" length of constant field is always 1. """
@@ -211,6 +219,38 @@ end
 function (field::DVTI)(time::Float64)
     return field
 end
+
+""" Create a similar DVTI field from vector data. 
+
+julia> f1 = DVTI(Vector[[1.0, 2.0], [3.0, 4.0]])
+julia> f2 = similar(f1, [2.0, 3.0, 4.0, 5.0])
+julia> f2 == DVTI(Vector[[2.0, 3.0], [4.0, 5.0]])
+true
+
+"""
+function similar(field::DVTI, data::Vector)
+    n = length(field)
+    m = length(data)
+    dim = round(Int, m/n)
+    @assert dim*n == m
+    new_data = reshape(data, dim, n)
+    new_field = DVTI()
+    new_field.data = [new_data[:,i] for i=1:n]
+    return new_field
+end
+
+function start(::DVTI)
+    return 1
+end
+
+function next(f::DVTI, state)
+    return f.data[state], state+1
+end
+
+function done(f::DVTI, s)
+    return s > length(f.data)
+end
+
 
 
 function convert{T}(::Type{Increment{T}}, data::Pair{Float64,T})
@@ -366,24 +406,6 @@ end
 #    return Increment(reshape(data, round(Int, length(data)/length(increment)), length(increment)))
 #end
 
-function similar{T}(field::DVTI, data::Vector{T})
-    n = length(field.data)
-    data = reshape(data, round(Int, length(data)/n), n)
-    newdata = Vector[data[:,i] for i=1:n]
-    return typeof(field)(newdata)
-end
-
-function start(::DVTI)
-    return 1
-end
-
-function next(f::DVTI, state)
-    return f.data[state], state+1
-end
-
-function done(f::DVTI, s)
-    return s > length(f.data)
-end
 
 """ Update time-dependent fields with new values.
 
