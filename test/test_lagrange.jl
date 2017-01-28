@@ -3,7 +3,6 @@
 
 using JuliaFEM
 using JuliaFEM.Testing
-using JuliaFEM: description
 
 ALL_ELEMENTS = [
     Seg2, Seg3,
@@ -13,6 +12,16 @@ ALL_ELEMENTS = [
     Wedge6,
     Hex8, Hex20, Hex27
 ]
+
+info("basic data for elements implemented so far:")
+for element_type in [Poi1; ALL_ELEMENTS]
+    element = Element(element_type, Int[])
+    element_length = length(element)
+    element_size = size(element)
+    element_description = description(element)
+    info("Element $element_type, description = $element_description, length = $element_length, size = $element_size")
+end
+
 
 ALL_ELEMENTS_NODES = [
     [1,2], [1,2,3],
@@ -76,23 +85,5 @@ end
         vec = ALL_ELEMENTS_NODES[i]
         el = Element(typ,vec)
         @test length(el) == length(vec)
-    end
-end
-
-DESC = ["2 node segment", "3 node segment", "3 node triangle",
-        "6 node triangle", "7 node triangle", "4 node quadrangle",
-        "8 node Serendip quadrangle", "9 node quadrangle",
-        "4 node tetrahedral element", "10 node tetrahedral element",
-        "6 node prismatic element (wedge)",
-        "8 node hexahedral element", "20 node hexahedral element",
-        "27 node hexahedral element"]
-
-@testset "get basic data for element" begin
-    for (element_type, element_nodes) in zip(ALL_ELEMENTS, ALL_ELEMENTS_NODES)
-        element = Element(element_type, element_nodes)
-        element_length = length(element)
-        element_size = size(element)
-        element_description = description(element)
-        info("Element $element_type, description = $element_description, length = $element_length, size = $element_size")
     end
 end

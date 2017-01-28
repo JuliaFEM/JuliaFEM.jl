@@ -44,7 +44,9 @@ export Node, AbstractElement, Element, update!, get_connectivity, get_basis,
        get_dbasis, inside, get_local_coordinates
 
 include("elements_lagrange.jl") # Continuous Galerkin (Lagrange) elements
-export get_reference_coordinates, get_interpolation_polynomial
+export get_reference_coordinates,
+       get_interpolation_polynomial,
+       description
 export Poi1,
        Seg2, Seg3,
        Tri3, Tri6, Tri7,
