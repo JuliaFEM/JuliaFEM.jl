@@ -10,19 +10,208 @@ abstract Variable <: AbstractField
 abstract TimeVariant <: AbstractField
 abstract TimeInvariant <: AbstractField
 
-
 type Field{A<:Union{Discrete,Continuous}, B<:Union{Constant,Variable}, C<:Union{TimeVariant,TimeInvariant}}
     data
 end
 
-typealias FieldSet Dict{AbstractString, Field}
+typealias FieldSet Dict{String, Field}
 
-### Basic data structure for discrete field
+### Different field combinations and other typealiases
+
+typealias DCTI Field{Discrete,   Constant, TimeInvariant}
+typealias DVTI Field{Discrete,   Variable, TimeInvariant}
+typealias DCTV Field{Discrete,   Constant, TimeVariant}
+typealias DVTV Field{Discrete,   Variable, TimeVariant}
+typealias CCTI Field{Continuous, Constant, TimeInvariant}
+typealias CVTI Field{Continuous, Variable, TimeInvariant} # can be used to interpolate in spatial dimension
+typealias CCTV Field{Continuous, Constant, TimeVariant} # can be used to interpolate in time
+typealias CVTV Field{Continuous, Variable, TimeVariant}
+
+# Discrete fields
 
 type Increment{T}
     time :: Float64
     data :: T
 end
+
+typealias ScalarIncrement{T} Increment{T}
+typealias VectorIncrement{T} Increment{Vector{T}}
+typealias TensorIncrement{T} Increment{Matrix{T}}
+
+""" Discrete, constant, time-invariant field. This is constant in both spatial
+direction and time direction, i.e. df/dX = 0 and df/dt = 0.
+
+This is the most basic type of field having no anything special functionality.
+
+Examples
+--------
+
+julia> f = DCTI()
+julia> update!(f, 1.0)
+
+Multiplying by constant works:
+
+julia> 2*f
+2.0
+
+Interpolation in time direction gives the same constant:
+
+julia> f(1.0)
+1.0
+
+By default, when calling Field with scalar, DCTI is assumed, i.e.
+
+julia> Field(0.0) == DCTI(0.0)
+true
+
+"""
+function DCTI()
+    return DCTI(nothing)
+end
+
+function Field()
+    return DCTI()
+end
+
+function Field(data)
+    return DCTI(data)
+end
+
+function ==(x::DCTI, y::DCTI)
+    return ==(x.data, y.data)
+end
+
+function isapprox(x::DCTI, y::DCTI)
+    isapprox(x.data, y.data)
+end
+
+""" "Spatial" length of constant field is always 1. """
+function length(field::DCTI)
+    return 1
+end
+
+""" Kind of spatial interpolation of DCTI. """
+function Base.:*(N::Matrix, f::DCTI)
+    @assert length(N) == 1
+    return N[1]*f.data
+end
+
+function update!(field::DCTI, data)
+    field.data = data
+end
+
+""" Interpolate time-invariant field in time direction. """
+function (field::DCTI)(time::Float64)
+    return field.data
+end
+
+""" Discrete, variable, time-invariant field. This is constant in time direction,
+but not in spatial direction, i.e. df/dt = 0 but df/dX != 0. The basic structure
+of data is Vector, and it is implicitly assumed that length of field matches to
+the number of shape functions, so that interpolation in spatial direction works.
+
+Examples
+--------
+"""
+function DVTI()
+    return DVTI([])
+end
+
+""" For vector data, DVTI is automatically created.
+
+julia> DVTI([1.0, 2.0]) == Field([1.0, 2.0])
+true
+
+"""
+function Field(data::Vector)
+    return DVTI(data)
+end
+
+""" For dictionary data, DVTI is automatically created.
+
+Define e.g. nodal coordinates in dictionary
+julia> X = Dict(1 => [1.0, 2.0], 2 => [3.0, 4.0])
+julia> Field(X) == DVTI(X)
+
+"""
+function Field(data::Dict)
+    return DVTI(data)
+end
+
+function ==(x::DVTI, y::DVTI)
+    return ==(x.data, y.data)
+end
+
+function isapprox(x::DVTI, y)
+    return isapprox(x.data, y)
+end
+
+""" Default slicing of field.
+
+julia> f = DVTI([1.0, 2.0])
+julia> f[1]
+1.0
+
+"""
+function getindex(field::DVTI, i::Int64)
+    return field.data[i]
+end
+
+""" Multi-slicing of field.
+
+julia> f = DVTI([1.0, 2.0, 3.0])
+julia> f[[1, 3]]
+[1.0, 3.0]
+
+"""
+function getindex(field::DVTI, I::Array{Int64, 1})
+    return [field.data[i] for i in I]
+end
+
+function length(field::DVTI)
+    return length(field.data)
+end
+
+function Base.:+(f1::DVTI, f2::DVTI)
+    return DVTI(f1.data + f2.data)
+end
+
+function Base.:-(f1::DVTI, f2::DVTI)
+    return DVTI(f1.data - f2.data)
+end
+
+function update!(field::DVTI, data::Union{Vector, Dict})
+    field.data = data
+end
+
+""" Take scalar product of DVTI and constant T. """
+function Base.:*(T::Number, field::DVTI)
+    return DVTI(T*field.data)
+end
+
+""" Take dot product of DVTI field and vector T. Vector length must match to the
+field length and this can be used mainly for interpolation purposes, i.e., u = ∑ Nᵢuᵢ.
+"""
+function Base.:*(T::Vector, f::DVTI)
+    @assert length(T) <= length(f)
+    return sum([T[i]*f[i] for i=1:length(T)])
+end
+
+""" Take outer product of DVTI field and matrix T. """
+function Base.:*(T::Matrix, f::DVTI)
+    n, m = size(T)
+    return sum([kron(T[:,i], f[i]') for i=1:m])'
+end
+
+function vec(field::DVTI)
+    return [field.data...;]
+end
+
+""" Interpolate time-invariant field in time direction. """
+function (field::DVTI)(time::Float64)
+    return field
+end
+
 
 function convert{T}(::Type{Increment{T}}, data::Pair{Float64,T})
     return Increment{T}(data[1], data[2])
@@ -53,28 +242,6 @@ function (basis::Basis)(xi::Vector, ::Type{Val{:grad}})
     basis.dbasis(xi)
 end
 
-### Different field combinations and other typealiases
-
-typealias DCTI Field{Discrete,   Constant, TimeInvariant}
-typealias DVTI Field{Discrete,   Variable, TimeInvariant}
-typealias DCTV Field{Discrete,   Constant, TimeVariant}
-typealias DVTV Field{Discrete,   Variable, TimeVariant}
-typealias CCTI Field{Continuous, Constant, TimeInvariant}
-typealias CVTI Field{Continuous, Variable, TimeInvariant} # can be used to interpolate in spatial dimension
-typealias CCTV Field{Continuous, Constant, TimeVariant} # can be used to interpolate in time
-typealias CVTV Field{Continuous, Variable, TimeVariant}
-
-typealias ScalarIncrement{T} Increment{T}
-typealias VectorIncrement{T} Increment{Vector{T}}
-typealias TensorIncrement{T} Increment{Matrix{T}}
-
-typealias DiscreteField      Union{DCTI, DVTI, DCTV, DVTV}
-typealias ContinuousField    Union{CCTI, CVTI, CCTV, CVTV}
-typealias ConstantField      Union{DCTI, DCTV, CCTI, CCTV}
-typealias VariableField      Union{DVTI, DVTV, CVTI, CVTV}
-typealias TimeInvariantField Union{DCTI, DVTI, CCTI, CVTI}
-typealias TimeVariantField   Union{DCTV, DVTV, CCTV, CVTV}
-
 
 ### Convenient functions to create fields
 
@@ -82,13 +249,7 @@ typealias TimeVariantField   Union{DCTV, DVTV, CCTV, CVTV}
 #    return Field(data)
 #end
 
-function Field(data)
-    return DCTI(data)
-end
 
-function Field(data::Vector)
-    return DVTI(data)
-end
 
 function Field{T}(data::Pair{Float64, T}...)
     return DCTV([Increment{T}(d[1], d[2]) for d in data])
@@ -105,10 +266,6 @@ end
 
 function Field{T<:Union{Vector, Dict}}(data::Pair{Float64, T}...)
     return DVTV([Increment{T}(d[1], d[2]) for d in data])
-end
-
-function Field(data::Dict)
-    return DVTI(data)
 end
 
 function convert{T}(::Type{DCTV}, data::Pair{Real, Vector{T}}...)
@@ -166,14 +323,6 @@ function push!(field::DVTV, data::Pair)
     push!(field.data, data)
 end
 
-function getindex(field::DVTI, i::Int64)
-    return field.data[i]
-end
-
-function getindex(field::DVTI, I::Array{Int64, 1})
-    return [field.data[i] for i in I]
-end
-
 function getindex(field::DCTV, i::Int64)
     return field.data[i]
 end
@@ -182,13 +331,6 @@ function getindex(field::Field, i::Int64)
     return field.data[i]
 end
 
-function length(field::DVTI)
-    return length(field.data)
-end
-
-function length(field::DCTI)
-    return 1
-end
 
 function length(field::DVTV)
     return length(field.data)
@@ -202,10 +344,6 @@ function first(field::Union{DCTV, DVTV})
     return field[1]
 end
 
-function isapprox(f1::DCTI, f2::DCTI)
-    isapprox(f1.data, f2.data)
-end
-
 for op = (:+, :*, :/, :-)
     @eval ($op)(increment::Increment, field::DCTI) = ($op)(increment.data, field.data)
     @eval ($op)(field::DCTI, increment::Increment) = ($op)(increment.data, field.data)
@@ -214,35 +352,7 @@ for op = (:+, :*, :/, :-)
     @eval ($op)(k::Number, field::DCTI) = ($op)(field.data, k)
 end
 
-function Base.:+(f1::DVTI, f2::DVTI)
-    return DVTI(f1.data + f2.data)
-end
 
-function Base.:-(f1::DVTI, f2::DVTI)
-    return DVTI(f1.data - f2.data)
-end
-
-function Base.:*{T<:Real}(c::T, field::DVTI)
-    return DVTI(c*field.data)
-end
-
-function Base.:*(N::Matrix, f::DCTI)
-    return f.data*N'
-end
-
-
-
-#   Multiply DVTI field with another vector T. Vector length
-#   must match to the field length and this can be used mainly
-#   for interpolation purposes, i.e., u = ∑ Nᵢuᵢ
-function Base.:*(T::Vector, f::DVTI)
-    @assert length(T) <= length(f)
-    return sum([T[i]*f[i] for i=1:length(T)])
-end
-
-function vec(field::DVTI)
-    return [field.data...;]
-end
 
 function vec(field::DCTV)
     error("trying to vectorize $field does not make sense")
@@ -300,10 +410,6 @@ function update!{T}(field::Union{DCTV, DVTV}, val::Pair{Float64, T})
     end
 end
 
-function update!{T}(field::Union{DCTI, DVTI}, val::T)
-    field.data = val
-end
-
 ### Accessing continuous fields
 
 function (field::CVTI)(xi::Vector)
@@ -328,13 +434,6 @@ end
 
 ### Interpolation
 
-""" Interpolate time-invariant field in time direction. """
-function (field::DVTI)(time::Float64)
-    return field
-end
-function (field::DCTI)(time::Float64)
-    return field.data
-end
 function (field::CVTI)(time::Float64)
     return field.data()
 end
@@ -412,11 +511,6 @@ end
 
 function (basis::CVTI)(xi::Vector, time::Number)
     basis(xi)
-end
-
-function Base.:*(grad::Matrix, field::DVTI)
-    n, m = size(grad)
-    return sum([kron(grad[:,i], field[i]') for i=1:m])'
 end
 
 function DVTV(data::Pair{Float64, Vector}...)
