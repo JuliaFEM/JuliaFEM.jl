@@ -64,7 +64,7 @@ include("integrate.jl")  # default integration points for elements
 export get_integration_points
 
 include("sparse.jl")
-export add!, SparseMatrixCOO, SparseVectorCOO, get_nonzero_rows, get_nonzero_columns
+export add!, SparseMatrixCOO, SparseVectorCOO, get_nonzero_rows, get_nonzero_columns, optimize!, resize_sparse, resize_sparsevec
 
 include("problems.jl") # common problem routines
 export Problem, AbstractProblem, FieldProblem, BoundaryProblem,

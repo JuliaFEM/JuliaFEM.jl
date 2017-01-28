@@ -32,10 +32,6 @@ function convert(::Type{SparseMatrixCOO}, A::Matrix)
     return SparseMatrixCOO(findnz(A)...)
 end
 
-function convert(::Type{SparseMatrixCOO}, A::Vector)
-    return SparseMatrixCOO(findnz(sparse(A))...)
-end
-
 """ Convert from COO format to CSC.
 
 Parameters
@@ -61,12 +57,6 @@ function empty!(A::SparseMatrixCOO)
     empty!(A.V)
 end
 
-function append!(A::SparseMatrixCOO, I::Vector{Int}, J::Vector{Int}, V::Vector{Float64})
-    append!(A.I, I)
-    append!(A.J, J)
-    append!(A.V, V)
-end
-
 function append!(A::SparseMatrixCOO, B::SparseMatrixCOO)
     append!(A.I, B.I)
     append!(A.J, B.J)
@@ -75,17 +65,6 @@ end
 
 function isempty(A::SparseMatrixCOO)
     return isempty(A.I) && isempty(A.J) && isempty(A.V)
-end
-
-function Base.:+(A::SparseMatrixCOO, B::SparseMatrixCOO)
-    if isempty(A)
-        return B
-    end
-    if isempty(B)
-        return A
-    end
-    C = SparseMatrixCOO([A.I;B.I], [A.J;B.J], [A.V;B.V])
-    return C
 end
 
 function full(A::SparseMatrixCOO, args...)
@@ -156,6 +135,7 @@ function optimize!(A::SparseMatrixCOO)
     A.I = I
     A.J = J
     A.V = V
+    return
 end
 
 """ Find all nonzero rows from sparse matrix.
@@ -171,20 +151,6 @@ end
 
 function get_nonzero_columns(A::SparseMatrixCSC)
     return get_nonzero_rows(transpose(A))
-end
-
-function get_nonzero_rows(A::Union{SparseMatrixCOO, Matrix})
-    return get_nonzero_rows(sparse(A))
-end
-
-function get_nonzero_columns(A::Union{SparseMatrixCOO, Matrix})
-    return get_nonzero_columns(sparse(A))
-end
-
-function get_nonzeros(C::Union{SparseMatrixCSC, Matrix})
-    nz1 = get_nonzero_rows(C)
-    nz2 = get_nonzero_columns(C)
-    return (nz1, nz2)
 end
 
 function size(A::SparseMatrixCOO)
@@ -204,20 +170,6 @@ end
 """ Resize sparse vector b to (higher) dimension n. """
 function resize_sparsevec(b, n)
     return sparsevec(findnz(b)..., n)
-end
-
-""" Matrix norm. Automatically convert to dense when asking for 2-norm for small matrices. """
-function norm(A::SparseMatrixCOO, p=Inf; maxdim=1000)
-    dim = size(A, 1)
-    if p == 2 && dim > maxdim
-        warn("Assembly norm: dim = $dim > $maxdim and p=$p, not making dense matrices for operation.")
-        return 0.0
-    end
-    if p == 2
-        return norm(full(A), p)
-    else
-        return norm(sparse(A), p)
-    end
 end
 
 """ Approximative comparison of two matricse A and B. """
