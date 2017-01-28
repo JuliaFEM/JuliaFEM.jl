@@ -85,8 +85,7 @@ function isapprox(x::DCTI, y)
     isapprox(x.data, y)
 end
 
-""" "Spatial" length of constant field is always 1. """
-function length(field::DCTI)
+function length(f::DCTI)
     return 1
 end
 
@@ -176,6 +175,10 @@ function length(field::DVTI)
     return length(field.data)
 end
 
+function start(field::DVTI)
+    return 1
+end
+
 function Base.:+(f1::DVTI, f2::DVTI)
     return DVTI(f1.data + f2.data)
 end
@@ -235,10 +238,6 @@ function similar(field::DVTI, data::Vector)
     return new_field
 end
 
-function start(::DVTI)
-    return 1
-end
-
 function next(f::DVTI, state)
     return f.data[state], state+1
 end
@@ -252,21 +251,6 @@ type Increment{T}
     time :: Float64
     data :: T
 end
-
-function convert{T}(::Type{Increment{T}}, data::Pair{Float64,T})
-    return Increment{T}(data[1], data[2])
-end
-
-function convert{T}(::Type{Increment{Vector{Vector{T}}}}, data::Pair{Float64, Matrix{T}})
-    time = data[1]
-    content = data[2]
-    return Increment(time, Vector{T}[content[:,i] for i=1:size(content,2)])
-end
-
-function getindex{T}(increment::Increment{Vector{T}}, i::Int64)
-    return increment.data[i]
-end
-
 
 """ Discrete, constant, time variant field. This is constant in spatial
 direction but non-constant in time direction, i.e. df/dX = 0 but df/dt != 0.
@@ -283,14 +267,6 @@ end
 
 function Field{T}(data::Pair{Float64, T}...)
     return DCTV([Increment{T}(d[1], d[2]) for d in data])
-end
-
-function convert{T}(::Type{DCTV}, data::Pair{Real, Vector{T}}...)
-    return DCTV([Increment{Vector{T}}(d[1], d[2]) for d in data])
-end
-
-function push!(field::DCTV, data::Pair)
-    push!(field.data, data)
 end
 
 function getindex(field::DCTV, i::Int64)
@@ -330,16 +306,16 @@ function endof(field::DCTV)
 end
 
 """ Discrete, variable, time variant fields. """
+function DVTV()
+    return DVTV(Increment[])
+end
+
 function DVTV{T<:Union{Vector, Dict}}(data::Pair{Float64, T}...)
     return DVTV([Increment{T}(d[1], d[2]) for d in data])
 end
 
 function Field{T<:Union{Vector, Dict}}(data::Pair{Float64, T}...)
     return DVTV([Increment{T}(d[1], d[2]) for d in data])
-end
-
-function push!(field::DVTV, data::Pair)
-    push!(field.data, data)
 end
 
 function length(field::DVTV)
@@ -376,7 +352,6 @@ function (field::DVTV)(time::Float64)
             return DVTI(new_data)
         end
     end
-    error("interpolate DVTV: unknown failure when interpolating $(field.data) for time $time")
 end
 
 """ Update time-dependent fields with new values.
@@ -404,28 +379,12 @@ function update!{T}(field::Union{DCTV, DVTV}, val::Pair{Float64, T})
     end
 end
 
-
-### Accessing and manipulating discrete fields
-
-function getindex(field::Field, i::Int64)
-    return field.data[i]
-end
-
 ### Basic data structure for continuous field
 
 type Basis
     basis :: Function
     dbasis :: Function
 end
-
-function (basis::Basis)(xi::Vector)
-    basis.basis(xi)
-end
-
-function (basis::Basis)(xi::Vector, ::Type{Val{:grad}})
-    basis.dbasis(xi)
-end
-
 
 ### Convenient functions to create fields
 
@@ -443,99 +402,21 @@ function Field(func::Function)
     end
 end
 
-function CVTI(basis::Function, dbasis::Function)
-    return CVTI(Basis(basis, dbasis))
-end
-
-function Field(basis::Function, dbasis::Function)
-    return CVTI(basis, dbasis)
-end
-
 ### Accessing continuous fields
 
 function (field::CCTI)(xi::Vector, time::Number)
     return field.data()
 end
 
-function (field::CVTI)(xi::Vector)
+function (field::CVTI)(xi::Vector, time::Number)
     return field.data(xi)
-end
-
-function (field::CVTV)(xi, time::Float64)
-    return field.data(xi, time)
-end
-
-function (field::CVTI)(xi::Vector, ::Type{Val{:Grad}})
-    return field.data(xi, Val{:Grad})
 end
 
 function (field::CCTV)(xi::Vector, time::Number)
     return field.data(time)
 end
 
-function convert(::Type{Basis}, field::CVTI)
-    return field.data
+function (field::CVTV)(xi::Vector, time::Number)
+    return field.data(xi, time)
 end
 
-### Interpolation
-
-function (field::CVTI)(time::Float64)
-    return field.data()
-end
-function (field::CCTI)(time::Float64)
-    return field.data()
-end
-
-""" Interpolate constant field in spatial dimension. """
-function (basis::CVTI)(field::DCTI, xi::Vector)
-    return field.data
-end
-
-""" Interpolate variable field in spatial dimension. """
-function (basis::CVTI)(values::DVTI, xi::Vector)
-    N = basis(xi)
-    return sum([N[i]*values[i] for i=1:length(N)])
-end
-
-function (basis::CVTI)(geometry::DVTI, xi::Vector, ::Type{Val{:grad}})
-    dbasis = basis(xi, Val{:grad})
-    J = sum([kron(dbasis[:,i], geometry[i]') for i=1:length(geometry)])
-    invJ = isa(J, Vector) ? inv(J[1]) : inv(J)
-    grad = invJ * dbasis
-    return grad
-end
-
-function (basis::CVTI)(geometry::DVTI, values::DVTI, xi::Vector, ::Type{Val{:grad}})
-    grad = basis(geometry, xi, Val{:grad})
-    gradf = sum([kron(grad[:,i], values[i]') for i=1:length(values)])'
-    return length(gradf) == 1 ? gradf[1] : gradf
-end
-
-function (basis::CVTI)(xi::Vector, time::Number)
-    basis(xi)
-end
-
-function DVTV(data::Pair{Float64, Vector}...)
-    return DVTV([Increment(d[1], d[2]) for d in data])
-end
-
-function start(f::DVTV)
-    return start(f.data)
-end
-
-function next(f::DVTV, state)
-    return next(f.data, state)
-end
-
-function done(f::DVTV, state)
-    return done(f.data, state)
-end
-
-""" Return time vector from time variable field. """
-function keys(field::DVTV)
-    return Float64[increment.time for increment in field]
-end
-
-function setindex!(field::Field, val, idx::Int64)
-    field.data[idx] = val
-end

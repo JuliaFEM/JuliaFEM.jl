@@ -12,13 +12,14 @@ using JuliaFEM.Testing
     f = DCTI()
     update!(f, 1.0)
     @test f.data == 1.0
+    @test DCTI(1) == 1
+    @test length(DCTI(1)) == 1
     @test f == DCTI(1.0)
     @test isapprox(f, DCTI(1.0))
     @test isapprox(f, 1.0)
     @test 2*f == 2.0 # multiply by constant
     @test f(1.0) == 1.0 # time interpolation
     @test isapprox([2.0]''*f, 2.0) # wanted behavior?
-    @test length(f) == 1 # always
 end
 
 @testset "discrete, variable, time invariant field" begin
@@ -154,6 +155,10 @@ end
 @testset "continuous, variable, time variant field" begin
     f = Field((xi::Vector, t::Float64) -> xi[1]*t)
     @test isapprox(f([1.0], 2.0), 2.0)
+end
+
+@testset "unknown function argument for continuous field" begin
+    @test_throws ErrorException Field((a, b, c) -> a*b*c)
 end
 
 @testset "dictionary fields" begin
