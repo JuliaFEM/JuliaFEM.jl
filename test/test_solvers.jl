@@ -64,3 +64,15 @@ end
     @test s.ndofs == 4
 end
 
+@testset "test for error when overdetermined system and requesting boundary assembly" begin
+    s = Solver(Linear, "demo solver")
+    @test_throws AssertionError get_boundary_assembly(s) # ndofs = 0
+    p1 = Problem(Dirichlet, "bc1", 2, "displacement")
+    p2 = Problem(Dirichlet, "bc2", 2, "displacement")
+    # third dofs constrained 
+    add!(p1.assembly.C2, [3], [3], [1.0]'')
+    add!(p2.assembly.C2, [3], [4], [1.0]'')
+    s.ndofs = 4
+    push!(s, p1, p2)
+    @test_throws ErrorException get_boundary_assembly(s)
+end
