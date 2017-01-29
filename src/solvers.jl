@@ -577,47 +577,27 @@ Notes
 -----
 Default convergence criteria is obtained by checking each sub-problem convergence.
 """
-function has_converged(solver::Solver{Nonlinear}; show_info=false,
-                       check_convergence_for_boundary_problems=false)
+function has_converged(solver::Solver{Nonlinear})
     properties = solver.properties
     converged = true
     eps = properties.convergence_tolerance
-    for problem in solver.problems
-        has_converged = true
-        if is_field_problem(problem)
-            has_converged = problem.assembly.u_norm_change < eps
-            if isapprox(norm(problem.assembly.u), 0.0)
-                # trivial solution
-                has_converged = true
-            end
-            show_info && info("Details for problem $(problem.name)")
-            show_info && info("Norm: $(norm(problem.assembly.u))")
-            show_info && info("Norm change: $(problem.assembly.u_norm_change)")
-            show_info && info("Has converged? $(has_converged)")
+    for problem in get_field_problems(solver)
+        has_converged = problem.assembly.u_norm_change < eps
+        if isapprox(norm(problem.assembly.u), 0.0)
+            # trivial solution
+            has_converged = true
         end
-        if is_boundary_problem(problem) && check_convergence_for_boundary_problems
-            has_converged = problem.assembly.la_norm_change/norm(problem.assembly.la) < eps
-            show_info && info("Details for problem $(problem.name)")
-            show_info && info("Norm: $(norm(problem.assembly.la))")
-            show_info && info("Norm change: $(problem.assembly.la_norm_change)")
-            show_info && info("Has converged? $(has_converged)")
-        end
+        debug("Details for problem $(problem.name)")
+        debug("Norm: $(norm(problem.assembly.u))")
+        debug("Norm change: $(problem.assembly.u_norm_change)")
+        debug("Has converged? $(has_converged)")
         converged &= has_converged
     end
     return converged
 end
 
-type NonlinearConvergenceError <: Exception
-    solver :: Solver
-end
-
-function Base.showerror(io::IO, exception::NonlinearConvergenceError)
-    max_iters = exception.solver.properties.max_iterations
-    print(io, "nonlinear iteration did not converge in $max_iters iterations!")
-end
-
 """ Default solver for quasistatic nonlinear problems. """
-function (solver::Solver{Nonlinear})(; show_info=true)
+function (solver::Solver{Nonlinear})()
 
     properties = solver.properties
 
@@ -626,10 +606,10 @@ function (solver::Solver{Nonlinear})(; show_info=true)
 
     # 2. start non-linear iterations
     for properties.iteration=1:properties.max_iterations
-        show_info && info(repeat("-", 80))
-        show_info && info("Starting nonlinear iteration #$(properties.iteration)")
-        show_info && info("Increment time t=$(round(solver.time, 3))")
-        show_info && info(repeat("-", 80))
+        info(repeat("-", 80))
+        info("Starting nonlinear iteration #$(properties.iteration)")
+        info("Increment time t=$(round(solver.time, 3))")
+        info(repeat("-", 80))
 
         # 2.1 update linearized assemblies
         assemble!(solver)
@@ -647,7 +627,9 @@ function (solver::Solver{Nonlinear})(; show_info=true)
     end
 
     # 3. did not converge
-    properties.error_if_no_convergence && throw(NonlinearConvergenceError(solver))
+    if properties.error_if_no_convergence
+        error("nonlinear iteration did not converge in $(properties.iteration) iterations!")
+    end
 end
 
 """ Convenience function to call nonlinear solver. """
