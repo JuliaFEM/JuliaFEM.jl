@@ -766,9 +766,3 @@ function Postprocessor(problems::Problem...)
     end
     return solver
 end
-
-function Postprocessor(name::AbstractString, problems::Problem...)
-    solver = Postprocessor(problems...)
-    solver.name = name
-    return solver
-end
