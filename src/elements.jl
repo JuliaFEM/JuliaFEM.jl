@@ -29,6 +29,22 @@ function setindex!(element::Element, data::Field, field_name)
     element.fields[field_name] = data
 end
 
+function get_element_type{E}(element::Element{E})
+    return E
+end
+
+function get_element_id{E}(element::Element{E})
+    return element.id
+end
+
+function is_element_type{E}(element::Element{E}, element_type)
+    return is(E, element_type)
+end
+
+function filter_by_element_type(element_type, elements)
+    return filter(element -> is_element_type(element, element_type), elements)
+end
+
 function setindex!(element::Element, data::Function, field_name)
     if method_exists(data, Tuple{Element, Vector, Float64})
         # create enclosure to pass element as argument

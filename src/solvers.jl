@@ -408,22 +408,6 @@ function get_all_elements(solver::Solver)
     return [elements...;]
 end
 
-function get_element_type{E}(element::Element{E})
-    return E
-end
-
-function get_element_id{E}(element::Element{E})
-    return element.id
-end
-
-function is_element_type{E}(element::Element{E}, element_type)
-    return is(E, element_type)
-end
-
-function filter_by_element_type(element_type, elements)
-    return filter(element -> is_element_type(element, element_type), elements)
-end
-
 function (solver::Solver)(field_name::AbstractString, time::Float64)
     fields = []
     for problem in get_problems(solver)
