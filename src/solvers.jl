@@ -55,24 +55,6 @@ is_boundary_problem{P<:BoundaryProblem}(problem::Problem{P}) = true
 get_field_problems(solver::Solver) = filter(is_field_problem, get_problems(solver))
 get_boundary_problems(solver::Solver) = filter(is_boundary_problem, get_problems(solver))
 
-"""
-Posthook for field assembly. By default, do nothing.
-This can be used to make some modifications for assembly
-after all elements are assembled.
-
-Examples
---------
-function field_assembly_posthook!(solver::Solver,
-                                  K::SparseMatrixCSC,
-                                  Kg::SparseMatrixCSC,
-                                  f::SparseMatrixCSC,
-                                  fg::SpareMatrixCSC)
-    info("doing stuff, size(K) = ", size(K))
-end
-"""
-function field_assembly_posthook!
-end
-
 """Return one combined field assembly for a set of field problems.
 
 Parameters
@@ -119,12 +101,6 @@ function get_field_assembly(solver::Solver; show_info=true)
     Kg = sparse(Kg, solver.ndofs, solver.ndofs)
     f = sparse(f, solver.ndofs, 1)
     fg = sparse(fg, solver.ndofs, 1)
-
-    # run any posthook for assembly if defined
-    args = Tuple{Solver, SparseMatrixCSC, SparseMatrixCSC, SparseMatrixCSC, SparseMatrixCSC}
-    if method_exists(field_assembly_posthook!, args)
-        field_assembly_posthook!(solver, K, Kg, fg, fg)
-    end
 
     return M, K, Kg, f, fg
 end
