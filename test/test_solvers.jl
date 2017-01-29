@@ -47,3 +47,20 @@ using JuliaFEM.Testing
     info("Temperature at point X = $X is T = $T")
     @test isapprox(T, 100.0)
 end
+
+@testset "problem not found from solver" begin
+    s = Solver(Linear, "demo solver")
+    @test_throws KeyError getindex(s, "not_found")
+end
+
+@testset "automatic determination of problem dimension if not spesified" begin
+    s = Solver(Linear, "demo solver")
+    p = Problem(Elasticity, "demo problem", 2)
+    push!(s, p)
+    get_field_assembly(s)
+    @test s.ndofs == 0
+    add!(p.assembly.K, [4], [4], [4.0]'')
+    get_field_assembly(s)
+    @test s.ndofs == 4
+end
+
