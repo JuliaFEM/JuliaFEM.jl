@@ -33,27 +33,6 @@ function aster_parse_nodes(section; strip_characters=true)
     return nodes
 end
 
-function parse(mesh, ::Type{Val{:CODE_ASTER_MAIL}})
-    model = Dict()
-    header = nothing
-    data = []
-    for line in split(mesh, '\n')
-        length(line) != 0 || continue
-        info("line: $line")
-        if is_aster_mail_keyword(strip(line))
-            header = parse_aster_header(line)
-            empty!(data)
-            continue
-        end
-        if line == "FINSF"
-            info(data)
-            header = nothing
-            process_aster_section!(model, join(data, ""), header, Val{header[1]})
-        end
-    end
-    return model
-end
-
 
 """ Code Aster binary file (.med). """
 type MEDFile
