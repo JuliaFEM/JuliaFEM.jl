@@ -167,9 +167,11 @@ function get_boundary_assembly(solver::Solver)
         g_ = sparse(assembly.g, ndofs, 1)
         for dof in assembly.removed_dofs
             info("$(problem.name): removing dof $dof from assembly")
-            C1_[:,dof] = 0.0
+            C1_[dof,:] = 0.0
             C2_[dof,:] = 0.0
         end
+        SparseArrays.dropzeros!(C1_)
+        SparseArrays.dropzeros!(C2_)
 
         already_constrained = get_nonzero_rows(C2)
         new_constraints = get_nonzero_rows(C2_)
@@ -179,8 +181,6 @@ function get_boundary_assembly(solver::Solver)
             warn("already constrained = $already_constrained")
             warn("new constraints = $new_constraints")
             overconstrained_dofs = sort(overconstrained_dofs)
-            overconstrained_nodes = find_nodes_by_dofs(problem, overconstrained_dofs)
-            warn("in overconstrained nodes $overconstrained_nodes")
             error("overconstrained dofs, not solving problem.")
         end
 
