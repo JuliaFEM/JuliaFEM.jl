@@ -26,8 +26,8 @@ function calc_nodal_values!(elements::Vector, field_name, field_dim, time;
                 add!(A, gdofs, gdofs, w*kron(N', N))
             end
         end
-        nz = get_nonzero_rows(A)
         A = sparse(A)
+        nz = get_nonzero_rows(A)
         A = 1/2*(A + A')
         F = ldltfact(A[nz,nz])
     end

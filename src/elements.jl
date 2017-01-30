@@ -29,6 +29,22 @@ function setindex!(element::Element, data::Field, field_name)
     element.fields[field_name] = data
 end
 
+function get_element_type{E}(element::Element{E})
+    return E
+end
+
+function get_element_id{E}(element::Element{E})
+    return element.id
+end
+
+function is_element_type{E}(element::Element{E}, element_type)
+    return is(E, element_type)
+end
+
+function filter_by_element_type(element_type, elements)
+    return filter(element -> is_element_type(element, element_type), elements)
+end
+
 function setindex!(element::Element, data::Function, field_name)
     if method_exists(data, Tuple{Element, Vector, Float64})
         # create enclosure to pass element as argument
@@ -100,7 +116,7 @@ julia> el([0.0, 0.0], 0.0, 2)
 """
 function (element::Element)(ip, time::Float64, dim::Int)
     dim == 1 && return get_basis(element, ip, time)
-    Ni = get_basis(element, ip, time)
+    Ni = vec(get_basis(element, ip, time))
     N = zeros(dim, length(element)*dim)
     for i=1:dim
         N[i,i:dim:end] += Ni
@@ -142,14 +158,6 @@ end
 
 function (element::Element)(field_name::String, ip, time::Float64, ::Type{Val{:Grad}})
     return element(ip, time, Val{:Grad})*element[field_name](time)
-end
-
-function (element::Element)(field::Field, time::Float64)
-    return field(time)
-end
-
-function (element::Element)(field::DCTI, time::Float64)
-    return field.data
 end
 
 function (element::Element)(field_name::String, ip, time::Float64)
@@ -220,34 +228,7 @@ function update!{K,V}(element::Element, field_name, data::Pair{Float64, Dict{K, 
     time, field_data = data
     element_data = V[field_data[i] for i in get_connectivity(element)]
     update!(element, field_name, time => element_data)
-    #if haskey(element, field_name)
-    #    update!(element[field_name], data)
-    #else
-    #    element[field_name] = Field(data)
-    #end
 end
-
-function update!(element::Element, field_name::AbstractString, datas::Union{Real, Vector, Pair{Float64, Union{Float64, Real, Vector{Any}}}}...)
-    for data in datas
-        if haskey(element, field_name)
-            update!(element[field_name], data)
-        else
-            if length(data) != length(element)
-                update!(element, field_name, DCTI(data))
-            else
-                element[field_name] = data
-            end
-        end
-    end
-end
-
-#=
-function update!(element::Element, field_name, data::Pair...)
-    for data in datas
-        update!(element, field_name, data)
-    end
-end
-=#
 
 function update!(element::Element, field_name::AbstractString, data::Pair{Float64, Vector{Any}})
     if haskey(element, field_name)
@@ -351,10 +332,6 @@ function get_integration_points(element::Element, change_order::Int)
     order += change_order
     ips = get_integration_points(element.properties, order)
     return [IP(i, w, xi) for (i, (w, xi)) in enumerate(ips)]
-end
-
-function get_gdofs(element::Element)
-    return get_gdofs(element, 1)
 end
 
 """ Return dual basis transformation matrix Ae. """

@@ -81,10 +81,6 @@ function isempty(assembly::Assembly)
     return T
 end
 
-function get_dofs(assembly::Assembly)
-    return sort(unique(assembly.K.J))
-end
-
 type Problem{P<:AbstractProblem}
     name :: AbstractString           # descriptive name for problem
     dimension :: Int                 # degrees of freedom per node
@@ -359,10 +355,6 @@ function push!(problem::Problem, elements_::Vector...)
     end
 end
 
-function get_connectivity(problem::Problem)
-    return union([get_connectivity(element) for element in get_elements(problem)]...)
-end
-
 function get_gdofs(element::Element, dim::Int)
     conn = get_connectivity(element)
     if length(conn) == 0
@@ -370,10 +362,6 @@ function get_gdofs(element::Element, dim::Int)
     end
     gdofs = vec([dim*(i-1)+j for j=1:dim, i in conn])
     return gdofs
-end
-
-function get_dofs(problem::Problem)
-    return get_dofs(problem.assembly)
 end
 
 function empty!(problem::Problem)
@@ -395,34 +383,4 @@ function get_gdofs(problem::Problem, element::Element)
         problem.dofmap[element] = get_gdofs(element, dim)
     end
     return problem.dofmap[element]
-end
-
-""" Find dofs corresponding to nodes. """
-function find_dofs_by_nodes(problem::Problem, nodes)
-    dim = get_unknown_field_dimension(problem)
-    return find_dofs_by_nodes(dim, nodes)
-end
-function find_dofs_by_nodes(dim::Int, nodes)
-    dofs = Int64[]
-    for node in nodes
-        for j=1:dim
-            push!(dofs, dim*(node-1)+j)
-        end
-    end
-    return dofs
-end
-
-""" Find nodes corresponding to dofs. """
-function find_nodes_by_dofs(problem::Problem, dofs)
-    dim = get_unknown_field_dimension(problem)
-    return find_nodes_by_dofs(dim, dofs)
-end
-function find_nodes_by_dofs(dim, dofs)
-    nodes = Int64[]
-    for dof in dofs
-        j = Int(ceil(dof/dim))
-        j in nodes && continue
-        push!(nodes, j)
-    end
-    return nodes
 end

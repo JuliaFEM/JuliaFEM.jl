@@ -57,9 +57,3 @@ typealias IP Point{IntegrationPoint}
 function IP(id, weight, coords)
     return IP(id, weight, coords, Dict(), IntegrationPoint())
 end
-
-function convert(::Type{IP}, data::Tuple{Float64, Vector{Float64}})
-    weight, coords = data
-    return IP(-1, weight, coords)
-end
-

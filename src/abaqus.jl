@@ -703,7 +703,7 @@ end
 function abaqus_open_results(name)
     path = abaqus_input_file_path(name)
     result_file = "$path/$name.xmf"
-    return XDMF(result_file)
+    return Xdmf(result_file)
 end
 
 ### JuliaFEM-ABAQUS interface entry point
@@ -757,5 +757,9 @@ function create_surface_elements(mesh::Mesh, surface_name::Symbol)
    end
    update!(elements, "geometry", mesh.nodes)
    return elements
+end
+
+function create_surface_elements(mesh::Mesh, surface_name::String)
+    return create_surface_elements(mesh, Symbol(surface_name))
 end
 
