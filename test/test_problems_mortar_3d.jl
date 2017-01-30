@@ -5,6 +5,7 @@ using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
 using JuliaFEM.Testing
+using JuliaFEM.Abaqus: create_surface_elements
 
 @testset "test that interface transfers constant field without error" begin
     meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/block_3d.med"

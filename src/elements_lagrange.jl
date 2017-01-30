@@ -1,21 +1,64 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+global const ELEMENT_DESCRIPTIONS = Dict(
+    "Poi1" => "1 node discrete point element",
+    "Seg2" => "2 node linear segment/line element",
+    "Seg3" => "3 node quadratic segment/line element",
+    "Tri3" => "3 node linear triangle element",
+    "Tri6" => "6 node quadratic triangle element",
+    "Tri7" => "7 node quadratic triangle element (has middle node)",
+    "Quad4" => "4 node linear quadrangle element",
+    "Quad8" => "8 node quadratic quadrangle element (Serendip)",
+    "Quad9" => "9 node quadratic quadrangle element",
+    "Tet4" => "4 node linear tetrahedral element",
+    "Tet10" => "10 node quadratic tetrahedral element",
+    "Wedge6" => "6 node linear prismatic element (wedge)",
+    "Wedge15" => "15 node quadratic prismatic element (wedge)",
+    "Hex8" => "8 node linear hexahedral element",
+    "Hex20" => "20 node biquadratic hexahedral element",
+    "Hex27" => "27 node quadratic hexahedral element")
+
+global const ELEMENT_SIZES = Dict(
+    "Poi1" => (0, 1),
+    "Seg2" => (1, 2),
+    "Seg3" => (1, 3),
+    "Tri3" => (2, 3),
+    "Tri6" => (2, 6),
+    "Tri7" => (2, 7),
+    "Quad4" => (2, 4),
+    "Quad8" => (2, 8),
+    "Quad9" => (2, 9),
+    "Tet4" => (3, 4),
+    "Tet10" => (3, 10),
+    "Wedge6" => (3, 6),
+    "Wedge15" => (3, 15),
+    "Hex8" => (3, 8),
+    "Hex20" => (3, 20),
+    "Hex27" => (3, 27))
+
+""" Return description line of element. """
+function description{T}(element::Element{T})
+    element_type = last(split("$T", '.'))
+    return get(ELEMENT_DESCRIPTIONS, element_type, "Unknown element description")
+end
+
+""" Return size of element, i.e. tuple (n, m) where n is dimension of element
+(0, 1, 2, 3) and m is number of nodes. """
+function size{T}(element::Element{T})
+    element_type = last(split("$T", '.'))
+    return ELEMENT_SIZES[element_type]
+end
+
+""" Return length of element, i.e. number of nodes. """
+function length{T}(element::Element{T})
+    return size(element)[end]
+end
+
 ### 0d element
 
+
 type Poi1 <: AbstractElement
-end
-
-function description(::Type{Poi1})
-    "1 node point"
-end
-
-function size(element::Element{Poi1})
-    return (0, 1)
-end
-
-function length(element::Element{Poi1})
-    return 1
 end
 
 function get_basis(element::Element{Poi1}, ip, time)
@@ -47,18 +90,6 @@ end
 type Seg2 <: AbstractElement
 end
 
-function description(::Type{Seg2})
-    "2 node segment"
-end
-
-function size(element::Element{Seg2})
-    return (1, 2)
-end
-
-function length(element::Element{Seg2})
-    return 2
-end
-
 function get_reference_coordinates(::Type{Seg2})
     Vector{Float64}[
         [-1.0], # N1
@@ -76,18 +107,6 @@ end
 #
 
 type Seg3 <: AbstractElement
-end
-
-function description(::Type{Seg3})
-    "3 node segment"
-end
-
-function size(element::Element{Seg3})
-    return (1, 3)
-end
-
-function length(element::Element{Seg3})
-    return 3
 end
 
 function get_reference_coordinates(::Type{Seg3})
@@ -108,18 +127,6 @@ end
 ### 2d elements
 
 type Tri3 <: AbstractElement
-end
-
-function description(::Type{Tri3})
-    "3 node triangle"
-end
-
-function size(element::Element{Tri3})
-    return (2, 3)
-end
-
-function length(element::Element{Tri3})
-    return 3
 end
 
 function get_reference_coordinates(::Type{Tri3})
@@ -145,18 +152,6 @@ end
 #
 
 type Tri6 <: AbstractElement
-end
-
-function description(::Type{Tri6})
-    "6 node triangle"
-end
-
-function size(element::Element{Tri6})
-    return (2, 6)
-end
-
-function length(element::Element{Tri6})
-    return 6
 end
 
 function get_reference_coordinates(::Type{Tri6})
@@ -185,18 +180,6 @@ end
 #
 
 type Tri7 <: AbstractElement
-end
-
-function description(::Type{Tri7})
-    "7 node triangle"
-end
-
-function size(element::Element{Tri7})
-    return (2, 7)
-end
-
-function length(element::Element{Tri7})
-    return 7
 end
 
 function get_reference_coordinates(::Type{Tri7})
@@ -228,18 +211,6 @@ end
 type Quad4 <: AbstractElement
 end
 
-function description(::Type{Quad4})
-    "4 node quadrangle"
-end
-
-function size(element::Element{Quad4})
-    return (2, 4)
-end
-
-function length(element::Element{Quad4})
-    return 4
-end
-
 function get_reference_coordinates(::Type{Quad4})
     Vector{Float64}[
         [-1.0, -1.0], # N1
@@ -264,18 +235,6 @@ end
 #
 
 type Quad8 <: AbstractElement
-end
-
-function description(::Type{Quad8})
-    "8 node Serendip quadrangle"
-end
-
-function size(element::Element{Quad8})
-    return (2, 8)
-end
-
-function length(element::Element{Quad8})
-    return 8
 end
 
 function get_reference_coordinates(::Type{Quad8})
@@ -306,18 +265,6 @@ end
 #
 
 type Quad9 <: AbstractElement
-end
-
-function description(::Type{Quad9})
-    "9 node quadrangle"
-end
-
-function size(element::Element{Quad9})
-    return (2, 9)
-end
-
-function length(element::Element{Quad9})
-    return 9
 end
 
 function get_reference_coordinates(::Type{Quad9})
@@ -351,18 +298,6 @@ end
 type Tet4 <: AbstractElement
 end
 
-function description(::Type{Tet4})
-    "4 node tetrahedral element"
-end
-
-function size(element::Element{Tet4})
-    return (3, 4)
-end
-
-function length(element::Element{Tet4})
-    return 4
-end
-
 function get_reference_coordinates(::Type{Tet4})
     Vector{Float64}[
         [0.0, 0.0, 0.0], # N1
@@ -388,18 +323,6 @@ end
 #
 
 type Tet10 <: AbstractElement
-end
-
-function description(::Type{Tet10})
-    "10 node tetrahedral element"
-end
-
-function size(element::Element{Tet10})
-    return (3, 10)
-end
-
-function length(element::Element{Tet10})
-    return 10
 end
 
 function get_reference_coordinates(::Type{Tet10})
@@ -435,18 +358,6 @@ end
 type Wedge6 <: AbstractElement
 end
 
-function description(::Type{Wedge6})
-    "6 node prismatic element (wedge)"
-end
-
-function size(element::Element{Wedge6})
-    return (3, 6)
-end
-
-function length(element::Element{Wedge6})
-    return 6
-end
-
 function get_reference_coordinates(::Type{Wedge6})
     Vector{Float64}[
         [0.0, 0.0, -1.0], # N1
@@ -474,18 +385,6 @@ end
 #
 
 type Wedge15 <: AbstractElement
-end
-
-function description(::Type{Wedge15})
-    "15 node prismatic element (wedge)"
-end
-
-function size(element::Element{Wedge15})
-    return (3, 15)
-end
-
-function length(element::Element{Wedge15})
-    return 15
 end
 
 function get_reference_coordinates(::Type{Wedge15})
@@ -526,18 +425,6 @@ end
 type Hex8 <: AbstractElement
 end
 
-function description(::Type{Hex8})
-    "8 node hexahedral element"
-end
-
-function size(element::Element{Hex8})
-    return (3, 8)
-end
-
-function length(element::Element{Hex8})
-    return 8
-end
-
 function get_reference_coordinates(::Type{Hex8})
     Vector{Float64}[
         [-1.0, -1.0, -1.0], # N1
@@ -567,18 +454,6 @@ end
 #
 
 type Hex20 <: AbstractElement
-end
-
-function description(::Type{Hex20})
-    "20 node hexahedral element"
-end
-
-function size(element::Element{Hex20})
-    return (3, 20)
-end
-
-function length(element::Element{Hex20})
-    return 20
 end
 
 function get_reference_coordinates(::Type{Hex20})
@@ -622,18 +497,6 @@ end
 ###
 
 type Hex27 <: AbstractElement
-end
-
-function description(::Type{Hex27})
-    "27 node hexahedral element"
-end
-
-function size(element::Element{Hex27})
-    return (3, 27)
-end
-
-function length(element::Element{Hex27})
-    return 27
 end
 
 function get_reference_coordinates(::Type{Hex27})

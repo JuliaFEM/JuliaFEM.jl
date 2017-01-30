@@ -34,15 +34,15 @@ function vertex_inside_polygon(q, P; atol=1.0e-3)
         cosa = dot(A,B)/c
         isapprox(cosa, 1.0; atol=atol) && return false
         isapprox(cosa, -1.0; atol=atol) && return true
-        try
-            angle += acos(cosa)
-        catch
-            info("Unable to calculate acos($(ForwardDiff.get_value(cosa))) when determining is a vertex inside polygon.")
-            info("Polygon is: $(ForwardDiff.get_value(P)) and vertex under consideration is $(ForwardDiff.get_value(q))")
-            info("Polygon corner point in loop: A=$(ForwardDiff.get_value(A)), B=$(ForwardDiff.get_value(B))")
-            info("c = ||A||*||B|| = $(ForwardDiff.get_value(c))")
-            rethrow()
-        end
+        #try
+        angle += acos(cosa)
+        #catch
+        #    info("Unable to calculate acos($(ForwardDiff.get_value(cosa))) when determining is a vertex inside polygon.")
+        #    info("Polygon is: $(ForwardDiff.get_value(P)) and vertex under consideration is $(ForwardDiff.get_value(q))")
+        #    info("Polygon corner point in loop: A=$(ForwardDiff.get_value(A)), B=$(ForwardDiff.get_value(B))")
+        #    info("c = ||A||*||B|| = $(ForwardDiff.get_value(c))")
+        #    rethrow()
+        #end
     end
     return isapprox(angle, 2*pi; atol=atol)
 end
@@ -68,26 +68,8 @@ function get_cells(P, C; allow_quads=false)
     if N == 4 && allow_quads
         return Vector[P]
     end
-    #V = sum([cross(P[i], P[mod(i,N)+1]) for i=1:N])
-    #A = 1/2*abs(dot(n, V))
-    #info("A = $A")
     cells = Vector[Vector[C, P[i], P[mod(i,N)+1]] for i=1:N]
     return cells
-
-    maxa = 0.0
-    maxj = 0
-    for i=1:N
-        A = P[i] - C
-        B = P[mod(i,N)+1] - C
-        theta = acos(dot(A,B)/(norm(A)*norm(B)))
-        if theta > maxa
-            maxa = theta
-            maxj = i
-        end
-    end
-    info("max angle $(maxa/pi*180) at index $maxj, N=$N")
-    indices = mod(collect(maxj:maxj+N), N)
-    info("indices = $indices")
 end
 
 """ Test does P contain q. """
@@ -175,7 +157,7 @@ function project_vertex_to_surface{E}(p::Vector, x0::Vector, n0::Vector,
             return theta[1:2], theta[3]
         end
     end
-
+    #=
     info("failed to project vertex from auxiliary plane back to surface")
     info("element type: $E")
     info("element connectivity: $(get_connectivity(element))")
@@ -199,7 +181,7 @@ function project_vertex_to_surface{E}(p::Vector, x0::Vector, n0::Vector,
         info("dtheta = $(dtheta)")
         theta -= dtheta
     end
-
+    =#
     throw(error("project_point_to_surface: did not converge in $max_iterations iterations!"))
 end
 
@@ -272,8 +254,10 @@ function split_quadratic_element(element::Element{Tri6}, time::Float64)
         new_element = Element(Tri3, connectivity[elmap])
         X = element("geometry", time)
         update!(new_element, "geometry", time => X[elmap])
-        u = element("displacement", time)
-        update!(new_element, "displacement", time => u[elmap])
+        if haskey(element, "displacement")
+            u = element("displacement", time)
+            update!(new_element, "displacement", time => u[elmap])
+        end
         #n = element("normal", time)
         #update!(new_element, "normal", time => n[elmap])
         if haskey(element, "master elements")
@@ -372,6 +356,7 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
             check_orientation!(P, n0)
             N_P = length(P)
             P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
+
             if first_slave_element
                 debug("Polygon clip info for first slave element:")
                 debug("S = $S")
@@ -380,11 +365,15 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
                 debug("N_P = $N_P")
                 debug("P_area = $P_area")
             end
+
             if isapprox(P_area, 0.0)
                 info("Polygon P has zero area: $P_area")
                 continue
             end
+
             C0 = calculate_centroid(P)
+
+            #=
             if isnan(C0[1])
                 info("C0 = $C0")
                 info("P = $P")
@@ -393,6 +382,7 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
                 info("n0 = $n0")
                 error("Calculation of centroid of polygon clip P failed.")
             end
+            =#
 
             De = zeros(nsl, nsl)
             Me = zeros(nsl, nm)
@@ -412,7 +402,7 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
                     Me = zeros(nnodes, nnodes)
                     for ip in get_integration_points(virtual_element, 3)
                         x_gauss = nothing
-                        try
+                        #try
                             x_gauss = virtual_element("geometry", ip, time)
                             xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
                             detJ = virtual_element(ip, time, Val{:detJ})
@@ -420,17 +410,17 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
                             N1 = vec(get_basis(slave_element, xi_s, time))
                             De += w*diagm(vec(N1))
                             Me += w*N1*N1'
-                        catch
-                            info("Failed to construct bi-orthogonal basis: cannot project vertex from auxiliary plane back to sufface.")
-                            info("x_gauss = $x_gauss")
-                            info("cell = $cell")
-                            info("C0 = $C0")
-                            info("P = $P")
-                            info("S = $S")
-                            info("M = $M")
-                            info("n0 = $n0")
-                            rethrow()
-                        end
+                        #catch
+                        #    info("Failed to construct bi-orthogonal basis: cannot project vertex from auxiliary plane back to sufface.")
+                        #    info("x_gauss = $x_gauss")
+                        #    info("cell = $cell")
+                        #    info("C0 = $C0")
+                        #    info("P = $P")
+                        #    info("S = $S")
+                        #    info("M = $M")
+                        #    info("n0 = $n0")
+                        #    rethrow()
+                        #end
                     end
                     Ae = De*inv(Me)
                 else
@@ -449,6 +439,7 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
                     # project gauss point from auxiliary plane to master and slave element
                     #x_gauss = N*x_cell
                     x_gauss = virtual_element("geometry", ip, time)
+                    #=
                     if isnan(x_gauss[1])
                         info("is nan")
                         info("x_gauss = $x_gauss")
@@ -460,25 +451,26 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
                         info("n0 = $n0")
                         error("nan, unable to continue")
                     end
+                    =#
 
                     xi_s = nothing
                     xi_m = nothing
                     alpha = nothing
 
-                    try
+                    #try
                         xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
                         xi_m, alpha = project_vertex_to_surface(x_gauss, x0, n0, master_element, X2, time)
-                    catch
-                        info("projecting vertex back to surface has failed.")
-                        info("x_gauss = $x_gauss")
-                        info("cell = $cell")
-                        info("C0 = $C0")
-                        info("P = $P")
-                        info("S = $S")
-                        info("M = $M")
-                        info("n0 = $n0")
-                        rethrow()
-                    end
+                    #catch
+                    #    info("projecting vertex back to surface has failed.")
+                    #    info("x_gauss = $x_gauss")
+                    #    info("cell = $cell")
+                    #    info("C0 = $C0")
+                    #    info("P = $P")
+                    #    info("S = $S")
+                    #    info("M = $M")
+                    #    info("n0 = $n0")
+                    #    rethrow()
+                    #end
 
                     # add contributions
                     N1 = vec(get_basis(slave_element, xi_s, time))

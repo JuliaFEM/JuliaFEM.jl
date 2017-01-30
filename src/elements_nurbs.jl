@@ -92,12 +92,12 @@ function get_basis(element::Element{NSolid}, xi::Vector, time)
     tu = element.properties.knots_u
     tv = element.properties.knots_v
     tw = element.properties.knots_w
-    w = element.properties.weights
-    nu = length(tu)
-    nv = length(tv)
-    nw = length(tw)
+    weights = element.properties.weights
+    nu = length(tu)-pu-1
+    nv = length(tv)-pv-1
+    nw = length(tw)-pw-1
     u, v, w = xi
-    N = [w[i,j,k]*NURBS(i,pu,u,tu)*NURBS(j,pv,v,tv)*NURBS(k,pw,w,tw) for i=1:nu, j=1:nv, k=1:nw]
+    N = vec([weights[i,j,k]*NURBS(i,pu,u,tu)*NURBS(j,pv,v,tv)*NURBS(k,pw,w,tw) for i=1:nu, j=1:nv, k=1:nw])'
     return N / sum(N)
 end
 

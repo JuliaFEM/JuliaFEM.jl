@@ -55,24 +55,6 @@ is_boundary_problem{P<:BoundaryProblem}(problem::Problem{P}) = true
 get_field_problems(solver::Solver) = filter(is_field_problem, get_problems(solver))
 get_boundary_problems(solver::Solver) = filter(is_boundary_problem, get_problems(solver))
 
-"""
-Posthook for field assembly. By default, do nothing.
-This can be used to make some modifications for assembly
-after all elements are assembled.
-
-Examples
---------
-function field_assembly_posthook!(solver::Solver,
-                                  K::SparseMatrixCSC,
-                                  Kg::SparseMatrixCSC,
-                                  f::SparseMatrixCSC,
-                                  fg::SpareMatrixCSC)
-    info("doing stuff, size(K) = ", size(K))
-end
-"""
-function field_assembly_posthook!
-end
-
 """Return one combined field assembly for a set of field problems.
 
 Parameters
@@ -119,12 +101,6 @@ function get_field_assembly(solver::Solver; show_info=true)
     Kg = sparse(Kg, solver.ndofs, solver.ndofs)
     f = sparse(f, solver.ndofs, 1)
     fg = sparse(fg, solver.ndofs, 1)
-
-    # run any posthook for assembly if defined
-    args = Tuple{Solver, SparseMatrixCSC, SparseMatrixCSC, SparseMatrixCSC, SparseMatrixCSC}
-    if method_exists(field_assembly_posthook!, args)
-        field_assembly_posthook!(solver, K, Kg, fg, fg)
-    end
 
     return M, K, Kg, f, fg
 end
@@ -191,9 +167,11 @@ function get_boundary_assembly(solver::Solver)
         g_ = sparse(assembly.g, ndofs, 1)
         for dof in assembly.removed_dofs
             info("$(problem.name): removing dof $dof from assembly")
-            C1_[:,dof] = 0.0
+            C1_[dof,:] = 0.0
             C2_[dof,:] = 0.0
         end
+        SparseArrays.dropzeros!(C1_)
+        SparseArrays.dropzeros!(C2_)
 
         already_constrained = get_nonzero_rows(C2)
         new_constraints = get_nonzero_rows(C2_)
@@ -203,8 +181,6 @@ function get_boundary_assembly(solver::Solver)
             warn("already constrained = $already_constrained")
             warn("new constraints = $new_constraints")
             overconstrained_dofs = sort(overconstrained_dofs)
-            overconstrained_nodes = find_nodes_by_dofs(problem, overconstrained_dofs)
-            warn("in overconstrained nodes $overconstrained_nodes")
             error("overconstrained dofs, not solving problem.")
         end
 
@@ -224,10 +200,9 @@ Solve linear system using LDLt factorization (SuiteSparse). This version
 requires that final system is symmetric and positive definite, so boundary
 conditions are first eliminated before solution.
 """
-function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{1}}; debug=false)
+function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{1}})
 
     nnz(D) == 0 || return false
-    C1 == C2 || return false
 
     A = get_nonzero_rows(K)
     B = get_nonzero_rows(C2)
@@ -235,28 +210,14 @@ function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{1}}; debug
     B == B2 || return false
     I = setdiff(A, B)
     
-    if debug
-        info("# A = $(length(A))")
-        info("# B = $(length(B))")
-        info("# I = $(length(I))")
-    end
+    debug("# A = $(length(A))")
+    debug("# B = $(length(B))")
+    debug("# I = $(length(I))")
 
     if length(B) == 0
         warn("No rows in C2, forget to set Dirichlet boundary conditions to model?")
     else
-        # solver boundary dofs (usually a trivial solution Iu = g
-        try
-            u[B] = lufact(C2[B,B2]) \ full(g[B])
-        catch
-            info("solver #1 failed to solve boundary dofs (you should not see this message).")
-            info("# A = $(length(A))")
-            info("# B = $(length(B))")
-            info("# B2 = $(length(B2))")
-            info("# I = $(length(I))")
-            info("B = $B")
-            info("B2 = $B2")
-            rethrow()
-        end
+        u[B] = lufact(C2[B,B2]) \ full(g[B])
     end
 
     # solve interior domain using LDLt factorization
@@ -287,12 +248,9 @@ function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{2}})
 end
 
 """ Default linear system solver for solver. """
-function solve!(solver::Solver; empty_assemblies_before_solution=true,
-show_info=true, symmetric=true, optimize=false, fill_D_diagonal=false)
+function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric=true)
 
-    if show_info
-        info("Solving problems ...")
-    end
+    info("Solving problems ...")
     t0 = Base.time()
 
     # assemble field & boundary problems
@@ -310,21 +268,10 @@ show_info=true, symmetric=true, optimize=false, fill_D_diagonal=false)
         M = 1/2*(M + M')
     end
 
-    if fill_D_diagonal
-        nz = ones(solver.ndofs)
-        nz[get_nonzero_rows(C2)] = 0.0
-        nz[get_nonzero_rows(D)] = 0.0
-        D += spdiagm(nz)
-    end
-
-    # free up some memory before solution by either emptying field assemblies
-    # or combining values with same indices in sparse COO matrices. Small
-    # boundary problems are untouched.
-    for problem in get_field_problems(solver)
-        if empty_assemblies_before_solution
+    if empty_assemblies_before_solution
+        # free up some memory before solution by emptying field assemblies from problems
+        for problem in get_field_problems(solver)
             empty!(problem.assembly)
-        elseif optimize
-            optimize!(problem.assembly)
         end
         gc()
     end
@@ -332,13 +279,17 @@ show_info=true, symmetric=true, optimize=false, fill_D_diagonal=false)
     ndofs = solver.ndofs
     u = zeros(ndofs)
     la = zeros(ndofs)
-    status = false
+    is_solved = false
     i = 0
     for i in [1, 2]
-        status = solve!(solver, K, C1, C2, D, f, g, u, la, Val{i})
-        status && break
+        is_solved = solve!(solver, K, C1, C2, D, f, g, u, la, Val{i})
+        if is_solved
+            break
+        end
     end
-    status || error("Failed to solve linear system!")
+    if !is_solved
+        error("Failed to solve linear system!")
+    end
     t1 = round(Base.time()-t0, 2)
     norms = (norm(u), norm(la))
     push!(solver.norms, norms)
@@ -346,10 +297,8 @@ show_info=true, symmetric=true, optimize=false, fill_D_diagonal=false)
     solver.u = u
     solver.la = la
 
-    if show_info
-        info("Solved problems in $t1 seconds using solver $i.")
-        info("Solution norms = $norms.")
-    end
+    info("Solved problems in $t1 seconds using solver $i.")
+    info("Solution norms = $norms.")
 
     return
 end
@@ -457,22 +406,6 @@ end
 function get_all_elements(solver::Solver)
     elements = [get_elements(problem) for problem in get_problems(solver)]
     return [elements...;]
-end
-
-function get_element_type{E}(element::Element{E})
-    return E
-end
-
-function get_element_id{E}(element::Element{E})
-    return element.id
-end
-
-function is_element_type{E}(element::Element{E}, element_type)
-    return is(E, element_type)
-end
-
-function filter_by_element_type(element_type, elements)
-    return filter(element -> is_element_type(element, element_type), elements)
 end
 
 function (solver::Solver)(field_name::AbstractString, time::Float64)
@@ -644,47 +577,27 @@ Notes
 -----
 Default convergence criteria is obtained by checking each sub-problem convergence.
 """
-function has_converged(solver::Solver{Nonlinear}; show_info=false,
-                       check_convergence_for_boundary_problems=false)
+function has_converged(solver::Solver{Nonlinear})
     properties = solver.properties
     converged = true
     eps = properties.convergence_tolerance
-    for problem in solver.problems
-        has_converged = true
-        if is_field_problem(problem)
-            has_converged = problem.assembly.u_norm_change < eps
-            if isapprox(norm(problem.assembly.u), 0.0)
-                # trivial solution
-                has_converged = true
-            end
-            show_info && info("Details for problem $(problem.name)")
-            show_info && info("Norm: $(norm(problem.assembly.u))")
-            show_info && info("Norm change: $(problem.assembly.u_norm_change)")
-            show_info && info("Has converged? $(has_converged)")
+    for problem in get_field_problems(solver)
+        has_converged = problem.assembly.u_norm_change < eps
+        if isapprox(norm(problem.assembly.u), 0.0)
+            # trivial solution
+            has_converged = true
         end
-        if is_boundary_problem(problem) && check_convergence_for_boundary_problems
-            has_converged = problem.assembly.la_norm_change/norm(problem.assembly.la) < eps
-            show_info && info("Details for problem $(problem.name)")
-            show_info && info("Norm: $(norm(problem.assembly.la))")
-            show_info && info("Norm change: $(problem.assembly.la_norm_change)")
-            show_info && info("Has converged? $(has_converged)")
-        end
+        debug("Details for problem $(problem.name)")
+        debug("Norm: $(norm(problem.assembly.u))")
+        debug("Norm change: $(problem.assembly.u_norm_change)")
+        debug("Has converged? $(has_converged)")
         converged &= has_converged
     end
     return converged
 end
 
-type NonlinearConvergenceError <: Exception
-    solver :: Solver
-end
-
-function Base.showerror(io::IO, exception::NonlinearConvergenceError)
-    max_iters = exception.solver.properties.max_iterations
-    print(io, "nonlinear iteration did not converge in $max_iters iterations!")
-end
-
 """ Default solver for quasistatic nonlinear problems. """
-function (solver::Solver{Nonlinear})(; show_info=true)
+function (solver::Solver{Nonlinear})()
 
     properties = solver.properties
 
@@ -693,10 +606,10 @@ function (solver::Solver{Nonlinear})(; show_info=true)
 
     # 2. start non-linear iterations
     for properties.iteration=1:properties.max_iterations
-        show_info && info(repeat("-", 80))
-        show_info && info("Starting nonlinear iteration #$(properties.iteration)")
-        show_info && info("Increment time t=$(round(solver.time, 3))")
-        show_info && info(repeat("-", 80))
+        info(repeat("-", 80))
+        info("Starting nonlinear iteration #$(properties.iteration)")
+        info("Increment time t=$(round(solver.time, 3))")
+        info(repeat("-", 80))
 
         # 2.1 update linearized assemblies
         assemble!(solver)
@@ -714,7 +627,9 @@ function (solver::Solver{Nonlinear})(; show_info=true)
     end
 
     # 3. did not converge
-    properties.error_if_no_convergence && throw(NonlinearConvergenceError(solver))
+    if properties.error_if_no_convergence
+        error("nonlinear iteration did not converge in $(properties.iteration) iterations!")
+    end
 end
 
 """ Convenience function to call nonlinear solver. """
@@ -849,11 +764,5 @@ function Postprocessor(problems::Problem...)
     if length(problems) != 0
         push!(solver, problems...)
     end
-    return solver
-end
-
-function Postprocessor(name::AbstractString, problems::Problem...)
-    solver = Postprocessor(problems...)
-    solver.name = name
     return solver
 end

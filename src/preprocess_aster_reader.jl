@@ -33,27 +33,6 @@ function aster_parse_nodes(section; strip_characters=true)
     return nodes
 end
 
-function parse(mesh, ::Type{Val{:CODE_ASTER_MAIL}})
-    model = Dict()
-    header = nothing
-    data = []
-    for line in split(mesh, '\n')
-        length(line) != 0 || continue
-        info("line: $line")
-        if is_aster_mail_keyword(strip(line))
-            header = parse_aster_header(line)
-            empty!(data)
-            continue
-        end
-        if line == "FINSF"
-            info(data)
-            header = nothing
-            process_aster_section!(model, join(data, ""), header, Val{header[1]})
-        end
-    end
-    return model
-end
-
 
 """ Code Aster binary file (.med). """
 type MEDFile
@@ -161,7 +140,7 @@ Returns
 Dict containing fields "nodes" and "connectivity".
 
 """
-function parse_aster_med_file(fn, mesh_name=nothing; debug=false)
+function parse_aster_med_file(fn, mesh_name=nothing)
     med = MEDFile(fn)
     mesh_names = get_mesh_names(med::MEDFile)
     all_meshes = join(mesh_names, ", ")
@@ -173,12 +152,10 @@ function parse_aster_med_file(fn, mesh_name=nothing; debug=false)
     end
     nsets = get_node_sets(med, mesh_name)
     elsets = get_element_sets(med, mesh_name)
-    if debug
-        elset_names = join(values(elsets), ", ")
-        info("Code Aster .med reader: found $(length(elsets)) element sets: $elset_names")
-        nset_names = join(values(nsets), ", ")
-        info("Code ASter .med reader: found $(length(nsets)) node sets: $nset_names")
-    end
+    elset_names = join(values(elsets), ", ")
+    debug("Code Aster .med reader: found $(length(elsets)) element sets: $elset_names")
+    nset_names = join(values(nsets), ", ")
+    debug("Code ASter .med reader: found $(length(nsets)) node sets: $nset_names")
     nodes = get_nodes(med, nsets, mesh_name)
     conn = get_connectivity(med, elsets, mesh_name)
     result = Dict("nodes" => nodes, "connectivity" => conn)
