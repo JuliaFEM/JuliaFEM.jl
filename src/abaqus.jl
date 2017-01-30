@@ -759,3 +759,7 @@ function create_surface_elements(mesh::Mesh, surface_name::Symbol)
    return elements
 end
 
+function create_surface_elements(mesh::Mesh, surface_name::String)
+    return create_surface_elements(mesh, Symbol(surface_name))
+end
+
