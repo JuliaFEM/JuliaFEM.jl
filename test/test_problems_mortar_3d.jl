@@ -44,7 +44,49 @@ using JuliaFEM.Abaqus: create_surface_elements
     @test isapprox(maxT, 0.5)
 end
 
-@testset "patch test displacement + tet10" begin
+@testset "patch test temperature + abaqus inp + tet10" begin
+    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet10.inp"
+    mesh = abaqus_read_mesh(meshfile)
+
+    upper = Problem(Heat, "UPPER", 1)
+    upper.elements = create_elements(mesh, "UPPER")
+    update!(upper, "temperature thermal conductivity", 1.0)
+
+    lower = Problem(Heat, "LOWER", 1)
+    lower.elements = create_elements(mesh, "LOWER")
+    update!(lower, "temperature thermal conductivity", 1.0)
+
+    bc_upper = Problem(Dirichlet, "UPPER_TOP", 1, "temperature")
+    bc_upper.elements = create_surface_elements(mesh, "UPPER_TOP")
+    update!(bc_upper, "temperature 1", 0.0)
+
+    bc_lower = Problem(Dirichlet, "LOWER_BOTTOM", 1, "temperature")
+    bc_lower.elements = create_surface_elements(mesh, "LOWER_BOTTOM")
+    update!(bc_lower, "temperature 1", 1.0)
+
+    interface = Problem(Mortar, "LOWER_TO_UPPER", 1, "temperature")
+    interface_slave_elements = create_surface_elements(mesh, "LOWER_TO_UPPER")
+    interface_master_elements = create_surface_elements(mesh, "UPPER_TO_LOWER")
+    update!(interface_slave_elements, "master elements", interface_master_elements)
+    interface.elements = [interface_slave_elements; interface_master_elements]
+
+    interface.properties.linear_surface_elements = true
+    interface.properties.split_quadratic_slave_elements = false
+    interface.properties.split_quadratic_master_elements = false
+
+    solver = LinearSolver(upper, lower, bc_upper, bc_lower, interface)
+    solver()
+    
+    node_ids, temperature = get_nodal_vector(interface.elements, "temperature", 0.0)
+    T = [t[1] for t in temperature]
+    minT = minimum(T)
+    maxT = maximum(T)
+    info("minT = $minT, maxT = $maxT")
+    @test isapprox(minT, 0.5)
+    @test isapprox(maxT, 0.5)
+end
+
+@testset "patch test displacement + abaqus inp + tet10" begin
     meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet10.inp"
     mesh = abaqus_read_mesh(meshfile)
 
