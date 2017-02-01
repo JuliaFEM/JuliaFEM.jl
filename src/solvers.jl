@@ -233,28 +233,46 @@ end
 """
 Solve linear system using LU factorization (UMFPACK). This version solves
 directly the saddle point problem without elimination of boundary conditions.
+It is assumed that C1 == C2 and D = 0, so problem is symmetric and zero rows
+cand be removed from total system before solution. This kind of system arises
+in e.g. mesh tie problem
 """
-function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{2}}; fill_diagonal=false, remove_zero_rows=true)
+function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{2}})
+
+    C1 == C2 || return false
+    length(D) == 0 || return false
 
     A = [K C1'; C2  D]
     b = [f; g]
 
-    if fill_diagonal
-        nz = ones(2*solver.ndofs)
-        nz[get_nonzero_rows(A)] = 0.0
-        A += spdiagm(nz)
-    end
-
+    nz1 = get_nonzero_rows(A)
+    nz2 = get_nonzero_columns(A)
+    nz1 == nz2 || return false
+    
     x = zeros(2*solver.ndofs)
+    x[nz1] = lufact(A[nz1,nz2]) \ full(b[nz1])
 
-    if remove_zero_rows
-        nz1 = get_nonzero_rows(A)
-        nz2 = get_nonzero_columns(A)
-        @assert nz1 == nz2
-        x[nz1] = lufact(A[nz1,nz2]) \ full(b[nz1])
-    else
-        x[:] = lufact(A) \ full(b)
-    end
+    u[:] = x[1:solver.ndofs]
+    la[:] = x[solver.ndofs+1:end]
+
+    return true
+end
+
+"""
+Solve linear system using LU factorization (UMFPACK). This version solves
+directly the saddle point problem without elimination of boundary conditions.
+If matrix has zero rows, diagonal term is added to that matrix is invertible.
+"""
+function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{3}})
+
+    A = [K C1'; C2  D]
+    b = [f; g]
+
+    nz = ones(2*solver.ndofs)
+    nz[get_nonzero_rows(A)] = 0.0
+    A += spdiagm(nz)
+
+    x = lufact(A) \ full(b)
 
     u[:] = x[1:solver.ndofs]
     la[:] = x[solver.ndofs+1:end]
@@ -296,7 +314,7 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
     la = zeros(ndofs)
     is_solved = false
     i = 0
-    for i in [1, 2]
+    for i in [1, 2, 3]
         is_solved = solve!(solver, K, C1, C2, D, f, g, u, la, Val{i})
         if is_solved
             break
