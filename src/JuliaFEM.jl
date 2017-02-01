@@ -8,7 +8,9 @@ This is JuliaFEM -- Finite Element Package
 """
 module JuliaFEM
 
-importall Base
+import Base: getindex, setindex!, convert, length, size, isapprox, similar,
+             start, first, next, done, last, endof, vec, ==, +, -, *, /, haskey, copy,
+             push!, isempty, empty!, append!, sparse, full, read
 
 using Logging
 

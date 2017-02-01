@@ -12,7 +12,7 @@
 - etc only topology related stuff
 =#
 
-importall Base
+import Base: copy
 
 using JuliaFEM
 
