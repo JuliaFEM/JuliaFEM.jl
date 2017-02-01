@@ -33,7 +33,9 @@ using JuliaFEM.Abaqus: create_surface_elements
     update!(interface_slave_elements, "master elements", interface_master_elements)
     interface.elements = [interface_master_elements; interface_slave_elements]
 
+    #JuliaFEM.diagnose_interface(interface, 0.0)
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, interface)
+
     solver()
     
     node_ids, temperature = get_nodal_vector(interface.elements, "temperature", 0.0)
@@ -43,6 +45,18 @@ using JuliaFEM.Abaqus: create_surface_elements
     info("minT = $minT, maxT = $maxT")
     @test isapprox(minT, 0.5)
     @test isapprox(maxT, 0.5)
+
+    #=
+    initialize!(solver)
+    assemble!(solver)
+    M, K, Kg, f, fg = get_field_assembly(solver)
+    Kb, C1, C2, D, fb, g = get_boundary_assembly(solver)
+    K = K + Kg + Kb
+    f = f + fg + fb
+    K = 1/2*(K + K')
+    M = 1/2*(M + M')
+    =#
+
 end
 
 @testset "patch test temperature + abaqus inp + tet10, quadratic surface elements" begin
@@ -86,6 +100,8 @@ end
     @test isapprox(minT, 0.5)
     @test isapprox(maxT, 0.5)
 end
+
+#=
 
 @testset "patch test temperature + abaqus inp + tet10, linear surface elements" begin
     meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet10.inp"
@@ -170,4 +186,5 @@ end
     @test isapprox(minT, 0.5)
     @test isapprox(maxT, 0.5)
 end
+=#
 
