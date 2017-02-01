@@ -72,16 +72,32 @@ function get_cells(P, C; allow_quads=false)
     return cells
 end
 
-""" Test does P contain q. """
-function contains{T}(P::Vector{T}, q::T; check_is_close=true, rtol=1.0e-4)
-    if q in P
-        return true
-    end
-    if check_is_close
-        for p in P
-            if isapprox(p, q; rtol=rtol)
-                return true
-            end
+""" Test does vector P contain approximately q. This function uses isapprox()
+internally to make boolean test.
+
+Examples
+--------
+julia> P = Vector[[1.0, 1.0], [2.0, 2.0]]
+2-element Array{Array{T,1},1}:
+ [1.0,1.0]
+ [2.0,2.0]
+
+julia> q = [1.0, 1.0] + eps(Float64)
+2-element Array{Float64,1}:
+ 1.0
+ 1.0
+
+julia> in(q, P)
+false
+
+julia> approx_in(q, P)
+true
+
+"""
+function approx_in{T}(q::T, P::Vector{T}; rtol=1.0e-4, atol=0.0)
+    for p in P
+        if isapprox(q, p; rtol=rtol, atol=atol)
+            return true
         end
     end
     return false
@@ -104,7 +120,7 @@ function get_polygon_clip(xs, xm, n)
     # 2. test is slave point inside master, if yes, add to clip
     for i=1:ns
         if vertex_inside_polygon(xs[i], xm)
-            contains(P, xs[i]) && continue
+            approx_in(xs[i], P) && continue
             debug("2. $(xs[i]) inside M -> push")
             push!(P, xs[i])
         end
@@ -127,7 +143,7 @@ function get_polygon_clip(xs, xm, n)
             q = xs1 + t*(xs2 - xs1)
             #info("t=$t, q=$q, q ∈ xm ? $(vertex_inside_polygon(q, xm))")
             if vertex_inside_polygon(q, xm)
-                contains(P, q) && continue
+                approx_in(q, P) && continue
                 debug("3. $q inside M -> push")
                 push!(P, q)
             end
