@@ -96,7 +96,7 @@ function get_polygon_clip(xs, xm, n)
     # 1. test is master point inside slave, if yes, add to clip
     for i=1:nm
         if vertex_inside_polygon(xm[i], xs)
-            debug("1. $(xm[i]) inside S -> push")
+            # debug("1. $(xm[i]) inside S -> push")
             push!(P, xm[i])
         end
     end
@@ -105,7 +105,7 @@ function get_polygon_clip(xs, xm, n)
     for i=1:ns
         if vertex_inside_polygon(xs[i], xm)
             contains(P, xs[i]) && continue
-            debug("2. $(xs[i]) inside M -> push")
+            # debug("2. $(xs[i]) inside M -> push")
             push!(P, xs[i])
         end
     end
@@ -128,7 +128,7 @@ function get_polygon_clip(xs, xm, n)
             #info("t=$t, q=$q, q ∈ xm ? $(vertex_inside_polygon(q, xm))")
             if vertex_inside_polygon(q, xm)
                 contains(P, q) && continue
-                debug("3. $q inside M -> push")
+                # debug("3. $q inside M -> push")
                 push!(P, q)
             end
         end
@@ -212,12 +212,39 @@ function calculate_normals(elements, time, ::Type{Val{2}}; rotate_normals=false)
     return normals
 end
 
+""" Given polygon P and normal direction n, check that polygon vertices are
+ordered in counter clock wise direction with respect to surface normal and
+sort if necessary. It is assumed that polygon is convex.
+
+Examples
+--------
+Unit triangle, normal in z-direction:
+
+julia> P = Vector[[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
+3-element Array{Array{T,1},1}:
+ [0.0,0.0,0.0]
+ [0.0,1.0,0.0]
+ [1.0,0.0,0.0]
+
+julia> n = [0.0, 0.0, 1.0]
+3-element Array{Float64,1}:
+ 0.0
+ 0.0
+ 1.0
+
+julia> check_orientation!(P, n)
+3-element Array{Array{T,1},1}:
+ [1.0,0.0,0.0]
+ [0.0,0.0,0.0]
+ [0.0,1.0,0.0]
+
+"""
 function check_orientation!(P, n)
     C = mean(P)
     np = length(P)
     s = [dot(n, cross(P[i]-C, P[mod(i+1,np)+1]-C)) for i=1:np]
     all(s .< 0) && return
-    debug("polygon not in ccw order, fixing")
+    # debug("polygon not in ccw order, fixing")
     # project points to new orthogonal basis Q and sort there
     t1 = (P[1]-C)/norm(P[1]-C)
     t2 = cross(n, t1)
@@ -282,7 +309,9 @@ function split_quadratic_elements(elements::Vector, time::Float64)
     end
     n1 = length(elements)
     n2 = length(new_elements)
-    info("Splitted $n1 (maybe quadratic) elements to $n2 (linear) sub-elements")
+    if n1 != n2
+        info("Splitted $n1 elements to $n2 (linear) sub-elements")
+    end
     return new_elements
 end
 
