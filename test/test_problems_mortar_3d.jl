@@ -59,6 +59,7 @@ using JuliaFEM.Abaqus: create_surface_elements
 
 end
 
+#=
 @testset "patch test temperature + abaqus inp + tet10, quadratic surface elements" begin
     meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet10.inp"
     mesh = abaqus_read_mesh(meshfile)
@@ -100,9 +101,9 @@ end
     @test isapprox(minT, 0.5)
     @test isapprox(maxT, 0.5)
 end
+=#
 
 #=
-
 @testset "patch test temperature + abaqus inp + tet10, linear surface elements" begin
     meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet10.inp"
     mesh = abaqus_read_mesh(meshfile)
