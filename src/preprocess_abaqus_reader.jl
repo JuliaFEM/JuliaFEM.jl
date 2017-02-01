@@ -1,8 +1,6 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-importall Base
-
 element_has_nodes(::Type{Val{:C3D4}}) = 4
 element_has_type( ::Type{Val{:C3D4}}) = :Tet4
 
