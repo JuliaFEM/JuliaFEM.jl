@@ -89,12 +89,12 @@ function length(f::DCTI)
     return 1
 end
 
-function Base.:*(c::Number, f::DCTI)
+function *(c::Number, f::DCTI)
     return c*f.data
 end
 
 """ Kind of spatial interpolation of DCTI. """
-function Base.:*(N::Matrix, f::DCTI)
+function *(N::Matrix, f::DCTI)
     @assert length(N) == 1
     return N[1]*f.data
 end
@@ -179,11 +179,11 @@ function start(field::DVTI)
     return 1
 end
 
-function Base.:+(f1::DVTI, f2::DVTI)
+function +(f1::DVTI, f2::DVTI)
     return DVTI(f1.data + f2.data)
 end
 
-function Base.:-(f1::DVTI, f2::DVTI)
+function -(f1::DVTI, f2::DVTI)
     return DVTI(f1.data - f2.data)
 end
 
@@ -192,20 +192,20 @@ function update!(field::DVTI, data::Union{Vector, Dict})
 end
 
 """ Take scalar product of DVTI and constant T. """
-function Base.:*(T::Number, field::DVTI)
+function *(T::Number, field::DVTI)
     return DVTI(T*field.data)
 end
 
 """ Take dot product of DVTI field and vector T. Vector length must match to the
 field length and this can be used mainly for interpolation purposes, i.e., u = ∑ Nᵢuᵢ.
 """
-function Base.:*(T::Vector, f::DVTI)
+function *(T::Vector, f::DVTI)
     @assert length(T) <= length(f)
     return sum([T[i]*f[i] for i=1:length(T)])
 end
 
 """ Take outer product of DVTI field and matrix T. """
-function Base.:*(T::Matrix, f::DVTI)
+function *(T::Matrix, f::DVTI)
     n, m = size(T)
     return sum([kron(T[:,i], f[i]') for i=1:m])'
 end
