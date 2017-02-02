@@ -33,7 +33,7 @@ using JuliaFEM.Abaqus: create_surface_elements
     update!(interface_slave_elements, "master elements", interface_master_elements)
     interface.elements = [interface_master_elements; interface_slave_elements]
 
-    #JuliaFEM.diagnose_interface(interface, 0.0)
+    JuliaFEM.diagnose_interface(interface, 0.0)
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, interface)
 
     solver()
