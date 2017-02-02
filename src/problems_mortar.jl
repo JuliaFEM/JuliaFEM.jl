@@ -159,6 +159,7 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
         n0 = N*n1
         info("Auxiliary plane x0 = $x0, n0 = $n0")
         S = Vector[project_vertex_to_auxiliary_plane(X1[i], x0, n0) for i=1:nsl]
+        check_orientation!(S, n0)
         info("Slave element $(slave_element.id) vertices in auxiliary plane: $S")
 
         # 3. loop all master elements
@@ -184,6 +185,7 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
 
             # 3.1 project master nodes to auxiliary plane and create polygon clipping
             M = Vector[project_vertex_to_auxiliary_plane(X2[i], x0, n0) for i=1:nm]
+            check_orientation!(M, n0)
             P = get_polygon_clip(S, M, n0)
             if length(P) < 3
                 if length(P) == 0

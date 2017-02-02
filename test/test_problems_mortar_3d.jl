@@ -59,7 +59,6 @@ using JuliaFEM.Abaqus: create_surface_elements
 
 end
 
-#=
 @testset "patch test temperature + abaqus inp + tet10, quadratic surface elements" begin
     meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet10.inp"
     mesh = abaqus_read_mesh(meshfile)
@@ -90,6 +89,8 @@ end
     interface.properties.split_quadratic_slave_elements = false
     interface.properties.split_quadratic_master_elements = false
 
+#   JuliaFEM.diagnose_interface(interface, 0.0)
+
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, interface)
     solver()
     
@@ -100,8 +101,8 @@ end
     info("minT = $minT, maxT = $maxT")
     @test isapprox(minT, 0.5)
     @test isapprox(maxT, 0.5)
+
 end
-=#
 
 #=
 @testset "patch test temperature + abaqus inp + tet10, linear surface elements" begin
