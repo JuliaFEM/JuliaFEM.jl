@@ -396,7 +396,6 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
         for cell in all_cells
             virtual_element = Element(Tri3, Int[])
             update!(virtual_element, "geometry", cell)
-            #x_cell = Field(cell)
 
             # construct bi-orthogonal basis
             nnodes = length(slave_element)
@@ -404,10 +403,10 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
                 De = zeros(nnodes, nnodes)
                 Me = zeros(nnodes, nnodes)
                 for ip in get_integration_points(virtual_element, 3)
-                    x_gauss = virtual_element("geometry", ip, time)
-                    xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
                     detJ = virtual_element(ip, time, Val{:detJ})
                     w = ip.weight*detJ
+                    x_gauss = virtual_element("geometry", ip, time)
+                    xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
                     N1 = vec(get_basis(slave_element, xi_s, time))
                     De += w*diagm(vec(N1))
                     Me += w*N1*N1'
@@ -419,7 +418,6 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
 
             # 5. loop integration point of integration cell
             for ip in get_integration_points(virtual_element, 3)
-                N = vec(get_basis(virtual_element, ip, time))
                 detJ = virtual_element(ip, time, Val{:detJ})
                 w = ip.weight*detJ
 
@@ -435,7 +433,7 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
                 Phi = Ae*N1
                 De += w*Phi*N1'
                 Me += w*Phi*N2'
-                if props.adjust
+                if props.adjust && haskey(slave_element, "displacement") && haskey(master_element, "displacement")
                     u1 = slave_element("displacement", time)
                     u2 = master_element("displacement", time)
                     x_s = N1*(X1+u1)
@@ -595,7 +593,7 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
                         Phi = Ae*N1
                         De += w*Phi*N1'
                         Me += w*Phi*N2'
-                        if props.adjust
+                        if props.adjust && haskey(slave_element, "displacement") && haskey(master_element, "displacement")
                             u1 = slave_element("displacement", time)
                             u2 = master_element("displacement", time)
                             xs = N1*(Xs+u1)
