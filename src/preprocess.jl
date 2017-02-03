@@ -46,6 +46,17 @@ function add_node_to_node_set!(mesh::Mesh, set_name, nids...)
         mesh.node_sets[set_name] = Set{Int64}()
     end
     push!(mesh.node_sets[set_name], nids...)
+    return
+end
+
+""" Create a new node set from nodes in element set. """
+function create_node_set_from_element_set!(mesh::Mesh, set_name)
+    node_ids = Set{Int64}()
+    for elid in mesh.element_sets[set_name]
+        push!(node_ids, mesh.elements[elid]...)
+    end
+    mesh.node_sets[set_name] = node_ids
+    return
 end
 
 function add_element!(mesh::Mesh, elid::Int, eltype::Symbol, connectivity::Vector{Int64})
@@ -177,18 +188,3 @@ function JuliaFEM.Problem{P<:BoundaryProblem}(mesh::Mesh, ::Type{P}, name, dimen
     problem.elements = create_elements(mesh, name)
     return problem
 end
-
-"""
-Swap surface element connectivity s.t. normals point outward
-"""
-function check_orientation!
-    # TODO
-end
-
-"""
-Partition model using METIS
-"""
-function partition_model!
-    # TODO
-end
-
