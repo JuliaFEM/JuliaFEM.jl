@@ -330,7 +330,14 @@ function split_quadratic_elements(elements::Vector, time::Float64)
     return new_elements
 end
 
-""" Assemble linear surface element to problem. """
+""" Assemble linear surface element to problem.
+
+Notes
+-----
+For full integrated slave element, coefficient matrix for Tri3 is
+Ae = [3.0 -1.0 -1.0; -1.0 3.0 -1.0; -1.0 -1.0 3.0]
+
+"""
 function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_element::Element{E}, time::Real; first_slave_element=false)
     
     props = problem.properties
