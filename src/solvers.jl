@@ -109,11 +109,13 @@ end
 function check_for_overconstrained_dofs(solver::Solver)
     overdetermined = false
     constrained_dofs = Set{Int}()
+    all_overconstrained_dofs = Set{Int}()
     boundary_problems = get_boundary_problems(solver)
     for problem in boundary_problems
         new_constraints = Set(problem.assembly.C2.I)
         new_constraints = setdiff(new_constraints, problem.assembly.removed_dofs)
         overconstrained_dofs = intersect(constrained_dofs, new_constraints)
+        all_overconstrained_dofs = union(all_overconstrained_dofs, overconstrained_dofs)
         if length(overconstrained_dofs) != 0
             warn("problem is overconstrained, finding overconstrained dofs... ")
             overdetermined = true
@@ -133,6 +135,8 @@ function check_for_overconstrained_dofs(solver::Solver)
         constrained_dofs = union(constrained_dofs, new_constraints)
     end
     if overdetermined
+        info("List of all overconstrained dofs:")
+        info(sort(collect(all_overconstrained_dofs)))
         error("problem is overconstrained, not continuing to solution.")
     end
     return true
