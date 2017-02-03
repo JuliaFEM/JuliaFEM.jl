@@ -353,6 +353,63 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
 
     master_elements = slave_element("master elements", time)
 
+    if props.dual_basis
+
+        info("Creating dual basis for element $(slave_element.id)")
+                    
+        De = zeros(nsl, nsl)
+        Me = zeros(nsl, nsl)
+ 
+        for master_element in master_elements
+
+            master_element_nodes = get_connectivity(master_element)
+            nm = length(master_element)
+            X2 = master_element("geometry", time)
+
+            if norm(mean(X1) - mean(X2)) > problem.properties.distval
+                continue
+            end
+
+            # 3.1 project master nodes to auxiliary plane and create polygon clipping
+            M = Vector[project_vertex_to_auxiliary_plane(X2[i], x0, n0) for i=1:nm]
+            P = get_polygon_clip(S, M, n0)
+            length(P) < 3 && continue # no clipping or shared edge (no volume)
+            check_orientation!(P, n0)
+            N_P = length(P)
+            P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
+
+            if isapprox(P_area, 0.0)
+                info("Polygon P has zero area: $P_area")
+                continue
+            end
+
+            # 4. loop integration cells
+            C0 = calculate_centroid(P)
+            all_cells = get_cells(P, C0)
+            for cell in all_cells
+                virtual_element = Element(Tri3, Int[])
+                update!(virtual_element, "geometry", cell)
+                for ip in get_integration_points(virtual_element, 3)
+                    detJ = virtual_element(ip, time, Val{:detJ})
+                    w = ip.weight*detJ
+                    x_gauss = virtual_element("geometry", ip, time)
+                    xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
+                    N1 = slave_element(xi_s, time)
+                    De += w*diagm(vec(N1))
+                    Me += w*N1'*N1
+                end
+            end # integration cells done
+
+        end # master elements done
+                    
+        Ae = De*inv(Me)
+
+        info("Dual basis coefficient matrix: $Ae")
+
+    else
+        Ae = eye(nsl)
+    end
+
     for master_element in master_elements
 
         master_element_nodes = get_connectivity(master_element)
@@ -397,25 +454,6 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
             virtual_element = Element(Tri3, Int[])
             update!(virtual_element, "geometry", cell)
 
-            # construct bi-orthogonal basis
-            nnodes = length(slave_element)
-            if props.dual_basis
-                De = zeros(nnodes, nnodes)
-                Me = zeros(nnodes, nnodes)
-                for ip in get_integration_points(virtual_element, 3)
-                    detJ = virtual_element(ip, time, Val{:detJ})
-                    w = ip.weight*detJ
-                    x_gauss = virtual_element("geometry", ip, time)
-                    xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
-                    N1 = vec(get_basis(slave_element, xi_s, time))
-                    De += w*diagm(vec(N1))
-                    Me += w*N1*N1'
-                end
-                Ae = De*inv(Me)
-            else
-                Ae = eye(nnodes)
-            end
-
             # 5. loop integration point of integration cell
             for ip in get_integration_points(virtual_element, 3)
                 detJ = virtual_element(ip, time, Val{:detJ})
@@ -431,6 +469,7 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
                 N1 = vec(get_basis(slave_element, xi_s, time))
                 N2 = vec(get_basis(master_element, xi_m, time))
                 Phi = Ae*N1
+                # Phi = [3.0-4.0*xi_s[1]-4.0*xi_s[2], 4.0*xi_s[1]-1.0, 4.0*xi_s[2]-1.0]
                 De += w*Phi*N1'
                 Me += w*Phi*N2'
                 if props.adjust && haskey(slave_element, "displacement") && haskey(master_element, "displacement")
