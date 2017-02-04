@@ -32,4 +32,11 @@ using JuliaFEM.Testing
     @test length(P) == 3
     @test isapprox(calculate_polygon_area(P), 1/48)
 
+    # visually inspected
+    Xs = Vector[[0.0,0.0], [1.0,0.0], [0.0,1.0]]
+    Xm = Vector[[-0.25,0.50], [0.50,-0.25], [0.75,0.75]]
+    P_ = Vector[[0.65,0.35,0.0], [0.5625,0.0,0.0], [0.25,0.0,0.0],
+                [0.0,0.25,0.0], [0.0,0.5625,0.0], [0.35,0.65,0.0]]
+    P = get_polygon_clip(Xs, Xm, [0.0, 0.0, 1.0])
+    @test length(P) == length(P_)
 end

@@ -63,10 +63,13 @@ function get_formulation_type(problem::Problem{Mortar})
 end
 
 function assemble!(problem::Problem{Mortar}, time::Float64)
+    if length(problem.elements) == 0
+        warn("No elements defined in interface $(problem.name), this will result empty assembly!")
+        return
+    end
     if problem.properties.dimension == -1
         problem.properties.dimension = dim = size(first(problem.elements), 1)
-        info("assuming dimension of mesh tie surface is $dim")
-        info("if this is wrong set is manually using problem.properties.dimension")
+        info("Assuming dimension of mesh tie surface is $dim. If this is wrong set is manually using problem.properties.dimension")
     end
     dimension = Val{problem.properties.dimension}
     use_forwarddiff = Val{problem.properties.use_forwarddiff}
