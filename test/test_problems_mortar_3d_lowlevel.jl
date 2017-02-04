@@ -60,7 +60,7 @@ function calculate_mortar_projection_matrix(problem::Problem{Mortar}, ndim::Int)
     return S, M, P
 end
 
-@testset "two element clipping, calculation of projection matrix P" begin
+@testset "two linear element clipping, calculation of projection matrix P" begin
     X = Dict(
         1 => [0.0, 0.0, 0.0],
         2 => [1.0, 0.0, 0.0],
@@ -73,6 +73,7 @@ end
     update!([s, m], "geometry", X)
     update!(s, "master elements", [m])
     p = Problem(Mortar, "two elements", 1, "temperature")
+    p.properties.dual_basis = false
     p.elements = [s; m]
     initialize!(p)
     assemble!(p)
@@ -84,5 +85,20 @@ end
     S, M, P = calculate_mortar_projection_matrix(p, 6)
     @test S == [1, 2, 3]
     @test M == [4, 5, 6]
-    dump(full(P))
+    # visually inspected to be ok result
+    P_expected = 1/15*[9 9 -3; -7 13 9; 13 -7 9]
+    @test isapprox(P, P_expected)
+
+    empty!(p.assembly)
+    p.properties.dual_basis = true
+    assemble!(p)
+    C1 = sparse(p.assembly.C1)
+    C2 = sparse(p.assembly.C2)
+    D = sparse(p.assembly.D)
+    @test length(D) == 0
+    @test C1 == C2
+    S, M, P = calculate_mortar_projection_matrix(p, 6)
+    @test S == [1, 2, 3]
+    @test M == [4, 5, 6]
+    @test isapprox(P, P_expected)
 end
