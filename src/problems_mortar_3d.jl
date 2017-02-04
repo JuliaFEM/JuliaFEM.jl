@@ -538,7 +538,8 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
         
     Xs = slave_element("geometry", time)
 
-    alp = 0.2
+    alp = props.alpha
+
     T = [
             1.0 0.0 0.0 0.0 0.0 0.0
             0.0 1.0 0.0 0.0 0.0 0.0
@@ -767,12 +768,14 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
     slave_elements = get_slave_elements(problem)
     area = 0.0
 
+    #=
     if props.split_quadratic_slave_elements
         if !props.linear_surface_elements
             warn("Mortar3D: split_quadratic_surfaces = true and linear_surface_elements = false maybe have unexpected behavior")
         end
         slave_elements = split_quadratic_elements(slave_elements, time)
     end
+    =#
 
     # 1. calculate nodal normals and tangents for slave element nodes j ∈ S
     normals = calculate_normals(slave_elements, time, Val{2};

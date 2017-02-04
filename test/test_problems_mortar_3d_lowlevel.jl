@@ -60,7 +60,7 @@ function calculate_mortar_projection_matrix(problem::Problem{Mortar}, ndim::Int)
     return S, M, P
 end
 
-@testset "two linear element clipping, calculation of projection matrix P" begin
+@testset "two linear element clipping, calculation of projection matrix P for standard and dual basis" begin
     X = Dict(
         1 => [0.0, 0.0, 0.0],
         2 => [1.0, 0.0, 0.0],
@@ -88,6 +88,8 @@ end
     # visually inspected to be ok result
     P_expected = 1/15*[9 9 -3; -7 13 9; 13 -7 9]
     @test isapprox(P, P_expected)
+    um = [7.5, 15.0, 22.5]
+    @test isapprox(P*um, [9.0, 23.0, 13.0])
 
     empty!(p.assembly)
     p.properties.dual_basis = true
@@ -101,4 +103,89 @@ end
     @test S == [1, 2, 3]
     @test M == [4, 5, 6]
     @test isapprox(P, P_expected)
+    um = [7.5, 15.0, 22.5]
+    @test isapprox(P*um, [9.0, 23.0, 13.0])
 end
+
+
+@testset "two quadratic element clipping, calculation of projection matrix P for standard basis" begin
+    X = Dict(
+        1 => [0.0, 0.0, 0.0],
+        2 => [1.0, 0.0, 0.0],
+        3 => [0.0, 1.0, 0.0],
+        7 => [-0.25, 0.50, 0.00],
+        8 => [0.50, -0.25, 0.00],
+        9 => [0.75, 0.75, 0.00])
+    # middle nodes
+    X[4] = 1/2*(X[1] + X[2])
+    X[5] = 1/2*(X[2] + X[3])
+    X[6] = 1/2*(X[3] + X[1])
+    X[10] = 1/2*(X[7] + X[8])
+    X[11] = 1/2*(X[8] + X[9])
+    X[12] = 1/2*(X[9] + X[7])
+    s = Element(Tri6, [1, 2, 3, 4, 5, 6])
+    m = Element(Tri6, [7, 8, 9, 10, 11, 12])
+    update!([s, m], "geometry", X)
+    update!(s, "master elements", [m])
+    p = Problem(Mortar, "two elements", 1, "temperature")
+    p.properties.dual_basis = false
+    p.elements = [s; m]
+    initialize!(p)
+    assemble!(p)
+    C1 = sparse(p.assembly.C1)
+    C2 = sparse(p.assembly.C2)
+    D = sparse(p.assembly.D)
+    @test length(D) == 0
+    @test C1 == C2
+    S, M, P = calculate_mortar_projection_matrix(p, 12)
+    @test S == [1, 2, 3, 4, 5, 6]
+    @test M == [7, 8, 9, 10, 11, 12]
+    println(full(P))
+    # visually inspected to be ok result
+    # for alpha = 0.2
+    # P_expected = 1/675*[81 81 189 972 -324 -324; 609 429 81 -1092 1404 -756; 429 609 81 -1092 -756 1404; -295 215 -225 260 300 420; -481 -481 81 908 324 324; 215 -295 -225 260 420 300]
+    P_expected = 1/675*[81 81 189 972 -324 -324; 609 429 81 -1092 1404 -756; 429 609 81 -1092 -756 1404; -39 231 -81 132 396 36; -81 -81 81 108 324 324; 231 -39 -81 132 36 396]
+    @test isapprox(P, P_expected)
+    um = 15/2*[1, 2, 3]
+    um = [um[1], um[2], um[3], 0.5*(um[1]+um[2]), 0.5*(um[2]+um[3]), 0.5*(um[3]+um[1])]
+    us = P*um
+    @test isapprox(us, [9.0, 23.0, 13.0, 16.0, 18.0, 11.0])
+end
+
+@testset "two quadratic element clipping, calculation of projection matrix P for dual lagrange basis" begin
+    X = Dict(
+        1 => [0.0, 0.0, 0.0],
+        2 => [1.0, 0.0, 0.0],
+        3 => [0.0, 1.0, 0.0],
+        7 => [-0.25, 0.50, 0.00],
+        8 => [0.50, -0.25, 0.00],
+        9 => [0.75, 0.75, 0.00])
+    # middle nodes
+    X[4] = 1/2*(X[1] + X[2])
+    X[5] = 1/2*(X[2] + X[3])
+    X[6] = 1/2*(X[3] + X[1])
+    X[10] = 1/2*(X[7] + X[8])
+    X[11] = 1/2*(X[8] + X[9])
+    X[12] = 1/2*(X[9] + X[7])
+    s = Element(Tri6, [1, 2, 3, 4, 5, 6])
+    m = Element(Tri6, [7, 8, 9, 10, 11, 12])
+    update!([s, m], "geometry", X)
+    update!(s, "master elements", [m])
+    p = Problem(Mortar, "two elements", 1, "temperature")
+    p.properties.dual_basis = true
+    p.properties.alpha = 0.2
+    p.elements = [s; m]
+    initialize!(p)
+    assemble!(p)
+    C1 = sparse(p.assembly.C1)
+    C2 = sparse(p.assembly.C2)
+    D = sparse(p.assembly.D)
+    @test length(D) == 0
+    @test C1 == C2
+    S, M, P = calculate_mortar_projection_matrix(p, 12)
+    um = 15/2*[1, 2, 3]
+    um = [um[1], um[2], um[3], 0.5*(um[1]+um[2]), 0.5*(um[2]+um[3]), 0.5*(um[3]+um[1])]
+    us = P*um
+    @test isapprox(us, [9.0, 23.0, 13.0, 16.0, 18.0, 11.0])
+end
+
