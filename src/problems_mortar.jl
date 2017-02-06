@@ -43,12 +43,13 @@ type Mortar <: BoundaryProblem
     split_quadratic_slave_elements :: Bool
     split_quadratic_master_elements :: Bool
     alpha :: Float64
+    drop_tolerance :: Float64
     store_fields :: Vector{Symbol}
 end
 
 function Mortar()
     default_fields = []
-    return Mortar(-1, false, false, false, false, Inf, true, true, true, 0.0, default_fields)
+    return Mortar(-1, false, false, false, false, Inf, true, true, true, 0.0, 1.0e-9, default_fields)
 end
 
 function get_unknown_field_name(problem::Problem{Mortar})
