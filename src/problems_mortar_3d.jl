@@ -623,11 +623,11 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
                     for cell in all_cells
                         virtual_element = Element(Tri3, Int[])
                         update!(virtual_element, "geometry", cell)
-                        for (weight, xi) in get_integration_points(virtual_element, Val{:FPG12})
-                            x_gauss = virtual_element("geometry", xi, time)
+                        for ip in get_integration_points(virtual_element, 3)
+                            x_gauss = virtual_element("geometry", ip, time)
                             xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, Xs, time)
-                            detJ = virtual_element(xi, time, Val{:detJ})
-                            w = weight*detJ
+                            detJ = virtual_element(ip, time, Val{:detJ})
+                            w = ip.weight*detJ
                             N1 = vec(slave_element(xi_s, time)*T)
                             De += w*diagm(N1)
                             Me += w*N1*N1'
@@ -728,9 +728,9 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
                     update!(virtual_element, "geometry", cell)
 
                     # 5. loop integration point of integration cell
-                    for (weight, xi) in get_integration_points(virtual_element, Val{:FPG12})
+                    for ip in get_integration_points(virtual_element, 3)
 
-                        x_gauss = virtual_element("geometry", xi, time)
+                        x_gauss = virtual_element("geometry", ip, time)
                         xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, Xs, time)
                         xi_m, alpha = project_vertex_to_surface(x_gauss, x0, n0, master_element, Xm, time)
 
@@ -739,17 +739,19 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
                         N2 = vec(master_element(xi_m, time))
                         Phi = Ae*N1
 
-                        detJ = virtual_element(xi, time, Val{:detJ})
-                        De += weight*Phi*N1'*detJ
-                        Me += weight*Phi*N2'*detJ
+                        detJ = virtual_element(ip, time, Val{:detJ})
+                        w = ip.weight*detJ
+
+                        De += w*Phi*N1'
+                        Me += w*Phi*N2'
                         if props.adjust && haskey(slave_element, "displacement") && haskey(master_element, "displacement")
                             u1 = slave_element("displacement", time)
                             u2 = master_element("displacement", time)
                             xs = N1*(Xs+u1)
                             xm = N2*(Xm+u2)
-                            ge += weight*vec((xm-xs)*Phi')*detJ
+                            ge += w*vec((xm-xs)*Phi')
                         end
-                        area += (weight*detJ)
+                        area += w
                     end # integration points done
 
                 end # integration cells done

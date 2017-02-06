@@ -144,8 +144,8 @@ end
     maxT = maximum(T)
     stdT = std(T)
     info("minT = $minT, maxT = $maxT, stdT = $stdT")
-    @test maxT - minT < 5.0e-4
-    @test isapprox(stdT, 0.0; atol=1.0e-4)
+    @test maxT - minT < 1.0e-10
+    @test isapprox(stdT, 0.0; atol=1.0e-10)
 
 end
 
@@ -209,7 +209,7 @@ end
     maxabsu3 = maximum(abs(u3))
     stdabsu3 = std(abs(u3))
     info("tet10 block: max(abs(u3)) = $maxabsu3, std(abs(u3)) = $stdabsu3")
-    @test isapprox(stdabsu3, 0.0; atol=1.0e-12)
+    @test isapprox(stdabsu3, 0.0; atol=1.0e-10)
 end
 
 @testset "patch test displacement + abaqus inp + tet10 + adjust + dual basis + alpha=0.2" begin
@@ -274,7 +274,7 @@ end
     maxabsu3 = maximum(abs(u3))
     stdabsu3 = std(abs(u3))
     info("tet10 block: max(abs(u3)) = $maxabsu3, std(abs(u3)) = $stdabsu3")
-    @test isapprox(stdabsu3, 0.0; atol=3.0e-5)
+    @test isapprox(stdabsu3, 0.0; atol=1.0e-6)
 end
 
 @testset "patch test temperature + abaqus inp + tet10 + quadratic surface elements + dual basis + alpha=0.2" begin
@@ -325,6 +325,6 @@ end
     maxT = maximum(T)
     stdT = std(T)
     info("minT = $minT, maxT = $maxT, stdT = $stdT")
-    @test maxT - minT < 5.0e-4
-    @test isapprox(stdT, 0.0; atol=1.0e-4)
+    @test maxT - minT < 1.0e-10
+    @test isapprox(stdT, 0.0; atol=1.0e-10)
 end
