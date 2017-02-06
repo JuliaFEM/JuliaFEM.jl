@@ -131,7 +131,7 @@ end
     interface.properties.linear_surface_elements = false
     interface.properties.split_quadratic_slave_elements = false
     interface.properties.split_quadratic_master_elements = false
-
+    interface.properties.alpha = 0.0
 #   JuliaFEM.diagnose_interface(interface, 0.0)
 
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, interface)
@@ -139,11 +139,13 @@ end
     
     node_ids, temperature = get_nodal_vector(interface.elements, "temperature", 0.0)
     T = [t[1] for t in temperature]
+    
     minT = minimum(T)
     maxT = maximum(T)
-    info("minT = $minT, maxT = $maxT")
-    @test isapprox(minT, 0.5)
-    @test isapprox(maxT, 0.5)
+    stdT = std(T)
+    info("minT = $minT, maxT = $maxT, stdT = $stdT")
+    @test maxT - minT < 5.0e-4
+    @test isapprox(stdT, 0.0; atol=1.0e-4)
 
 end
 
@@ -210,8 +212,7 @@ end
     @test isapprox(stdabsu3, 0.0; atol=1.0e-12)
 end
 
-#=
-@testset "patch test displacement + abaqus inp + tet10 + adjust + dual basis" begin
+@testset "patch test displacement + abaqus inp + tet10 + adjust + dual basis + alpha=0.2" begin
     meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet10.inp"
 
     mesh = abaqus_read_mesh(meshfile)
@@ -261,6 +262,7 @@ end
     interface.properties.split_quadratic_master_elements = false
     interface.properties.adjust = true
     interface.properties.dual_basis = true
+    interface.properties.alpha = 0.2
 
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, bc_sym13, bc_sym23, interface)
     #solver.xdmf = Xdmf("results")
@@ -272,11 +274,10 @@ end
     maxabsu3 = maximum(abs(u3))
     stdabsu3 = std(abs(u3))
     info("tet10 block: max(abs(u3)) = $maxabsu3, std(abs(u3)) = $stdabsu3")
-    @test isapprox(stdabsu3, 0.0; atol=1.0e-10)
+    @test isapprox(stdabsu3, 0.0; atol=3.0e-5)
 end
-=#
 
-@testset "patch test temperature + abaqus inp + tet10, quadratic surface elements + dual basis" begin
+@testset "patch test temperature + abaqus inp + tet10 + quadratic surface elements + dual basis + alpha=0.2" begin
     meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet10.inp"
     mesh = abaqus_read_mesh(meshfile)
 
@@ -306,18 +307,24 @@ end
     interface.properties.split_quadratic_slave_elements = false
     interface.properties.split_quadratic_master_elements = false
     interface.properties.dual_basis = true
-    interface.properties.alpha = 0.0
+    interface.properties.alpha = 0.2
 
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, interface)
     solver()
     
     node_ids, temperature = get_nodal_vector(interface.elements, "temperature", 0.0)
+    #node_ids, temperature = get_nodal_vector(interface_slave_elements, "temperature", 0.0)
+    #=
+    for (j, (nid, T)) in enumerate(zip(node_ids, temperature))
+        info("$j: $nid -> $(T[1])")
+        j == 10 && break
+    end
+    =#
     T = [t[1] for t in temperature]
     minT = minimum(T)
     maxT = maximum(T)
     stdT = std(T)
     info("minT = $minT, maxT = $maxT, stdT = $stdT")
-    @test isapprox(minT, 0.5)
-    @test isapprox(maxT, 0.5)
-    @test isapprox(stdT, 0.0)
+    @test maxT - minT < 5.0e-4
+    @test isapprox(stdT, 0.0; atol=1.0e-4)
 end

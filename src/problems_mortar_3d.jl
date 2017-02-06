@@ -540,17 +540,32 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
 
     alp = props.alpha
 
-    T = [
-            1.0 0.0 0.0 0.0 0.0 0.0
-            0.0 1.0 0.0 0.0 0.0 0.0
-            0.0 0.0 1.0 0.0 0.0 0.0
-            alp alp 0.0 1.0-2*alp 0.0 0.0
-            0.0 alp alp 0.0 1.0-2*alp 0.0
-            alp 0.0 alp 0.0 0.0 1.0-2*alp
-        ]
+    if alp != 0.0
+        T = [
+                1.0 0.0 0.0 0.0 0.0 0.0
+                0.0 1.0 0.0 0.0 0.0 0.0
+                0.0 0.0 1.0 0.0 0.0 0.0
+                alp alp 0.0 1.0-2*alp 0.0 0.0
+                0.0 alp alp 0.0 1.0-2*alp 0.0
+                alp 0.0 alp 0.0 0.0 1.0-2*alp
+            ]
+    else
+        T = eye(6)
+    end
+
+    #=
+    invT = [
+        1.0 0.0 0.0 0.0 0.0 0.0
+        0.0 1.0 0.0 0.0 0.0 0.0
+        0.0 0.0 1.0 0.0 0.0 0.0
+        -alp/(1-2*alp) -alp/(1-2*alp) 0.0 1/(1-2*alp) 0.0 0.0
+        0.0 -alp/(1-2*alp) -alp/(1-2*alp) 0.0 1/(1-2*alp) 0.0
+        -alp/(1-2*alp) 0.0 -alp/(1-2*alp) 0.0 0.0 1/(1-2*alp)
+    ]
+    =#
 
     if props.dual_basis
-        info("Creating dual basis for element $(slave_element.id)")            
+        # info("Creating dual basis for element $(slave_element.id)")            
         nsl = length(slave_element)
         De = zeros(nsl, nsl)
         Me = zeros(nsl, nsl)
@@ -608,14 +623,14 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
                     for cell in all_cells
                         virtual_element = Element(Tri3, Int[])
                         update!(virtual_element, "geometry", cell)
-                        for ip in get_integration_points(virtual_element, 3)
-                            x_gauss = virtual_element("geometry", ip, time)
+                        for (weight, xi) in get_integration_points(virtual_element, Val{:FPG12})
+                            x_gauss = virtual_element("geometry", xi, time)
                             xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, Xs, time)
-                            detJ = virtual_element(ip, time, Val{:detJ})
-                            w = ip.weight*detJ
-                            N1 = slave_element(xi_s, time)*T
-                            De += w*diagm(vec(N1))
-                            Me += w*N1'*N1
+                            detJ = virtual_element(xi, time, Val{:detJ})
+                            w = weight*detJ
+                            N1 = vec(slave_element(xi_s, time)*T)
+                            De += w*diagm(N1)
+                            Me += w*N1*N1'
                         end
 
                     end # integration cells done
@@ -627,7 +642,11 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
         end # sub slave elements done
         
         Ae = De*inv(Me)
-        info("Dual basis coefficient matrix: $Ae")
+        # info("Dual basis construction finished.")
+        # info("Slave element geometry = $Xs")
+        # info("De = $De")
+        # info("Me = $Me")
+        # info("Dual basis coefficient matrix: $Ae")
 
     else
         nsl = length(slave_element)
@@ -709,29 +728,28 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
                     update!(virtual_element, "geometry", cell)
 
                     # 5. loop integration point of integration cell
-                    for ip in get_integration_points(virtual_element, 3)
-                        N = vec(get_basis(virtual_element, ip, time))
-                        detJ = virtual_element(ip, time, Val{:detJ})
-                        w = ip.weight*detJ
+                    for (weight, xi) in get_integration_points(virtual_element, Val{:FPG12})
 
-                        x_gauss = virtual_element("geometry", ip, time)
+                        x_gauss = virtual_element("geometry", xi, time)
                         xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, Xs, time)
                         xi_m, alpha = project_vertex_to_surface(x_gauss, x0, n0, master_element, Xm, time)
 
                         # add contributions
-                        N1 = vec(get_basis(slave_element, xi_s, time)*T)
-                        N2 = vec(get_basis(master_element, xi_m, time))
+                        N1 = vec(slave_element(xi_s, time)*T)
+                        N2 = vec(master_element(xi_m, time))
                         Phi = Ae*N1
-                        De += w*Phi*N1'
-                        Me += w*Phi*N2'
+
+                        detJ = virtual_element(xi, time, Val{:detJ})
+                        De += weight*Phi*N1'*detJ
+                        Me += weight*Phi*N2'*detJ
                         if props.adjust && haskey(slave_element, "displacement") && haskey(master_element, "displacement")
                             u1 = slave_element("displacement", time)
                             u2 = master_element("displacement", time)
                             xs = N1*(Xs+u1)
                             xm = N2*(Xm+u2)
-                            ge += w*vec((xm-xs)*Phi')
+                            ge += weight*vec((xm-xs)*Phi')*detJ
                         end
-                        area += w
+                        area += (weight*detJ)
                     end # integration points done
 
                 end # integration cells done
@@ -792,17 +810,64 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
         first_slave_element = false
 
     end # slave elements done, contact virtual work ready
-    
-    if problem.properties.dual_basis
-        tol = 1.0e-9
-        debug("Dual basis is used, dropping small values for C1 & C2, tol = $tol")
-        C1 = sparse(problem.assembly.C1)
-        C2 = sparse(problem.assembly.C2)
-        SparseArrays.droptol!(C1, tol)
-        SparseArrays.droptol!(C2, tol)
-        problem.assembly.C1 = C1
-        problem.assembly.C2 = C2
+ 
+    C1 = sparse(problem.assembly.C1)
+    C2 = sparse(problem.assembly.C2)
+
+    maxdim = maximum(size(C1))
+    if problem.properties.alpha != 0.0
+        debug("mortar_3d: size C1 = ", size(C1), " max dim = $maxdim")
+        debug("alpha != 0.0, applying transformation D = Dh*T^-1")
+        alp = problem.properties.alpha
+        Te = [
+                1.0 0.0 0.0 0.0 0.0 0.0
+                0.0 1.0 0.0 0.0 0.0 0.0
+                0.0 0.0 1.0 0.0 0.0 0.0
+                alp alp 0.0 1.0-2*alp 0.0 0.0
+                0.0 alp alp 0.0 1.0-2*alp 0.0
+                alp 0.0 alp 0.0 0.0 1.0-2*alp
+            ]
+        invTe = [
+            1.0 0.0 0.0 0.0 0.0 0.0
+            0.0 1.0 0.0 0.0 0.0 0.0
+            0.0 0.0 1.0 0.0 0.0 0.0
+            -alp/(1-2*alp) -alp/(1-2*alp) 0.0 1/(1-2*alp) 0.0 0.0
+            0.0 -alp/(1-2*alp) -alp/(1-2*alp) 0.0 1/(1-2*alp) 0.0
+            -alp/(1-2*alp) 0.0 -alp/(1-2*alp) 0.0 0.0 1/(1-2*alp)
+        ]
+        # construct global transformation matrices T and invT
+        T = SparseMatrixCOO()
+        invT = SparseMatrixCOO()
+        for element in slave_elements
+            dofs = get_gdofs(problem, element)
+            for i=1:field_dim
+                ldofs = dofs[i:field_dim:end]
+                add!(T, ldofs, ldofs, Te)
+                add!(invT, ldofs, ldofs, invTe)
+            end
+        end
+        T = sparse(T, maxdim, maxdim, (a, b) -> b)
+        invT = sparse(invT, maxdim, maxdim, (a, b) -> b)
+        # fill diagonal
+        d = ones(size(T, 1))
+        d[get_nonzero_rows(T)] = 0.0
+        T += spdiagm(d)
+        invT += spdiagm(d)
+        #invT2 = sparse(inv(full(T)))
+        #info("invT == invT2? ", invT == invT2)
+        #maxabsdiff = maximum(abs(invT - invT2))
+        #info("max diff = $maxabsdiff")
+        C1 = C1*invT
+        C2 = C2*invT
     end
+
+    tol = problem.properties.drop_tolerance
+    debug("Dropping small values from C1 & C2, tolerace = $tol")
+    SparseArrays.droptol!(C1, tol)
+    SparseArrays.droptol!(C2, tol)
+
+    problem.assembly.C1 = C1
+    problem.assembly.C2 = C2
 
     debug("area of interface: $area")
 

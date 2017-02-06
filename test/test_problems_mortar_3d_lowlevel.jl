@@ -48,14 +48,18 @@ function calculate_mortar_projection_matrix(problem::Problem{Mortar}, ndim::Int)
     # Construct matrix P = D^-1*M
     D_ = C2[S,S]
     M_ = -C2[S,M]
-    P = nothing
 
+    #=
+    P = nothing
     if !isdiag(D_)
         warn("D is not diagonal, is dual basis used? This might take a long time.")
         P = ldltfact(1/2*(D_ + D_')) \ M_
     else
         P = D_ \ M_
     end
+    =#
+
+    P = lufact(D_) \ full(M_)
 
     return S, M, P
 end
@@ -129,6 +133,7 @@ end
     update!(s, "master elements", [m])
     p = Problem(Mortar, "two elements", 1, "temperature")
     p.properties.dual_basis = false
+    p.properties.alpha = 0.2
     p.elements = [s; m]
     initialize!(p)
     assemble!(p)
@@ -142,8 +147,6 @@ end
     @test M == [7, 8, 9, 10, 11, 12]
     println(full(P))
     # visually inspected to be ok result
-    # for alpha = 0.2
-    # P_expected = 1/675*[81 81 189 972 -324 -324; 609 429 81 -1092 1404 -756; 429 609 81 -1092 -756 1404; -295 215 -225 260 300 420; -481 -481 81 908 324 324; 215 -295 -225 260 420 300]
     P_expected = 1/675*[81 81 189 972 -324 -324; 609 429 81 -1092 1404 -756; 429 609 81 -1092 -756 1404; -39 231 -81 132 396 36; -81 -81 81 108 324 324; 231 -39 -81 132 36 396]
     @test isapprox(P, P_expected)
     um = 15/2*[1, 2, 3]
@@ -183,6 +186,8 @@ end
     @test length(D) == 0
     @test C1 == C2
     S, M, P = calculate_mortar_projection_matrix(p, 12)
+    P_expected = 1/675*[81 81 189 972 -324 -324; 609 429 81 -1092 1404 -756; 429 609 81 -1092 -756 1404; -39 231 -81 132 396 36; -81 -81 81 108 324 324; 231 -39 -81 132 36 396]
+    @test isapprox(P, P_expected)
     um = 15/2*[1, 2, 3]
     um = [um[1], um[2], um[3], 0.5*(um[1]+um[2]), 0.5*(um[2]+um[3]), 0.5*(um[3]+um[1])]
     us = P*um
