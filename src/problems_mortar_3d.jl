@@ -112,7 +112,7 @@ function get_polygon_clip(xs, xm, n)
     # 1. test is master point inside slave, if yes, add to clip
     for i=1:nm
         if vertex_inside_polygon(xm[i], xs)
-            debug("1. $(xm[i]) inside S -> push")
+            # debug("1. $(xm[i]) inside S -> push")
             push!(P, xm[i])
         end
     end
@@ -121,7 +121,7 @@ function get_polygon_clip(xs, xm, n)
     for i=1:ns
         if vertex_inside_polygon(xs[i], xm)
             approx_in(xs[i], P) && continue
-            debug("2. $(xs[i]) inside M -> push")
+            # debug("2. $(xs[i]) inside M -> push")
             push!(P, xs[i])
         end
     end
@@ -144,7 +144,7 @@ function get_polygon_clip(xs, xm, n)
             #info("t=$t, q=$q, q ∈ xm ? $(vertex_inside_polygon(q, xm))")
             if vertex_inside_polygon(q, xm)
                 approx_in(q, P) && continue
-                debug("3. $q inside M -> push")
+                # debug("3. $q inside M -> push")
                 push!(P, q)
             end
         end
@@ -228,12 +228,39 @@ function calculate_normals(elements, time, ::Type{Val{2}}; rotate_normals=false)
     return normals
 end
 
+""" Given polygon P and normal direction n, check that polygon vertices are
+ordered in counter clock wise direction with respect to surface normal and
+sort if necessary. It is assumed that polygon is convex.
+
+Examples
+--------
+Unit triangle, normal in z-direction:
+
+julia> P = Vector[[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
+3-element Array{Array{T,1},1}:
+ [0.0,0.0,0.0]
+ [0.0,1.0,0.0]
+ [1.0,0.0,0.0]
+
+julia> n = [0.0, 0.0, 1.0]
+3-element Array{Float64,1}:
+ 0.0
+ 0.0
+ 1.0
+
+julia> check_orientation!(P, n)
+3-element Array{Array{T,1},1}:
+ [1.0,0.0,0.0]
+ [0.0,0.0,0.0]
+ [0.0,1.0,0.0]
+
+"""
 function check_orientation!(P, n)
     C = mean(P)
     np = length(P)
     s = [dot(n, cross(P[i]-C, P[mod(i+1,np)+1]-C)) for i=1:np]
     all(s .< 0) && return
-    debug("polygon not in ccw order, fixing")
+    # debug("polygon not in ccw order, fixing")
     # project points to new orthogonal basis Q and sort there
     t1 = (P[1]-C)/norm(P[1]-C)
     t2 = cross(n, t1)
@@ -274,10 +301,9 @@ function split_quadratic_element(element::Element{Tri6}, time::Float64)
             u = element("displacement", time)
             update!(new_element, "displacement", time => u[elmap])
         end
-        #n = element("normal", time)
-        #update!(new_element, "normal", time => n[elmap])
-        if haskey(element, "master elements")
-            update!(new_element, "master elements", time => element("master elements", time))
+        if haskey(element, "normal")
+            n = element("normal", time)
+            update!(new_element, "normal", time => n[elmap])
         end
         push!(new_elements, new_element)
     end
@@ -298,70 +324,62 @@ function split_quadratic_elements(elements::Vector, time::Float64)
     end
     n1 = length(elements)
     n2 = length(new_elements)
-    info("Splitted $n1 (maybe quadratic) elements to $n2 (linear) sub-elements")
+    if n1 != n2
+        info("Splitted $n1 elements to $n2 (linear) sub-elements")
+    end
     return new_elements
 end
 
-function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{Val{false}})
+""" Assemble linear surface element to problem.
 
+Dual basis is constructed such that partially integrated slave segments are taken into account in a proper way.
+
+Notes
+-----
+For full integrated slave element, coefficient matrix for Tri3 is
+Ae = [3.0 -1.0 -1.0; -1.0 3.0 -1.0; -1.0 -1.0 3.0]
+
+References
+----------
+
+[Popp2013] Popp, Alexander, et al. "Improved robustness and consistency of 3D contact algorithms based on a dual mortar approach." Computer Methods in Applied Mechanics and Engineering 264 (2013): 67-80.
+"""
+function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_element::Element{E}, time::Real; first_slave_element=false)
+    
     props = problem.properties
     field_dim = get_unknown_field_dimension(problem)
     field_name = get_parent_field_name(problem)
-    slave_elements = get_slave_elements(problem)
     area = 0.0
 
-    if props.split_quadratic_slave_elements
-        if !props.linear_surface_elements
-            warn("Mortar3D: split_quadratic_surfaces = true and linear_surface_elements = false maybe have unexpected behavior")
-        end
-        slave_elements = split_quadratic_elements(slave_elements, time)
-    end
+    slave_element_nodes = get_connectivity(slave_element)
+    nsl = length(slave_element)
+    X1 = slave_element("geometry", time)
+    n1 = slave_element("normal", time)
 
-    # 1. calculate nodal normals and tangents for slave element nodes j ∈ S
-    normals = calculate_normals(slave_elements, time, Val{2};
-                                rotate_normals=props.rotate_normals)
-    update!(slave_elements, "normal", time => normals)
+    # project slave nodes to auxiliary plane (x0, Q)
+    xi = mean(get_reference_coordinates(slave_element))
+    first_slave_element && debug("midpoint xi = $xi")
+    N = vec(get_basis(slave_element, xi, time))
+    x0 = N*X1
+    n0 = N*n1
+    S = Vector[project_vertex_to_auxiliary_plane(X1[i], x0, n0) for i=1:nsl]
 
-    # 2. loop all slave elements
-    first_slave_element = true
+    master_elements = slave_element("master elements", time)
 
-    for slave_element in slave_elements
+    if props.dual_basis
 
-        if props.linear_surface_elements
-            slave_element = convert_to_linear_element(slave_element)
-        end
+        debug("Creating dual basis for element $(slave_element.id)")
 
-        slave_element_nodes = get_connectivity(slave_element)
-        nsl = length(slave_element)
-        X1 = slave_element("geometry", time)
-        n1 = Field([normals[j] for j in slave_element_nodes])
-
-        # project slave nodes to auxiliary plane (x0, Q)
-        xi = mean(get_reference_coordinates(slave_element))
-        first_slave_element && debug("midpoint xi = $xi")
-        N = vec(get_basis(slave_element, xi, time))
-        x0 = N*X1
-        n0 = N*n1
-        S = Vector[project_vertex_to_auxiliary_plane(X1[i], x0, n0) for i=1:nsl]
-
-        # 3. loop all master elements
-        master_elements = slave_element("master elements", time)
-        if props.split_quadratic_master_elements
-            master_elements = split_quadratic_elements(master_elements, time)
-        end
-
+        De = zeros(nsl, nsl)
+        Me = zeros(nsl, nsl)
+ 
         for master_element in master_elements
-
-            if props.linear_surface_elements
-                master_element = convert_to_linear_element(master_element)
-            end
 
             master_element_nodes = get_connectivity(master_element)
             nm = length(master_element)
             X2 = master_element("geometry", time)
 
             if norm(mean(X1) - mean(X2)) > problem.properties.distval
-                # elements are "far enough"
                 continue
             end
 
@@ -373,169 +391,485 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
             N_P = length(P)
             P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
 
-            if first_slave_element
-                debug("Polygon clip info for first slave element:")
-                debug("S = $S")
-                debug("M = $M")
-                debug("P = $P")
-                debug("N_P = $N_P")
-                debug("P_area = $P_area")
-            end
-
             if isapprox(P_area, 0.0)
                 info("Polygon P has zero area: $P_area")
                 continue
             end
 
-            C0 = calculate_centroid(P)
-
-            #=
-            if isnan(C0[1])
-                info("C0 = $C0")
-                info("P = $P")
-                info("S = $S")
-                info("M = $M")
-                info("n0 = $n0")
-                error("Calculation of centroid of polygon clip P failed.")
-            end
-            =#
-
-            De = zeros(nsl, nsl)
-            Me = zeros(nsl, nm)
-            ge = zeros(field_dim*nsl)
-
             # 4. loop integration cells
+            C0 = calculate_centroid(P)
             all_cells = get_cells(P, C0)
             for cell in all_cells
                 virtual_element = Element(Tri3, Int[])
                 update!(virtual_element, "geometry", cell)
-                #x_cell = Field(cell)
-
-                # construct bi-orthogonal basis
-                nnodes = length(slave_element)
-                if props.dual_basis
-                    De = zeros(nnodes, nnodes)
-                    Me = zeros(nnodes, nnodes)
-                    for ip in get_integration_points(virtual_element, 3)
-                        x_gauss = nothing
-                        #try
-                            x_gauss = virtual_element("geometry", ip, time)
-                            xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
-                            detJ = virtual_element(ip, time, Val{:detJ})
-                            w = ip.weight*detJ
-                            N1 = vec(get_basis(slave_element, xi_s, time))
-                            De += w*diagm(vec(N1))
-                            Me += w*N1*N1'
-                        #catch
-                        #    info("Failed to construct bi-orthogonal basis: cannot project vertex from auxiliary plane back to sufface.")
-                        #    info("x_gauss = $x_gauss")
-                        #    info("cell = $cell")
-                        #    info("C0 = $C0")
-                        #    info("P = $P")
-                        #    info("S = $S")
-                        #    info("M = $M")
-                        #    info("n0 = $n0")
-                        #    rethrow()
-                        #end
-                    end
-                    Ae = De*inv(Me)
-                else
-                    Ae = eye(nnodes)
-                end
-
-                # 5. loop integration point of integration cell
                 for ip in get_integration_points(virtual_element, 3)
-                    N = vec(get_basis(virtual_element, ip, time))
-                    #dN = vec(get_dbasis(virtual_element, ip, time))
-                    #JC = transpose(sum([kron(dNC[:,j], x_cell[j]') for j=1:length(x_cell)]))
-                    #wC = ip.weight*norm(cross(JC[:,1], JC[:,2]))
                     detJ = virtual_element(ip, time, Val{:detJ})
                     w = ip.weight*detJ
-
-                    # project gauss point from auxiliary plane to master and slave element
-                    #x_gauss = N*x_cell
                     x_gauss = virtual_element("geometry", ip, time)
-                    #=
-                    if isnan(x_gauss[1])
-                        info("is nan")
-                        info("x_gauss = $x_gauss")
-                        info("cell = $cell")
-                        info("C0 = $C0")
-                        info("P = $P")
-                        info("S = $S")
-                        info("M = $M")
-                        info("n0 = $n0")
-                        error("nan, unable to continue")
-                    end
-                    =#
-
-                    xi_s = nothing
-                    xi_m = nothing
-                    alpha = nothing
-
-                    #try
-                        xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
-                        xi_m, alpha = project_vertex_to_surface(x_gauss, x0, n0, master_element, X2, time)
-                    #catch
-                    #    info("projecting vertex back to surface has failed.")
-                    #    info("x_gauss = $x_gauss")
-                    #    info("cell = $cell")
-                    #    info("C0 = $C0")
-                    #    info("P = $P")
-                    #    info("S = $S")
-                    #    info("M = $M")
-                    #    info("n0 = $n0")
-                    #    rethrow()
-                    #end
-
-                    # add contributions
-                    N1 = vec(get_basis(slave_element, xi_s, time))
-                    N2 = vec(get_basis(master_element, xi_m, time))
-                    Phi = Ae*N1
-                    De += w*Phi*N1'
-                    Me += w*Phi*N2'
-                    if props.adjust
-                        u1 = slave_element("displacement", time)
-                        u2 = master_element("displacement", time)
-                        x_s = N1*(X1+u1)
-                        x_m = N2*(X2+u2)
-                        ge += w*vec((x_m-x_s)*Phi')
-                    end
-                    area += w
-                end # integration points done
-
+                    xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
+                    N1 = slave_element(xi_s, time)
+                    De += w*diagm(vec(N1))
+                    Me += w*N1'*N1
+                end
             end # integration cells done
 
-            # 6. add contribution to contact virtual work
-            sdofs = get_gdofs(problem, slave_element)
-            mdofs = get_gdofs(problem, master_element)
-            
-            for i=1:field_dim
-                lsdofs = sdofs[i:field_dim:end]
-                lmdofs = mdofs[i:field_dim:end]
-                add!(problem.assembly.C1, lsdofs, lsdofs, De)
-                add!(problem.assembly.C1, lsdofs, lmdofs, -Me)
-                add!(problem.assembly.C2, lsdofs, lsdofs, De)
-                add!(problem.assembly.C2, lsdofs, lmdofs, -Me)
+        end # master elements done
+                    
+        Ae = De*inv(Me)
+
+        info("Dual basis coefficient matrix: $Ae")
+
+    else
+        Ae = eye(nsl)
+    end
+
+    for master_element in master_elements
+
+        master_element_nodes = get_connectivity(master_element)
+        nm = length(master_element)
+        X2 = master_element("geometry", time)
+
+        if norm(mean(X1) - mean(X2)) > problem.properties.distval
+            continue
+        end
+
+        # 3.1 project master nodes to auxiliary plane and create polygon clipping
+        M = Vector[project_vertex_to_auxiliary_plane(X2[i], x0, n0) for i=1:nm]
+        P = get_polygon_clip(S, M, n0)
+        length(P) < 3 && continue # no clipping or shared edge (no volume)
+        check_orientation!(P, n0)
+        N_P = length(P)
+        P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
+
+        if first_slave_element
+            debug("Polygon clip info for first slave element:")
+            debug("S = $S")
+            debug("M = $M")
+            debug("P = $P")
+            debug("N_P = $N_P")
+            debug("P_area = $P_area")
+        end
+
+        if isapprox(P_area, 0.0)
+            info("Polygon P has zero area: $P_area")
+            continue
+        end
+
+        C0 = calculate_centroid(P)
+
+        De = zeros(nsl, nsl)
+        Me = zeros(nsl, nm)
+        ge = zeros(field_dim*nsl)
+
+        # 4. loop integration cells
+        all_cells = get_cells(P, C0)
+        for cell in all_cells
+            virtual_element = Element(Tri3, Int[])
+            update!(virtual_element, "geometry", cell)
+
+            # 5. loop integration point of integration cell
+            for ip in get_integration_points(virtual_element, 3)
+                detJ = virtual_element(ip, time, Val{:detJ})
+                w = ip.weight*detJ
+
+                # project gauss point from auxiliary plane to master and slave element
+                x_gauss = virtual_element("geometry", ip, time)
+
+                xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
+                xi_m, alpha = project_vertex_to_surface(x_gauss, x0, n0, master_element, X2, time)
+
+                # add contributions
+                N1 = vec(get_basis(slave_element, xi_s, time))
+                N2 = vec(get_basis(master_element, xi_m, time))
+                Phi = Ae*N1
+                # Phi = [3.0-4.0*xi_s[1]-4.0*xi_s[2], 4.0*xi_s[1]-1.0, 4.0*xi_s[2]-1.0]
+                De += w*Phi*N1'
+                Me += w*Phi*N2'
+                if props.adjust && haskey(slave_element, "displacement") && haskey(master_element, "displacement")
+                    u1 = slave_element("displacement", time)
+                    u2 = master_element("displacement", time)
+                    x_s = N1*(X1+u1)
+                    x_m = N2*(X2+u2)
+                    ge += w*vec((x_m-x_s)*Phi')
+                end
+                area += w
+            end # integration points done
+
+        end # integration cells done
+
+        # 6. add contribution to contact virtual work
+        sdofs = get_gdofs(problem, slave_element)
+        mdofs = get_gdofs(problem, master_element)
+        
+        for i=1:field_dim
+            lsdofs = sdofs[i:field_dim:end]
+            lmdofs = mdofs[i:field_dim:end]
+            add!(problem.assembly.C1, lsdofs, lsdofs, De)
+            add!(problem.assembly.C1, lsdofs, lmdofs, -Me)
+            add!(problem.assembly.C2, lsdofs, lsdofs, De)
+            add!(problem.assembly.C2, lsdofs, lmdofs, -Me)
+        end
+        add!(problem.assembly.g, sdofs, ge)
+
+    end # master elements done
+
+    return area
+end
+
+
+""" Assemble quadratic surface element to problem.
+
+In polygon clipping element is divided to linear sub-elements proposed in [Puso2008].
+
+References
+----------
+
+[Puso2008] Puso, Michael A., T. A. Laursen, and Jerome Solberg. "A segment-to-segment mortar contact method for quadratic elements and large deformations." Computer Methods in Applied Mechanics and Engineering 197.6 (2008): 555-566.
+
+[Popp1012] Popp, Alexander, et al. "Dual quadratic mortar finite element methods for 3D finite deformation contact." SIAM Journal on Scientific Computing 34.4 (2012): B421-B446.
+
+"""
+function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Element{E}, time::Real; first_slave_element=false)
+    
+    props = problem.properties
+    field_dim = get_unknown_field_dimension(problem)
+    field_name = get_parent_field_name(problem)
+    area = 0.0
+        
+    Xs = slave_element("geometry", time)
+
+    alp = props.alpha
+
+    if alp != 0.0
+        T = [
+                1.0 0.0 0.0 0.0 0.0 0.0
+                0.0 1.0 0.0 0.0 0.0 0.0
+                0.0 0.0 1.0 0.0 0.0 0.0
+                alp alp 0.0 1.0-2*alp 0.0 0.0
+                0.0 alp alp 0.0 1.0-2*alp 0.0
+                alp 0.0 alp 0.0 0.0 1.0-2*alp
+            ]
+    else
+        T = eye(6)
+    end
+
+    #=
+    invT = [
+        1.0 0.0 0.0 0.0 0.0 0.0
+        0.0 1.0 0.0 0.0 0.0 0.0
+        0.0 0.0 1.0 0.0 0.0 0.0
+        -alp/(1-2*alp) -alp/(1-2*alp) 0.0 1/(1-2*alp) 0.0 0.0
+        0.0 -alp/(1-2*alp) -alp/(1-2*alp) 0.0 1/(1-2*alp) 0.0
+        -alp/(1-2*alp) 0.0 -alp/(1-2*alp) 0.0 0.0 1/(1-2*alp)
+    ]
+    =#
+
+    if props.dual_basis
+        # info("Creating dual basis for element $(slave_element.id)")            
+        nsl = length(slave_element)
+        De = zeros(nsl, nsl)
+        Me = zeros(nsl, nsl)
+    
+        # split slave element to linear sub-elements and loop
+        for sub_slave_element in split_quadratic_element(slave_element, time)
+
+            slave_element_nodes = get_connectivity(sub_slave_element)
+            nsl = length(sub_slave_element)
+            X1 = sub_slave_element("geometry", time)
+            n1 = sub_slave_element("normal", time)
+
+            # create auxiliary plane
+            xi = mean(get_reference_coordinates(sub_slave_element))
+            first_slave_element && debug("midpoint xi = $xi")
+            N = vec(get_basis(sub_slave_element, xi, time))
+            x0 = N*X1
+            n0 = N*n1
+        
+            # project slave nodes to auxiliary plane
+            S = Vector[project_vertex_to_auxiliary_plane(X1[i], x0, n0) for i=1:nsl]
+
+            # 3. loop all master elements
+            master_elements = slave_element("master elements", time)
+
+            for master_element in master_elements
+
+                Xm = master_element("geometry", time)
+                
+                if norm(mean(Xs) - mean(Xm)) > problem.properties.distval
+                    continue
+                end
+
+                # split master element to linear sub-elements and loop
+                for sub_master_element in split_quadratic_element(master_element, time)
+
+                    master_element_nodes = get_connectivity(sub_master_element)
+                    nm = length(sub_master_element)
+                    X2 = sub_master_element("geometry", time)
+
+                    # 3.1 project master nodes to auxiliary plane
+                    M = Vector[project_vertex_to_auxiliary_plane(X2[i], x0, n0) for i=1:nm]
+
+                    # create polygon clipping P
+                    P = get_polygon_clip(S, M, n0)
+                    length(P) < 3 && continue # no clipping or shared edge (no volume)
+                    check_orientation!(P, n0)
+                    N_P = length(P)
+                    P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
+
+                    C0 = calculate_centroid(P)
+
+                    # 4. loop integration cells
+                    all_cells = get_cells(P, C0)
+                    for cell in all_cells
+                        virtual_element = Element(Tri3, Int[])
+                        update!(virtual_element, "geometry", cell)
+                        for ip in get_integration_points(virtual_element, 3)
+                            x_gauss = virtual_element("geometry", ip, time)
+                            xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, Xs, time)
+                            detJ = virtual_element(ip, time, Val{:detJ})
+                            w = ip.weight*detJ
+                            N1 = vec(slave_element(xi_s, time)*T)
+                            De += w*diagm(N1)
+                            Me += w*N1*N1'
+                        end
+
+                    end # integration cells done
+ 
+                end # sub aster elements done
+
+            end # master elements done
+     
+        end # sub slave elements done
+        
+        Ae = De*inv(Me)
+        # info("Dual basis construction finished.")
+        # info("Slave element geometry = $Xs")
+        # info("De = $De")
+        # info("Me = $Me")
+        # info("Dual basis coefficient matrix: $Ae")
+
+    else
+        nsl = length(slave_element)
+        Ae = eye(nsl)
+    end
+
+    # split slave element to linear sub-elements and loop
+    for sub_slave_element in split_quadratic_element(slave_element, time)
+
+        slave_element_nodes = get_connectivity(sub_slave_element)
+        nsl = length(sub_slave_element)
+        X1 = sub_slave_element("geometry", time)
+        n1 = sub_slave_element("normal", time)
+
+        # create auxiliary plane
+        xi = mean(get_reference_coordinates(sub_slave_element))
+        first_slave_element && debug("midpoint xi = $xi")
+        N = vec(get_basis(sub_slave_element, xi, time))
+        x0 = N*X1
+        n0 = N*n1
+    
+        # project slave nodes to auxiliary plane
+        S = Vector[project_vertex_to_auxiliary_plane(X1[i], x0, n0) for i=1:nsl]
+
+        # 3. loop all master elements
+        master_elements = slave_element("master elements", time)
+
+        for master_element in master_elements
+
+            Xm = master_element("geometry", time)
+ 
+            if norm(mean(Xs) - mean(Xm)) > problem.properties.distval
+                continue
             end
-            add!(problem.assembly.g, sdofs, ge)
+
+            # split master element to linear sub-elements and loop
+            for sub_master_element in split_quadratic_element(master_element, time)
+
+                master_element_nodes = get_connectivity(sub_master_element)
+                nm = length(sub_master_element)
+                X2 = sub_master_element("geometry", time)
+
+                # 3.1 project master nodes to auxiliary plane
+                M = Vector[project_vertex_to_auxiliary_plane(X2[i], x0, n0) for i=1:nm]
+
+                # create polygon clipping P
+                P = get_polygon_clip(S, M, n0)
+                length(P) < 3 && continue # no clipping or shared edge (no volume)
+                check_orientation!(P, n0)
+                N_P = length(P)
+                P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
+
+                if first_slave_element
+                    debug("Polygon clip info for first slave element:")
+                    debug("S = $S")
+                    debug("M = $M")
+                    debug("P = $P")
+                    debug("N_P = $N_P")
+                    debug("P_area = $P_area")
+                end
+
+                if isapprox(P_area, 0.0)
+                    warn("Polygon P has zero area: $P_area")
+                    continue
+                end
+
+                C0 = calculate_centroid(P)
+
+                # while our polygon clipping algorithm is working in linear sub elements
+                # contributions is calculated using quadratic shape functions
+                De = zeros(length(slave_element), length(slave_element))
+                Me = zeros(length(slave_element), length(master_element))
+                ge = zeros(field_dim*length(slave_element))
+
+                # 4. loop integration cells
+                all_cells = get_cells(P, C0)
+                for cell in all_cells
+                    virtual_element = Element(Tri3, Int[])
+                    update!(virtual_element, "geometry", cell)
+
+                    # 5. loop integration point of integration cell
+                    for ip in get_integration_points(virtual_element, 3)
+
+                        x_gauss = virtual_element("geometry", ip, time)
+                        xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, Xs, time)
+                        xi_m, alpha = project_vertex_to_surface(x_gauss, x0, n0, master_element, Xm, time)
+
+                        # add contributions
+                        N1 = vec(slave_element(xi_s, time)*T)
+                        N2 = vec(master_element(xi_m, time))
+                        Phi = Ae*N1
+
+                        detJ = virtual_element(ip, time, Val{:detJ})
+                        w = ip.weight*detJ
+
+                        De += w*Phi*N1'
+                        Me += w*Phi*N2'
+                        if props.adjust && haskey(slave_element, "displacement") && haskey(master_element, "displacement")
+                            u1 = slave_element("displacement", time)
+                            u2 = master_element("displacement", time)
+                            xs = N1*(Xs+u1)
+                            xm = N2*(Xm+u2)
+                            ge += w*vec((xm-xs)*Phi')
+                        end
+                        area += w
+                    end # integration points done
+
+                end # integration cells done
+
+                # 6. add contribution to contact virtual work
+                sdofs = get_gdofs(problem, slave_element)
+                mdofs = get_gdofs(problem, master_element)
+                
+                for i=1:field_dim
+                    lsdofs = sdofs[i:field_dim:end]
+                    lmdofs = mdofs[i:field_dim:end]
+                    add!(problem.assembly.C1, lsdofs, lsdofs, De)
+                    add!(problem.assembly.C1, lsdofs, lmdofs, -Me)
+                    add!(problem.assembly.C2, lsdofs, lsdofs, De)
+                    add!(problem.assembly.C2, lsdofs, lmdofs, -Me)
+                end
+                add!(problem.assembly.g, sdofs, ge)
+   
+            end # sub aster elements done
 
         end # master elements done
+ 
+    end # sub slave elements done
 
+    return area
+end
+
+
+function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{Val{false}})
+
+    props = problem.properties
+    field_dim = get_unknown_field_dimension(problem)
+    field_name = get_parent_field_name(problem)
+    slave_elements = get_slave_elements(problem)
+    area = 0.0
+
+    #=
+    if props.split_quadratic_slave_elements
+        if !props.linear_surface_elements
+            warn("Mortar3D: split_quadratic_surfaces = true and linear_surface_elements = false maybe have unexpected behavior")
+        end
+        slave_elements = split_quadratic_elements(slave_elements, time)
+    end
+    =#
+
+    # 1. calculate nodal normals and tangents for slave element nodes j ∈ S
+    normals = calculate_normals(slave_elements, time, Val{2};
+                                rotate_normals=props.rotate_normals)
+
+    update!(slave_elements, "normal", time => normals)
+
+    # 2. loop all slave elements
+    first_slave_element = true
+
+    for slave_element in slave_elements
+
+        area += assemble!(problem, slave_element, time; first_slave_element=first_slave_element)
         first_slave_element = false
 
     end # slave elements done, contact virtual work ready
-    
-    if problem.properties.dual_basis
-        tol = 1.0e-9
-        debug("Dual basis is used, dropping small values for C1 & C2, tol = $tol")
-        C1 = sparse(problem.assembly.C1)
-        C2 = sparse(problem.assembly.C2)
-        SparseArrays.droptol!(C1, tol)
-        SparseArrays.droptol!(C2, tol)
-        problem.assembly.C1 = C1
-        problem.assembly.C2 = C2
+ 
+    C1 = sparse(problem.assembly.C1)
+    C2 = sparse(problem.assembly.C2)
+
+    maxdim = maximum(size(C1))
+    if problem.properties.alpha != 0.0
+        debug("mortar_3d: size C1 = ", size(C1), " max dim = $maxdim")
+        debug("alpha != 0.0, applying transformation D = Dh*T^-1")
+        alp = problem.properties.alpha
+        Te = [
+                1.0 0.0 0.0 0.0 0.0 0.0
+                0.0 1.0 0.0 0.0 0.0 0.0
+                0.0 0.0 1.0 0.0 0.0 0.0
+                alp alp 0.0 1.0-2*alp 0.0 0.0
+                0.0 alp alp 0.0 1.0-2*alp 0.0
+                alp 0.0 alp 0.0 0.0 1.0-2*alp
+            ]
+        invTe = [
+            1.0 0.0 0.0 0.0 0.0 0.0
+            0.0 1.0 0.0 0.0 0.0 0.0
+            0.0 0.0 1.0 0.0 0.0 0.0
+            -alp/(1-2*alp) -alp/(1-2*alp) 0.0 1/(1-2*alp) 0.0 0.0
+            0.0 -alp/(1-2*alp) -alp/(1-2*alp) 0.0 1/(1-2*alp) 0.0
+            -alp/(1-2*alp) 0.0 -alp/(1-2*alp) 0.0 0.0 1/(1-2*alp)
+        ]
+        # construct global transformation matrices T and invT
+        T = SparseMatrixCOO()
+        invT = SparseMatrixCOO()
+        for element in slave_elements
+            dofs = get_gdofs(problem, element)
+            for i=1:field_dim
+                ldofs = dofs[i:field_dim:end]
+                add!(T, ldofs, ldofs, Te)
+                add!(invT, ldofs, ldofs, invTe)
+            end
+        end
+        T = sparse(T, maxdim, maxdim, (a, b) -> b)
+        invT = sparse(invT, maxdim, maxdim, (a, b) -> b)
+        # fill diagonal
+        d = ones(size(T, 1))
+        d[get_nonzero_rows(T)] = 0.0
+        T += spdiagm(d)
+        invT += spdiagm(d)
+        #invT2 = sparse(inv(full(T)))
+        #info("invT == invT2? ", invT == invT2)
+        #maxabsdiff = maximum(abs(invT - invT2))
+        #info("max diff = $maxabsdiff")
+        C1 = C1*invT
+        C2 = C2*invT
     end
+
+    tol = problem.properties.drop_tolerance
+    debug("Dropping small values from C1 & C2, tolerace = $tol")
+    SparseArrays.droptol!(C1, tol)
+    SparseArrays.droptol!(C2, tol)
+
+    problem.assembly.C1 = C1
+    problem.assembly.C2 = C2
 
     debug("area of interface: $area")
 
