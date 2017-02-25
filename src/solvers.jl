@@ -424,7 +424,7 @@ function initialize!(solver::Solver; show_info=true)
     end
     nnodes = length(nodes)
     info("Total number of nodes in problems: $nnodes")
-    maxdof = maximum(nnodes)*field_dim
+    maxdof = maximum(nodes)*field_dim
     info("# of max dof (=size of solution vector) is $maxdof")
     solver.u = zeros(maxdof)
     solver.la = zeros(maxdof)
