@@ -368,8 +368,8 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
 
     if props.dual_basis
 
-        info("Creating dual basis for element $(slave_element.id)")
-                    
+        debug("Creating dual basis for element $(slave_element.id)")
+
         De = zeros(nsl, nsl)
         Me = zeros(nsl, nsl)
  

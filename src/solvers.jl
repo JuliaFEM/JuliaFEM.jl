@@ -135,8 +135,8 @@ function check_for_overconstrained_dofs(solver::Solver)
         constrained_dofs = union(constrained_dofs, new_constraints)
     end
     if overdetermined
-        info("List of all overconstrained dofs:")
-        info(sort(collect(all_overconstrained_dofs)))
+        warn("List of all overconstrained dofs:")
+        warn(sort(collect(all_overconstrained_dofs)))
         error("problem is overconstrained, not continuing to solution.")
     end
     return true
