@@ -148,23 +148,56 @@ function get_integration_points(element::TriangularElement, ::Type{Val{4}})
     return zip(weights, points)
 end
 
+""" 7 point integration rule for triangular elements.
+
+References
+----------
+Code Aster documentation, http://code-aster.org/doc/default/fr/man_r/r3/r3.01.01.pdf
+"""
 function get_integration_points(element::TriangularElement, ::Type{Val{5}})
-    weights = 0.5*[
-        0.22500000000000,
-        0.13239415278851,
-        0.13239415278851,
-        0.13239415278851,
-        0.12593918054483,
-        0.12593918054483,
-        0.12593918054483]
+    A = 0.470142064105115
+    B = 0.101286507323456
+    P1 = 0.066197076394253
+    P2 = 0.062969590272413
+    weights = [9/80, P1, P1, P1, P2, P2, P2]
     points = Vector{Float64}[
-        [0.33333333333333, 0.33333333333333], 
-        [0.47014206410511, 0.47014206410511], 
-        [0.47014206410511, 0.05971587178977],
-        [0.05971587178977, 0.47014206410511],
-        [0.10128650732346, 0.10128650732346],
-        [0.10128650732346, 0.79742698535309],
-        [0.79742698535309, 0.10128650732346]]
+        [1/3, 1/3], 
+        [A, A],
+        [1-2A, A],
+        [A, 1-2A],
+        [B, B],
+        [1-2B, B],
+        [B, 1-2B]]
+    return zip(weights, points)
+end
+
+""" 12 point integration fule for triangular elements.
+References
+----------
+Code Aster documentation, http://code-aster.org/doc/default/fr/man_r/r3/r3.01.01.pdf
+"""
+function get_integration_points{E<:TriangularElement}(element::Element{E}, ::Type{Val{:FPG12}})
+    A = 0.063089014491502
+    B = 0.249286745170910
+    C = 0.310352451033785
+    D = 0.053145049844816
+    P1 = 0.025422453185103
+    P2 = 0.058393137863189
+    P3 = 0.041425537809187
+    weights = [P1, P1, P1, P2, P2, P2, P3, P3, P3, P3, P3, P3]
+    points = Vector{Float64}[
+        [A, A],
+        [1-2A, A],
+        [A, 1-2A],
+        [B, B],
+        [1-2B, B],
+        [B, 1-2B],
+        [C, D],
+        [D, C],
+        [1-C-D, C],
+        [1-C,D, D],
+        [C, 1-C-D],
+        [D, 1-C-D]]
     return zip(weights, points)
 end
 
