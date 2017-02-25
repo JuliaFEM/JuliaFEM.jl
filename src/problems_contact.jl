@@ -25,6 +25,7 @@ type Contact <: BoundaryProblem
     remove_nodes :: Vector{Int}
     always_in_contact :: Bool
     update_contact_pairing :: Bool
+    contact_active_in_first_iteration :: Bool
     store_fields :: Vector{AbstractString}
 end
 
@@ -47,6 +48,7 @@ function Contact()
         [],      # remove these nodes always from set
         false,   # mainly for debugging, do not remove inactive nodes
         true,    # update contact pairing on each loop
+        false,
         default_fields)
 end
 
