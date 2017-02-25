@@ -7,8 +7,8 @@ using JuliaFEM.Postprocess
 using JuliaFEM.Testing
 using JuliaFEM.Abaqus: create_surface_elements
 
-tet4_meshfile = "test_problems_mortar_3d/tet4.inp"
-tet10_meshfile = "test_problems_mortar_3d/tet10.inp"
+tet4_meshfile = "test_problems_contact_3d/tet4.inp"
+tet10_meshfile = "test_problems_contact_3d/tet10.inp"
 
 @testset "patch test displacement + abaqus inp + tet4 + adjust" begin
 
@@ -26,7 +26,7 @@ tet10_meshfile = "test_problems_mortar_3d/tet10.inp"
 
     bc_upper = Problem(Dirichlet, "UPPER_TOP", 3, "displacement")
     bc_upper.elements = create_surface_elements(mesh, "UPPER_TOP")
-    update!(bc_upper, "displacement 3", -0.2)
+    update!(bc_upper, "displacement 3", -0.1)
 
     bc_lower = Problem(Dirichlet, "LOWER_BOTTOM", 3, "displacement")
     bc_lower.elements = create_surface_elements(mesh, "LOWER_BOTTOM")
@@ -45,17 +45,16 @@ tet10_meshfile = "test_problems_mortar_3d/tet10.inp"
     interface_master_elements = create_surface_elements(mesh, "UPPER_TO_LOWER")
     update!(interface_slave_elements, "master elements", interface_master_elements)
     interface.elements = [interface_slave_elements; interface_master_elements]
+    
+    append!(bc_sym13.assembly.removed_dofs, [1316, 1319, 1388, 1358])
+    append!(bc_sym23.assembly.removed_dofs, [1492, 1627, 1387, 1597])
 
-    append!(interface.assembly.removed_dofs, [1316, 1319, 1358, 1387, 1388, 1492, 1597, 1627])
-
-    interface.properties.linear_surface_elements = false
-    interface.properties.split_quadratic_slave_elements = false
-    interface.properties.split_quadratic_master_elements = false
-    interface.properties.adjust = true
+    #append!(interface.assembly.removed_dofs, [1316, 1319, 1358, 1387, 1388, 1492, 1597, 1627])
     interface.properties.dual_basis = false
+    interface.properties.contact_active_in_first_iteration = true
 
-    solver = LinearSolver(upper, lower, bc_upper, bc_lower, bc_sym13, bc_sym23, interface)
-    solver.xdmf = Xdmf("contact_sl_lin_disp_results")
+    solver = NonlinearSolver(upper, lower, bc_upper, bc_lower, bc_sym13, bc_sym23, interface)
+    solver.xdmf = Xdmf("contact_sl_lin_disp_results"; overwrite=true)
     solver()
 
     node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 0.0)
