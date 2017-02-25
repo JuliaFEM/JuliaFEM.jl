@@ -17,13 +17,13 @@ import Base: copy
 using JuliaFEM
 
 type Mesh
-    nodes :: Dict{Int64, Vector{Float64}}
-    node_sets :: Dict{Symbol, Set{Int64}}
-    elements :: Dict{Int64, Vector{Int64}}
-    element_types :: Dict{Int64, Symbol}
-    element_codes :: Dict{Int64, Symbol}
-    element_sets :: Dict{Symbol, Set{Int64}}
-    surface_sets :: Dict{Symbol, Vector{Tuple{Int64, Symbol}}}
+    nodes :: Dict{Int, Vector{Float64}}
+    node_sets :: Dict{Symbol, Set{Int}}
+    elements :: Dict{Int, Vector{Int}}
+    element_types :: Dict{Int, Symbol}
+    element_codes :: Dict{Int, Symbol}
+    element_sets :: Dict{Symbol, Set{Int}}
+    surface_sets :: Dict{Symbol, Vector{Tuple{Int, Symbol}}}
     surface_types :: Dict{Symbol, Symbol}
 end
 
@@ -35,7 +35,7 @@ function add_node!(mesh::Mesh, nid::Int, ncoords::Vector{Float64})
     mesh.nodes[nid] = ncoords
 end
 
-function add_nodes!(mesh::Mesh, nodes::Dict{Int64, Vector{Float64}})
+function add_nodes!(mesh::Mesh, nodes::Dict{Int, Vector{Float64}})
     for (nid, ncoords) in nodes
         add_node!(mesh, nid, ncoords)
     end
@@ -43,7 +43,7 @@ end
 
 function add_node_to_node_set!(mesh::Mesh, set_name, nids...)
     if !haskey(mesh.node_sets, set_name)
-        mesh.node_sets[set_name] = Set{Int64}()
+        mesh.node_sets[set_name] = Set{Int}()
     end
     push!(mesh.node_sets[set_name], nids...)
     return
@@ -51,7 +51,7 @@ end
 
 """ Create a new node set from nodes in element set. """
 function create_node_set_from_element_set!(mesh::Mesh, set_name)
-    node_ids = Set{Int64}()
+    node_ids = Set{Int}()
     for elid in mesh.element_sets[set_name]
         push!(node_ids, mesh.elements[elid]...)
     end
@@ -59,12 +59,12 @@ function create_node_set_from_element_set!(mesh::Mesh, set_name)
     return
 end
 
-function add_element!(mesh::Mesh, elid::Int, eltype::Symbol, connectivity::Vector{Int64})
+function add_element!(mesh::Mesh, elid::Int, eltype::Symbol, connectivity::Vector{Int})
     mesh.elements[elid] = connectivity
     mesh.element_types[elid] = eltype
 end
 
-function add_elements!(mesh::Mesh, elements::Dict{Int64, Tuple{Symbol, Vector{Int64}}})
+function add_elements!(mesh::Mesh, elements::Dict{Int, Tuple{Symbol, Vector{Int}}})
     for (elid, (eltype, elcon)) in elements
         add_element!(mesh, elid, eltype, elcon)
     end
@@ -72,7 +72,7 @@ end
 
 function add_element_to_element_set!(mesh::Mesh, set_name, elids...)
     if !haskey(mesh.element_sets, set_name)
-        mesh.element_sets[set_name] = Set{Int64}()
+        mesh.element_sets[set_name] = Set{Int}()
     end
     push!(mesh.element_sets[set_name], elids...)
 end
@@ -87,7 +87,7 @@ function copy(mesh::Mesh)
     return mesh2
 end
 
-function filter_by_element_id(mesh::Mesh, element_ids::Vector{Int64})
+function filter_by_element_id(mesh::Mesh, element_ids::Vector{Int})
     mesh2 = copy(mesh)
     mesh2.elements = Dict()
     for elid in element_ids
@@ -124,7 +124,7 @@ function create_elements(mesh::Mesh, element_sets::Symbol...; element_type=nothi
     if isempty(element_sets)
         element_ids = collect(keys(mesh.elements))
     else
-        element_ids = Set{Int64}()
+        element_ids = Set{Int}()
         for set_name in element_sets
             element_ids = union(element_ids, mesh.element_sets[set_name])
         end
@@ -146,7 +146,7 @@ end
 
 """ find npts nearest nodes from mesh and return id numbers as list. """
 function find_nearest_nodes(mesh::Mesh, coords::Vector, npts=1)
-    dist = Dict{Int64, Float64}()
+    dist = Dict{Int, Float64}()
     for (nid, c) in mesh.nodes
         dist[nid] = norm(coords-c)
     end
@@ -177,7 +177,7 @@ function reorder_element_connectivity!(mesh::Mesh, mapping::Dict{Symbol, Vector{
     end
 end
 
-function JuliaFEM.Problem{P<:FieldProblem}(mesh::Mesh, ::Type{P}, name::AbstractString, dimension::Int64)
+function JuliaFEM.Problem{P<:FieldProblem}(mesh::Mesh, ::Type{P}, name::AbstractString, dimension::Int)
     problem = Problem(P, name, dimension)
     problem.elements = create_elements(mesh, name)
     return problem
