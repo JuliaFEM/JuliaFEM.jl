@@ -9,9 +9,11 @@ using JuliaFEM.Abaqus: create_surface_elements
 
 ### temperature patch tests, sl tet4, dl tet4, sl tet10, dl tet 10
 
+tet4_meshfile = "test_problems_mortar_3d/tet4.inp"
+tet10_meshfile = "test_problems_mortar_3d/tet10.inp"
+
 @testset "patch test temperature + abaqus inp + tet4" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet4.inp"
-    mesh = abaqus_read_mesh(meshfile)
+    mesh = abaqus_read_mesh(tet4_meshfile)
 
     upper = Problem(Heat, "UPPER", 1)
     upper.elements = create_elements(mesh, "UPPER")
@@ -63,8 +65,7 @@ using JuliaFEM.Abaqus: create_surface_elements
 end
 
 @testset "patch test temperature + abaqus inp + tet4 + dual basis + adjust" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet4.inp"
-    mesh = abaqus_read_mesh(meshfile)
+    mesh = abaqus_read_mesh(tet4_meshfile)
 
     upper = Problem(Heat, "UPPER", 1)
     upper.elements = create_elements(mesh, "UPPER")
@@ -107,8 +108,7 @@ end
 end
 
 @testset "patch test temperature + abaqus inp + tet10, quadratic surface elements" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet10.inp"
-    mesh = abaqus_read_mesh(meshfile)
+    mesh = abaqus_read_mesh(tet10_meshfile)
 
     upper = Problem(Heat, "UPPER", 1)
     upper.elements = create_elements(mesh, "UPPER")
@@ -155,8 +155,7 @@ end
 end
 
 @testset "patch test temperature + abaqus inp + tet10 + quadratic surface elements + dual basis + alpha=0.2" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet10.inp"
-    mesh = abaqus_read_mesh(meshfile)
+    mesh = abaqus_read_mesh(tet10_meshfile)
 
     upper = Problem(Heat, "UPPER", 1)
     upper.elements = create_elements(mesh, "UPPER")
@@ -210,9 +209,8 @@ end
 ### displacement patch tests, sl tet4, dl tet4, sl tet10, dl tet 10
 
 @testset "patch test displacement + abaqus inp + tet4 + adjust" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet4.inp"
 
-    mesh = abaqus_read_mesh(meshfile)
+    mesh = abaqus_read_mesh(tet4_meshfile)
     # modify mesh a bit, find all nodes in elements in element set UPPER and put 0.2 to X3 to test adjust
     JuliaFEM.Preprocess.create_node_set_from_element_set!(mesh, :UPPER)
     for nid in mesh.node_sets[:UPPER]
@@ -273,9 +271,8 @@ end
 end
 
 @testset "patch test displacement + abaqus inp + tet4 + adjust + dual basis" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet4.inp"
 
-    mesh = abaqus_read_mesh(meshfile)
+    mesh = abaqus_read_mesh(tet4_meshfile)
     # modify mesh a bit, find all nodes in elements in element set UPPER and put 0.2 to X3 to test adjust
     JuliaFEM.Preprocess.create_node_set_from_element_set!(mesh, :UPPER)
     for nid in mesh.node_sets[:UPPER]
@@ -336,9 +333,8 @@ end
 end
 
 @testset "patch test displacement + abaqus inp + tet10 + adjust" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet10.inp"
 
-    mesh = abaqus_read_mesh(meshfile)
+    mesh = abaqus_read_mesh(tet10_meshfile)
     # modify mesh a bit, find all nodes in elements in element set UPPER and put 0.2 to X3 to test adjust
     JuliaFEM.Preprocess.create_node_set_from_element_set!(mesh, :UPPER)
     for nid in mesh.node_sets[:UPPER]
@@ -401,9 +397,8 @@ end
 
 
 @testset "patch test displacement + abaqus inp + tet10 + adjust + dual basis + alpha=0.2" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/test_problems_mortar_3d_tet10.inp"
 
-    mesh = abaqus_read_mesh(meshfile)
+    mesh = abaqus_read_mesh(tet10_meshfile)
     # modify mesh a bit, find all nodes in elements in element set UPPER and put 0.2 to X3 to test adjust
     JuliaFEM.Preprocess.create_node_set_from_element_set!(mesh, :UPPER)
     for nid in mesh.node_sets[:UPPER]
