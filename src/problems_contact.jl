@@ -27,6 +27,8 @@ type Contact <: BoundaryProblem
     update_contact_pairing :: Bool
     iteration :: Int
     contact_state_in_first_iteration :: Symbol
+    alpha :: Float64
+    drop_tolerance :: Float64
     store_fields :: Vector{AbstractString}
 end
 
@@ -51,6 +53,8 @@ function Contact()
         true,    # update contact pairing on each loop
         1,       # iteration counter
         :AUTO,   # contact state in first iteration, AUTO, INACTIVE, ACTIVE
+        0.0,     # alpha basis transform parameter
+        1.0e-9,  # drop tolerance
         default_fields)
 end
 
