@@ -39,8 +39,8 @@ end
     mesh = aster_read_mesh(meshfile)
     create_node_set_from_element_set!(mesh, "LOWER_LEFT", "UPPER_BOTTOM")
     # nid 1 coords = (0.0, 0.5), nid 13 coords = (0.0, 0.5)
-    nid = find_nearest_nodes(mesh, [0.0, 0.5]; node_set="LOWER_LEFT")
+    nid = find_nearest_node(mesh, [0.0, 0.5]; node_set="LOWER_LEFT")
     @test first(nid) == 1
-    nid = find_nearest_nodes(mesh, [0.0, 0.5]; node_set="UPPER_BOTTOM")
+    nid = find_nearest_node(mesh, [0.0, 0.5]; node_set="UPPER_BOTTOM")
     @test first(nid) == 13
 end
