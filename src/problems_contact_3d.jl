@@ -11,6 +11,100 @@ function create_orthogonal_basis(n)
     return t1, t2
 end
 
+""" Create rotation matrix Q for element nodes rotating quantities to nt coordinaet system. """
+function create_rotation_matrix(element::Element{Tri3}, time::Float64)
+    n = element("normal", time)
+    t11, t21 = create_orthogonal_basis(n[1])
+    t12, t22 = create_orthogonal_basis(n[2])
+    t13, t23 = create_orthogonal_basis(n[3])
+    Q1_ = [n[1] t11 t21]
+    Q2_ = [n[2] t12 t22]
+    Q3_ = [n[3] t13 t23]
+    Z = zeros(3, 3)
+    Q = [
+        Q1_ Z Z
+        Z Q2_ Z
+        Z Z Q3_]
+    return Q
+end
+
+function create_rotation_matrix(element::Element{Quad4}, time::Float64)
+    n = element("normal", time)
+    t11, t21 = create_orthogonal_basis(n[1])
+    t12, t22 = create_orthogonal_basis(n[2])
+    t13, t23 = create_orthogonal_basis(n[3])
+    t14, t24 = create_orthogonal_basis(n[4])
+    Q1_ = [n[1] t11 t21]
+    Q2_ = [n[2] t12 t22]
+    Q3_ = [n[3] t13 t23]
+    Q4_ = [n[4] t14 t24]
+    Z = zeros(3, 3)
+    Q = [
+        Q1_ Z Z Z
+        Z Q2_ Z Z
+        Z Z Q3_ Z
+        Z Z Z Q4_]
+    return Q
+end
+
+function create_rotation_matrix(element::Element{Tri6}, time::Float64)
+    n = element("normal", time)
+    t11, t21 = create_orthogonal_basis(n[1])
+    t12, t22 = create_orthogonal_basis(n[2])
+    t13, t23 = create_orthogonal_basis(n[3])
+    t14, t24 = create_orthogonal_basis(n[4])
+    t15, t25 = create_orthogonal_basis(n[5])
+    t16, t26 = create_orthogonal_basis(n[6])
+    Q1_ = [n[1] t11 t21]
+    Q2_ = [n[2] t12 t22]
+    Q3_ = [n[3] t13 t23]
+    Q4_ = [n[4] t14 t24]
+    Q5_ = [n[5] t15 t25]
+    Q6_ = [n[6] t16 t26]
+    Z = zeros(3, 3)
+    Q = [
+        Q1_ Z Z Z Z Z
+        Z Q2_ Z Z Z Z
+        Z Z Q3_ Z Z Z
+        Z Z Z Q4_ Z Z
+        Z Z Z Z Q5_ Z
+        Z Z Z Z Z Q6_]
+    return Q
+end
+
+""" Create a contact segmentation between one slave element and list of master elements.
+
+Returns
+-------
+
+Vector with tuples: (master_element, polygon_clip_vertices, polygon_clip_centroid, polygon_clip_area)
+"""
+function create_contact_segmentation(slave_element, master_elements, x0, n0, time::Float64; deformed=false)
+    result = []
+    x1 = slave_element("geometry", time)
+    if deformed
+        x1 += slave_element("displacement", time)
+    end
+    S = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in x1]
+    for master_element in master_elements
+        x2 = master_element("geometry", time)
+        if deformed
+            x2 += master_element("displacement", time)
+        end
+        M = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in x2]
+        P = get_polygon_clip(S, M, n0)
+        length(P) < 3 && continue # no clipping or shared edge (no volume)
+        check_orientation!(P, n0)
+        N_P = length(P)
+        P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
+        if isapprox(P_area, 0.0)
+            error("Polygon P has zero area")
+        end
+        C0 = calculate_centroid(P)
+        push!(result, (master_element, P, C0, P_area))
+    end
+    return result
+end
 
 "Assemble linear surface element to contact problem. """
 function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time::Float64)
@@ -25,36 +119,20 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
     n1 = slave_element("normal", time)
     la = slave_element("reaction force", time)
 
-    if nsl == 3
-        t11, t21 = create_orthogonal_basis(n1[1])
-        t12, t22 = create_orthogonal_basis(n1[2])
-        t13, t23 = create_orthogonal_basis(n1[3])
-        Q1_ = [n1[1] t11 t21]
-        Q2_ = [n1[2] t12 t22]
-        Q3_ = [n1[3] t13 t23]
-        Z = zeros(3, 3)
-        Q3 = [Q1_ Z Z; Z Q2_ Z; Z Z Q3_]
-    elseif nsl == 4
-        t11, t21 = create_orthogonal_basis(n1[1])
-        t12, t22 = create_orthogonal_basis(n1[2])
-        t13, t23 = create_orthogonal_basis(n1[3])
-        t14, t24 = create_orthogonal_basis(n1[4])
-        Q1_ = [n1[1] t11 t21]
-        Q2_ = [n1[2] t12 t22]
-        Q3_ = [n1[3] t13 t23]
-        Q4_ = [n1[4] t14 t24]
-        Z = zeros(3, 3)
-        Q3 = [Q1_ Z Z Z; Z Q2_ Z Z; Z Z Q3_ Z; Z Z Z Q4_]
-    else
-        error("nsl = $nsl")
-    end
+    Q3 = create_rotation_matrix(slave_element, time)
 
     # project slave nodes to auxiliary plane (x0, Q)
     xi = mean(get_reference_coordinates(slave_element))
     N = vec(get_basis(slave_element, xi, time))
     x0 = N*X1
     n0 = N*n1
-    S = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in X1]
+
+    # create contact segmentation
+    segmentation = create_contact_segmentation(slave_element, slave_element("master elements", time), x0, n0, time)
+
+    if length(segmentation) == 0 # no overlapping surface in slave and maters
+        return
+    end
 
     Ae = eye(nsl)
 
@@ -62,30 +140,11 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
 
         De = zeros(nsl, nsl)
         Me = zeros(nsl, nsl)
-        
-        # 3. loop all master elements
-        for master_element in slave_element("master elements", time)
 
-            nm = length(master_element)
-            X2 = master_element("geometry", time)
-            u2 = master_element("displacement", time)
-            x2 = X2 + u2
+        # loop all polygons
+        for (master_element, P, C0, P_area) in segmentation
 
-            # 3.1 project master nodes to auxiliary plane and create polygon clipping
-            M = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in X2]
-            P = get_polygon_clip(S, M, n0)
-            length(P) < 3 && continue # no clipping or shared edge (no volume)
-            check_orientation!(P, n0)
-
-            N_P = length(P)
-            P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
-            if isapprox(P_area, 0.0)
-                error("Polygon P has zero area")
-            end
-
-            C0 = calculate_centroid(P)
-
-            # 4. loop integration cells
+            # loop integration cells
             for cell in get_cells(P, C0)
                 virtual_element = Element(Tri3, Int[])
                 update!(virtual_element, "geometry", cell)
@@ -108,39 +167,24 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
         debug("Dual basis coeffients = $Ae")
     end
 
-    # 3. loop all master elements
-    for master_element in slave_element("master elements", time)
+    # loop all polygons
+    for (master_element, P, C0, P_area) in segmentation
 
         nm = length(master_element)
         X2 = master_element("geometry", time)
         u2 = master_element("displacement", time)
         x2 = X2 + u2
 
-        # 3.1 project master nodes to auxiliary plane and create polygon clipping
-        M = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in X2]
-        P = get_polygon_clip(S, M, n0)
-        length(P) < 3 && continue # no clipping or shared edge (no volume)
-        check_orientation!(P, n0)
-
-        N_P = length(P)
-        P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
-        if isapprox(P_area, 0.0)
-            error("Polygon P has zero area")
-        end
-
-        C0 = calculate_centroid(P)
-
         De = zeros(nsl, nsl)
         Me = zeros(nsl, nm)
         ce = zeros(field_dim*nsl)
         ge = zeros(field_dim*nsl)
 
-        # 4. loop integration cells
+        # loop integration cells
         for cell in get_cells(P, C0)
             virtual_element = Element(Tri3, Int[])
             update!(virtual_element, "geometry", cell)
-
-            # 5. loop integration point of integration cell
+            # loop integration point of integration cell
             for ip in get_integration_points(virtual_element, 3)
 
                 # project gauss point from auxiliary plane to master and slave element
@@ -160,14 +204,13 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
                 
                 x_s = N1*(X1+u1)
                 x_m = N2*(X2+u2)
-                la_s = N1*la
                 ge += w*vec((x_m-x_s)*Phi')
             
             end # integration points done
 
         end # integration cells done
 
-        # 6. add contribution to contact virtual work
+        # add contribution to contact virtual work
         sdofs = get_gdofs(problem, slave_element)
         mdofs = get_gdofs(problem, master_element)
         nsldofs = length(sdofs)
@@ -215,26 +258,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
     Xs = slave_element("geometry", time)
     n1 = slave_element("normal", time)
 
-    t11, t21 = create_orthogonal_basis(n1[1])
-    t12, t22 = create_orthogonal_basis(n1[2])
-    t13, t23 = create_orthogonal_basis(n1[3])
-    t14, t24 = create_orthogonal_basis(n1[4])
-    t15, t25 = create_orthogonal_basis(n1[5])
-    t16, t26 = create_orthogonal_basis(n1[6])
-    Q1_ = [n1[1] t11 t21]
-    Q2_ = [n1[2] t12 t22]
-    Q3_ = [n1[3] t13 t23]
-    Q4_ = [n1[4] t14 t24]
-    Q5_ = [n1[5] t15 t25]
-    Q6_ = [n1[6] t16 t26]
-    Z = zeros(3, 3)
-    Q3 = [
-        Q1_ Z Z Z Z Z
-        Z Q2_ Z Z Z Z
-        Z Z Q3_ Z Z Z
-        Z Z Z Q4_ Z Z
-        Z Z Z Z Q5_ Z
-        Z Z Z Z Z Q6_]
+    Q3 = create_rotation_matrix(slave_element, time)
 
     Ae = eye(nsl)
 
