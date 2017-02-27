@@ -237,27 +237,65 @@ function assemble!(problem::Problem{Contact}, time::Float64,
         # at this point we have calculated contact force fc and gap for all slave elements.
         # next task is to find out are they in contact or not and remove inactive nodes
 
-        #nzgap = sort(nonzeros(sparse(ForwardDiff.get_value(gap))))
-        #info("gap: $nzgap")
+        state = problem.properties.contact_state_in_first_iteration
+        if problem.properties.iteration == 1
+            info("First contact iteration, initial contact state = $state")
+            if state == :AUTO
+                avg_gap = ForwardDiff.value(mean([gap[1, j] for j in S]))
+                std_gap = ForwardDiff.value(std([gap[1, j] for j in S]))
+                if (avg_gap < 1.0e-12) && (std_gap < 1.0e-12)
+                    state = :ACTIVE
+                else
+                    state = :UNKNOWN
+                end
+                info("Average weighted gap = $avg_gap, std gap = $std_gap, automatically determined contact state = $state")
+            end
+        end
 
-        for (i, j) in enumerate(sort(collect(S)))
-#           if j in props.always_inactive
-#               info("special node $j always inactive")
-#               C[:,j] = la[:,j]
-#               continue
-#           end
-            n = normals[:,j]
-            t = Q'*n
-            lan = dot(n, la[:,j])
-            lat = dot(t, la[:,j])
+        is_active = Dict{Int, Bool}()
+        condition = Dict()
 
-            if lan - gap[1, j] > 0
-#               info("set node $j active, normal direction = $(ForwardDiff.get_value(n)), tangent plane = $(ForwardDiff.get_value(t))")
+        for j in S
+            if j in props.always_in_contact
+                is_active[j] = true
+                continue
+            end
+            lan = dot(normals[:,j], la[:,j])
+            condition[j] = ForwardDiff.value(lan - gap[1, j])
+            is_active[j] = condition[j] > 0
+        end
+
+        if problem.properties.iteration == 1 && state == :ACTIVE
+            for j in S
+                is_active[j] = true
+            end
+        end
+
+        if problem.properties.iteration == 1 && state == :INACTIVE
+            for j in S
+                is_active[j] = false
+            end
+        end
+
+        debug("Summary of nodes")
+        for j in sort(collect(keys(is_active)))
+            n = map(ForwardDiff.value, normals[:,j])
+            debug("$j, c=$(condition[j]), s=$(is_active[j]), n=$n")
+        end
+
+        for j in S
+
+            if is_active[j]
+                n = normals[:,j]
+                t = Q'*n
+                lan = dot(n, la[:,j])
+                lat = dot(t, la[:,j])
                 C[1,j] += gap[1, j]
                 C[2,j] += lat
             else
                 C[:,j] = la[:,j]
             end
+
         end
 
         return vec([fc C])
@@ -269,6 +307,7 @@ function assemble!(problem::Problem{Contact}, time::Float64,
     if length(x) == 0
         error("2d autodiff contact problem: initialize problem.assembly.u & la before solution")
     end
+
     A = ForwardDiff.jacobian(calculate_interface, x)
     b = calculate_interface(x)
     A = sparse(A)
@@ -284,13 +323,12 @@ function assemble!(problem::Problem{Contact}, time::Float64,
     f = -b[1:ndofs]
     g = -b[ndofs+1:end]
 
-    empty!(problem.assembly)
-    add!(problem.assembly.K, K)
-    add!(problem.assembly.C1, C1)
-    add!(problem.assembly.C2, C2)
-    add!(problem.assembly.D, D)
-    add!(problem.assembly.f, f)
-    add!(problem.assembly.g, g)
+    problem.assembly.K = K
+    problem.assembly.C1 = C1
+    problem.assembly.C2 = C2
+    problem.assembly.D = D
+    problem.assembly.f = f
+    problem.assembly.g = g
 
 end
 
