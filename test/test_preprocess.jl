@@ -6,6 +6,8 @@ using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
 using JuliaFEM.Testing
 
+datadir = first(splitext(basename(@__FILE__)))
+
 @testset "renumber element nodes" begin
     mesh = Mesh()
     add_element!(mesh, 1, :Tet10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
@@ -30,4 +32,15 @@ end
                             11=>(:Tet10,vec)))
     @test mesh.elements[1] == vec
     @test mesh.elements[11] == vec
+end
+
+@testset "find nearest nodes from mesh" begin
+    meshfile = joinpath(datadir, "block_2d.med")
+    mesh = aster_read_mesh(meshfile)
+    create_node_set_from_element_set!(mesh, "LOWER_LEFT", "UPPER_BOTTOM")
+    # nid 1 coords = (0.0, 0.5), nid 13 coords = (0.0, 0.5)
+    nid = find_nearest_node(mesh, [0.0, 0.5]; node_set="LOWER_LEFT")
+    @test first(nid) == 1
+    nid = find_nearest_node(mesh, [0.0, 0.5]; node_set="UPPER_BOTTOM")
+    @test first(nid) == 13
 end
