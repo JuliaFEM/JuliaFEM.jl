@@ -63,6 +63,10 @@ function create_node_set_from_element_set!(mesh::Mesh, set_names::String...)
     return
 end
 
+function create_node_set_from_element_set!(mesh::Mesh, set_name::Symbol)
+    create_node_set_from_element_set!(mesh, string(set_name))
+end
+
 function add_element!(mesh::Mesh, elid::Int, eltype::Symbol, connectivity::Vector{Int})
     mesh.elements[elid] = connectivity
     mesh.element_types[elid] = eltype
@@ -160,10 +164,11 @@ function find_nearest_nodes(mesh::Mesh, coords::Vector{Float64}, npts::Int=1; no
     s = sort(collect(dist), by=x->x[2])
     nd = s[1:npts] # [(id1, dist1), (id2, dist2), ..., (id_npts, dist_npts)]
     node_ids = [n[1] for n in nd]
-    if length(node_ids) == 1
-        return first(node_ids)
-    end
     return node_ids
+end
+
+function find_nearest_node(mesh::Mesh, coords::Vector{Float64}; node_set=nothing)
+    return first(find_nearest_nodes(mesh, coords, 1; node_set=node_set))
 end
 
 """
