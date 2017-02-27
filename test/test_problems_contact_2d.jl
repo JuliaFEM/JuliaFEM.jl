@@ -5,63 +5,15 @@ using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
 using JuliaFEM.Testing
-import JuliaFEM: get_mesh, get_model
 
-function get_mesh(::Type{Val{Symbol("curved 2d mesh model")}})
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/block_2d_curved.med"
-    mesh = aster_read_mesh(meshfile)
-end
+datadir = first(splitext(basename(@__FILE__)))
 
-function get_model(::Type{Val{Symbol("curved 2d contact small sliding")}})
-    
-    mesh = get_mesh("curved 2d mesh model")
-
-    upper = Problem(Elasticity, "upper", 2)
-    upper.properties.formulation = :plane_stress
-    upper.elements = create_elements(mesh, "UPPER")
-    update!(upper, "youngs modulus", 96.0)
-    update!(upper, "poissons ratio", 1/3)
-
-    lower = Problem(Elasticity, "lower", 2)
-    lower.properties.formulation = :plane_stress
-    lower.elements = create_elements(mesh, "LOWER")
-    update!(lower, "youngs modulus", 96.0)
-    update!(lower, "poissons ratio", 1/3)
-
-    bc_upper = Problem(Dirichlet, "upper boundary", 2, "displacement")
-    bc_upper.elements = create_elements(mesh, "UPPER_TOP")
-    update!(bc_upper, "displacement 1", 0.0)
-    update!(bc_upper, "displacement 2", -0.15)
-
-    bc_lower = Problem(Dirichlet, "lower boundary", 2, "displacement")
-    bc_lower.elements = create_elements(mesh, "LOWER_BOTTOM")
-    update!(bc_lower, "displacement 1", 0.0)
-    update!(bc_lower, "displacement 2", 0.0)
-
-    contact = Problem(Contact, "contact between upper and lower block", 2, "displacement")
-    contact.properties.dimension = 1
-    contact.properties.rotate_normals = true
-    contact_slave_elements = create_elements(mesh, "LOWER_TOP")
-    contact_master_elements = create_elements(mesh, "UPPER_BOTTOM")
-    update!(contact_slave_elements, "master elements", contact_master_elements)
-    contact.elements = [contact_master_elements; contact_slave_elements]
-
-    solver = Solver(Nonlinear)
-    push!(solver, upper, lower, bc_upper, bc_lower, contact)
-    return solver
-
-end
-
-@testset "test all nodes in contact" begin
-    # FIXME: needs verification of some other fem software
-    solver = get_model("curved 2d contact small sliding")
-    solver()
-    upper, lower, bc_upper, bc_lower, contact = solver.problems
-    @test isapprox(norm(contact.assembly.u), 0.49563347601324315)
-end
-
-function get_model(::Type{Val{Symbol("hertz contact, full 2d model")}})
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/hertz_2d_full.med"
+# from fenet d3613 advanced finite element contact benchmarks
+# a = 6.21 mm, pmax = 3585 MPa
+# this is a very sparse mesh and for that reason pmax is not very accurate
+# (only 6 elements in -20 .. 20 mm contact zone, 3 elements in contact
+@testset "hertz contact, full 2d model, linear elements" begin
+    meshfile = joinpath(datadir, "hertz_2d_full.med")
     mesh = aster_read_mesh(meshfile)
 
     upper = Problem(Elasticity, "CYLINDER", 2)
@@ -90,7 +42,7 @@ function get_model(::Type{Val{Symbol("hertz contact, full 2d model")}})
     #load = Problem(Dirichlet, "load", 2, "displacement")
     load = Problem(Elasticity, "point load", 2)
     load.properties.formulation = :plane_strain
-    load.elements = [Element(Poi1, nid)]
+    load.elements = [Element(Poi1, [nid])]
     #update!(load.elements, "displacement 2", -10.0)
     update!(load, "displacement traction force 2", -35.0e3)
 
@@ -106,18 +58,6 @@ function get_model(::Type{Val{Symbol("hertz contact, full 2d model")}})
     
     solver = Solver(Nonlinear)
     push!(solver, upper, lower, bc_fixed, bc_sym_23, load, contact)
-    return solver
-
-end
-
-@testset "test frictionless hertz contact, 2d plane strain" begin
-    # from fenet d3613 advanced finite element contact benchmarks
-    # a = 6.21 mm, pmax = 3585 MPa
-    # this is a very sparse mesh and for that reason pmax is not very
-    # (only 6 elements in -20 .. 20 mm contact zone, 3 elements in contact
-    # instead integrate pressure in normal and tangential direction
-    solver = get_model("hertz contact, full 2d model")
-    upper, lower, bc_fixed, bc_sym_23, load, contact = solver.problems
     solver()
     slaves = get_slave_elements(contact)
     node_ids, la = get_nodal_vector(slaves, "reaction force", 0.0)
@@ -146,3 +86,56 @@ end
     @test isapprox(Rt, 0.0; atol=10.0)
 end
 
+@testset "2d patch test, linear Seg2 elements" begin
+    meshfile = joinpath(datadir, "block_2d.med")
+    mesh = aster_read_mesh(meshfile)
+    println(mesh.nodes[1])
+
+    upper = Problem(mesh, Elasticity, "UPPER", 2)
+    lower = Problem(mesh, Elasticity, "LOWER", 2)
+
+    for body in [upper, lower]
+        body.properties.formulation = :plane_stress
+        update!(body, "youngs modulus", 288.0)
+        update!(body, "poissons ratio", 1/3)
+    end
+
+    load = Problem(mesh, Elasticity, "UPPER_TOP", 2)
+    load.properties.formulation = :plane_stress
+    update!(load, "displacement traction force 2", -28.8)
+    bc1 = Problem(mesh, Dirichlet, "LOWER_BOTTOM", 2, "displacement")
+    update!(bc1, "displacement 2", 0.0)
+    bc2 = Problem(mesh, Dirichlet, "LOWER_LEFT", 2, "displacement")
+    update!(bc2, "displacement 1", 0.0)
+    bc3 = Problem(mesh, Dirichlet, "UPPER_LEFT", 2, "displacement")
+    update!(bc3, "displacement 1", 0.0)
+
+    interface = Problem(Mortar, "interface", 2, "displacement")
+    interface_slave_elements = create_elements(mesh, "LOWER_TOP")
+    interface_master_elements = create_elements(mesh, "UPPER_BOTTOM")
+    update!(interface_slave_elements, "master elements", interface_master_elements)
+    interface.elements = [interface_master_elements; interface_slave_elements]
+    
+    # in LOWER_LEFT we have node belonging also to contact interface
+    # let's remove it from dirichlet bc
+    create_node_set_from_element_set!(mesh, "LOWER_LEFT")
+    nid = find_nearest_nodes(mesh, [0.0, 0.5]; node_set="LOWER_LEFT")
+    coords = mesh.nodes[nid]
+    info("nearest node to (0.0, 0.5) = $nid, coordinates = $coords")
+    dofs = [2*(nid-1)+1, 2*(nid-1)+2]
+    info("removing nid $nid, dofs $dofs from LOWER_LEFT")
+    push!(bc2.assembly.removed_dofs, dofs...)
+
+    solver = Solver(Linear)
+    #push!(solver, upper, lower, load, bc1, interface)
+    push!(solver, upper, lower, load, bc1, bc2, bc3, interface)
+    solver()
+
+    node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 0.0)
+    node_ids, geometry = get_nodal_vector(interface.elements, "geometry", 0.0)
+    u2 = [u[2] for u in displacement]
+    maxabsu2 = maximum(abs(u2))
+    stdabsu2 = std(abs(u2))
+    info("max(abs(u2)) = $maxabsu2, std(abs(u2)) = $stdabsu2")
+    @test isapprox(stdabsu2, 0.0; atol=1.0e-12)
+end
