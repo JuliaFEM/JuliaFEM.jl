@@ -24,7 +24,8 @@ function get_model()
 
     load = Problem(mesh, Elasticity, "UPPER_TOP", 2)
     load.properties.formulation = :plane_stress
-    update!(load, "displacement traction force 2", -28.8)
+    update!(load, "displacement traction force 2", 0.0 => 0.0)
+    update!(load, "displacement traction force 2", 1.0 => -28.8)
     bc1 = Problem(mesh, Dirichlet, "LOWER_BOTTOM", 2, "displacement")
     update!(bc1, "displacement 2", 0.0)
     bc2 = Problem(mesh, Dirichlet, "LOWER_LEFT", 2, "displacement")
@@ -66,11 +67,16 @@ end
     end
     interface.properties.finite_sliding = true
     interface.properties.use_forwarddiff = true
-    solver()
 
-    node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 0.0)
-    node_ids, geometry = get_nodal_vector(interface.elements, "geometry", 0.0)
-    node_ids, reaction_force = get_nodal_vector(get_slave_elements(interface), "reaction force", 0.0)
+    for time in [0.0, 1/3, 2/3, 1.0]
+        interface.properties.iteration = 1
+        solver.time = time
+        solver()
+    end
+
+    node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 1.0)
+    node_ids, geometry = get_nodal_vector(interface.elements, "geometry", 1.0)
+    node_ids, reaction_force = get_nodal_vector(get_slave_elements(interface), "reaction force", 1.0)
     u2 = [u[2] for u in displacement]
     f2 = [f[2] for f in reaction_force]
     maxabsu2 = maximum(abs(u2))

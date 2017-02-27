@@ -163,6 +163,38 @@ function assemble!(problem::Problem{Contact}, time::Float64,
             n1 = Field(Vector[normals[:,i] for i in slave_element_nodes])
             nnodes = size(slave_element, 2)
 
+            # construct dual basis
+            De = zeros(nnodes, nnodes)
+            Me = zeros(nnodes, nnodes)
+            for master_element in slave_element("master elements", time)
+
+                master_element_nodes = get_connectivity(master_element)
+                X2 = master_element("geometry", time)
+                u2 = Field(Vector[u[:,i] for i in master_element_nodes])
+                x2 = X2 + u2
+
+                # calculate segmentation: we care only about endpoints
+                xi1a = project_from_master_to_slave(slave_element, x1, n1, x2[1])
+                xi1b = project_from_master_to_slave(slave_element, x1, n1, x2[2])
+                xi1 = clamp([xi1a; xi1b], -1.0, 1.0)
+                l = 1/2*abs(xi1[2]-xi1[1])
+                isapprox(l, 0.0) && continue # no contribution in this master element
+
+                for ip in get_integration_points(slave_element, 3)
+                    # jacobian of slave element in deformed state
+                    dN = get_dbasis(slave_element, ip, time)
+                    j = sum([kron(dN[:,i], x1[i]') for i=1:length(x1)])
+                    w = ip.weight*norm(j)*l
+                    xi = ip.coords[1]
+                    xi_s = dot([1/2*(1-xi); 1/2*(1+xi)], xi1)
+                    N1 = get_basis(slave_element, xi_s, time)
+                    De += w*diagm(vec(N1))
+                    Me += w*N1'*N1
+                end
+            end
+            
+            Ae = De*inv(Me)
+
             # 3. loop all master elements
             for master_element in slave_element("master elements", time)
 
@@ -182,21 +214,6 @@ function assemble!(problem::Problem{Contact}, time::Float64,
                 xi1 = clamp([xi1a; xi1b], -1.0, 1.0)
                 l = 1/2*abs(xi1[2]-xi1[1])
                 isapprox(l, 0.0) && continue # no contribution in this master element
-
-                De = zeros(nnodes, nnodes)
-                Me = zeros(nnodes, nnodes)
-                for ip in get_integration_points(slave_element, 3)
-                    # jacobian of slave element in deformed state
-                    dN = get_dbasis(slave_element, ip, time)
-                    j = sum([kron(dN[:,i], x1[i]') for i=1:length(x1)])
-                    w = ip.weight*norm(j)*l
-                    xi = ip.coords[1]
-                    xi_s = dot([1/2*(1-xi); 1/2*(1+xi)], xi1)
-                    N1 = get_basis(slave_element, xi_s, time)
-                    De += w*diagm(vec(N1))
-                    Me += w*N1'*N1
-                end
-                Ae = De*inv(Me)
 
                 slave_dofs = get_gdofs(slave_element, field_dim)
                 master_dofs = get_gdofs(master_element, field_dim)
@@ -317,18 +334,40 @@ function assemble!(problem::Problem{Contact}, time::Float64,
 
     ndofs = round(Int, length(x)/2)
     K = A[1:ndofs,1:ndofs]
-    C1 = transpose(A[1:ndofs,ndofs+1:end])
+    C1 = A[1:ndofs,ndofs+1:end]
     C2 = A[ndofs+1:end,1:ndofs]
     D = A[ndofs+1:end,ndofs+1:end]
     f = -b[1:ndofs]
     g = -b[ndofs+1:end]
+    
+    f += C1*problem.assembly.la
+    g += D*problem.assembly.la
+
+    #=
+    if !haskey(problem, "contact force")
+        problem.fields["contact force"] = Field(time => f)
+    else
+        update!(problem.fields["contact force"], time => f)
+    end
+
+    fc = problem.fields["contact force"]
+
+    if length(fc) > 1
+        # kick in generalized alpha rule for time integration
+        alpha = 0.5
+        info("Applying Generalized alpha time integration")
+        K = (1-alpha)*K
+        C1 = (1-alpha)*C1
+        f = alpha*fc[end-1].data
+    end
+    =#
 
     problem.assembly.K = K
-    problem.assembly.C1 = C1
+    problem.assembly.C1 = transpose(C1)
     problem.assembly.C2 = C2
     problem.assembly.D = D
-    problem.assembly.f = f
-    problem.assembly.g = g
+    problem.assembly.f = sparse(f)
+    problem.assembly.g = sparse(g)
 
 end
 

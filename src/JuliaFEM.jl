@@ -141,16 +141,6 @@ export aster_create_elements, parse_aster_med_file, is_aster_mail_keyword,
        aster_read_mesh_names, aster_read_node_sets, aster_read_nodes, RMEDFile
 end
 
-function get_mesh(mesh_name::AbstractString, args...; kwargs...)
-    return get_mesh(Val{Symbol(mesh_name)}, args...; kwargs...)
-end
-
-function get_model(model_name::AbstractString, args...; kwargs...)
-    return get_model(Val{Symbol(model_name)}, args...; kwargs...)
-end
-
-export get_mesh, get_model
-
 module Postprocess
 
 include("postprocess_utils.jl")

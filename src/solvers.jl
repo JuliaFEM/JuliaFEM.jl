@@ -13,13 +13,14 @@ type Solver{S<:AbstractSolver}
     initialized :: Bool
     u :: Vector{Float64}
     la :: Vector{Float64}
+    fields :: Dict{AbstractString, Field}
     properties :: S
 end
 
 
 function Solver{S<:AbstractSolver}(::Type{S}, name="solver", properties...)
     variant = S(properties...)
-    solver = Solver{S}(name, 0.0, [], [], 0, nothing, false, [], [], variant)
+    solver = Solver{S}(name, 0.0, [], [], 0, nothing, false, [], [], Dict(), variant)
     return solver
 end
 
@@ -33,17 +34,21 @@ function get_problems(solver::Solver)
     return solver.problems
 end
 
-function push!(solver::Solver, problem)
+function push!(solver::Solver, problem::Problem)
     push!(solver.problems, problem)
 end
 
-function getindex(solver::Solver, problem_name)
+function getindex(solver::Solver, problem_name::String)
     for problem in get_problems(solver)
         if problem.name == problem_name
             return problem
         end
     end
     throw(KeyError(problem_name))
+end
+
+function haskey(solver::Solver, field_name::String)
+    return haskey(solver.fields, field_name)
 end
 
 # one-liner helpers to identify problem types
@@ -311,6 +316,23 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
             empty!(problem.assembly)
         end
         gc()
+    end
+    
+    if !haskey(solver, "fint")
+        solver.fields["fint"] = Field(time => f)
+    else
+        update!(solver.fields["fint"], time => f)
+    end
+
+    fint = solver.fields["fint"]
+
+    if length(fint) > 1
+        # kick in generalized alpha rule for time integration
+        alpha = 0.5
+        info("Applying Generalized alpha time integration")
+        K = (1-alpha)*K
+        C1 = (1-alpha)*C1
+        f = (1-alpha)*f + alpha*fint[end-1].data
     end
 
     ndofs = solver.ndofs

@@ -63,11 +63,15 @@ function get_unknown_field_name(problem::Problem{Contact})
 end
 
 function get_formulation_type(problem::Problem{Contact})
+    #=
     if problem.properties.use_forwarddiff
         return :forwarddiff
     else
         return :incremental
     end
+    =#
+    return :incremental
+    #return :forwarddiff
 end
 
 function assemble!(problem::Problem{Contact}, time::Real)
