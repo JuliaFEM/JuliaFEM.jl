@@ -50,13 +50,21 @@ function add_node_to_node_set!(mesh::Mesh, set_name, nids...)
 end
 
 """ Create a new node set from nodes in element set. """
-function create_node_set_from_element_set!(mesh::Mesh, set_name)
-    node_ids = Set{Int}()
-    for elid in mesh.element_sets[set_name]
-        push!(node_ids, mesh.elements[elid]...)
+function create_node_set_from_element_set!(mesh::Mesh, set_names::String...)
+    for set_name in set_names
+        set_name = Symbol(set_name)
+        info("Creating node set $set_name from element set")
+        node_ids = Set{Int}()
+        for elid in mesh.element_sets[set_name]
+            push!(node_ids, mesh.elements[elid]...)
+        end
+        mesh.node_sets[set_name] = node_ids
     end
-    mesh.node_sets[set_name] = node_ids
     return
+end
+
+function create_node_set_from_element_set!(mesh::Mesh, set_name::Symbol)
+    create_node_set_from_element_set!(mesh, string(set_name))
 end
 
 function add_element!(mesh::Mesh, elid::Int, eltype::Symbol, connectivity::Vector{Int})
@@ -145,15 +153,22 @@ end
 
 
 """ find npts nearest nodes from mesh and return id numbers as list. """
-function find_nearest_nodes(mesh::Mesh, coords::Vector, npts=1)
+function find_nearest_nodes(mesh::Mesh, coords::Vector{Float64}, npts::Int=1; node_set=nothing)
     dist = Dict{Int, Float64}()
     for (nid, c) in mesh.nodes
+        if node_set != nothing && !(nid in mesh.node_sets[Symbol(node_set)])
+            continue
+        end
         dist[nid] = norm(coords-c)
     end
     s = sort(collect(dist), by=x->x[2])
     nd = s[1:npts] # [(id1, dist1), (id2, dist2), ..., (id_npts, dist_npts)]
     node_ids = [n[1] for n in nd]
     return node_ids
+end
+
+function find_nearest_node(mesh::Mesh, coords::Vector{Float64}; node_set=nothing)
+    return first(find_nearest_nodes(mesh, coords, 1; node_set=node_set))
 end
 
 """
