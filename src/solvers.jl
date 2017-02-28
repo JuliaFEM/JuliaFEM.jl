@@ -13,6 +13,7 @@ type Solver{S<:AbstractSolver}
     initialized :: Bool
     u :: Vector{Float64}
     la :: Vector{Float64}
+    alpha :: Float64             # generalized alpha time integration coefficient
     fields :: Dict{AbstractString, Field}
     properties :: S
 end
@@ -20,7 +21,7 @@ end
 
 function Solver{S<:AbstractSolver}(::Type{S}, name="solver", properties...)
     variant = S(properties...)
-    solver = Solver{S}(name, 0.0, [], [], 0, nothing, false, [], [], Dict(), variant)
+    solver = Solver{S}(name, 0.0, [], [], 0, nothing, false, [], [], 0.0, Dict(), variant)
     return solver
 end
 
@@ -328,8 +329,8 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
 
     if length(fint) > 1
         # kick in generalized alpha rule for time integration
-        alpha = 0.5
-        info("Applying Generalized alpha time integration")
+        alpha = solver.alpha
+        debug("Using generalized-α time integration, α=$alpha")
         K = (1-alpha)*K
         C1 = (1-alpha)*C1
         f = (1-alpha)*f + alpha*fint[end-1].data
