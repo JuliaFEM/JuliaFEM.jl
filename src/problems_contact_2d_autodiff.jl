@@ -294,10 +294,12 @@ function assemble!(problem::Problem{Contact}, time::Float64,
             end
         end
 
-        debug("Summary of nodes")
-        for j in sort(collect(keys(is_active)))
-            n = map(ForwardDiff.value, normals[:,j])
-            debug("$j, c=$(condition[j]), s=$(is_active[j]), n=$n")
+        if Logging._root.level == DEBUG
+            debug("Summary of nodes")
+            for j in sort(collect(keys(is_active)))
+                n = map(ForwardDiff.value, normals[:,j])
+                debug("$j, c=$(condition[j]), s=$(is_active[j]), n=$n")
+            end
         end
 
         for j in S

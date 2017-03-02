@@ -17,8 +17,7 @@ using Logging
 Logging.configure(level=INFO)
 
 if haskey(ENV, "JULIAFEM_LOGLEVEL")
-    ENV["JULIAFEM_LOGLEVEL"] == "INFO" && Logging.configure(level=INFO)
-    ENV["JULIAFEM_LOGLEVEL"] == "DEBUG" && Logging.configure(level=DEBUG)
+    Logging.configure(level=LogLevel(ENV["JULIAFEM_LOGLEVEL"]))
 end
 
 export info, debug
