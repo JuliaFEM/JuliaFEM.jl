@@ -6,17 +6,13 @@ using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
 using JuliaFEM.Testing
 
-function JuliaFEM.get_mesh(::Type{Val{Symbol("curved 2d block splitted to upper and lower")}})
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/block_2d_curved.med"
-    mesh = aster_read_mesh(meshfile)
-end
-
-function JuliaFEM.get_model(::Type{Val{Symbol("mesh tie with curved 2d block")}};
+function get_model(::Type{Val{Symbol("mesh tie with curved 2d block")}};
             dy=0.0, adjust=false, tolerance=0.0, rotate_normals=false, swap=false,
             dual_basis=false, use_forwarddiff=true, finite_strain=false,
             geometric_stiffness=false)
 
-    mesh = get_mesh("curved 2d block splitted to upper and lower")
+    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/block_2d_curved.med"
+    mesh = aster_read_mesh(meshfile)
 
     upper = Problem(Elasticity, "upper", 2)
     upper.properties.formulation = :plane_stress

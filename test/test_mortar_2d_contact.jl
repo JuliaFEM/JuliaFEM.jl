@@ -5,7 +5,8 @@ using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Testing
 
-function JuliaFEM.get_mesh(::Type{Val{Symbol("two elements 1.0x0.5 with 0.1 gap in y direction")}})
+function get_model()
+    
     mesh = Mesh()
     add_node!(mesh, 1, [0.0, 0.0])
     add_node!(mesh, 2, [1.0, 0.0])
@@ -27,12 +28,6 @@ function JuliaFEM.get_mesh(::Type{Val{Symbol("two elements 1.0x0.5 with 0.1 gap 
     add_element_to_element_set!(mesh, :UPPER_TOP, 4)
     add_element_to_element_set!(mesh, :LOWER_TOP, 5)
     add_element_to_element_set!(mesh, :UPPER_BOTTOM, 6)
-    return mesh
-end
-
-function JuliaFEM.get_model(::Type{Val{Symbol("two element contact")}})
-
-    mesh = get_mesh("two elements 1.0x0.5 with 0.1 gap in y direction")
 
     upper = Problem(Elasticity, "UPPER", 2)
     upper.properties.formulation = :plane_stress
@@ -72,7 +67,7 @@ function JuliaFEM.get_model(::Type{Val{Symbol("two element contact")}})
 end
 
 @testset "test simple two element contact" begin
-    solver = get_model("two element contact")
+    solver = get_model()
     solver()
     contact = solver["LOWER_TO_UPPER"]
     master = first(contact.elements)
@@ -82,5 +77,4 @@ end
     info("u = $u, la = $la")
     @test isapprox(u, [-0.2, -0.15])
     @test isapprox(la, [0.0, -30.375])
-    # FIXME
 end

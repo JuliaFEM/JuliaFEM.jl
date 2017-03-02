@@ -17,8 +17,7 @@ using Logging
 Logging.configure(level=INFO)
 
 if haskey(ENV, "JULIAFEM_LOGLEVEL")
-    ENV["JULIAFEM_LOGLEVEL"] == "INFO" && Logging.configure(level=INFO)
-    ENV["JULIAFEM_LOGLEVEL"] == "DEBUG" && Logging.configure(level=DEBUG)
+    Logging.configure(level=LogLevel(ENV["JULIAFEM_LOGLEVEL"]))
 end
 
 export info, debug
@@ -140,16 +139,6 @@ export aster_create_elements, parse_aster_med_file, is_aster_mail_keyword,
        filter_by_element_set, filter_by_element_id, MEDFile, aster_read_data,
        aster_read_mesh_names, aster_read_node_sets, aster_read_nodes, RMEDFile
 end
-
-function get_mesh(mesh_name::AbstractString, args...; kwargs...)
-    return get_mesh(Val{Symbol(mesh_name)}, args...; kwargs...)
-end
-
-function get_model(model_name::AbstractString, args...; kwargs...)
-    return get_model(Val{Symbol(model_name)}, args...; kwargs...)
-end
-
-export get_mesh, get_model
 
 module Postprocess
 
