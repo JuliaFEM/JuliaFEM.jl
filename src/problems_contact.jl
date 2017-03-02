@@ -25,6 +25,10 @@ type Contact <: BoundaryProblem
     remove_nodes :: Vector{Int}
     always_in_contact :: Bool
     update_contact_pairing :: Bool
+    iteration :: Int
+    contact_state_in_first_iteration :: Symbol
+    alpha :: Float64
+    drop_tolerance :: Float64
     store_fields :: Vector{AbstractString}
 end
 
@@ -47,6 +51,10 @@ function Contact()
         [],      # remove these nodes always from set
         false,   # mainly for debugging, do not remove inactive nodes
         true,    # update contact pairing on each loop
+        1,       # iteration counter
+        :AUTO,   # contact state in first iteration, AUTO, INACTIVE, ACTIVE
+        0.0,     # alpha basis transform parameter
+        1.0e-9,  # drop tolerance
         default_fields)
 end
 
@@ -55,24 +63,29 @@ function get_unknown_field_name(problem::Problem{Contact})
 end
 
 function get_formulation_type(problem::Problem{Contact})
+    #=
     if problem.properties.use_forwarddiff
         return :forwarddiff
     else
         return :incremental
     end
+    =#
+    return :incremental
+    #return :forwarddiff
 end
 
 function assemble!(problem::Problem{Contact}, time::Real)
     if problem.properties.dimension == -1
         problem.properties.dimension = dim = size(first(problem.elements), 1)
-        info("assuming dimension of mesh tie surface is $dim")
-        info("if this is wrong set is manually using problem.properties.dimension")
+        debug("assuming dimension of mesh tie surface is $dim")
+        debug("if this is wrong set is manually using problem.properties.dimension")
     end
     dimension = Val{problem.properties.dimension}
     finite_sliding = Val{problem.properties.finite_sliding}
     friction = Val{problem.properties.friction}
     use_forwarddiff = Val{problem.properties.use_forwarddiff}
     assemble!(problem, time, dimension, finite_sliding, friction, use_forwarddiff)
+    problem.properties.iteration += 1
 end
 
 typealias ContactElements2D Union{Seg2}

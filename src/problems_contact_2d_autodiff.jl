@@ -163,6 +163,38 @@ function assemble!(problem::Problem{Contact}, time::Float64,
             n1 = Field(Vector[normals[:,i] for i in slave_element_nodes])
             nnodes = size(slave_element, 2)
 
+            # construct dual basis
+            De = zeros(nnodes, nnodes)
+            Me = zeros(nnodes, nnodes)
+            for master_element in slave_element("master elements", time)
+
+                master_element_nodes = get_connectivity(master_element)
+                X2 = master_element("geometry", time)
+                u2 = Field(Vector[u[:,i] for i in master_element_nodes])
+                x2 = X2 + u2
+
+                # calculate segmentation: we care only about endpoints
+                xi1a = project_from_master_to_slave(slave_element, x1, n1, x2[1])
+                xi1b = project_from_master_to_slave(slave_element, x1, n1, x2[2])
+                xi1 = clamp([xi1a; xi1b], -1.0, 1.0)
+                l = 1/2*abs(xi1[2]-xi1[1])
+                isapprox(l, 0.0) && continue # no contribution in this master element
+
+                for ip in get_integration_points(slave_element, 3)
+                    # jacobian of slave element in deformed state
+                    dN = get_dbasis(slave_element, ip, time)
+                    j = sum([kron(dN[:,i], x1[i]') for i=1:length(x1)])
+                    w = ip.weight*norm(j)*l
+                    xi = ip.coords[1]
+                    xi_s = dot([1/2*(1-xi); 1/2*(1+xi)], xi1)
+                    N1 = get_basis(slave_element, xi_s, time)
+                    De += w*diagm(vec(N1))
+                    Me += w*N1'*N1
+                end
+            end
+            
+            Ae = De*inv(Me)
+
             # 3. loop all master elements
             for master_element in slave_element("master elements", time)
 
@@ -182,21 +214,6 @@ function assemble!(problem::Problem{Contact}, time::Float64,
                 xi1 = clamp([xi1a; xi1b], -1.0, 1.0)
                 l = 1/2*abs(xi1[2]-xi1[1])
                 isapprox(l, 0.0) && continue # no contribution in this master element
-
-                De = zeros(nnodes, nnodes)
-                Me = zeros(nnodes, nnodes)
-                for ip in get_integration_points(slave_element, 3)
-                    # jacobian of slave element in deformed state
-                    dN = get_dbasis(slave_element, ip, time)
-                    j = sum([kron(dN[:,i], x1[i]') for i=1:length(x1)])
-                    w = ip.weight*norm(j)*l
-                    xi = ip.coords[1]
-                    xi_s = dot([1/2*(1-xi); 1/2*(1+xi)], xi1)
-                    N1 = get_basis(slave_element, xi_s, time)
-                    De += w*diagm(vec(N1))
-                    Me += w*N1'*N1
-                end
-                Ae = De*inv(Me)
 
                 slave_dofs = get_gdofs(slave_element, field_dim)
                 master_dofs = get_gdofs(master_element, field_dim)
@@ -237,27 +254,67 @@ function assemble!(problem::Problem{Contact}, time::Float64,
         # at this point we have calculated contact force fc and gap for all slave elements.
         # next task is to find out are they in contact or not and remove inactive nodes
 
-        #nzgap = sort(nonzeros(sparse(ForwardDiff.get_value(gap))))
-        #info("gap: $nzgap")
+        state = problem.properties.contact_state_in_first_iteration
+        if problem.properties.iteration == 1
+            info("First contact iteration, initial contact state = $state")
+            if state == :AUTO
+                avg_gap = ForwardDiff.value(mean([gap[1, j] for j in S]))
+                std_gap = ForwardDiff.value(std([gap[1, j] for j in S]))
+                if (avg_gap < 1.0e-12) && (std_gap < 1.0e-12)
+                    state = :ACTIVE
+                else
+                    state = :UNKNOWN
+                end
+                info("Average weighted gap = $avg_gap, std gap = $std_gap, automatically determined contact state = $state")
+            end
+        end
 
-        for (i, j) in enumerate(sort(collect(S)))
-#           if j in props.always_inactive
-#               info("special node $j always inactive")
-#               C[:,j] = la[:,j]
-#               continue
-#           end
-            n = normals[:,j]
-            t = Q'*n
-            lan = dot(n, la[:,j])
-            lat = dot(t, la[:,j])
+        is_active = Dict{Int, Bool}()
+        condition = Dict()
 
-            if lan - gap[1, j] > 0
-#               info("set node $j active, normal direction = $(ForwardDiff.get_value(n)), tangent plane = $(ForwardDiff.get_value(t))")
+        for j in S
+            if j in props.always_in_contact
+                is_active[j] = true
+                continue
+            end
+            lan = dot(normals[:,j], la[:,j])
+            condition[j] = ForwardDiff.value(lan - gap[1, j])
+            is_active[j] = condition[j] > 0
+        end
+
+        if problem.properties.iteration == 1 && state == :ACTIVE
+            for j in S
+                is_active[j] = true
+            end
+        end
+
+        if problem.properties.iteration == 1 && state == :INACTIVE
+            for j in S
+                is_active[j] = false
+            end
+        end
+
+        if Logging._root.level == DEBUG
+            debug("Summary of nodes")
+            for j in sort(collect(keys(is_active)))
+                n = map(ForwardDiff.value, normals[:,j])
+                debug("$j, c=$(condition[j]), s=$(is_active[j]), n=$n")
+            end
+        end
+
+        for j in S
+
+            if is_active[j]
+                n = normals[:,j]
+                t = Q'*n
+                lan = dot(n, la[:,j])
+                lat = dot(t, la[:,j])
                 C[1,j] += gap[1, j]
                 C[2,j] += lat
             else
                 C[:,j] = la[:,j]
             end
+
         end
 
         return vec([fc C])
@@ -269,6 +326,7 @@ function assemble!(problem::Problem{Contact}, time::Float64,
     if length(x) == 0
         error("2d autodiff contact problem: initialize problem.assembly.u & la before solution")
     end
+
     A = ForwardDiff.jacobian(calculate_interface, x)
     b = calculate_interface(x)
     A = sparse(A)
@@ -278,19 +336,40 @@ function assemble!(problem::Problem{Contact}, time::Float64,
 
     ndofs = round(Int, length(x)/2)
     K = A[1:ndofs,1:ndofs]
-    C1 = transpose(A[1:ndofs,ndofs+1:end])
+    C1 = A[1:ndofs,ndofs+1:end]
     C2 = A[ndofs+1:end,1:ndofs]
     D = A[ndofs+1:end,ndofs+1:end]
     f = -b[1:ndofs]
     g = -b[ndofs+1:end]
+    
+    f += C1*problem.assembly.la
+    g += D*problem.assembly.la
 
-    empty!(problem.assembly)
-    add!(problem.assembly.K, K)
-    add!(problem.assembly.C1, C1)
-    add!(problem.assembly.C2, C2)
-    add!(problem.assembly.D, D)
-    add!(problem.assembly.f, f)
-    add!(problem.assembly.g, g)
+    #=
+    if !haskey(problem, "contact force")
+        problem.fields["contact force"] = Field(time => f)
+    else
+        update!(problem.fields["contact force"], time => f)
+    end
+
+    fc = problem.fields["contact force"]
+
+    if length(fc) > 1
+        # kick in generalized alpha rule for time integration
+        alpha = 0.5
+        info("Applying Generalized alpha time integration")
+        K = (1-alpha)*K
+        C1 = (1-alpha)*C1
+        f = alpha*fc[end-1].data
+    end
+    =#
+
+    problem.assembly.K = K
+    problem.assembly.C1 = transpose(C1)
+    problem.assembly.C2 = C2
+    problem.assembly.D = D
+    problem.assembly.f = sparse(f)
+    problem.assembly.g = sparse(g)
 
 end
 
