@@ -510,7 +510,9 @@ function postprocess!(solver::Solver)
     info("Running postprocess scripts for solver...")
     for problem in get_problems(solver)
         for field_name in problem.postprocess_fields
-            postprocess!(problem, solver.time, Val{field_name})
+            field = Val{Symbol(field_name)}
+            info("Running postprocess for problem $(problem.name), field $field_name")
+            postprocess!(problem, solver.time, field)
         end
     end
 end
