@@ -77,7 +77,7 @@ If several field problems exists, they are simply summed together, so
 problems must have unique node ids.
 
 """
-function get_field_assembly(solver::Solver; show_info=true)
+function get_field_assembly(solver::Solver)
     problems = get_field_problems(solver)
 
     M = SparseMatrixCOO()
@@ -96,7 +96,7 @@ function get_field_assembly(solver::Solver; show_info=true)
 
     if solver.ndofs == 0
         solver.ndofs = size(K, 1)
-        show_info && info("automatically determined problem dimension, ndofs = $(solver.ndofs)")
+        info("automatically determined problem dimension, ndofs = $(solver.ndofs)")
     end
 
     M = sparse(M, solver.ndofs, solver.ndofs)
@@ -364,8 +364,8 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
 end
 
 """ Default assembler for solver. """
-function assemble!(solver::Solver; show_info=true, timing=true, with_mass_matrix=false)
-    show_info && info("Assembling problems ...")
+function assemble!(solver::Solver; timing=true, with_mass_matrix=false)
+    info("Assembling problems ...")
 
     function do_assemble(problem)
         t00 = Base.time()
@@ -391,7 +391,7 @@ function assemble!(solver::Solver; show_info=true, timing=true, with_mass_matrix
 
     solver.ndofs = ndofs
     t1 = round(Base.time()-t0, 2)
-    show_info && info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
+    info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
     if timing
         info("Assembly times:")
         for (i, problem) in enumerate(solver.problems)
@@ -423,12 +423,12 @@ function get_unknown_field_dimension(solver::Solver)
 end
 
 """ Default initializer for solver. """
-function initialize!(solver::Solver; show_info=true)
+function initialize!(solver::Solver)
     if solver.initialized
-        show_info && info("initialize!(): solver already initialized")
+        warn("initialize!(): solver already initialized")
         return
     end
-    show_info && info("Initializing solver ...")
+    info("Initializing solver ...")
     problems = get_problems(solver)
     length(problems) != 0 || error("Empty solver, add problems to solver using push!")
     t0 = Base.time()
@@ -459,7 +459,7 @@ function initialize!(solver::Solver; show_info=true)
         # initialize(problem, ....)
     end
     t1 = round(Base.time()-t0, 2)
-    show_info && info("Initialized solver in $t1 seconds.")
+    info("Initialized solver in $t1 seconds.")
     solver.initialized = true
 end
 
@@ -482,11 +482,11 @@ function (solver::Solver)(field_name::AbstractString, time::Float64)
 end
 
 """ Default update for solver. """
-function update!{S}(solver::Solver{S}; show_info=true)
+function update!{S}(solver::Solver{S})
     u = solver.u
     la = solver.la
 
-    show_info && info("Updating problems ...")
+    info("Updating problems ...")
     t0 = Base.time()
 
     for problem in solver.problems
@@ -498,16 +498,17 @@ function update!{S}(solver::Solver{S}; show_info=true)
         update!(problem, assembly, elements, solver.time)
     end
 
-    # if io is attached to solver, update hdf / xml also
-    if !isnull(solver.xdmf)
-        update_xdmf!(solver)
-    end
-
     t1 = round(Base.time()-t0, 2)
-    show_info && info("Updated problems in $t1 seconds.")
+    info("Updated problems in $t1 seconds.")
 end
 
-function update_xdmf!{S}(solver::Solver{S}; show_info=true)
+function update_xdmf!{S}(solver::Solver{S})
+    
+    if isnull(solver.xdmf)
+        info("update_xdmf: xdmf not attached to solver, not writing output to file.")
+        return
+    end
+
     xdmf = get(solver.xdmf)
     temporal_collection = get_temporal_collection(xdmf)
 
@@ -601,7 +602,7 @@ function update_xdmf!{S}(solver::Solver{S}; show_info=true)
         iteration = solver.properties.iteration
         path = "/Results/Time $time/Iteration $iteration/Nodal Fields/$unknown_field_name"
     elseif S == Linear
-        path = "/Results/Time $time/Nodal Fields/$unknown_field_name"
+        path = "/Results/Time $time/Iteration 1/Nodal Fields/$unknown_field_name"
     end
     attribute = new_child(frame, "Attribute")
     set_attribute(attribute, "Name", unknown_field_name)
@@ -671,14 +672,22 @@ function (solver::Solver{Nonlinear})()
         info("Increment time t=$(round(solver.time, 3))")
         info(repeat("-", 80))
 
-        # 2.1 update linearized assemblies
+        # 2.1 update assemblies
         assemble!(solver)
+
         # 2.2 call solver for linearized system
         solve!(solver)
+
         # 2.3 update solution back to elements
         update!(solver)
 
-        # 2.4 check convergence
+        # 2.4 run any postprocessing of problems
+        postprocess!(solver)
+
+        # 2.5 update Xdmf output
+        update_xdmf!(solver)
+
+        # 2.6 check convergence
         if has_converged(solver)
             info("Converged in $(properties.iteration) iterations.")
             properties.iteration >= properties.min_iterations && return true
@@ -721,8 +730,8 @@ Main differences in this solver, compared to nonlinear solver are:
 type Linear <: AbstractSolver
 end
 
-function assemble!(solver::Solver{Linear}; show_info=true)
-    show_info && info("Assembling problems ...")
+function assemble!(solver::Solver{Linear})
+    info("Assembling problems ...")
     tic()
     nproblems = 0
     ndofs = 0
@@ -731,27 +740,27 @@ function assemble!(solver::Solver{Linear}; show_info=true)
             assemble!(problem, solver.time)
             nproblems += 1
         else
-            show_info && info("$(problem.name) already assembled, skipping.")
+            info("$(problem.name) already assembled, skipping.")
         end
         ndofs = max(ndofs, size(problem.assembly.K, 2))
     end
     solver.ndofs = ndofs
     t1 = round(toq(), 2)
-    show_info && info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
+    info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
 end
 
-function (solver::Solver{Linear})(; show_info=true)
+function (solver::Solver{Linear})()
     t0 = Base.time()
-    show_info && info(repeat("-", 80))
-    show_info && info("Starting linear solver")
-    show_info && info("Increment time t=$(round(solver.time, 3))")
-    show_info && info(repeat("-", 80))
+    info(repeat("-", 80))
+    info("Starting linear solver")
+    info("Increment time t=$(round(solver.time, 3))")
+    info(repeat("-", 80))
     initialize!(solver)
     assemble!(solver)
     solve!(solver)
     update!(solver)
     t1 = round(Base.time()-t0, 2)
-    show_info && info("Linear solver ready in $t1 seconds.")
+    info("Linear solver ready in $t1 seconds.")
 end
 
 """ Convenience function to call linear solver. """
@@ -769,60 +778,3 @@ function LinearSolver(name::AbstractString, problems::Problem...)
 end
 
 ### End of linear quasistatic solver
-
-### Postprocessor
-
-type Postprocessor <: AbstractSolver
-    assembly :: Assembly
-    F :: Union{Factorization, Void}
-end
-
-function Postprocessor()
-    Postprocessor(Assembly(), nothing)
-end
-
-function assemble!(solver::Solver{Postprocessor}; show_info=true)
-    show_info && info("Assembling problems ...")
-    tic()
-    nproblems = 0
-    ndofs = 0
-    assembly = solver.properties.assembly
-    empty!(assembly)
-    for problem in get_problems(solver)
-        for element in get_elements(problem)
-            postprocess!(assembly, problem, element, solver.time)
-        end
-        nproblems += 1
-        ndofs = max(ndofs, size(problem.assembly.K, 2))
-    end
-    solver.ndofs = ndofs
-    t1 = round(toq(), 2)
-    show_info && info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
-end
-
-function (solver::Solver{Postprocessor})(; show_info=true)
-    t0 = Base.time()
-    show_info && info(repeat("-", 80))
-    show_info && info("Starting postprocessor")
-    show_info && info("Increment time t=$(round(solver.time, 3))")
-    show_info && info(repeat("-", 80))
-    initialize!(solver)
-    assemble!(solver)
-    assembly = solver.properties.assembly
-    M = sparse(assembly.M)
-    f = sparse(assembly.f)
-    F = cholfact(M)
-    q = F \ f
-    t1 = round(Base.time()-t0, 2)
-    show_info && info("Postprocess of results ready in $t1 seconds.")
-    return q
-end
-
-""" Convenience function to call postprocessor. """
-function Postprocessor(problems::Problem...)
-    solver = Solver(Postprocessor, "default postprocessor")
-    if length(problems) != 0
-        push!(solver, problems...)
-    end
-    return solver
-end

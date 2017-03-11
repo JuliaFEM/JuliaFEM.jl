@@ -209,8 +209,7 @@ Parameters
 sigma
     Shift stiffness matrix by adding diagonal term, i.e. K_shifted = K + sigma*I
 """
-function (solver::Solver{Modal})(; show_info=true, debug=false,
-              bc_invertible=false, P=nothing, symmetric=true,
+function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=true,
               empty_assemblies_before_solution=true, dense=false,
               info_matrices=false, sigma=0.0)
     info(repeat("-", 80))
@@ -272,13 +271,6 @@ function (solver::Solver{Modal})(; show_info=true, debug=false,
     props = solver.properties
 
     info("Calculate $(props.nev) eigenvalues...")
-
-    if debug && length(nz) < 100
-        info("Stiffness matrix:")
-        dump(round(full(K_red)))
-        info("Mass matrix:")
-        dump(round(full(M_red)))
-    end
 
     tic()
  
@@ -358,14 +350,18 @@ function (solver::Solver{Modal})(; show_info=true, debug=false,
         end
     end
 
-    if !isnull(solver.xdmf)
-        update_xdmf!(solver)
-    end
+    update_xdmf!(solver)
+    
     return true
 
 end
 
-function update_xdmf!(solver::Solver{Modal}; show_info=true)
+function update_xdmf!(solver::Solver{Modal})
+
+    if isnull(solver.xdmf)
+        info("update_xdmf: xdmf not attached to solver, not writing file output.")
+        return
+    end
 
     if maximum(abs(imag(solver.properties.eigvals))) > 1.0e-9
         error("Writing imaginary eigenvalues for Xdmf not supported.")
