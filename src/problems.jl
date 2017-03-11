@@ -89,6 +89,7 @@ type Problem{P<:AbstractProblem}
     dofmap :: Dict{Element, Vector{Int64}} # connects element local dofs to global dofs
     assembly :: Assembly
     fields :: Dict{AbstractString, Field}
+    postprocess_fields :: Vector{String}
     properties :: P
 end
 
@@ -103,10 +104,10 @@ julia> prob2 = Problem(Elasticity, 3)
 
 """
 function Problem{P<:FieldProblem}(::Type{P}, name::AbstractString, dimension::Int64)
-    return Problem{P}(name, dimension, "none", [], Dict(), Assembly(), Dict(), P())
+    return Problem{P}(name, dimension, "none", [], Dict(), Assembly(), Dict(), Vector(), P())
 end
 function Problem{P<:FieldProblem}(::Type{P}, dimension::Int64)
-    return Problem{P}("$P problem", dimension, "none", [], Dict(), Assembly(), Dict(), P())
+    return Problem(P, "$P problem", dimension)
 end
 
 """ Construct a new boundary problem.
@@ -119,13 +120,13 @@ julia> bc1 = Problem(Dirichlet, "support", 3, "displacement")
 solver.
 """
 function Problem{P<:BoundaryProblem}(::Type{P}, name, dimension, parent_field_name)
-    return Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), Dict(), P())
+    return Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), Dict(), Vector(), P())
 end
 function Problem{P<:BoundaryProblem}(::Type{P}, main_problem::Problem)
     name = "$P problem"
     dimension = get_unknown_field_dimension(main_problem)
     parent_field_name = get_unknown_field_name(main_problem)
-    return Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), Dict(), P())
+    return Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), Dict(), Vector(), P())
 end
 
 function get_formulation_type{P<:FieldProblem}(problem::Problem{P})
@@ -139,7 +140,6 @@ end
 function get_assembly(problem)
     return problem.assembly
 end
-
 
 """ Initialize element ready for calculation. """
 function initialize!(problem::Problem, element::Element, time::Float64)

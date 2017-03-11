@@ -534,3 +534,80 @@ function assemble{El<:Elasticity3DSurfaceElements}(problem::Problem{Elasticity},
     end
     return Km, Kg, f
 end
+
+""" Return strain tensor. """
+function get_strain_tensor(problem, element, ip, time)
+    gradu = element("displacement", ip, time, Val{:Grad})
+    eps = 0.5*(gradu' + gradu)
+    return eps
+end
+
+""" Return stress tensor. """
+function get_stress_tensor(problem, element, ip, time)
+    eps = get_strain_tensor(problem, element, ip, time)
+    E = element("youngs modulus", ip, time)
+    nu = element("poissons ratio", ip, time)
+    mu = E/(2.0*(1.0+nu))
+    la = E*nu/((1.0+nu)*(1.0-2.0*nu))
+    S = la*trace(eps)*I + 2.0*mu*eps
+    return S
+end
+
+""" Return stain vector in "ABAQUS" order 11, 22, 33, 12, 23, 13. """
+function get_strain_vector(problem, element, ip, time)
+    eps = get_strain_tensor(problem, element, ip, time)
+    return [eps[1,1], eps[2,2], eps[3,3], eps[1,2], eps[2,3], eps[1,3]]
+end
+
+""" Return stress vector in "ABAQUS" order 11, 22, 33, 12, 23, 13. """
+function get_stress_vector(problem, element, ip, time)
+    S = get_stress_tensor(problem, element, ip, time)
+    return [S[1,1], S[2,2], S[3,3], S[1,2], S[2,3], S[1,3]]
+end
+
+""" Make least squares fit for some field to nodes. """
+function lsq_fit(problem, elements, field, time)
+    A = SparseMatrixCOO()
+    b = SparseMatrixCOO()
+    volume = 0.0
+    for element in elements
+        gdofs = get_connectivity(element)
+        for ip in get_integration_points(element)
+            detJ = element(ip, time, Val{:detJ})
+            w = ip.weight*detJ
+            N = element(ip, time)
+            f = field(problem, element, ip, time)
+            add!(A, gdofs, gdofs, w*kron(N', N))
+            for i=1:length(f)
+                add!(b, gdofs, w*f[i]*N, i)
+            end
+            volume += w
+        end
+    end
+    debug("Mass matrix for least-squares fit is assembled. Total volume to fit: $volume")
+    A = sparse(A)
+    b = sparse(b)
+    A = 1/2*(A + A')
+    
+    nz = get_nonzero_rows(A)
+    F = ldltfact(A[nz,nz])
+
+    x = F \ b[nz, :]
+
+    nodal_values = Dict(node_id => vec(full(x[idx,:])) for (idx, node_id) in enumerate(nz))
+    return nodal_values
+end
+
+
+""" Postprocessing, extrapolate strain to nodes using least-squares fit. """
+function postprocess!(problem::Problem{Elasticity}, time::Float64, ::Type{Val{:strain}})
+    elements = get_elements(problem)
+    strain = lsq_fit(problem, elements, get_strain_vector, time)
+    update!(elements, "strain", time => strain)
+end
+
+function postprocess!(problem::Problem{Elasticity}, time::Float64, ::Type{Val{:stress}})
+    elements = get_elements(problem)
+    stress = lsq_fit(problem, elements, get_stress_vector, time)
+    update!(elements, "stress", time => stress)
+end

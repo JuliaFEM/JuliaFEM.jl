@@ -489,7 +489,7 @@ function update!{S}(solver::Solver{S})
     info("Updating problems ...")
     t0 = Base.time()
 
-    for problem in solver.problems
+    for problem in get_problems(solver)
         assembly = get_assembly(problem)
         elements = get_elements(problem)
         # update solution, first for assembly (u,la) ...
@@ -500,6 +500,19 @@ function update!{S}(solver::Solver{S})
 
     t1 = round(Base.time()-t0, 2)
     info("Updated problems in $t1 seconds.")
+end
+
+""" Default postprocess for solver. Loop all problems and run postprocess
+functions to calculate secondary fields, i.e. contact pressure, stress,
+heat flux, reaction force etc. quantities.
+"""
+function postprocess!(solver::Solver)
+    info("Running postprocess scripts for solver...")
+    for problem in get_problems(solver)
+        for field_name in problem.postprocess_fields
+            postprocess!(problem, solver.time, Val{field_name})
+        end
+    end
 end
 
 function update_xdmf!{S}(solver::Solver{S})
