@@ -8,6 +8,8 @@ type Xdmf
     name :: String
     xml :: XMLElement
     hdf :: HDF5File
+    hdf_counter :: Int
+    format :: String
 end
 
 function Xdmf()
@@ -23,7 +25,7 @@ function xmffile(xdmf::Xdmf)
 end
 
 """ Initialize a new Xdmf object. """
-function Xdmf(name::String; overwrite=false)
+function Xdmf(name::String; version="3.0", overwrite=false)
     xdmf = new_element("Xdmf")
     h5file = "$name.h5"
     xmlfile = "$name.xmf"
@@ -47,10 +49,10 @@ function Xdmf(name::String; overwrite=false)
     end
 
     set_attribute(xdmf, "xmlns:xi", "http://www.w3.org/2001/XInclude")
-    set_attribute(xdmf, "Version", "2.1")
+    set_attribute(xdmf, "Version", version)
     flag = isfile(h5file) ? "r+" : "w"
     hdf = h5open(h5file, flag)
-    return Xdmf(name, xdmf, hdf)
+    return Xdmf(name, xdmf, hdf, 1, "HDF")
 end
 
 """ Return the basic structure of Xdmf document. Creates a new TemporalCollection if not found.
@@ -194,6 +196,13 @@ function traverse(xdmf::Xdmf, x::XMLElement, attr_name::String)
     if '/' in attr_name
         items = split(attr_name, '/')
         new_item = xdmf_filter(childs, first(items))
+        if new_item == nothing
+            info("traverse: childs:")
+            for child in childs
+                info(LightXML.name(child))
+            end
+            error("traverse: failed, items = $items, xdmf_filter not find child")
+        end
         new_path = join(items[2:end], '/')
         return traverse(xdmf, new_item, new_path)
     end
@@ -211,11 +220,14 @@ function read(xdmf::Xdmf, path::String)
     result = traverse(xdmf, xdmf.xml, path)
     if endswith(path, "DataItem")
         format = attribute(result, "Format"; required=true)
-        @assert format == "HDF"
-        h5file, path = map(String, split(content(result), ':'))
-        h5file = dirname(xdmf.name) * "/" * h5file
-        isfile(h5file) || throw("Xdmf: h5 file $h5file not found!")
-        return read(xdmf.hdf, path)
+        if format == "HDF"
+            h5file, path = map(String, split(content(result), ':'))
+            h5file = dirname(xdmf.name) * "/" * h5file
+            isfile(h5file) || throw("Xdmf: h5 file $h5file not found!")
+            return read(xdmf.hdf, path)
+        else
+            error("Read from Xdmf, reading from $format not implemented")
+        end
     else
         return result
     end
@@ -228,14 +240,14 @@ function save!(xdmf::Xdmf)
     save_file(doc, xmffile(xdmf))
 end
 
-function new_dataitem{T,N}(xdmf::Xdmf, path::String, data::Array{T,N}; format="HDF")
+function new_dataitem{T,N}(xdmf::Xdmf, path::String, data::Array{T,N})
     dataitem = new_element("DataItem")
     datatype = replace("$T", "64", "")
     dimensions = join(reverse(size(data)), " ")
     set_attribute(dataitem, "DataType", datatype)
     set_attribute(dataitem, "Dimensions", dimensions)
-    set_attribute(dataitem, "Format", format)
-    if format == "HDF"
+    set_attribute(dataitem, "Format", xdmf.format)
+    if xdmf.format == "HDF"
         hdf = basename(h5file(xdmf))
         if exists(xdmf.hdf, path)
             info("Xdmf: $path already existing in h5 file, not overwriting.")
@@ -243,9 +255,34 @@ function new_dataitem{T,N}(xdmf::Xdmf, path::String, data::Array{T,N}; format="H
             write(xdmf.hdf, path, data)
         end
         add_text(dataitem, "$hdf:$path")
-    elseif format == "XML"
-        add_text(dataitem, strip(string(data), ['[', ']']))
+    elseif xdmf.format == "XML"
+        text_data = string(data')
+        text_data = strip(text_data, ['[', ']'])
+        text_data = replace(text_data, ';', '\n')
+        text_data = "\n" * text_data * "\n"
+        add_text(dataitem, text_data)
+    else
+        error("Unsupported Xdmf big data format $(xdmf.format)")
     end
     return dataitem
 end
 
+""" Create a new DataItem element, hdf path automatically determined. """
+function new_dataitem{T,N}(xdmf::Xdmf, data::Array{T,N})
+    if xdmf.format == "XML"
+        # Path can be whatever as XML format does not store to HDF at all
+        return new_dataitem(xdmf, "/whatever", data)
+    else
+        path = "/DataItem_$(xdmf.hdf_counter)"
+        while exists(xdmf.hdf, path)
+            xdmf.hdf_counter += 1
+            path = "/DataItem_$(xdmf.hdf_counter)"
+            if xdmf.hdf_counter > 100
+                # this is just to prevent infinite while loop, increase if necessary
+                error("xdmf.hdf_counter = $(xdmf.hdf_counter), too many DataItems in hdf file")
+            end
+        end
+        info("HDF path automatically determined to be $path")
+        return new_dataitem(xdmf, path, data)
+    end
+end

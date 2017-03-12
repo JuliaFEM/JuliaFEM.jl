@@ -7,7 +7,7 @@ using LightXML
 
 @testset "create new Xdmf object" begin
     r = Xdmf()
-    expected = "<Xdmf xmlns:xi=\"http://www.w3.org/2001/XInclude\" Version=\"2.1\"/>"
+    expected = "<Xdmf xmlns:xi=\"http://www.w3.org/2001/XInclude\" Version=\"3.0\"/>"
     @test string(r.xml) == expected
 end
 
@@ -21,6 +21,14 @@ end
     set_attribute(obj, "Name", "Test Domain")
     obj2 = find_element(io.xml, "Domain")
     @test attribute(obj2, "Name") == "Test Domain"
+end
+
+@testset "write data to HDF, automatically generate path" begin
+    xdmf = Xdmf()
+    di1 = new_dataitem(xdmf, [1 2 3])
+    di2 = new_dataitem(xdmf, [4 5 6])
+    @test contains(content(di1), "DataItem_1")
+    @test contains(content(di2), "DataItem_2")
 end
 
 @testset "Xdmf filtering" begin

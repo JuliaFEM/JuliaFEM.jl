@@ -31,7 +31,7 @@ module Testing
 end
 
 include("io.jl")
-export Xdmf, h5file, xmffile, xdmf_filter, new_dataitem, get_temporal_collection
+export Xdmf, h5file, xmffile, xdmf_filter, new_dataitem, get_temporal_collection, save!
 
 include("fields.jl")
 export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment
@@ -42,7 +42,8 @@ export AbstractPoint, Point, IntegrationPoint, IP, Node
 ### ELEMENTS ###
 include("elements.jl") # common element routines
 export Node, AbstractElement, Element, update!, get_connectivity, get_basis,
-       get_dbasis, inside, get_local_coordinates
+       get_dbasis, inside, get_local_coordinates, get_element_type,
+       filter_by_element_type, get_element_id
 
 include("elements_lagrange.jl") # Continuous Galerkin (Lagrange) elements
 export get_reference_coordinates,
@@ -148,10 +149,9 @@ export calc_nodal_values!, get_nodal_vector, get_nodal_dict, copy_field!,
        calculate_second_moment_of_mass, extract
 
 include("postprocess_xdmf.jl")
-export XDMF, xdmf_new_result!, xdmf_save_field!, xdmf_save!, DataFrame
+export update_xdmf!
 
 end
-export Postprocessor
 
 module Abaqus
 include("abaqus.jl")
