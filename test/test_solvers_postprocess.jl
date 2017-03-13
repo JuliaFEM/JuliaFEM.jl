@@ -61,7 +61,8 @@ datadir = first(splitext(basename(@__FILE__)))
     interface.elements = [interface_slave_elements; interface_master_elements]
     interface.properties.dual_basis = true
     interface.properties.contact_state_in_first_iteration = :AUTO
-    
+    push!(interface.postprocess_fields, "contact pressure")
+
     solver = NonlinearSolver(upper, lower, bc_upper, bc_lower, bc_sym13, bc_sym23, interface)
 
     solver.xdmf = Xdmf("contact_two_blocks_postprocess"; overwrite=true)
