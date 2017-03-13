@@ -530,7 +530,6 @@ function update_xdmf!(solver::Solver)
     end
     xdmf = get(solver.xdmf)
     for problem in get_problems(solver)
-        is_field_problem(problem) || continue
         fields = [get_unknown_field_name(problem); problem.postprocess_fields]
         update_xdmf!(xdmf, problem, solver.time, fields)
     end
