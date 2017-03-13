@@ -63,8 +63,8 @@ end
     println(sparse(solver["symmetry 23"].assembly.C2))
     solver()
     pel = nodal_bc.elements[1]
-    la = pel("reaction force", [0.0], 0.0)
-    info("reaction force: $la")
+    la = pel("lambda", [0.0], 0.0)
+    info("lambda: $la")
     info(solver["body"].assembly.u)
     @test isapprox(pel("displacement", [], 0.0), [0.5, 0.0])
 end

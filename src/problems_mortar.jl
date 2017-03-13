@@ -52,18 +52,6 @@ function Mortar()
     return Mortar(-1, false, false, false, false, Inf, true, true, true, 0.0, 1.0e-9, default_fields)
 end
 
-function get_unknown_field_name(problem::Problem{Mortar})
-    return "reaction force"
-end
-
-function get_formulation_type(problem::Problem{Mortar})
-    if problem.properties.use_forwarddiff
-        return :forwarddiff
-    else
-        return :incremental
-    end
-end
-
 function assemble!(problem::Problem{Mortar}, time::Float64)
     if length(problem.elements) == 0
         warn("No elements defined in interface $(problem.name), this will result empty assembly!")

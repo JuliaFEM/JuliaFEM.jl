@@ -91,24 +91,25 @@ end
     @test isapprox(A[free_dofs, free_dofs] \ b[free_dofs], [2.0, 2.0])
 end
 
-function T_acc(x)
-    # accurate solution
-    a = 0.01
-    L = 0.20
-    k = 50.0
-    Tᵤ = 20.0
-    h = 10.0
-    P = 4*a
-    A = a^2
-    α = h
-    β = sqrt((h*P)/(k*A))
-    T̂ = 100.0
-    C = [1.0 1.0; (α+k*β)*exp(β*L) (α-k*β)*exp(-β*L)] \ [T̂-Tᵤ, 0.0]
-    return dot(C, [exp(β*x), exp(-β*x)]) + Tᵤ
-end
-
 #=
 @testset "test 1d heat problem" begin
+
+    function T_acc(x)
+        # accurate solution
+        a = 0.01
+        L = 0.20
+        k = 50.0
+        Tᵤ = 20.0
+        h = 10.0
+        P = 4*a
+        A = a^2
+        α = h
+        β = sqrt((h*P)/(k*A))
+        T̂ = 100.0
+        C = [1.0 1.0; (α+k*β)*exp(β*L) (α-k*β)*exp(-β*L)] \ [T̂-Tᵤ, 0.0]
+        return dot(C, [exp(β*x), exp(-β*x)]) + Tᵤ
+    end
+
     X = Dict{Int, Vector{Float64}}(
         1 => [0.0, 0.0, 0.0],
         2 => [0.1, 0.0, 0.0],
