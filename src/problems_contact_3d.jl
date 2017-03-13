@@ -670,3 +670,18 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
     problem.assembly.g = g
 
 end
+
+function postprocess!(problem::Problem{Contact}, time::Float64, ::Type{Val{Symbol("contact pressure")}})
+    n = problem("normal", time)
+    rf = problem("reaction force", time)
+    node_ids = keys(n)
+    cp = Dict(nid => dot(-n[nid], rf[nid]) for nid in node_ids)
+    # FIXME: have to define zero contact pressure & reaction force for master side
+    # elements because interface.elements = [slave_elements; master_elements]
+    for nid in keys(rf)
+        if !haskey(cp, nid)
+            cp[nid] = 0.0
+        end
+    end
+    update!(problem, "contact pressure", time => cp)
+end
