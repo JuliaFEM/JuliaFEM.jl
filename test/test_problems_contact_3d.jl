@@ -76,12 +76,18 @@ end
     solver()
     node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 0.0)
     node_ids, geometry = get_nodal_vector(interface.elements, "geometry", 0.0)
-    # node_ids, pressure = get_nodal_vector(interface.elements, "contact pressure", 0.0)
+    # test postprocess of fields
+    postprocess!(interface, 0.0, Val{Symbol("contact pressure")})
+    node_ids, contact_pressure = get_nodal_vector(interface.elements, "contact pressure", 0.0)
     u3 = [u[3] for u in displacement]
     maxabsu3 = maximum(abs(u3))
     stdabsu3 = std(abs(u3))
+    maxpres = maximum(contact_pressure)
+    stdpres = std(contact_pressure)
     info("max(abs(u3)) = $maxabsu3, std(abs(u3)) = $stdabsu3")
+    info("max(contact_pressure) = $maxpres, std(contact_pressure) = $stdpres")
     @test isapprox(stdabsu3, 0.0; atol=1.0e-12)
+    @test isapprox(maxpres, 172.8; atol=1.0e-6)
 end
 
 @testset "small sliding contact patch test, tet4 + dual basis" begin
@@ -116,7 +122,7 @@ end
 
 @testset "small sliding contact patch test, tet10 + dual basis, alpha=0.2" begin
     solver = get_model(tet10_meshfile)
-    solver.xdmf = Xdmf("contact_sl_quad_disp_results"; overwrite=true)
+    solver.xdmf = Xdmf("contact_dl_quad_disp_results"; overwrite=true)
     interface = solver["LOWER_TO_UPPER"]
     interface.properties.dual_basis = true
     interface.properties.alpha = 0.2
