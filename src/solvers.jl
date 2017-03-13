@@ -531,6 +531,9 @@ function update_xdmf!(solver::Solver)
     xdmf = get(solver.xdmf)
     for problem in get_problems(solver)
         fields = [get_unknown_field_name(problem); problem.postprocess_fields]
+        if is_boundary_problem(problem)
+            fields = [fields; get_parent_field_name(problem)]
+        end
         update_xdmf!(xdmf, problem, solver.time, fields)
     end
 end
