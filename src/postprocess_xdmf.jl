@@ -145,8 +145,6 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
         field_node_ids = sort(collect(keys(field_dict)))
         @assert node_ids == field_node_ids
         field_dim = length(field_dict[first(field_node_ids)])
-        field_type = field_dim == 1 ? "Scalar" : "Vector"
-        info("Xdmf: Saving field $field_name, type = $field_type, dimension = $field_dim, center = $field_center")
         if field_dim == 2
             info("Xdmf: Field dimension = 2, extending to 3")
             for nid in field_node_ids
@@ -154,6 +152,8 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
             end
             field_dim == 3
         end
+        field_type = Dict(1 => "Scalar", 3 => "Vector", 6 => "Tensor6")[field_dim]
+        info("Xdmf: Saving field $field_name, type = $field_type, dimension = $field_dim, center = $field_center")
 
         field_array = hcat([field_dict[nid] for nid in field_node_ids]...)
         field_dataitem = new_dataitem(xdmf, field_array)
