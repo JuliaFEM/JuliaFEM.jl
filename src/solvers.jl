@@ -468,7 +468,7 @@ function get_all_elements(solver::Solver)
     return [elements...;]
 end
 
-function (solver::Solver)(field_name::AbstractString, time::Float64)
+function (solver::Solver)(field_name::String, time::Float64)
     fields = []
     for problem in get_problems(solver)
         field = problem(field_name, time)
@@ -517,120 +517,24 @@ function postprocess!(solver::Solver)
     end
 end
 
-function update_xdmf!{S}(solver::Solver{S})
-    
+""" Default xdmf update for solver. Loop all problems and write them individually
+to Xdmf file. By default write the main unknown field (displacement, temperature,
+...) and any fields requested separately in `problem.postprocess_fields` vector
+(stress, strain, ...)
+"""
+function update_xdmf!(solver::Solver)
     if isnull(solver.xdmf)
         info("update_xdmf: xdmf not attached to solver, not writing output to file.")
+        info("turn Xdmf writing on to solver by typing: solver.xdmf = Xdmf(\"results\")")
         return
     end
-
     xdmf = get(solver.xdmf)
-    temporal_collection = get_temporal_collection(xdmf)
-
-    # 1. save geometry
-    X_ = solver("geometry", solver.time)
-    node_ids = sort(collect(keys(X_)))
-    X = hcat([X_[nid] for nid in node_ids]...)
-    ndim, nnodes = size(X)
-    geom_type = (ndim == 2 ? "XY" : "XYZ")
-    data_node_ids = new_dataitem(xdmf, "/Node IDs", node_ids)
-    data_geometry = new_dataitem(xdmf, "/Geometry", X)
-    geometry = new_element("Geometry")
-    set_attribute(geometry, "Type", geom_type)
-    add_child(geometry, data_geometry)
-
-    # 2. save topology
-    nid_mapping = Dict(j=>i for (i, j) in enumerate(node_ids))
-    all_elements = get_all_elements(solver)
-    nelements = length(all_elements)
-    debug("Saving topology: $nelements elements total.")
-    element_types = unique(map(get_element_type, all_elements))
-
-    xdmf_element_mapping = Dict(
-        "Poi1" => "Polyvertex",
-        "Seg2" => "Polyline",
-        "Tri3" => "Triangle",
-        "Quad4" => "Quadrilateral",
-        "Tet4" => "Tetrahedron",
-        "Pyramid5" => "Pyramid",
-        "Wedge6" => "Wedge",
-        "Hex8" => "Hexahedron",
-        "Seg3" => "Edge_3",
-        "Tri6" => "Tri_6",
-        "Quad8" => "Quad_8",
-        "Tet10" => "Tet_10",
-        "Pyramid13" => "Pyramid_13",
-        "Wedge15" => "Wedge_15",
-        "Hex20" => "Hex_20")
-
-    topology = []
-    for element_type in element_types
-        elements = filter_by_element_type(element_type, all_elements)
-        nelements = length(elements)
-        info("Xdmf save: $nelements elements of type $element_type")
-        sort!(elements, by=get_element_id)
-        element_ids = map(get_element_id, elements)
-        element_conn = map(element -> [nid_mapping[j]-1 for j in get_connectivity(element)], elements)
-        element_conn = hcat(element_conn...)
-        element_code = split(string(element_type), ".")[end]
-        dataitem = new_dataitem(xdmf, "/Topology/$element_code/Element IDs", element_ids)
-        dataitem = new_dataitem(xdmf, "/Topology/$element_code/Connectivity", element_conn)
-        topology_ = new_element("Topology")
-        set_attribute(topology_, "TopologyType", xdmf_element_mapping[element_code])
-        set_attribute(topology_, "NumberOfElements", length(elements))
-        add_child(topology_, dataitem)
-        push!(topology, topology_)
+    for problem in get_problems(solver)
+        is_field_problem(problem) || continue
+        fields = [get_unknown_field_name(problem); problem.postprocess_fields]
+        update_xdmf!(xdmf, problem, solver.time, fields)
     end
-
-    # 3. save solved field
-    frame = new_element("Grid")
-    time = new_child(frame, "Time")
-    set_attribute(time, "Value", solver.time)
-    add_child(frame, geometry)
-    for topo in topology
-        add_child(frame, topo)
-    end
-
-    unknown_field_name = get_unknown_field_name(solver)
-    U_ = solver(unknown_field_name, solver.time)
-    node_ids2 = sort(collect(keys(U_)))
-    @assert node_ids == node_ids2
-
-    ndim = length(U_[first(node_ids)])
-    field_type = ndim == 1 ? "Scalar" : "Vector"
-    field_center = "Node"
-    if ndim == 2
-        for nid in node_ids
-            U_[nid] = [U_[nid]; 0.0]
-        end
-        ndim = 3
-    end
-    U = zeros(X)
-    for nid in node_ids
-        loc = nid_mapping[nid]
-        U[:,loc] = U_[nid]
-    end
-    unknown_field_name = ucfirst(unknown_field_name)
-    time = solver.time
-    path = ""
-    if S == Nonlinear
-        iteration = solver.properties.iteration
-        path = "/Results/Time $time/Iteration $iteration/Nodal Fields/$unknown_field_name"
-    elseif S == Linear
-        path = "/Results/Time $time/Iteration 1/Nodal Fields/$unknown_field_name"
-    end
-    attribute = new_child(frame, "Attribute")
-    set_attribute(attribute, "Name", unknown_field_name)
-    set_attribute(attribute, "Center", field_center)
-    set_attribute(attribute, "AttributeType", field_type)
-    add_child(attribute, new_dataitem(xdmf, path, U))
-    add_child(frame, attribute)
-    if (S == Linear) || ((S == Nonlinear) && has_converged(solver))
-        add_child(temporal_collection, frame)
-    end
-    save!(xdmf)
 end
-
 
 ### Nonlinear quasistatic solver
 
@@ -696,17 +600,14 @@ function (solver::Solver{Nonlinear})()
         # 2.3 update solution back to elements
         update!(solver)
 
-        # 2.4 run any postprocessing of problems
-        postprocess!(solver)
-
-        # 2.5 update Xdmf output
-        update_xdmf!(solver)
-
-        # 2.6 check convergence
-        if has_converged(solver)
+        # 2.4 check convergence
+        if properties.iteration >= properties.min_iterations && has_converged(solver)
             info("Converged in $(properties.iteration) iterations.")
-            properties.iteration >= properties.min_iterations && return true
-            info("Convergence criteria met, but iteration < min_iterations, continuing...")
+            # 2.4.1 run any postprocessing of problems
+            postprocess!(solver)
+            # 2.4.2 update Xdmf output
+            update_xdmf!(solver)
+            return true
         end
     end
 

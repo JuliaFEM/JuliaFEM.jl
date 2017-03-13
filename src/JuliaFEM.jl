@@ -30,9 +30,6 @@ module Testing
 
 end
 
-include("io.jl")
-export Xdmf, h5file, xmffile, xdmf_filter, new_dataitem, get_temporal_collection, save!
-
 include("fields.jl")
 export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment
 
@@ -100,6 +97,8 @@ export calculate_normals, calculate_normals!, project_from_slave_to_master,
        project_from_master_to_slave, Mortar, get_slave_elements,
        get_polygon_clip
 
+include("io.jl")
+export Xdmf, h5file, xmffile, xdmf_filter, new_dataitem, update_xdmf!, save!
 
 ### ASSEMBLY + SOLVE ###
 include("assembly.jl")
@@ -142,15 +141,10 @@ export aster_create_elements, parse_aster_med_file, is_aster_mail_keyword,
 end
 
 module Postprocess
-
 include("postprocess_utils.jl")
 export calc_nodal_values!, get_nodal_vector, get_nodal_dict, copy_field!,
        calculate_area, calculate_center_of_mass,
        calculate_second_moment_of_mass, extract
-
-include("postprocess_xdmf.jl")
-export update_xdmf!
-
 end
 
 module Abaqus
