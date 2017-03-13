@@ -203,13 +203,6 @@ end
         7 => [1.74360055518019E+04, -4.73227515822118E+02, -1.75280965396335E+02],
         8 => [1.74447696000717E+04, -4.72904678032179E+02, -1.75280965396335E+02])
 
-    postprocessor = Postprocessor(p1)
-    flux = full(postprocessor())
-    fluxd = Dict{Int64, Vector{Float64}}()
-    for j=1:8
-        fluxd[j] = vec(flux[j,:])
-    end
-
     T = p1("temperature")
 
     for j in sort(collect(keys(T)))
@@ -217,23 +210,6 @@ end
         T2 = TEMP[j]
         rtol = norm(T1-T2)/max(T1,T2)*100.0
         @printf "node %i temp, JF: %e, CA: %e, rtol: %10.6f %%\n" j T1 T2 rtol
-        @test rtol < 1.0e-9
-    end
-
-    for j=1:8
-        q1 = get_integration_points(first(rod))[j]("heat flux", 0.0)
-        q2 = FLUX_ELGA[j]
-        rtol = norm(q1-q2)/max(norm(q1),norm(q2))*100.0
-        @printf "ip   %i flux, JF: (% e,% e,% e), CA: (% e,% e,% e), rtol: %10.6f %%\n" j q1... q2... rtol
-        # @test rtol < 0.05
-        # testing in integration points makes no sense because they are in different order in CA
-    end
-
-    for j in sort(collect(keys(fluxd)))
-        q1 = fluxd[j]
-        q2 = FLUX_NOEU[j]
-        rtol = norm(q1-q2)/max(norm(q1),norm(q2))*100.0
-        @printf "node %i flux, JF: (% e,% e,% e), CA: (% e,% e,% e), rtol: %10.6f %%\n" j q1... q2... rtol
         @test rtol < 1.0e-9
     end
 
