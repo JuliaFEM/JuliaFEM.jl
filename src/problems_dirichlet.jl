@@ -140,5 +140,6 @@ end
 
 function postprocess!(problem::Problem{Dirichlet}, time::Float64, ::Type{Val{Symbol("reaction force")}})
     la = problem("lambda", time)
-    update!(problem, "reaction force", time => -la)
+    rf = Dict(nid => -lai for (nid, lai) in la)
+    update!(problem, "reaction force", time => rf)
 end

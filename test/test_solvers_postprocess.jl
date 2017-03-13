@@ -54,6 +54,10 @@ datadir = first(splitext(basename(@__FILE__)))
     update!(bc_sym23, "geometry", mesh.nodes)
     update!(bc_sym23, "displacement 1", 0.0)
 
+    for bc in [bc_upper, bc_lower, bc_sym13, bc_sym23]
+        push!(bc.postprocess_fields, "reaction force")
+    end
+
     interface = Problem(Contact, "LOWER_TO_UPPER", 3, "displacement")
     interface_slave_elements = create_surface_elements(mesh, "LOWER_TO_UPPER")
     interface_master_elements = create_surface_elements(mesh, "UPPER_TO_LOWER")
