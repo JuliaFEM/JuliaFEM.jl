@@ -55,6 +55,30 @@ function Xdmf(name::String; version="3.0", overwrite=false)
     return Xdmf(name, xdmf, hdf, 1, "HDF")
 end
 
+""" Return the basic structure of Xdmf document. Creates a new TemporalCollection if not found.
+Basic structure for XML part of Xdmf file is
+<?xml version="1.0" encoding="utf-8"?>
+<Xdmf xmlns:xi="http://www.w3.org/2001/XInclude" Version="2.1">
+  <Domain>
+    <Grid CollectionType="Temporal" GridType="Collection">
+    </Grid>
+  </Domain>
+</Xdmf>
+"""
+function get_temporal_collection(xdmf::Xdmf)
+    domain = find_element(xdmf.xml, "Domain")
+    grid = nothing
+    if domain == nothing
+        debug("Xdmf: creating new temporal collection")
+        domain = new_child(xdmf.xml, "Domain")
+        grid = new_child(domain, "Grid")
+        set_attribute(grid, "CollectionType", "Temporal")
+        set_attribute(grid, "GridType", "Collection")
+    end
+    grid = find_element(domain, "Grid")
+    return grid
+end
+
 """ Returns some spesific child xml element from a array of XMLElement based on,
 "Xdmf extensions" see [1] for details.
 
