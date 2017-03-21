@@ -564,8 +564,8 @@ function process_output_request(model::Model, solver::Solver, output_request::Ab
             haskey(code_mapping, code) || continue
             field_name = code_mapping[code]
             abbr = get(abbr_mapping, code, code)
-            table = solver(DataFrame, field_name, abbr, solver.time)
-            push!(tables, table)
+            #table = solver(DataFrame, field_name, abbr, solver.time)
+            #push!(tables, table)
         end
         length(tables) != 0 || continue
         results = join(tables..., on=:NODE, kind=:outer)

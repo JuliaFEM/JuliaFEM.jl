@@ -60,9 +60,9 @@ datadir = first(splitext(basename(@__FILE__)))
     push!(solver, upper, lower, bc_fixed, bc_sym_23, load, contact)
     solver()
     slaves = get_slave_elements(contact)
-    node_ids, la = get_nodal_vector(slaves, "reaction force", 0.0)
+    node_ids, la = get_nodal_vector(slaves, "lambda", 0.0)
     node_ids, n = get_nodal_vector(slaves, "normal", 0.0)
-    pres = [dot(ni, -lai) for (ni, lai) in zip(n, la)]
+    pres = [dot(ni, lai) for (ni, lai) in zip(n, la)]
     #@test isapprox(maximum(pres), 4060.010799583303)
     # 12 % error in maximum pressure
     # integrate pressure in normal and tangential direction
@@ -75,15 +75,15 @@ datadir = first(splitext(basename(@__FILE__)))
             w = ip.weight*sel(ip, time, Val{:detJ})
             n = sel("normal", ip, time)
             t = Q'*n
-            la = sel("reaction force", ip, time)
-            Rn += w*dot(n, -la)
+            la = sel("lambda", ip, time)
+            Rn += w*dot(n, la)
             Rt += w*dot(t, la)
         end
     end
     info("2d hertz: Rn = $Rn, Rt = $Rt")
     info("2d hertz: maximum pressure pmax = ", maximum(pres))
     @test isapprox(maximum(pres), 3585.0; rtol = 0.13)
-    # under 0.15 % error in reaction force
+    # under 0.15 % error in resultant force
     @test isapprox(Rn, 35.0e3; rtol=0.020)
     @test isapprox(Rt, 0.0; atol=200.0)
 end
@@ -136,9 +136,9 @@ end
     push!(solver, upper, lower, bc_fixed, bc_sym_23, load, contact)
     solver()
     slaves = get_slave_elements(contact)
-    node_ids, la = get_nodal_vector(slaves, "reaction force", 0.0)
+    node_ids, la = get_nodal_vector(slaves, "lambda", 0.0)
     node_ids, n = get_nodal_vector(slaves, "normal", 0.0)
-    pres = [dot(ni, -lai) for (ni, lai) in zip(n, la)]
+    pres = [dot(ni, lai) for (ni, lai) in zip(n, la)]
     #@test isapprox(maximum(pres), 4060.010799583303)
     # 12 % error in maximum pressure
     # integrate pressure in normal and tangential direction
@@ -151,15 +151,15 @@ end
             w = ip.weight*sel(ip, time, Val{:detJ})
             n = sel("normal", ip, time)
             t = Q'*n
-            la = sel("reaction force", ip, time)
-            Rn += w*dot(n, -la)
+            la = sel("lambda", ip, time)
+            Rn += w*dot(n, la)
             Rt += w*dot(t, la)
         end
     end
     info("2d hertz: Rn = $Rn, Rt = $Rt")
     info("2d hertz: maximum pressure pmax = ", maximum(pres))
     @test isapprox(maximum(pres), 3585.0; rtol = 0.13)
-    # under 0.15 % error in reaction force
+    # under 0.15 % error in resultant force
     @test isapprox(Rn, 35.0e3; rtol=0.020)
     @test isapprox(Rt, 0.0; atol=200.0)
 end
@@ -219,9 +219,9 @@ end
 
     node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 0.0)
     node_ids, geometry = get_nodal_vector(interface.elements, "geometry", 0.0)
-    node_ids, reaction_force = get_nodal_vector(get_slave_elements(interface), "reaction force", 0.0)
+    node_ids, lambda = get_nodal_vector(get_slave_elements(interface), "lambda", 0.0)
     u2 = [u[2] for u in displacement]
-    f2 = [f[2] for f in reaction_force]
+    f2 = [f[2] for f in lambda]
     maxabsu2 = maximum(abs(u2))
     stdabsu2 = std(abs(u2))
     info("max(abs(u2)) = $maxabsu2, std(abs(u2)) = $stdabsu2")
@@ -242,9 +242,9 @@ end
 
     node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 0.0)
     node_ids, geometry = get_nodal_vector(interface.elements, "geometry", 0.0)
-    node_ids, reaction_force = get_nodal_vector(get_slave_elements(interface), "reaction force", 0.0)
+    node_ids, lambda = get_nodal_vector(get_slave_elements(interface), "lambda", 0.0)
     u2 = [u[2] for u in displacement]
-    f2 = [f[2] for f in reaction_force]
+    f2 = [f[2] for f in lambda]
     maxabsu2 = maximum(abs(u2))
     stdabsu2 = std(abs(u2))
     info("max(abs(u2)) = $maxabsu2, std(abs(u2)) = $stdabsu2")

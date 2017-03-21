@@ -73,8 +73,8 @@ end
     master = first(contact.elements)
     slave = last(contact.elements)
     u = master("displacement", [0.0], 0.0)
-    la = slave("reaction force", [0.0], 0.0)
+    la = slave("lambda", [0.0], 0.0)
     info("u = $u, la = $la")
     @test isapprox(u, [-0.2, -0.15])
-    @test isapprox(la, [0.0, -30.375])
+    @test isapprox(la, [0.0, 30.375])
 end

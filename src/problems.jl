@@ -89,6 +89,7 @@ type Problem{P<:AbstractProblem}
     dofmap :: Dict{Element, Vector{Int64}} # connects element local dofs to global dofs
     assembly :: Assembly
     fields :: Dict{AbstractString, Field}
+    postprocess_fields :: Vector{String}
     properties :: P
 end
 
@@ -103,10 +104,10 @@ julia> prob2 = Problem(Elasticity, 3)
 
 """
 function Problem{P<:FieldProblem}(::Type{P}, name::AbstractString, dimension::Int64)
-    return Problem{P}(name, dimension, "none", [], Dict(), Assembly(), Dict(), P())
+    return Problem{P}(name, dimension, "none", [], Dict(), Assembly(), Dict(), Vector(), P())
 end
 function Problem{P<:FieldProblem}(::Type{P}, dimension::Int64)
-    return Problem{P}("$P problem", dimension, "none", [], Dict(), Assembly(), Dict(), P())
+    return Problem(P, "$P problem", dimension)
 end
 
 """ Construct a new boundary problem.
@@ -119,27 +120,26 @@ julia> bc1 = Problem(Dirichlet, "support", 3, "displacement")
 solver.
 """
 function Problem{P<:BoundaryProblem}(::Type{P}, name, dimension, parent_field_name)
-    return Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), Dict(), P())
+    return Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), Dict(), Vector(), P())
 end
 function Problem{P<:BoundaryProblem}(::Type{P}, main_problem::Problem)
     name = "$P problem"
     dimension = get_unknown_field_dimension(main_problem)
     parent_field_name = get_unknown_field_name(main_problem)
-    return Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), Dict(), P())
+    return Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), Dict(), Vector(), P())
 end
 
-function get_formulation_type{P<:FieldProblem}(problem::Problem{P})
+function get_formulation_type(problem::Problem)
     return :incremental
 end
 
-function get_formulation_type{P<:BoundaryProblem}(problem::Problem{P})
-    return :incremental
+function get_unknown_field_name{P<:BoundaryProblem}(::Type{P})
+    return "lambda"
 end
 
 function get_assembly(problem)
     return problem.assembly
 end
-
 
 """ Initialize element ready for calculation. """
 function initialize!(problem::Problem, element::Element, time::Float64)
@@ -175,7 +175,7 @@ function initialize!(problem::Problem, time::Float64=0.0)
 end
 
 """ Update problem solution vector for assembly. """
-function update!(problem::Problem, assembly::Assembly, u::Vector, la::Vector; verbose=false)
+function update!(problem::Problem, assembly::Assembly, u::Vector, la::Vector)
 
     # resize & fill with zeros vectors if length mismatch with current solution
 
@@ -186,7 +186,7 @@ function update!(problem::Problem, assembly::Assembly, u::Vector, la::Vector; ve
     end
 
     if length(la) != length(assembly.la)
-        info("resizing lagrange multipliers vector u")
+        info("resizing lagrange multiplier vector la")
         resize!(assembly.la, length(la))
         fill!(assembly.la, 0.0)
     end
@@ -199,15 +199,12 @@ function update!(problem::Problem, assembly::Assembly, u::Vector, la::Vector; ve
     assembly.la_prev = copy(assembly.la)
 
     if get_formulation_type(problem) == :total
-        verbose && info("$(problem.name): total formulation, replacing solution vector with new values")
         assembly.u = u
         assembly.la = la
     elseif get_formulation_type(problem) == :incremental
-        verbose && info("$(problem.name): incremental formulation, adding increment to solution vector")
         assembly.u += u
         assembly.la = la
     elseif get_formulation_type(problem) == :forwarddiff
-        verbose && info("$(problem.name): forwarddiff formulation, adding increment to solution vector and reaction force vector")
         assembly.u += u
         assembly.la += la
     else
@@ -259,13 +256,12 @@ end
 function update!{P<:BoundaryProblem}(problem::Problem{P}, assembly::Assembly, elements::Vector{Element}, time::Float64)
     u, la = get_global_solution(problem, assembly)
     parent_field_name = get_parent_field_name(problem) # displacement
-    field_name = get_unknown_field_name(problem) # reaction force
-    # update solution u and reaction force λ for boundary elements
+    field_name = get_unknown_field_name(problem) # lambda
+    # update solution and lagrange multipliers for boundary elements
     for element in elements
         connectivity = get_connectivity(element)
         update!(element, parent_field_name, time => u[connectivity])
-        # FIXME
-        update!(element, field_name, time => -la[connectivity])
+        update!(element, field_name, time => la[connectivity])
     end
 end
 
