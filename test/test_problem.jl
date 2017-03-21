@@ -34,7 +34,7 @@ end
     pr = Problem(Dirichlet, "bc", 1, "temperature")
     push!(pr, el)
     initialize!(pr)
-    @test haskey(el, "reaction force")
+    @test haskey(el, "lambda")
     @test haskey(el, "temperature")
 end
 

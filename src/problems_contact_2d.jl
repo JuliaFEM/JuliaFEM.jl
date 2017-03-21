@@ -77,7 +77,7 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{1}}, ::T
         nsl = length(slave_element)
         X1 = slave_element("geometry", time)
         u1 = slave_element("displacement", time)
-        la1 = slave_element("reaction force", time)
+        la1 = slave_element("lambda", time)
         n1 = slave_element("normal", time)
         t1 = slave_element("tangent", time)
         x1 = X1 + u1
@@ -160,8 +160,8 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{1}}, ::T
                 Te += w*reshape(kron(N2, n_s, Phi), 2, 4)
                 He += w*reshape(kron(N1, t_s, Phi), 2, 4)
                 ge += w*Phi*dot(n_s, x_m-x_s)
-                ce += w*N1*dot(n_s, -la_s)
-                Rn += w*dot(n_s, -la_s)
+                ce += w*N1*dot(n_s, la_s)
+                Rn += w*dot(n_s, la_s)
 
                 contact_area += w
                 contact_error += 1/2*w*dot(n_s, x_s-x_m)^2

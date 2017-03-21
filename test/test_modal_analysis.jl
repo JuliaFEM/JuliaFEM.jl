@@ -39,7 +39,7 @@ end
 
 @testset "test eigenvalues for single tet4 element" begin
     solver = get_model()
-    solver(; debug=true)
+    solver()
     @test isapprox(solver.properties.eigvals, [4/3, 1/3])
 end
 
@@ -49,7 +49,7 @@ end
 #   problem.properties.finite_strain = true
     problem.properties.geometric_stiffness = true
     solver.properties.geometric_stiffness = true
-    solver(; debug=true)
+    solver()
     @test isapprox(solver.properties.eigvals, [5/3, 2/3])
 end
 
@@ -119,4 +119,3 @@ end
     solver()
     @test isapprox(solver.properties.eigvals[1], 1.0)
 end
-

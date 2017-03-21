@@ -77,7 +77,7 @@ If several field problems exists, they are simply summed together, so
 problems must have unique node ids.
 
 """
-function get_field_assembly(solver::Solver; show_info=true)
+function get_field_assembly(solver::Solver)
     problems = get_field_problems(solver)
 
     M = SparseMatrixCOO()
@@ -96,7 +96,7 @@ function get_field_assembly(solver::Solver; show_info=true)
 
     if solver.ndofs == 0
         solver.ndofs = size(K, 1)
-        show_info && info("automatically determined problem dimension, ndofs = $(solver.ndofs)")
+        info("automatically determined problem dimension, ndofs = $(solver.ndofs)")
     end
 
     M = sparse(M, solver.ndofs, solver.ndofs)
@@ -364,8 +364,8 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
 end
 
 """ Default assembler for solver. """
-function assemble!(solver::Solver; show_info=true, timing=true, with_mass_matrix=false)
-    show_info && info("Assembling problems ...")
+function assemble!(solver::Solver; timing=true, with_mass_matrix=false)
+    info("Assembling problems ...")
 
     function do_assemble(problem)
         t00 = Base.time()
@@ -391,7 +391,7 @@ function assemble!(solver::Solver; show_info=true, timing=true, with_mass_matrix
 
     solver.ndofs = ndofs
     t1 = round(Base.time()-t0, 2)
-    show_info && info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
+    info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
     if timing
         info("Assembly times:")
         for (i, problem) in enumerate(solver.problems)
@@ -423,12 +423,12 @@ function get_unknown_field_dimension(solver::Solver)
 end
 
 """ Default initializer for solver. """
-function initialize!(solver::Solver; show_info=true)
+function initialize!(solver::Solver)
     if solver.initialized
-        show_info && info("initialize!(): solver already initialized")
+        warn("initialize!(): solver already initialized")
         return
     end
-    show_info && info("Initializing solver ...")
+    info("Initializing solver ...")
     problems = get_problems(solver)
     length(problems) != 0 || error("Empty solver, add problems to solver using push!")
     t0 = Base.time()
@@ -459,7 +459,7 @@ function initialize!(solver::Solver; show_info=true)
         # initialize(problem, ....)
     end
     t1 = round(Base.time()-t0, 2)
-    show_info && info("Initialized solver in $t1 seconds.")
+    info("Initialized solver in $t1 seconds.")
     solver.initialized = true
 end
 
@@ -468,7 +468,7 @@ function get_all_elements(solver::Solver)
     return [elements...;]
 end
 
-function (solver::Solver)(field_name::AbstractString, time::Float64)
+function (solver::Solver)(field_name::String, time::Float64)
     fields = []
     for problem in get_problems(solver)
         field = problem(field_name, time)
@@ -482,14 +482,14 @@ function (solver::Solver)(field_name::AbstractString, time::Float64)
 end
 
 """ Default update for solver. """
-function update!{S}(solver::Solver{S}; show_info=true)
+function update!{S}(solver::Solver{S})
     u = solver.u
     la = solver.la
 
-    show_info && info("Updating problems ...")
+    info("Updating problems ...")
     t0 = Base.time()
 
-    for problem in solver.problems
+    for problem in get_problems(solver)
         assembly = get_assembly(problem)
         elements = get_elements(problem)
         # update solution, first for assembly (u,la) ...
@@ -498,123 +498,45 @@ function update!{S}(solver::Solver{S}; show_info=true)
         update!(problem, assembly, elements, solver.time)
     end
 
-    # if io is attached to solver, update hdf / xml also
-    if !isnull(solver.xdmf)
-        update_xdmf!(solver)
-    end
-
     t1 = round(Base.time()-t0, 2)
-    show_info && info("Updated problems in $t1 seconds.")
+    info("Updated problems in $t1 seconds.")
 end
 
-function update_xdmf!{S}(solver::Solver{S}; show_info=true)
-    xdmf = get(solver.xdmf)
-    temporal_collection = get_temporal_collection(xdmf)
-
-    # 1. save geometry
-    X_ = solver("geometry", solver.time)
-    node_ids = sort(collect(keys(X_)))
-    X = hcat([X_[nid] for nid in node_ids]...)
-    ndim, nnodes = size(X)
-    geom_type = (ndim == 2 ? "XY" : "XYZ")
-    data_node_ids = new_dataitem(xdmf, "/Node IDs", node_ids)
-    data_geometry = new_dataitem(xdmf, "/Geometry", X)
-    geometry = new_element("Geometry")
-    set_attribute(geometry, "Type", geom_type)
-    add_child(geometry, data_geometry)
-
-    # 2. save topology
-    nid_mapping = Dict(j=>i for (i, j) in enumerate(node_ids))
-    all_elements = get_all_elements(solver)
-    nelements = length(all_elements)
-    debug("Saving topology: $nelements elements total.")
-    element_types = unique(map(get_element_type, all_elements))
-
-    xdmf_element_mapping = Dict(
-        "Poi1" => "Polyvertex",
-        "Seg2" => "Polyline",
-        "Tri3" => "Triangle",
-        "Quad4" => "Quadrilateral",
-        "Tet4" => "Tetrahedron",
-        "Pyramid5" => "Pyramid",
-        "Wedge6" => "Wedge",
-        "Hex8" => "Hexahedron",
-        "Seg3" => "Edge_3",
-        "Tri6" => "Tri_6",
-        "Quad8" => "Quad_8",
-        "Tet10" => "Tet_10",
-        "Pyramid13" => "Pyramid_13",
-        "Wedge15" => "Wedge_15",
-        "Hex20" => "Hex_20")
-
-    topology = []
-    for element_type in element_types
-        elements = filter_by_element_type(element_type, all_elements)
-        nelements = length(elements)
-        info("Xdmf save: $nelements elements of type $element_type")
-        sort!(elements, by=get_element_id)
-        element_ids = map(get_element_id, elements)
-        element_conn = map(element -> [nid_mapping[j]-1 for j in get_connectivity(element)], elements)
-        element_conn = hcat(element_conn...)
-        element_code = split(string(element_type), ".")[end]
-        dataitem = new_dataitem(xdmf, "/Topology/$element_code/Element IDs", element_ids)
-        dataitem = new_dataitem(xdmf, "/Topology/$element_code/Connectivity", element_conn)
-        topology_ = new_element("Topology")
-        set_attribute(topology_, "TopologyType", xdmf_element_mapping[element_code])
-        set_attribute(topology_, "NumberOfElements", length(elements))
-        add_child(topology_, dataitem)
-        push!(topology, topology_)
-    end
-
-    # 3. save solved field
-    frame = new_element("Grid")
-    time = new_child(frame, "Time")
-    set_attribute(time, "Value", solver.time)
-    add_child(frame, geometry)
-    for topo in topology
-        add_child(frame, topo)
-    end
-
-    unknown_field_name = get_unknown_field_name(solver)
-    U_ = solver(unknown_field_name, solver.time)
-    node_ids2 = sort(collect(keys(U_)))
-    @assert node_ids == node_ids2
-
-    ndim = length(U_[first(node_ids)])
-    field_type = ndim == 1 ? "Scalar" : "Vector"
-    field_center = "Node"
-    if ndim == 2
-        for nid in node_ids
-            U_[nid] = [U_[nid]; 0.0]
+""" Default postprocess for solver. Loop all problems and run postprocess
+functions to calculate secondary fields, i.e. contact pressure, stress,
+heat flux, reaction force etc. quantities.
+"""
+function postprocess!(solver::Solver)
+    info("Running postprocess scripts for solver...")
+    for problem in get_problems(solver)
+        for field_name in problem.postprocess_fields
+            field = Val{Symbol(field_name)}
+            info("Running postprocess for problem $(problem.name), field $field_name")
+            postprocess!(problem, solver.time, field)
         end
-        ndim = 3
     end
-    U = zeros(X)
-    for nid in node_ids
-        loc = nid_mapping[nid]
-        U[:,loc] = U_[nid]
-    end
-    unknown_field_name = ucfirst(unknown_field_name)
-    time = solver.time
-    path = ""
-    if S == Nonlinear
-        iteration = solver.properties.iteration
-        path = "/Results/Time $time/Iteration $iteration/Nodal Fields/$unknown_field_name"
-    elseif S == Linear
-        path = "/Results/Time $time/Nodal Fields/$unknown_field_name"
-    end
-    attribute = new_child(frame, "Attribute")
-    set_attribute(attribute, "Name", unknown_field_name)
-    set_attribute(attribute, "Center", field_center)
-    set_attribute(attribute, "AttributeType", field_type)
-    add_child(attribute, new_dataitem(xdmf, path, U))
-    add_child(frame, attribute)
-    if (S == Linear) || ((S == Nonlinear) && has_converged(solver))
-        add_child(temporal_collection, frame)
-    end
-    save!(xdmf)
 end
 
+""" Default xdmf update for solver. Loop all problems and write them individually
+to Xdmf file. By default write the main unknown field (displacement, temperature,
+...) and any fields requested separately in `problem.postprocess_fields` vector
+(stress, strain, ...)
+"""
+function update_xdmf!(solver::Solver)
+    if isnull(solver.xdmf)
+        info("update_xdmf: xdmf not attached to solver, not writing output to file.")
+        info("turn Xdmf writing on to solver by typing: solver.xdmf = Xdmf(\"results\")")
+        return
+    end
+    xdmf = get(solver.xdmf)
+    for problem in get_problems(solver)
+        fields = [get_unknown_field_name(problem); problem.postprocess_fields]
+        if is_boundary_problem(problem)
+            fields = [fields; get_parent_field_name(problem)]
+        end
+        update_xdmf!(xdmf, problem, solver.time, fields)
+    end
+end
 
 ### Nonlinear quasistatic solver
 
@@ -671,18 +593,23 @@ function (solver::Solver{Nonlinear})()
         info("Increment time t=$(round(solver.time, 3))")
         info(repeat("-", 80))
 
-        # 2.1 update linearized assemblies
+        # 2.1 update assemblies
         assemble!(solver)
+
         # 2.2 call solver for linearized system
         solve!(solver)
+
         # 2.3 update solution back to elements
         update!(solver)
 
         # 2.4 check convergence
-        if has_converged(solver)
+        if properties.iteration >= properties.min_iterations && has_converged(solver)
             info("Converged in $(properties.iteration) iterations.")
-            properties.iteration >= properties.min_iterations && return true
-            info("Convergence criteria met, but iteration < min_iterations, continuing...")
+            # 2.4.1 run any postprocessing of problems
+            postprocess!(solver)
+            # 2.4.2 update Xdmf output
+            update_xdmf!(solver)
+            return true
         end
     end
 
@@ -721,8 +648,8 @@ Main differences in this solver, compared to nonlinear solver are:
 type Linear <: AbstractSolver
 end
 
-function assemble!(solver::Solver{Linear}; show_info=true)
-    show_info && info("Assembling problems ...")
+function assemble!(solver::Solver{Linear})
+    info("Assembling problems ...")
     tic()
     nproblems = 0
     ndofs = 0
@@ -731,27 +658,27 @@ function assemble!(solver::Solver{Linear}; show_info=true)
             assemble!(problem, solver.time)
             nproblems += 1
         else
-            show_info && info("$(problem.name) already assembled, skipping.")
+            info("$(problem.name) already assembled, skipping.")
         end
         ndofs = max(ndofs, size(problem.assembly.K, 2))
     end
     solver.ndofs = ndofs
     t1 = round(toq(), 2)
-    show_info && info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
+    info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
 end
 
-function (solver::Solver{Linear})(; show_info=true)
+function (solver::Solver{Linear})()
     t0 = Base.time()
-    show_info && info(repeat("-", 80))
-    show_info && info("Starting linear solver")
-    show_info && info("Increment time t=$(round(solver.time, 3))")
-    show_info && info(repeat("-", 80))
+    info(repeat("-", 80))
+    info("Starting linear solver")
+    info("Increment time t=$(round(solver.time, 3))")
+    info(repeat("-", 80))
     initialize!(solver)
     assemble!(solver)
     solve!(solver)
     update!(solver)
     t1 = round(Base.time()-t0, 2)
-    show_info && info("Linear solver ready in $t1 seconds.")
+    info("Linear solver ready in $t1 seconds.")
 end
 
 """ Convenience function to call linear solver. """
@@ -769,60 +696,3 @@ function LinearSolver(name::AbstractString, problems::Problem...)
 end
 
 ### End of linear quasistatic solver
-
-### Postprocessor
-
-type Postprocessor <: AbstractSolver
-    assembly :: Assembly
-    F :: Union{Factorization, Void}
-end
-
-function Postprocessor()
-    Postprocessor(Assembly(), nothing)
-end
-
-function assemble!(solver::Solver{Postprocessor}; show_info=true)
-    show_info && info("Assembling problems ...")
-    tic()
-    nproblems = 0
-    ndofs = 0
-    assembly = solver.properties.assembly
-    empty!(assembly)
-    for problem in get_problems(solver)
-        for element in get_elements(problem)
-            postprocess!(assembly, problem, element, solver.time)
-        end
-        nproblems += 1
-        ndofs = max(ndofs, size(problem.assembly.K, 2))
-    end
-    solver.ndofs = ndofs
-    t1 = round(toq(), 2)
-    show_info && info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
-end
-
-function (solver::Solver{Postprocessor})(; show_info=true)
-    t0 = Base.time()
-    show_info && info(repeat("-", 80))
-    show_info && info("Starting postprocessor")
-    show_info && info("Increment time t=$(round(solver.time, 3))")
-    show_info && info(repeat("-", 80))
-    initialize!(solver)
-    assemble!(solver)
-    assembly = solver.properties.assembly
-    M = sparse(assembly.M)
-    f = sparse(assembly.f)
-    F = cholfact(M)
-    q = F \ f
-    t1 = round(Base.time()-t0, 2)
-    show_info && info("Postprocess of results ready in $t1 seconds.")
-    return q
-end
-
-""" Convenience function to call postprocessor. """
-function Postprocessor(problems::Problem...)
-    solver = Solver(Postprocessor, "default postprocessor")
-    if length(problems) != 0
-        push!(solver, problems...)
-    end
-    return solver
-end

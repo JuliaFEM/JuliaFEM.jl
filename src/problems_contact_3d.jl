@@ -117,7 +117,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
     u1 = slave_element("displacement", time)
     x1 = X1 + u1
     n1 = slave_element("normal", time)
-    la = slave_element("reaction force", time)
+    la = slave_element("lambda", time)
 
     Q3 = create_rotation_matrix(slave_element, time)
 
@@ -277,7 +277,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
             #u1 = sub_slave_element("displacement", time)
             #x1 = X1 + u1
             n1 = sub_slave_element("normal", time)
-            #la = sub_slave_element("reaction force", time)
+            #la = sub_slave_element("lambda", time)
 
             # create auxiliary plane
             xi = mean(get_reference_coordinates(sub_slave_element))
@@ -599,15 +599,15 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
         end
         complementarity_condition[j] = contact_pressure[j] - weighted_gap[j]
         
-        if complementarity_condition[j][1] < 0.0
-            is_inactive[j] = 1
-            is_active[j] = 0
-            is_slip[j] = 0
-            is_stick[j] = 0
-        else
+        if complementarity_condition[j][1] > 0.0
             is_inactive[j] = 0
             is_active[j] = 1
             is_slip[j] = 1
+            is_stick[j] = 0
+        else
+            is_inactive[j] = 1
+            is_active[j] = 0
+            is_slip[j] = 0
             is_stick[j] = 0
         end
     end
@@ -669,4 +669,19 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
     problem.assembly.D = D
     problem.assembly.g = g
 
+end
+
+function postprocess!(problem::Problem{Contact}, time::Float64, ::Type{Val{Symbol("contact pressure")}})
+    n = problem("normal", time)
+    la = problem("lambda", time)
+    node_ids = keys(n)
+    cp = Dict(nid => dot(n[nid], la[nid]) for nid in node_ids)
+    # FIXME: have to define zero contact pressure & lambda to master elements
+    # elements because interface.elements = [slave_elements; master_elements]
+    for nid in keys(la)
+        if !haskey(cp, nid)
+            cp[nid] = 0.0
+        end
+    end
+    update!(problem, "contact pressure", time => cp)
 end

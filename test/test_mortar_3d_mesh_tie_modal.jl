@@ -151,25 +151,10 @@ FIN()
     freqs_jf = sqrt(solver.properties.eigvals)/(2*pi)
 
     freqs_ca = [1.12946E+00, 1.13141E+00, 2.93779E+00, 2.94143E+00, 4.51684E+00]
-    freq_jf = freqs_jf[1]
-    freq_ca = freqs_ca[1]
-    rtol = norm(freq_jf - freq_ca)/max(freq_jf, freq_ca)
-    info("rtol = $rtol")
     for (i, freq) in enumerate(freqs_jf)
         @printf "mode %i | freq JuliaFEM %8.3f | freq Code Aster %8.3f\n" i freqs_jf[i] freqs_ca[i]
     end
-    if rtol > 1.0e-3
-        outfile = tempname() * ".xmf"
-        info("Something went wrong, results are saved to $outfile")
-        result = XDMF()
-        elems = [body1.elements; body2.elements]
-        for (i, freq) in enumerate(freqs_jf)
-            xdmf_new_result!(result, elems, freq)
-            xdmf_save_field!(result, elems, freq, "displacement"; field_type="Vector")
-        end
-        xdmf_save!(result, outfile)
-    end
-    @test rtol < 0.05
+    @test isapprox(freqs_ca, freqs_jf; rtol=0.04)
 
 end
 

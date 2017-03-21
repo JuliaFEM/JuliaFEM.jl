@@ -76,9 +76,9 @@ end
 
     node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 1.0)
     node_ids, geometry = get_nodal_vector(interface.elements, "geometry", 1.0)
-    node_ids, reaction_force = get_nodal_vector(get_slave_elements(interface), "reaction force", 1.0)
+    node_ids, la = get_nodal_vector(get_slave_elements(interface), "lambda", 1.0)
     u2 = [u[2] for u in displacement]
-    f2 = [f[2] for f in reaction_force]
+    f2 = [f[2] for f in la]
     maxabsu2 = maximum(abs(u2))
     stdabsu2 = std(abs(u2))
     info("max(abs(u2)) = $maxabsu2, std(abs(u2)) = $stdabsu2")
