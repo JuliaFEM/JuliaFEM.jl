@@ -4,7 +4,7 @@
 abstract AbstractSolver
 
 type Solver{S<:AbstractSolver}
-    name :: AbstractString       # some descriptive name for problem
+    name :: String       # some descriptive name for problem
     time :: Float64              # current time
     problems :: Vector{Problem}
     norms :: Vector{Tuple}       # solution norms for convergence studies
@@ -14,7 +14,7 @@ type Solver{S<:AbstractSolver}
     u :: Vector{Float64}
     la :: Vector{Float64}
     alpha :: Float64             # generalized alpha time integration coefficient
-    fields :: Dict{AbstractString, Field}
+    fields :: Dict{String, Field}
     properties :: S
 end
 
