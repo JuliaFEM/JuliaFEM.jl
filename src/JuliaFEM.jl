@@ -30,6 +30,9 @@ module Testing
 
 end
 
+include("FEMSparse/src/FEMSparse.jl")
+using FEMSparse
+
 include("fields.jl")
 export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment
 
@@ -62,8 +65,8 @@ export NSeg, NSurf, NSolid, is_nurbs
 include("integrate.jl")  # default integration points for elements
 export get_integration_points
 
-include("sparse.jl")
-export add!, SparseMatrixCOO, SparseVectorCOO, get_nonzero_rows, get_nonzero_columns, optimize!, resize_sparse, resize_sparsevec
+# include("sparse.jl")
+# export add!, SparseMatrixCOO, SparseVectorCOO, get_nonzero_rows, get_nonzero_columns, optimize!, resize_sparse, resize_sparsevec
 
 include("problems.jl") # common problem routines
 export Problem, AbstractProblem, FieldProblem, BoundaryProblem,
