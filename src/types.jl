@@ -68,47 +68,54 @@ General linearized problem to solve
 """
 type Assembly
 
-    M :: SparseMatrixCOO  # mass matrix
+    M :: SparseMatrixFEM{Float64, Int64} 
+    K :: SparseMatrixFEM{Float64, Int64}
+    Kg :: SparseMatrixFEM{Float64, Int64}
+    f :: SparseVectorFEM{Float64, Int64}
+    fg :: SparseVectorFEM{Float64, Int64}
 
-    # for field assembly
-    K :: SparseMatrixCOO   # stiffness matrix
-    Kg :: SparseMatrixCOO  # geometric stiffness matrix
-    f :: SparseMatrixCOO   # force vector
-    fg :: SparseMatrixCOO  #
+    C1 :: SparseMatrixFEM{Float64, Int64}
+    C2 :: SparseMatrixFEM{Float64, Int64}
+    D :: SparseMatrixFEM{Float64, Int64}
+    g :: SparseVectorFEM{Float64, Int64}
+    c :: SparseVectorFEM{Float64, Int64}
 
-    # for boundary assembly
-    C1 :: SparseMatrixCOO
-    C2 :: SparseMatrixCOO
-    D :: SparseMatrixCOO
-    g :: SparseMatrixCOO
-    c :: SparseMatrixCOO
+    # to be removed later
 
     u :: Vector{Float64}  # solution vector u
     u_prev :: Vector{Float64}  # previous solution vector u
-    u_norm_change :: Real  # change of norm in u
+    u_norm_change :: Float64  # change of norm in u
 
     la :: Vector{Float64}  # solution vector la
     la_prev :: Vector{Float64}  # previous solution vector u
-    la_norm_change :: Real # change of norm in la
+    la_norm_change :: Float64 # change of norm in la
 
     removed_dofs :: Vector{Int64} # manually remove dofs from assembly
 end
 
 function Assembly()
-    return Assembly(
-        SparseMatrixCOO(),
-        SparseMatrixCOO(),
-        SparseMatrixCOO(),
-        SparseMatrixCOO(),
-        SparseMatrixCOO(),
-        SparseMatrixCOO(),
-        SparseMatrixCOO(),
-        SparseMatrixCOO(),
-        SparseMatrixCOO(),
-        SparseMatrixCOO(),
-        [], [], Inf,
-        [], [], Inf,
-        [])
+    M = SparseMatrixFEM()
+    K = SparseMatrixFEM()
+    Kg = SparseMatrixFEM()
+    f = SparseVectorFEM()
+    fg = SparseVectorFEM()
+    C1 = SparseMatrixFEM()
+    C2 = SparseMatrixFEM()
+    D = SparseMatrixFEM()
+    g = SparseVectorFEM()
+    c = SparseVectorFEM()
+    u = Float64[]
+    u_prev = Float64[]
+    u_norm_change = Inf
+    la = Float64[]
+    la_prev = Float64[]
+    la_norm_change = Inf
+    removed_dofs = Int64[]
+    assembly = Assembly(M, K, Kg, f, fg, C1, C2, D, g, c,
+                        u, u_prev, u_norm_change,
+                        la, la_prev, la_norm_change,
+                        removed_dofs)
+    return assembly
 end
 
 function empty!(assembly::Assembly)
