@@ -8,6 +8,13 @@ This is JuliaFEM -- Finite Element Package
 """
 module JuliaFEM
 
+using TimerOutputs
+const to = TimerOutput()
+function print_statistics()
+    println(to)
+end
+export print_statistics
+
 import Base: getindex, setindex!, convert, length, size, isapprox, similar,
              start, first, next, done, last, endof, vec, ==, +, -, *, /, haskey, copy,
              push!, isempty, empty!, append!, sparse, full, read
