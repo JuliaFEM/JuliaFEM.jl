@@ -59,7 +59,7 @@ function IP(id, weight, coords)
 end
 
 typealias SparseMatrixFEM{Tv,Ti<:Integer} SparseMatrixCOO{Tv,Ti}
-typealias SparseVectorFEM{Tv,Ti<:Integer} SparseVector{Tv,Ti}
+typealias SparseVectorFEM{Tv,Ti<:Integer} SparseVectorCOO{Tv,Ti}
 
 """
 General linearized problem to solve
@@ -94,16 +94,16 @@ type Assembly
 end
 
 function Assembly()
-    M = SparseMatrixFEM()
-    K = SparseMatrixFEM()
-    Kg = SparseMatrixFEM()
-    f = SparseVectorFEM()
-    fg = SparseVectorFEM()
-    C1 = SparseMatrixFEM()
-    C2 = SparseMatrixFEM()
-    D = SparseMatrixFEM()
-    g = SparseVectorFEM()
-    c = SparseVectorFEM()
+    M = SparseMatrixFEM(Matrix{Float64}())
+    K = SparseMatrixFEM(Matrix{Float64}())
+    Kg = SparseMatrixFEM(Matrix{Float64}())
+    f = SparseVectorFEM(Vector{Float64}())
+    fg = SparseVectorFEM(Vector{Float64}())
+    C1 = SparseMatrixFEM(Matrix{Float64}())
+    C2 = SparseMatrixFEM(Matrix{Float64}())
+    D = SparseMatrixFEM(Matrix{Float64}())
+    g = SparseVectorFEM(Vector{Float64}())
+    c = SparseVectorFEM(Vector{Float64}())
     u = Float64[]
     u_prev = Float64[]
     u_norm_change = Inf

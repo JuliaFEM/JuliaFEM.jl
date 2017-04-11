@@ -61,73 +61,88 @@ is_boundary_problem{P<:BoundaryProblem}(problem::Problem{P}) = true
 get_field_problems(solver::Solver) = filter(is_field_problem, get_problems(solver))
 get_boundary_problems(solver::Solver) = filter(is_boundary_problem, get_problems(solver))
 
-"""Return one combined field assembly for a set of field problems.
-
-Parameters
-----------
-solver :: Solver
-
-Returns
--------
-M, K, Kg, f, fg :: SparseMatrixCSC
-
-Notes
------
-If several field problems exists, they are simply summed together, so
-problems must have unique node ids.
-
-"""
+"""Return one combined field assembly for a set of field problems. """
 function get_field_assembly(solver::Solver)
+
     problems = get_field_problems(solver)
 
-    M = SparseMatrixCOO()
-    K = SparseMatrixCOO()
-    Kg = SparseMatrixCOO()
-    f = SparseMatrixCOO()
-    fg = SparseMatrixCOO()
+    M = SparseMatrixFEM()
+    K = SparseMatrixFEM()
+    Kg = SparseMatrixFEM()
+    f = SparseVectorFEM()
+    fg = SparseVectorFEM()
+    C1 = SparseMatrixFEM()
+    C2 = SparseMatrixFEM()
+    D = SparseMatrixFEM()
+    g = SparseVectorFEM()
 
     for problem in problems
-        append!(M, problem.assembly.M)
-        append!(K, problem.assembly.K)
-        append!(Kg, problem.assembly.Kg)
-        append!(f, problem.assembly.f)
-        append!(fg, problem.assembly.fg)
+        add!(M, problem.assembly.M)
+        add!(K, problem.assembly.K)
+        add!(Kg, problem.assembly.Kg)
+        add!(f, problem.assembly.f)
+        add!(fg, problem.assembly.fg)
+        add!(C1, problem.assembly.C1)
+        add!(C2, problem.assembly.C2)
+        add!(D, problem.assembly.D)
+        add!(g, problem.assembly.g)
     end
 
-    if solver.ndofs == 0
-        solver.ndofs = size(K, 1)
-        info("automatically determined problem dimension, ndofs = $(solver.ndofs)")
+    if length(K) == 0
+        warn("get_field_assembly(): stiffness matrix seems to be empty.")
+        warn("get_field_assembly(): check that elements are pushed to problem and formulation is correct.")
     end
 
-    M = sparse(M, solver.ndofs, solver.ndofs)
-    K = sparse(K, solver.ndofs, solver.ndofs)
-    if nnz(K) == 0
-        warn("Field assembly seems to be empty. Check that elements are pushed to problem and formulation is correct.")
-    end
-    Kg = sparse(Kg, solver.ndofs, solver.ndofs)
-    f = sparse(f, solver.ndofs, 1)
-    fg = sparse(fg, solver.ndofs, 1)
-
-    return M, K, Kg, f, fg
+    return M, K, Kg, f, fg, C1, C2, D, g
 end
 
-""" Loop through boundary assemblies and check for possible overconstrain situations. """
-function check_for_overconstrained_dofs(solver::Solver)
-    overdetermined = false
-    constrained_dofs = Set{Int}()
-    all_overconstrained_dofs = Set{Int}()
-    boundary_problems = get_boundary_problems(solver)
-    for problem in boundary_problems
-        new_constraints = Set(problem.assembly.C2.I)
-        new_constraints = setdiff(new_constraints, problem.assembly.removed_dofs)
-        overconstrained_dofs = intersect(constrained_dofs, new_constraints)
-        all_overconstrained_dofs = union(all_overconstrained_dofs, overconstrained_dofs)
+""" Return one combined boundary assembly for a set of boundary problems. """
+function get_boundary_assembly(solver::Solver)
+
+    problems = get_boundary_problems(solver)
+
+    M = SparseMatrixFEM()
+    K = SparseMatrixFEM()
+    Kg = SparseMatrixFEM()
+    f = SparseVectorFEM()
+    fg = SparseVectorFEM()
+    C1 = SparseMatrixFEM()
+    C2 = SparseMatrixFEM()
+    D = SparseMatrixFEM()
+    g = SparseVectorFEM()
+
+    already_constrained_dofs = Int64[]
+
+    for problem in problems
+
+        # if we are ordered to remove some rows (=dofs) from constraint matrices
+        # before combining, do it now
+        for dof in problem.assembly.removed_dofs
+            info("$(problem.name): removing dof $dof from assembly")
+            remove_row!(problem.assembly.C1, dof)
+            remove_row!(problem.assembly.C2, dof)
+            remove_row!(problem.assembly.D, dof)
+        end
+
+        # do a simple check that we do not have overconstrained dofs in system
+        # this is just for case, we have tested this already
+        nz_C2 = FEMSparse.get_nonzero_rows(problem.assembly.C2)
+        nz_D = FEMSparse.get_nonzero_rows(problem.assembly.D)
+        new_constraints = union(nz_C2, nz_D)
+        overconstrained_dofs = intersect(already_constrained_dofs, new_constraints)
         if length(overconstrained_dofs) != 0
+            sort!(overconstrained_dofs)
+            sort!(already_constrained_dofs)
+            sort!(new_constraints)
+            warn("overconstrained dofs $overconstrained_dofs")
+            warn("already constrained = $already_constrained_dofs")
+            warn("new constraints = $new_constraints")
             warn("problem is overconstrained, finding overconstrained dofs... ")
-            overdetermined = true
             for dof in overconstrained_dofs
-                for problem_ in boundary_problems
-                    new_constraints_ = Set(problem_.assembly.C2.I)
+                for problem_ in problems
+                    nz_C2 = get_nonzero_rows(problem_.assembly.C2)
+                    nz_D = get_nonzero_rows(problem_.assembly.D)
+                    new_constraints_ = union(nz_C2, nz_D)
                     new_constraints_ = setdiff(new_constraints_, problem_.assembly.removed_dofs)
                     if dof in new_constraints_
                         warn("overconstrained dof $dof defined in problem $(problem_.name)")
@@ -137,71 +152,28 @@ function check_for_overconstrained_dofs(solver::Solver)
                 warn("To do this, use push! to add dofs to remove to problem.assembly.removed_dofs, e.g.")
                 warn("`push!(bc.assembly.removed_dofs, $dof`)")
             end
-        end
-        constrained_dofs = union(constrained_dofs, new_constraints)
-    end
-    if overdetermined
-        warn("List of all overconstrained dofs:")
-        warn(sort(collect(all_overconstrained_dofs)))
-        error("problem is overconstrained, not continuing to solution.")
-    end
-    return true
-end
-
-""" Return one combined boundary assembly for a set of boundary problems.
-
-Returns
--------
-K, C1, C2, D, f, g :: SparseMatrixCSC
-
-"""
-function get_boundary_assembly(solver::Solver)
-
-    check_for_overconstrained_dofs(solver)
-
-    ndofs = solver.ndofs
-    @assert ndofs != 0
-    K = spzeros(ndofs, ndofs)
-    C1 = spzeros(ndofs, ndofs)
-    C2 = spzeros(ndofs, ndofs)
-    D = spzeros(ndofs, ndofs)
-    f = spzeros(ndofs, 1)
-    g = spzeros(ndofs, 1)
-    for problem in get_boundary_problems(solver)
-        assembly = problem.assembly
-        K_ = sparse(assembly.K, ndofs, ndofs)
-        C1_ = sparse(assembly.C1, ndofs, ndofs)
-        C2_ = sparse(assembly.C2, ndofs, ndofs)
-        D_ = sparse(assembly.D, ndofs, ndofs)
-        f_ = sparse(assembly.f, ndofs, 1)
-        g_ = sparse(assembly.g, ndofs, 1)
-        for dof in assembly.removed_dofs
-            info("$(problem.name): removing dof $dof from assembly")
-            C1_[dof,:] = 0.0
-            C2_[dof,:] = 0.0
-        end
-        SparseArrays.dropzeros!(C1_)
-        SparseArrays.dropzeros!(C2_)
-
-        already_constrained = get_nonzero_rows(C2)
-        new_constraints = get_nonzero_rows(C2_)
-        overconstrained_dofs = intersect(already_constrained, new_constraints)
-        if length(overconstrained_dofs) != 0
-            warn("overconstrained dofs $overconstrained_dofs")
-            warn("already constrained = $already_constrained")
-            warn("new constraints = $new_constraints")
-            overconstrained_dofs = sort(overconstrained_dofs)
             error("overconstrained dofs, not solving problem.")
         end
+        already_constrained_dofs = union(already_constrained_dofs, new_constraints)
 
-        K += K_
-        C1 += C1_
-        C2 += C2_
-        D += D_
-        f += f_
-        g += g_
+        add!(M, problem.assembly.M)
+        add!(K, problem.assembly.K)
+        add!(Kg, problem.assembly.Kg)
+        add!(f, problem.assembly.f)
+        add!(fg, problem.assembly.fg)
+        add!(C1, problem.assembly.C1)
+        add!(C2, problem.assembly.C2)
+        add!(D, problem.assembly.D)
+        add!(g, problem.assembly.g)
     end
-    return K, C1, C2, D, f, g
+
+    if length(C2) == 0
+        warn("get_boundary_assembly(): constraint matrix seems to be empty.")
+        warn("get_boundary_assembly(): check that boundary elements are pushed to problem and formulation is correct.")
+    end
+
+    return M, K, Kg, f, fg, C1, C2, D, g
+
 end
 
 
@@ -291,32 +263,60 @@ function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{3}})
 end
 
 """ Default linear system solver for solver. """
-function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric=true)
+function solve!(solver::Solver; empty_field_assemblies_before_solution=true, symmetric=true)
 
     info("Solving problems ...")
     t0 = Base.time()
 
     # assemble field & boundary problems
-    # TODO: return same kind of set for both assembly types
-    # M1, K1, Kg1, f1, fg1, C11, C21, D1, g1 = get_field_assembly(solver)
-    # M2, K2, Kg2, f2, fg2, C12, C22, D2, g2 = get_boundary_assembly(solver)
+    M1, K1, Kg1, f1, fg1, C11, C21, D1, g1 = get_field_assembly(solver)
+    M2, K2, Kg2, f2, fg2, C12, C22, D2, g2 = get_boundary_assembly(solver)
 
-    M, K, Kg, f, fg = get_field_assembly(solver)
-    Kb, C1, C2, D, fb, g = get_boundary_assembly(solver)
-    K = K + Kg + Kb
-    f = f + fg + fb
+    M = SparseMatrixFEM()
+    K = SparseMatrixFEM()
+    f = SparseVectorFEM()
+    C1 = SparseMatrixFEM()
+    C2 = SparseMatrixFEM()
+    D = SparseMatrixFEM()
+    g = SparseVectorFEM()
 
-    if symmetric
-        K = 1/2*(K + K')
-        M = 1/2*(M + M')
-    end
+    add!(M, M1, M2)
+    add!(K, K1, K2, Kg1, Kg2)
+    add!(f, f1, f2, fg1, fg2)
+    add!(C1, C11, C12)
+    add!(C2, C21, C22)
+    add!(D, D1, D2)
+    add!(g, g1, g2)
 
-    if empty_assemblies_before_solution
+    if empty_field_assemblies_before_solution
         # free up some memory before solution by emptying field assemblies from problems
         for problem in get_field_problems(solver)
             empty!(problem.assembly)
         end
         gc()
+    end
+
+    # assembling of problems is almost ready, convert to CSC format for fast arithmetic operations
+
+    if solver.ndofs == 0
+        K_size = size(K)
+        @assert K_size[1] == K_size[2]
+        solver.ndofs = K_size[1]
+        info("automatically determined problem dimension, ndofs = $(solver.ndofs)")
+    end
+
+    ndofs = solver.ndofs
+    M = sparse(M, ndofs, ndofs)
+    K = sparse(K, ndofs, ndofs)
+    C1 = sparse(C1, ndofs, ndofs)
+    C2 = sparse(C2, ndofs, ndofs)
+    D = sparse(D, ndofs, ndofs)
+    f = sparsevec(f, solver.ndofs)
+    g = sparsevec(g, solver.ndofs)
+
+    if symmetric
+        K = 1/2*(K + K')
+        M = 1/2*(M + M')
     end
     
     if !haskey(solver, "fint")
@@ -336,7 +336,6 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
         f = (1-alpha)*f + alpha*fint[end-1].data
     end
 
-    ndofs = solver.ndofs
     u = zeros(ndofs)
     la = zeros(ndofs)
     is_solved = false
@@ -627,7 +626,7 @@ function NonlinearSolver(problems...)
     end
     return solver
 end
-function NonlinearSolver(name::AbstractString, problems::Problem...)
+function NonlinearSolver(name::String, problems::Problem...)
     solver = NonlinearSolver(problems...)
     solver.name = name
     return solver
@@ -689,7 +688,7 @@ function LinearSolver(problems::Problem...)
     end
     return solver
 end
-function LinearSolver(name::AbstractString, problems::Problem...)
+function LinearSolver(name::String, problems::Problem...)
     solver = LinearSolver(problems...)
     solver.name = name
     return solver

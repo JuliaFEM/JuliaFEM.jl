@@ -16,14 +16,20 @@ function SparseVectorDOK{Tv,Ti<:Integer}(b::SparseVector{Tv,Ti})
     return c
 end
 
+function SparseVectorDOK{T}(b::Vector{T})
+    return SparseVectorDOK(sparsevec(b))
+end
+
 function add!{Tv,Ti<:Integer}(b::SparseVectorDOK{Tv,Ti}, i::Ti, v::Tv)
     b.data[i] = get(b, i) + v
     return nothing
 end
 
 function add!{Tv,Ti<:Integer}(b::SparseVectorDOK{Tv,Ti}, dofs::Vector{Ti}, data::Vector{Tv})
-    for (i, v) in zip(dofs, data)
-        b.data[i] = get(b, i) + v
+    @assert length(dofs) == length(data)
+    z = Tv(0)
+    for i=1:length(dofs)
+        @inbounds b.data[dofs[i]] = Base.get(b.data, i, z) + data[i]
     end
     return nothing
 end

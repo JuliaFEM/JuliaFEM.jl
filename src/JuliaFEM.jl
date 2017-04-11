@@ -10,6 +10,9 @@ This is JuliaFEM -- Finite Element Package
 """
 module JuliaFEM
 
+# Magic stuff to make life with SparseMatrixCSC easier
+include("sparse.jl")
+
 using TimerOutputs
 const to = TimerOutput()
 function print_statistics()
@@ -19,7 +22,7 @@ export print_statistics
 
 import Base: getindex, setindex!, convert, length, size, isapprox, similar,
              start, first, next, done, last, endof, vec, ==, +, -, *, /, haskey, copy,
-             push!, isempty, empty!, append!, sparse, full, read
+             push!, isempty, empty!, append!, sparse, full, read, resize!
 
 using Logging
 
@@ -72,9 +75,6 @@ export NSeg, NSurf, NSolid, is_nurbs
 
 include("integrate.jl")  # default integration points for elements
 export get_integration_points
-
-# include("sparse.jl")
-# export add!, SparseMatrixCOO, SparseVectorCOO, get_nonzero_rows, get_nonzero_columns, optimize!, resize_sparse, resize_sparsevec
 
 include("problems.jl") # common problem routines
 export Problem, AbstractProblem, FieldProblem, BoundaryProblem,

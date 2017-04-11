@@ -7,18 +7,13 @@ include("SparseMatrixCOO.jl")
 include("SparseVectorCOO.jl")
 include("SparseVectorDOK.jl")
 
-export SparseMatrixCOO, SparseVectorCOO, SparseVectorDOK, add!
-
-#=
-""" Resize sparse matrix A to (higher) dimension n x m. """
-function resize_sparse(A, n, m)
-    return sparse(findnz(A)..., n, m)
-end
-
-""" Resize sparse vector b to (higher) dimension n. """
-function resize_sparsevec(b, n)
-    return sparsevec(findnz(b)..., n)
-end
-=#
+export SparseMatrixCOO,
+       SparseVectorCOO,
+       SparseVectorDOK,
+       add!,
+       get_nonzero_rows,
+       get_nonzero_columns,
+       remove_row!,
+       remove_column!
 
 end

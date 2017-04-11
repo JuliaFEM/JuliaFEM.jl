@@ -1,7 +1,9 @@
 # This file is a part of JuliaFEM/SparseCOO
 # License is MIT: see https://github.com/JuliaFEM/SparseCOO.jl/blob/master/LICENSE.md
 
-import Base: convert, size, full, resize!, empty!, isempty, isapprox, findnz, getindex, SparseMatrixCSC
+import Base: convert, size, full, resize!, empty!, isempty, isapprox, findnz, getindex, sparse
+
+global const SPARSEMATRIXCOO_DEFAULT_BLOCK_SIZE = 1024*1024
 
 type SparseMatrixCOO{Tv,Ti<:Integer} <: AbstractSparseArray{Tv,Ti<:Integer,2}
     I :: Vector{Ti}
@@ -9,15 +11,16 @@ type SparseMatrixCOO{Tv,Ti<:Integer} <: AbstractSparseArray{Tv,Ti<:Integer,2}
     V :: Vector{Tv}
     cnt :: Int64
     max_cnt :: Int64
+    blk_size :: Int64
 end
 
 function SparseMatrixCOO()
-    return SparseMatrixCOO(Int64[], Int64[], Float64[], 0, 0)
+    return SparseMatrixCOO(Int64[], Int64[], Float64[], 0, 0, SPARSEMATRIXCOO_DEFAULT_BLOCK_SIZE)
 end
 
 function SparseMatrixCOO{Tv,Ti<:Integer}(I::Vector{Ti}, J::Vector{Ti}, V::Vector{Tv})
     @assert length(I) == length(J) == length(V)
-    return SparseMatrixCOO(I, J, V, length(V), length(V))
+    return SparseMatrixCOO(I, J, V, length(V), length(V), SPARSEMATRIXCOO_DEFAULT_BLOCK_SIZE)
 end
 
 function SparseMatrixCOO{Tv,Ti<:Integer}(A::SparseMatrixCSC{Tv,Ti})
@@ -35,16 +38,7 @@ function SparseMatrixCOO{T}(A::Matrix{T})
 end
 
 function getindex(A::SparseMatrixCOO, I::Int64, J::Int64)
-    if A.cnt > 1000
-        error("Indexing SparseMatrixCOO is very ineffective!")
-    end
-    V = 0.0
-    for i=1:A.cnt
-        if A.I[i] == I && A.J[i] == J
-            V += A.V[i]
-        end
-    end
-    return V
+    error("Indexing of SparseMatrixCOO is very ineffective and not implemented. Convert this to SparseMatrixCSC.")
 end
 
 function findnz(A::SparseMatrixCOO)
@@ -67,8 +61,13 @@ function full{Tv,Ti<:Integer}(A::SparseMatrixCOO{Tv,Ti})
     full(convert(SparseMatrixCSC{Tv,Ti}, A))
 end
 
-""" Resize I,J,V vectors of SparseMatrixCOO. """
-function resize!(A::SparseMatrixCOO, N::Int)
+""" Return Julia default SparseMatrixCSC from SparseMatrixCOO. """
+function sparse(A::SparseMatrixCOO, args...)
+    return sparse(A.I[1:A.cnt], A.J[1:A.cnt], A.V[1:A.cnt], args...)
+end
+
+""" Allocate (more) memory for I,J,V vectors of SparseMatrixCOO. """
+function allocate!(A::SparseMatrixCOO, N::Int)
     if N < A.max_cnt
         warn("Down-sizing SparseMatrixCOO")
     end
@@ -79,19 +78,10 @@ function resize!(A::SparseMatrixCOO, N::Int)
     return A
 end
 
-""" Make sure that sparse matrix has space for at least N new enties. """
-function reserve_space!(A::SparseMatrixCOO, N::Int)
-    resize!(A, A.cnt + N)
-end
-
 """ Add new value to sparse matrix. """
-function add!{T}(A::SparseMatrixCOO{T}, I::Int, J::Int, V::T; auto_resize=true)
+function add!{T}(A::SparseMatrixCOO{T}, I::Int, J::Int, V::T)
     if A.cnt == A.max_cnt
-        if auto_resize
-            resize!(A, A.cnt+1)
-        else
-            error("Cannot add to SparseMatrixCOO: maximum size of $(A.cnt) exceeded.")
-        end
+        allocate!(A, A.cnt+A.blk_size)
     end
     A.cnt += 1
     @inbounds begin
@@ -111,9 +101,12 @@ function empty!(A::SparseMatrixCOO)
     return A
 end
 
-function add!(A::SparseMatrixCOO, B::SparseMatrixCOO)
-    for (I, J, V) in zip(B.I, B.J, B.V)
-        add!(A, I, J, V)
+""" Add one or more SparseMatrixCOOs to one SparseMatrixCOO. """
+function add!(A::SparseMatrixCOO, rest::SparseMatrixCOO...)
+    for B in rest
+        for (I, J, V) in zip(B.I[1:B.cnt], B.J[1:B.cnt], B.V[1:B.cnt])
+            add!(A, I, J, V)
+        end
     end
 end
 
@@ -160,9 +153,9 @@ function add!(A::SparseMatrixCOO, B::SparseMatrixCSC)
 end
 
 function get_nonzero_rows(A::SparseMatrixCOO)
-    return setdiff(sort(unique(A.I)), [0])
+    return unique(A.I[1:A.cnt])
 end
 
 function get_nonzero_columns(A::SparseMatrixCOO)
-    return setdiff(sort(unique(A.J)), [0])
+    return unique(A.J[1:A.cnt])
 end

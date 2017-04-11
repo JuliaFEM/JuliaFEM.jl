@@ -73,9 +73,9 @@ function assemble!(problem::Problem{Dirichlet}, time::Float64=0.0;
             end
         end
         for (k, v) in field_vals
-            push!(problem.assembly.C1, k, k, 1.0)
-            push!(problem.assembly.C2, k, k, 1.0)
-            push!(problem.assembly.g, k, 1, v)
+            add!(problem.assembly.C1, k, k, 1.0)
+            add!(problem.assembly.C2, k, k, 1.0)
+            add!(problem.assembly.g, k, v)
         end
     end
 
