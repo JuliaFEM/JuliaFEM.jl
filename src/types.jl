@@ -57,3 +57,6 @@ typealias IP Point{IntegrationPoint}
 function IP(id, weight, coords)
     return IP(id, weight, coords, Dict(), IntegrationPoint())
 end
+
+typealias SparseMatrixFEM{Tv,Ti<:Integer} SparseMatrixCOO{Tv,Ti}
+typealias SparseVectorFEM{Tv,Ti<:Integer} SparseVector{Tv,Ti}
