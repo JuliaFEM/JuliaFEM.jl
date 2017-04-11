@@ -3,6 +3,8 @@
 
 # __precompile__()
 
+push!(LOAD_PATH, Pkg.dir("JuliaFEM") * "/subpackages")
+
 """
 This is JuliaFEM -- Finite Element Package
 """
@@ -30,7 +32,6 @@ module Testing
 
 end
 
-include("FEMSparse/src/FEMSparse.jl")
 using FEMSparse
 
 include("fields.jl")
