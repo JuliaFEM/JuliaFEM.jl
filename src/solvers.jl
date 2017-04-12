@@ -3,30 +3,71 @@
 
 abstract AbstractSolver
 
+type LinearSystem{Tv, Ti<:Integer}
+    K :: SparseMatrixCSC{Tv, Ti}
+    C1 :: SparseMatrixCSC{Tv, Ti}
+    C2 :: SparseMatrixCSC{Tv, Ti}
+    D :: SparseMatrixCSC{Tv, Ti}
+    f :: SparseVector{Tv, Ti}
+    g :: SparseVector{Tv, Ti}
+    du :: SparseVector{Tv, Ti}
+    la :: SparseVector{Tv, Ti}
+end
+
+function LinearSystem()
+    K = SparseMatrixCSC(Matrix{Float64}())
+    C1 = SparseMatrixCSC(Matrix{Float64}())
+    C2 = SparseMatrixCSC(Matrix{Float64}())
+    D = SparseMatrixCSC(Matrix{Float64}())
+    f = SparseVector(Vector{Float64}())
+    g = SparseVector(Vector{Float64}())
+    du = SparseVector(Vector{Float64}())
+    la = SparseVector(Vector{Float64}())
+    return LinearSystem(K, C1, C2, D, f, g, du, la)
+end
+
 type Solver{S<:AbstractSolver}
     name :: String       # some descriptive name for problem
     time :: Float64              # current time
     problems :: Vector{Problem}
     norms :: Vector{Tuple}       # solution norms for convergence studies
-    ndofs :: Int                 # number of degrees of freedom in problem
+    nnodes :: Int64              # total number of nodes in problem
+    ndim :: Int64                # total number of dofs / node
+    ndofs :: Int                 # total number of degrees of freedom in problems, nnodes*ndim
+    dof_names :: Vector{String}  # name of dofs, ["U1", "U2", "U3", ...]
     xdmf :: Nullable{Xdmf}       # input/output handle
     initialized :: Bool
-    u :: Vector{Float64}
-    la :: Vector{Float64}
+    ls :: LinearSystem{Float64, Int64}
+    ls_prev :: LinearSystem{Float64, Int64}
+    u :: SparseVector{Float64, Int64}
+    la :: SparseVector{Float64, Int64}
     alpha :: Float64             # generalized alpha time integration coefficient
     fields :: Dict{String, Field}
     properties :: S
 end
 
-function Solver{S<:AbstractSolver}(::Type{S}, name="solver", properties...)
-    variant = S(properties...)
-    solver = Solver{S}(name, 0.0, [], [], 0, nothing, false, [], [], 0.0, Dict(), variant)
-    return solver
-end
-
 function Solver{S<:AbstractSolver}(::Type{S}, problems::Problem...)
-    solver = Solver(S, "$(S)Solver")
-    push!(solver.problems, problems...)
+    name = "$(S)Solver"
+    time = 0.0
+    problems_ = Problem[problem for problem in problems]
+    norms = Tuple[]
+    nnodes = 0
+    ndim = 0
+    ndofs = 0
+    dof_names = String[]
+    xdmf = nothing
+    initialized = false
+    ls = LinearSystem()
+    ls_prev = LinearSystem()
+    u = spzeros(ndofs)
+    la = spzeros(ndofs)
+    alpha = 0.0
+    fields = Dict{String, Field}()
+    properties = S()
+
+    solver = Solver{S}(name, time, problems_, norms, nnodes, ndim, ndofs, dof_names, xdmf,
+                       initialized, ls, ls_prev, u, la, alpha, fields, properties)
+
     return solver
 end
 
@@ -60,10 +101,8 @@ is_boundary_problem{P<:BoundaryProblem}(problem::Problem{P}) = true
 get_field_problems(solver::Solver) = filter(is_field_problem, get_problems(solver))
 get_boundary_problems(solver::Solver) = filter(is_boundary_problem, get_problems(solver))
 
-"""Return one combined field assembly for a set of field problems. """
-function get_field_assembly(solver::Solver)
-
-    problems = get_field_problems(solver)
+"""Return one combined assembly for a set of field problems. """
+function get_assembly(solver::Solver)
 
     M = SparseMatrixFEM()
     K = SparseMatrixFEM()
@@ -74,6 +113,8 @@ function get_field_assembly(solver::Solver)
     C2 = SparseMatrixFEM()
     D = SparseMatrixFEM()
     g = SparseVectorFEM()
+
+    problems = get_field_problems(solver)
 
     for problem in problems
         add!(M, problem.assembly.M)
@@ -87,28 +128,7 @@ function get_field_assembly(solver::Solver)
         add!(g, problem.assembly.g)
     end
 
-    if length(K) == 0
-        warn("get_field_assembly(): stiffness matrix seems to be empty.")
-        warn("get_field_assembly(): check that elements are pushed to problem and formulation is correct.")
-    end
-
-    return M, K, Kg, f, fg, C1, C2, D, g
-end
-
-""" Return one combined boundary assembly for a set of boundary problems. """
-function get_boundary_assembly(solver::Solver)
-
     problems = get_boundary_problems(solver)
-
-    M = SparseMatrixFEM()
-    K = SparseMatrixFEM()
-    Kg = SparseMatrixFEM()
-    f = SparseVectorFEM()
-    fg = SparseVectorFEM()
-    C1 = SparseMatrixFEM()
-    C2 = SparseMatrixFEM()
-    D = SparseMatrixFEM()
-    g = SparseVectorFEM()
 
     already_constrained_dofs = Int64[]
 
@@ -166,6 +186,11 @@ function get_boundary_assembly(solver::Solver)
         add!(g, problem.assembly.g)
     end
 
+    if length(K) == 0
+        warn("get_assembly(): stiffness matrix seems to be empty.")
+        warn("get_assembly(): check that elements are pushed to problem and formulation is correct.")
+    end
+
     if length(C2) == 0
         warn("get_boundary_assembly(): constraint matrix seems to be empty.")
         warn("get_boundary_assembly(): check that boundary elements are pushed to problem and formulation is correct.")
@@ -184,31 +209,16 @@ function solve!(solver::Solver; empty_field_assemblies_before_solution=true, sym
     t0 = Base.time()
 
     # assemble field & boundary problems
-    M1, K1, Kg1, f1, fg1, C11, C21, D1, g1 = get_field_assembly(solver)
-    M2, K2, Kg2, f2, fg2, C12, C22, D2, g2 = get_boundary_assembly(solver)
-
-    M = SparseMatrixFEM()
-    K = SparseMatrixFEM()
-    f = SparseVectorFEM()
-    C1 = SparseMatrixFEM()
-    C2 = SparseMatrixFEM()
-    D = SparseMatrixFEM()
-    g = SparseVectorFEM()
-
-    add!(M, M1, M2)
-    add!(K, K1, K2, Kg1, Kg2)
-    add!(f, f1, f2, fg1, fg2)
-    add!(C1, C11, C12)
-    add!(C2, C21, C22)
-    add!(D, D1, D2)
-    add!(g, g1, g2)
+    @timeit to "combine assemblies" M, K, Kg, f, fg, C1, C2, D, g = get_assembly(solver)
 
     if empty_field_assemblies_before_solution
-        # free up some memory before solution by emptying field assemblies from problems
-        for problem in get_field_problems(solver)
-            empty!(problem.assembly)
+        @timeit to "empty field assemblies before solution" begin
+            # free up some memory before solution by emptying field assemblies from problems
+            for problem in get_field_problems(solver)
+                empty!(problem.assembly)
+            end
+            gc()
         end
-        gc()
     end
 
     # assembling of problems is almost ready, convert to CSC format for fast arithmetic operations
@@ -217,46 +227,45 @@ function solve!(solver::Solver; empty_field_assemblies_before_solution=true, sym
         K_size = size(K)
         @assert K_size[1] == K_size[2]
         solver.ndofs = K_size[1]
-        info("automatically determined problem dimension, ndofs = $(solver.ndofs)")
+        info("solve!(): automatically determined problem dimension, ndofs = $(solver.ndofs)")
     end
 
     ndofs = solver.ndofs
-    M = sparse(M, ndofs, ndofs)
-    K = sparse(K, ndofs, ndofs)
-    C1 = sparse(C1, ndofs, ndofs)
-    C2 = sparse(C2, ndofs, ndofs)
-    D = sparse(D, ndofs, ndofs)
-    f = sparsevec(f, solver.ndofs)
-    g = sparsevec(g, solver.ndofs)
+    length(solver.ls.la) == 0 && (solver.ls.la = spzeros(ndofs))
+    length(solver.ls.du) == 0 && (solver.ls.du = spzeros(ndofs))
+    length(solver.u) == 0 && (solver.u = spzeros(ndofs))
+    length(solver.la) == 0 && (solver.la = spzeros(ndofs))
+
+    @timeit to "construct LinearSystem" begin
+        ls = solver.ls
+        ls_prev = solver.ls_prev
+        ls.K = sparse(K, ndofs, ndofs)# + sparse(Kg, ndofs, ndofs)
+        ls.C1 = sparse(C1, ndofs, ndofs)
+        ls.C2 = sparse(C2, ndofs, ndofs)
+        ls.D = sparse(D, ndofs, ndofs)
+        ls.f = sparsevec(f, ndofs)# + sparsevec(f, ndofs)
+        ls.g = sparsevec(g, ndofs)
+    end
 
     if symmetric
-        K = 1/2*(K + K')
-        M = 1/2*(M + M')
-    end
-    
-    if !haskey(solver, "fint")
-        solver.fields["fint"] = Field(time => f)
-    else
-        update!(solver.fields["fint"], time => f)
+        @timeit to "make stffiness matrix symmetric" ls.K = 1/2*(ls.K + ls.K')
     end
 
-    fint = solver.fields["fint"]
-
-    if length(fint) > 1
-        # kick in generalized alpha rule for time integration
-        alpha = solver.alpha
-        debug("Using generalized-α time integration, α=$alpha")
-        K = (1-alpha)*K
-        C1 = (1-alpha)*C1
-        f = (1-alpha)*f + alpha*fint[end-1].data
+    # kick in generalized alpha rule for time integration
+    if !isapprox(solver.alpha, 0.0) && !isempty(ls_prev.f)
+        @timeit to "use generalized-alpha time integration" begin
+            alpha = solver.alpha
+            debug("Using generalized-α time integration, α=$alpha")
+            ls.K = (1-alpha)*ls.K
+            ls.C1 = (1-alpha)*ls.C1
+            ls.f = (1-alpha)*ls.f + alpha*ls_prev.f
+        end
     end
 
-    u = zeros(ndofs)
-    la = zeros(ndofs)
     is_solved = false
     i = 0
-    for i in [1, 2, 3]
-        is_solved = solve_linear_system!(ndofs, K, C1, C2, D, f, g, u, la, Val{i})
+    @timeit to "solve linear system" for i in [1, 2, 3]
+        is_solved = solve_linear_system!(ls, Val{i})
         if is_solved
             break
         end
@@ -265,16 +274,20 @@ function solve!(solver::Solver; empty_field_assemblies_before_solution=true, sym
         error("Failed to solve linear system!")
     end
     t1 = round(Base.time()-t0, 2)
-    norms = (norm(u), norm(la))
-    push!(solver.norms, norms)
 
-    solver.u = u
-    solver.la = la
+    norms = (norm(ls.du), norm(ls.la))
+    push!(solver.norms, norms)
 
     info("Solved problems in $t1 seconds using solver $i.")
     info("Solution norms = $norms.")
 
-    return
+    @timeit to "update solution vectors" begin
+        ls_prev.f = ls.f
+        solver.u += ls.du
+        solver.la = ls.la
+    end
+
+    return nothing
 end
 
 """ Default assembler for solver. """
@@ -340,76 +353,85 @@ end
 function initialize!(solver::Solver)
     if solver.initialized
         warn("initialize!(): solver already initialized")
-        return
+        return nothing
     end
-    info("Initializing solver ...")
-    problems = get_problems(solver)
-    length(problems) != 0 || error("Empty solver, add problems to solver using push!")
-    t0 = Base.time()
-    field_problems = get_field_problems(solver)
-    length(field_problems) != 0 || warn("No field problem found from solver, add some..?")
-    field_name = get_unknown_field_name(solver)
-    field_dim = get_unknown_field_dimension(solver)
-    info("initialize!(): looks we are solving $field_name, $field_dim dofs/node")
-    nodes = Set{Int64}()
-    for problem in problems
-        initialize!(problem, solver.time)
-        for element in get_elements(problem)
-            conn = get_connectivity(element)
-            push!(nodes, conn...)
-        end
-    end
-    nnodes = length(nodes)
-    info("Total number of nodes in problems: $nnodes")
-    maxdof = maximum(nodes)*field_dim
-    info("# of max dof (=size of solution vector) is $maxdof")
-    solver.u = zeros(maxdof)
-    solver.la = zeros(maxdof)
-    # TODO: this could be used to initialize elements too...
-    # TODO: cannot initialize to zero always, construct vector from elements.
-    for problem in problems
-        problem.assembly.u = zeros(maxdof)
-        problem.assembly.la = zeros(maxdof)
-        # initialize(problem, ....)
-    end
-    t1 = round(Base.time()-t0, 2)
-    info("Initialized solver in $t1 seconds.")
-    solver.initialized = true
-end
-
-function get_all_elements(solver::Solver)
-    elements = [get_elements(problem) for problem in get_problems(solver)]
-    return [elements...;]
-end
-
-function (solver::Solver)(field_name::String, time::Float64)
-    fields = []
     for problem in get_problems(solver)
-        field = problem(field_name, time)
-        if length(field) == 0
-            warn("no field $field_name found for problem $(problem.name)")
-        else
-            push!(fields, field)
-        end
+        initialize!(problem, solver.time)
     end
-    return merge(fields...)
+    solver.initialized = true
+    return nothing
+end
+
+function to_dict{Tv,Ti<:Integer}(b::SparseVector{Tv,Ti}, dim::Int)
+    I, V = findnz(b)
+    debug(I)
+    debug(V)
+    DOK = Dict{Ti,Tv}(i => v for (i, v) in zip(I, V))
+    dim == 1 && return DOK
+    node_ids = unique(ceil(Int, I/dim))
+    nnodes = length(node_ids)
+    debug("number of nodes = $nnodes")
+    debug("node ids = $node_ids")
+    MDOK = Dict{Ti,Vector{Tv}}()
+    for nid in node_ids
+        val = [get(DOK, dim*(nid-1)+i, Tv(0)) for i=1:dim]
+        debug("$nid => $val")
+        MDOK[nid] = val
+    end
+    return MDOK
 end
 
 """ Default update for solver. """
 function update!{S}(solver::Solver{S})
-    u = solver.u
-    la = solver.la
+    @assert length(get_unknown_fields(solver)) == 1
+    dim = solver.ndim = get_unknown_field_dimension(solver)
+    time = solver.time
+    info("Updating problems, $dim dofs / node ...")
 
-    info("Updating problems ...")
+    SparseArrays.droptol!(solver.u, 1.0e-12)
+    SparseArrays.droptol!(solver.la, 1.0e-12)
+
+    u = to_dict(solver.u, dim)
+    la = to_dict(solver.la, dim)
+
+    node_ids = Set{Int64}()
+    for problem in get_problems(solver)
+        for element in get_elements(problem)
+            for c in get_connectivity(element)
+                push!(node_ids, c)
+            end
+        end
+    end
+
+    solver.nnodes = length(node_ids)
+
+    for nid in node_ids
+        if !haskey(u, nid)
+            u[nid] = dim == 1 ? 0.0 : zeros(dim)
+        end
+        if !haskey(la, nid)
+            la[nid] = dim == 1 ? 0.0 : zeros(dim)
+        end
+    end
+
     t0 = Base.time()
 
-    for problem in get_problems(solver)
-        assembly = get_assembly(problem)
-        elements = get_elements(problem)
-        # update solution, first for assembly (u,la) ...
-        update!(problem, assembly, u, la)
-        # .. and then from assembly (u,la) to elements
-        update!(problem, assembly, elements, solver.time)
+    for problem in get_field_problems(solver)
+        field_name = get_unknown_field_name(problem)
+        for element in get_elements(problem)
+            connectivity = get_connectivity(element)
+            update!(element, field_name, time => [u[i] for i in connectivity])
+        end
+    end
+
+    for problem in get_boundary_problems(solver)
+        field_name = get_unknown_field_name(problem) # "lambda"
+        parent_field_name = get_parent_field_name(problem)
+        for element in get_elements(problem)
+            connectivity = get_connectivity(element)
+            update!(element, parent_field_name, time => [u[i] for i in connectivity])
+            update!(element, field_name, time => [la[i] for i in connectivity])
+        end
     end
 
     t1 = round(Base.time()-t0, 2)
@@ -498,7 +520,7 @@ function (solver::Solver{Nonlinear})()
     properties = solver.properties
 
     # 1. initialize each problem so that we can start nonlinear iterations
-    initialize!(solver)
+    @timeit to "initialize!(solver)" initialize!(solver)
 
     # 2. start non-linear iterations
     for properties.iteration=1:properties.max_iterations
@@ -508,21 +530,21 @@ function (solver::Solver{Nonlinear})()
         info(repeat("-", 80))
 
         # 2.1 update assemblies
-        assemble!(solver)
+        @timeit to "assemble!(solver)" assemble!(solver)
 
         # 2.2 call solver for linearized system
-        solve!(solver)
+        @timeit to "solve!(solver)" solve!(solver)
 
         # 2.3 update solution back to elements
-        update!(solver)
+        @timeit to "update!(solver)" update!(solver)
 
         # 2.4 check convergence
         if properties.iteration >= properties.min_iterations && has_converged(solver)
             info("Converged in $(properties.iteration) iterations.")
             # 2.4.1 run any postprocessing of problems
-            postprocess!(solver)
+            @timeit to "postprocess!(solver)" postprocess!(solver)
             # 2.4.2 update Xdmf output
-            update_xdmf!(solver)
+            @timeit to "update_xdmf!(solver)" update_xdmf!(solver)
             return true
         end
     end
@@ -587,24 +609,21 @@ function (solver::Solver{Linear})()
     info("Starting linear solver")
     info("Increment time t=$(round(solver.time, 3))")
     info(repeat("-", 80))
-    @timeit to "initialize solver" initialize!(solver)
-    @timeit to "assemble problems" assemble!(solver)
-    @timeit to "solve linear system" solve!(solver)
-    @timeit to "update problems" update!(solver)
+    @timeit to "initialize!(solver)" initialize!(solver)
+    @timeit to "assemble!(solver)" assemble!(solver)
+    @timeit to "solve!(solver)" solve!(solver)
+    @timeit to "update!(solver)" update!(solver)
     t1 = round(Base.time()-t0, 2)
     info("Linear solver ready in $t1 seconds.")
 end
 
 """ Convenience function to call linear solver. """
 function LinearSolver(problems::Problem...)
-    solver = Solver(Linear, "default linear solver")
-    if length(problems) != 0
-        push!(solver, problems...)
-    end
+    solver = Solver(Linear, problems...)
     return solver
 end
 function LinearSolver(name::String, problems::Problem...)
-    solver = LinearSolver(problems...)
+    solver = Solver(Linear, problems...)
     solver.name = name
     return solver
 end
