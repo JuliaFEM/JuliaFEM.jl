@@ -54,11 +54,11 @@ function size(A::SparseMatrixCOO, idx::Int)
     return size(A)[idx]
 end
 
-function full{Tv,Ti<:Integer}(A::SparseMatrixCOO{Tv,Ti})
+function full{Tv,Ti<:Integer}(A::SparseMatrixCOO{Tv,Ti}, args...)
     if A.cnt == 0
         return Matrix{Tv}()
     end
-    full(convert(SparseMatrixCSC{Tv,Ti}, A))
+    return full(sparse(A, args...))
 end
 
 """ Return Julia default SparseMatrixCSC from SparseMatrixCOO. """

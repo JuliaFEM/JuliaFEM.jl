@@ -1,7 +1,7 @@
 # This file is a part of JuliaFEM/FEMAssemble
 # License is MIT: see https://github.com/JuliaFEM/FEMAssemble.jl/blob/master/LICENSE.md
 
-import Base: size, resize!, convert, getindex, get!, isempty, empty!, sparsevec
+import Base: size, resize!, convert, getindex, get!, isempty, empty!, sparsevec, full
 import Base.SparseArrays: nonzeroinds, nonzeros, nnz
 
 global const SPARSEVECTORCOO_DEFAULT_BLOCK_SIZE = 1024
@@ -58,6 +58,10 @@ end
 
 function isempty(b::SparseVectorCOO)
     return b.cnt == 0
+end
+
+function full(b::SparseVectorCOO, args...)
+    full(sparsevec(b, args...))
 end
 
 function empty!(b::SparseVectorCOO)

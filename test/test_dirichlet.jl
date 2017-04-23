@@ -133,11 +133,11 @@ end
     p = Problem(Dirichlet, "test boundary", 2, "displacement")
     push!(p, element)
     assemble!(p, 0.0)
-    g1 = full(p.assembly.g, 4, 1)
+    g1 = full(p.assembly.g, 4)
     @test isapprox(g1, [0.0, 0.0, 0.0, 0.0])
     empty!(p.assembly)
     assemble!(p, 1.0)
-    g2 = full(p.assembly.g, 4, 1)
+    g2 = full(p.assembly.g, 4)
     C2 = full(p.assembly.C2, 4, 4)
     u = C2 \ g2
     info("u = $u")
