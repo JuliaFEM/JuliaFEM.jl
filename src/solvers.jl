@@ -490,29 +490,17 @@ function Nonlinear()
     return solver
 end
 
-""" Check convergence of problems.
-
-Notes
------
-Default convergence criteria is obtained by checking each sub-problem convergence.
-"""
+""" Check convergence of problems. """
 function has_converged(solver::Solver{Nonlinear})
-    properties = solver.properties
-    converged = true
-    eps = properties.convergence_tolerance
-    for problem in get_field_problems(solver)
-        has_converged = problem.assembly.u_norm_change < eps
-        if isapprox(norm(problem.assembly.u), 0.0)
-            # trivial solution
-            has_converged = true
-        end
-        debug("Details for problem $(problem.name)")
-        debug("Norm: $(norm(problem.assembly.u))")
-        debug("Norm change: $(problem.assembly.u_norm_change)")
-        debug("Has converged? $(has_converged)")
-        converged &= has_converged
+    u_norm = norm(solver.u)
+    du_norm = norm(solver.ls.du)
+    if isapprox(u_norm, 0.0)
+        info("Trivial solution, ||u|| = 0")
+        return true
     end
-    return converged
+    ratio = du_norm/u_norm
+    debug("||u|| = $u_norm, ||Δu|| = $du_norm, ||Δu|| / ||u|| = $ratio")
+    return du_norm/u_norm < solver.properties.convergence_tolerance
 end
 
 """ Default solver for quasistatic nonlinear problems. """
