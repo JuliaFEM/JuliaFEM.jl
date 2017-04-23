@@ -648,10 +648,8 @@ function (model::Model)()
         step_problems = [create_boundary_problem(model, bc) for bc in step.boundary_conditions]
         # 3.2 create solver and solve set of problems
         solver_type = determine_solver_type(model, step)
-        solver_description = "$solver_type solver"
-        solver = Solver(solver_type, solver_description)
         all_problems = [model.problems; boundary_problems; step_problems]
-        push!(solver, all_problems...)
+        solver = Solver(solver_type, all_problems...)
         solver()
         info(repeat("-", 80))
         info("Simulation ready, processing output requests")
