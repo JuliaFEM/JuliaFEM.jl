@@ -163,5 +163,7 @@ include("abaqus.jl")
 export abaqus_read_model, abaqus_run_model, abaqus_open_results, create_surface_elements
 end
 
+include("deprecated.jl")
+
 end
 

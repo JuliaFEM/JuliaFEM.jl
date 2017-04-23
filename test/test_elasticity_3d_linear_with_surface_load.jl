@@ -6,7 +6,7 @@ using JuliaFEM.Preprocess
 using JuliaFEM.Testing
 
 @testset "test continuum 3d linear elasticity with surface load" begin
-    nodes = Dict{Int64, Node}(
+    nodes = Dict(
     1 => [0.0, 0.0, 0.0],
     2 => [1.0, 0.0, 0.0],
     3 => [1.0, 1.0, 0.0],
@@ -71,7 +71,7 @@ function solve_rod_model_elasticity(eltype)
     update!(p5, "displacement 3", 0.0)
     solver = LinearSolver(p1, p2, p3, p4, p5)
     solver()
-    u_max = maximum(p1.assembly.u)
+    u_max = maximum(solver.u)
     info("$eltype, u_max = $u_max")
     return u_max
 end

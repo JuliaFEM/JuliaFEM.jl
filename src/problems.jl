@@ -7,9 +7,9 @@ abstract BoundaryProblem <: AbstractProblem
 abstract MixedProblem <: AbstractProblem
 
 type Problem{P<:AbstractProblem}
-    name :: AbstractString           # descriptive name for problem
+    name :: String                   # descriptive name for problem
     dimension :: Int                 # degrees of freedom per node
-    parent_field_name :: AbstractString # (optional) name of parent field e.g. "displacement"
+    parent_field_name :: String      # (optional) name of parent field e.g. "displacement"
     elements :: Vector{Element}
     dofmap :: Dict{Element, Vector{Int64}} # connects element local dofs to global dofs
     assembly :: Assembly
@@ -24,15 +24,20 @@ Examples
 --------
 Create vector-valued (dim=3) elasticity problem:
 
-julia> prob1 = Problem(Elasticity, "this is my problem", 3)
-julia> prob2 = Problem(Elasticity, 3)
+julia> prob1 = Problem(Elasticity, 3)
 
 """
-function Problem{P<:FieldProblem}(::Type{P}, name::AbstractString, dimension::Int64)
-    return Problem{P}(name, dimension, "none", [], Dict(), Assembly(), Dict(), Vector(), P())
-end
 function Problem{P<:FieldProblem}(::Type{P}, dimension::Int64)
-    return Problem(P, "$P problem", dimension)
+    name = "$P problem"
+    properties = P()
+    parent_field_name = "none"
+    elements = Vector()
+    dofmap = Dict()
+    assembly = Assembly()
+    fields = Dict()
+    postprocess_fields = Vector()
+    return Problem{P}(name, dimension, parent_field_name, elements, dofmap,
+                      assembly, fields, postprocess_fields, properties)
 end
 
 """ Construct a new boundary problem.
