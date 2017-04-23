@@ -43,9 +43,11 @@ using JuliaFEM.Testing
 
     solver = Solver(Linear, block, traction, bc_sym_23, bc_sym_13)
     solver()
+    println(round(Int, full(solver.ls.K)))
+    println(round(Int, full(solver.ls.f)))
 
-    info("u = ", block.assembly.u)
-    info("λ = ", block.assembly.la)
+    info("u = ", solver.u)
+    info("λ = ", solver.la)
 
     f = 288.0
     g = 576.0
@@ -53,6 +55,7 @@ using JuliaFEM.Testing
     nu = 1/3
     u3 = block("displacement", 0.0)[3]
     u3_expected = f/E*[-nu, 1] + g/(2*E)*[-nu, 1]
+    info("u3 = $u3, u3_expected = $u3_expected")
     @test isapprox(u3, u3_expected)
 end
 

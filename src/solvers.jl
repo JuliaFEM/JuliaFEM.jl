@@ -230,25 +230,26 @@ function solve!(solver::Solver; empty_field_assemblies_before_solution=true, sym
         info("solve!(): automatically determined problem dimension, ndofs = $(solver.ndofs)")
     end
 
+    ls = solver.ls
+    ls_prev = solver.ls_prev
+
     ndofs = solver.ndofs
-    length(solver.ls.la) == 0 && (solver.ls.la = spzeros(ndofs))
-    length(solver.ls.du) == 0 && (solver.ls.du = spzeros(ndofs))
+    length(ls.la) == 0 && (ls.la = spzeros(ndofs))
+    length(ls.du) == 0 && (ls.du = spzeros(ndofs))
     length(solver.u) == 0 && (solver.u = spzeros(ndofs))
     length(solver.la) == 0 && (solver.la = spzeros(ndofs))
 
     @timeit to "construct LinearSystem" begin
-        ls = solver.ls
-        ls_prev = solver.ls_prev
-        ls.K = sparse(K, ndofs, ndofs)# + sparse(Kg, ndofs, ndofs)
+        ls.K = sparse(K, ndofs, ndofs) + sparse(Kg, ndofs, ndofs)
         ls.C1 = sparse(C1, ndofs, ndofs)
         ls.C2 = sparse(C2, ndofs, ndofs)
         ls.D = sparse(D, ndofs, ndofs)
-        ls.f = sparsevec(f, ndofs)# + sparsevec(f, ndofs)
+        ls.f = sparsevec(f, ndofs) + sparsevec(fg, ndofs)
         ls.g = sparsevec(g, ndofs)
     end
 
     if symmetric
-        @timeit to "make stffiness matrix symmetric" ls.K = 1/2*(ls.K + ls.K')
+        @timeit to "make stiffness matrix symmetric" ls.K = 1/2*(ls.K + ls.K')
     end
 
     # kick in generalized alpha rule for time integration
