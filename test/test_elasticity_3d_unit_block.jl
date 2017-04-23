@@ -6,7 +6,7 @@ using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
 using JuliaFEM.Testing
 
-function calc_model(mesh_name; with_volume_load=false, debug_print=false)
+function calc_model(mesh_name; with_volume_load=false)
     meshfile = Pkg.dir("JuliaFEM")*"/test/testdata/3d_block.med"
     mesh = aster_read_mesh(meshfile, mesh_name)
 
@@ -33,19 +33,10 @@ function calc_model(mesh_name; with_volume_load=false, debug_print=false)
     update!(symxy, "displacement 3", 0.0)
     push!(bc, symyz, symxz, symxy)
 
-    solver = LinearSolver("Solver block problem")
-    push!(solver, block, traction, bc)
+    solver = Solver(Linear, block, traction, bc)
     solver()
 
-    max_u = maximum(block.assembly.u)
-    nu = round(Int, length(block.assembly.u)/3)
-    u = reshape(block.assembly.u, 3, nu)
-    if debug_print
-        f = reshape(full(block.assembly.f), 3, nu)
-        dump(round(u', 5))
-        dump(round(f', 5))
-        info("max |u| = $max_u")
-    end
+    u = reshape(get_solution_vector(solver), solver.ndim, solver.nnodes)
     return block, u
 end
 
