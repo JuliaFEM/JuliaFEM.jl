@@ -88,6 +88,10 @@ function getindex(solver::Solver, problem_name::String)
     throw(KeyError(problem_name))
 end
 
+function get_solution_vector(solver::Solver)
+    return solver.u
+end
+
 function haskey(solver::Solver, field_name::String)
     return haskey(solver.fields, field_name)
 end

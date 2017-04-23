@@ -119,7 +119,7 @@ export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
        get_field_problems, get_boundary_problems,
        get_field_assembly, get_boundary_assembly,
        initialize!, create_projection, eliminate_interior_dofs,
-       is_field_problem, is_boundary_problem
+       is_field_problem, is_boundary_problem, get_solution_vector
 include("solvers_modal.jl")
 export Modal
 

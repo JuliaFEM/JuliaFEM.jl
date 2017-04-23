@@ -2,64 +2,53 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM.Preprocess
 using JuliaFEM.Testing
 
 @testset "test 2d nonlinear elasticity with surface load" begin
-    meshfile = "/geometry/2d_block/BLOCK_1elem.med"
-    mesh = aster_read_mesh(Pkg.dir("JuliaFEM")*meshfile)
+
+    X = Dict(1 => [0.0, 0.0],
+             2 => [1.0, 0.0],
+             3 => [1.0, 1.0],
+             4 => [0.0, 1.0])
+
+    el1 = Element(Quad4, [1, 2, 3, 4])
+    update!(el1, "geometry", X)
+    update!(el1, "youngs modulus", 288.0)
+    update!(el1, "poissons ratio", 1/3)
+    update!(el1, "displacement load 2", 576.0)
+
+    el2 = Element(Seg2, [3, 4])
+    update!(el2, "geometry", X)
+    update!(el2, "displacement traction force 2", 288.0)
 
     # field problem
     block = Problem(Elasticity, "BLOCK", 2)
     block.properties.formulation = :plane_stress
     block.properties.finite_strain = true
     block.properties.geometric_stiffness = true
+    push!(block.elements, el1, el2)
 
-    block.elements = create_elements(mesh, "BLOCK")
-    update!(block.elements, "youngs modulus", 288.0)
-    update!(block.elements, "poissons ratio", 1/3)
-    update!(block.elements, "displacement load 2", 576.0)
-
-    traction = create_elements(mesh, "TOP")
-    update!(traction, "displacement traction force 2", 288.0)
-    push!(block, traction...)
+    el3 = Element(Seg2, [1, 2])
+    update!(el3, "geometry", X)
+    update!(el3, "displacement 2", 0.0)
+    el4 = Element(Seg2, [4, 1])
+    update!(el4, "geometry", X)
+    update!(el4, "displacement 1", 0.0)
 
     # boundary conditions
     bc_sym = Problem(Dirichlet, "symmetry bc", 2, "displacement")
-    bc_elements_left = create_elements(mesh, "LEFT")
-    bc_elements_bottom = create_elements(mesh, "BOTTOM")
-    update!(bc_elements_left, "displacement 1", 0.0)
-    update!(bc_elements_bottom, "displacement 2", 0.0)
-    push!(bc_sym, bc_elements_left..., bc_elements_bottom...)
+    push!(bc_sym, el3, el4)
 
-    solver = NonlinearSolver("solve block problem")
-    push!(solver, block, bc_sym)
+    solver = Solver(Nonlinear, block, bc_sym)
     solver()
 
-    # from code aster
+    # verified using from code aster
     u3_expected = [-4.92316106779943E-01, 7.96321884292103E-01]
     eps_zz = -3.71128811855451E-01
     eps_expected = [-3.71128532282463E-01, 1.11338615599337E+00, 0.0]
     sig_expected = [ 3.36174888827909E-05, 2.23478729403118E+03, 0.0]
 
-    u3 = reshape(block.assembly.u, 2, 4)[:, 3]
-    info("u3 = $u3")
+    u3 = reshape(get_solution_vector(solver), 2, 4)[:,3]
+    info("u3 = $u3, u3_expected = $u3_expected")
     @test isapprox(u3, u3_expected, atol=1.0e-5)
-
-    #= TODO: Test postprocessing in separate test
-    info("strain")
-    for ip in get_integration_points(block.elements[1])
-        eps = ip("strain")
-        @printf "%i | %8.3f %8.3f | %8.3f %8.3f %8.3f\n" ip.id ip.coords[1] ip.coords[2] eps[1] eps[2] eps[3]
-        @test isapprox(eps, eps_expected)
-    end
-
-    info("stress")
-    for ip in get_integration_points(block.elements[1])
-        sig = ip("stress")
-        @printf "%i | %8.3f %8.3f | %8.3f %8.3f %8.3f\n" ip.id ip.coords[1] ip.coords[2] sig[1] sig[2] sig[3]
-        #@test isapprox(sig, sig_expected)
-    end
-    =#
 end
-
