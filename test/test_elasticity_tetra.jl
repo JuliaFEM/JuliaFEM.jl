@@ -6,62 +6,72 @@ using JuliaFEM.Preprocess
 using JuliaFEM.Testing
 
 @testset "test tet4 + volume load" begin
-    X1 = [2.0, 3.0, 4.0]
-    X2 = [6.0, 3.0, 2.0]
-    X3 = [2.0, 5.0, 1.0]
-    X4 = [4.0, 3.0, 6.0]
-    e1 = Element(Tet4, [1, 2, 3, 4])
-    e1["geometry"] = Node[X1, X2, X3, X4]
-    e1["youngs modulus"] = 96.0
-    e1["poissons ratio"] = 1/3
-    e1["displacement load 3"] = 784.0/110.0
-    e2 = Element(Tri3, [1, 2, 3])
-    e2["geometry"] = Node[X2, X1, X3]
-    e2["displacement 1"] = 0.0
-    e2["displacement 2"] = 0.0
-    e2["displacement 3"] = 0.0
-    p1 = Problem(Elasticity, "tetra", 3)
-    p2 = Problem(Dirichlet, "bc", 3, "displacement")
-    push!(p1, e1)
-    push!(p2, e2)
-    s = Solver(Linear)
-    push!(s, p1, p2)
-    s()
-    u_4 = p1.assembly.u[10:end]
-    u_expected = [-3.0/220.0, -9.0/220.0, 1.0/10.0]
-    @test isapprox(u_4, u_expected)
-end
-
-@testset "test tet4 + surface load" begin
-    nodes = Dict{Int, Vector{Float64}}(
+    X = Dict(
         1 => [2.0, 3.0, 4.0],
         2 => [6.0, 3.0, 2.0],
         3 => [2.0, 5.0, 1.0],
         4 => [4.0, 3.0, 6.0])
+
     e1 = Element(Tet4, [1, 2, 3, 4])
-    update!(e1, "geometry", nodes)
-    e1["youngs modulus"] = 96.0
-    e1["poissons ratio"] = 1/3
+    update!(e1, "geometry", X)
+    update!(e1, "youngs modulus", 96.0)
+    update!(e1, "poissons ratio", 1/3)
+    update!(e1, "displacement load 3", 784.0/110.0)
+
     e2 = Element(Tri3, [1, 2, 3])
-    update!(e2, "geometry", nodes)
-    e2["displacement 1"] = 0.0
-    e2["displacement 2"] = 0.0
-    e2["displacement 3"] = 0.0
+    update!(e2, "geometry", X)
+    update!(e2, "displacement 1", 0.0)
+    update!(e2, "displacement 2", 0.0)
+    update!(e2, "displacement 3", 0.0)
+
+    p1 = Problem(Elasticity, "tetra", 3)
+    p2 = Problem(Dirichlet, "bc", 3, "displacement")
+    push!(p1, e1)
+    push!(p2, e2)
+
+    solver = Solver(Linear, p1, p2)
+    solver()
+
+    u4 = reshape(get_solution_vector(solver), solver.ndim, solver.nnodes)[:,4]
+    u4_expected = [-3.0/220.0, -9.0/220.0, 1.0/10.0]
+    debug("tet4 + volume load: u4 = $u4, u4_expected = $u4_expected")
+    @test isapprox(u4, u4_expected)
+end
+
+@testset "test tet4 + surface load" begin
+    X = Dict(
+        1 => [2.0, 3.0, 4.0],
+        2 => [6.0, 3.0, 2.0],
+        3 => [2.0, 5.0, 1.0],
+        4 => [4.0, 3.0, 6.0])
+
+    e1 = Element(Tet4, [1, 2, 3, 4])
+    update!(e1, "geometry", X)
+    update!(e1, "youngs modulus", 96.0)
+    update!(e1, "poissons ratio", 1/3)
+
+    e2 = Element(Tri3, [1, 2, 3])
+    update!(e2, "geometry", X)
+    update!(e2, "displacement 1", 0.0)
+    update!(e2, "displacement 2", 0.0)
+    update!(e2, "displacement 3", 0.0)
+    
     e3 = Element(Tri3, [4, 3, 2])
-    update!(e3, "geometry", nodes)
+    update!(e3, "geometry", X)
     update!(e3, "surface pressure", -96.0)
+
     p1 = Problem(Elasticity, "tetra", 3)
     p2 = Problem(Dirichlet, "bc", 3, "displacement")
     push!(p1, e1, e3)
     push!(p2, e2)
-    s = Solver(Linear)
-    push!(s, p1, p2)
-    s()
-    u_4 = p1.assembly.u[10:end]
-    u_expected = [-17.0/14.0, -27.0/14.0, 1.0]
-    info("u_4 = $(u_4)")
-    info("u_expected = $(u_expected)")
-    @test isapprox(u_4, u_expected)
+
+    solver = Solver(Linear, p1, p2)
+    solver()
+
+    u4 = reshape(get_solution_vector(solver), solver.ndim, solver.nnodes)[:,4]
+    u4_expected = [-17.0/14.0, -27.0/14.0, 1.0]
+    debug("tet4 + surface load: u4 = $u4, u4_expected = $u4_expected")
+    @test isapprox(u4, u4_expected)
 end
 
 #= TODO: Fix test. Make linear perturbation solver.
