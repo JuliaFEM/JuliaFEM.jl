@@ -44,24 +44,10 @@ function size(b::SparseVectorCOO)
     return (maximum(b.I),)
 end
 
-function nnz(b::SparseVectorCOO)
-    return length(nonzeroinds(b))
-end
-
-function nonzeroinds(b::SparseVectorCOO)
-    return unique(b.I)
-end
-
-function nonzeros(b::SparseVectorCOO)
-    return nonzeros(sparsevec(b.I, b.V))
-end
-
-function isempty(b::SparseVectorCOO)
-    return b.cnt == 0
-end
-
-function full(b::SparseVectorCOO, args...)
-    full(sparsevec(b, args...))
+function sparsevec(b::SparseVectorCOO, args...)
+    b_new = Base.sparsevec(b.I[1:b.cnt], b.V[1:b.cnt], args...)
+    SparseArrays.dropzeros!(b_new)
+    return b_new
 end
 
 function empty!(b::SparseVectorCOO)
@@ -72,8 +58,24 @@ function empty!(b::SparseVectorCOO)
     return b
 end
 
-function sparsevec(b::SparseVectorCOO, args...)
-    return Base.sparsevec(b.I[1:b.cnt], b.V[1:b.cnt], args...)
+function nnz(b::SparseVectorCOO)
+    return nnz(sparsevec(b))
+end
+
+function nonzeroinds(b::SparseVectorCOO)
+    return nonzeroinds(sparsevec(b))
+end
+
+function nonzeros(b::SparseVectorCOO)
+    return nonzeros(sparsevec(b))
+end
+
+function isempty(b::SparseVectorCOO)
+    return b.cnt == 0
+end
+
+function full(b::SparseVectorCOO, args...)
+    return full(sparsevec(b, args...))
 end
 
 #=

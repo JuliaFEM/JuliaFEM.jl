@@ -2,6 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/SparseCOO.jl/blob/master/LICENSE.md
 
 import Base: convert, size, full, resize!, empty!, isempty, isapprox, findnz, getindex, sparse
+import Base.SparseArrays: nnz
 
 global const SPARSEMATRIXCOO_DEFAULT_BLOCK_SIZE = 1024*1024
 
@@ -43,6 +44,10 @@ end
 
 function findnz(A::SparseMatrixCOO)
     return (A.I[1:A.cnt], A.J[1:A.cnt], A.V[1:A.cnt])
+end
+
+function nnz(A::SparseMatrixCOO)
+    return nnz(sparse(A))
 end
 
 function size(A::SparseMatrixCOO)
