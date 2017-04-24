@@ -1,17 +1,11 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM
-using DataFrames
-using HDF5
-using LightXML
-using Formatting
-
 """
 Calculate field values to nodal points from Gauss points using least-squares fitting.
 """
-function calc_nodal_values!(elements::Vector, field_name, field_dim, time;
-                            F=nothing, nz=nothing, b=nothing, return_F_and_nz=false)
+function calc_nodal_values!(elements::Vector, field_name::String, time::Float64;
+                            F=nothing, nz=nothing, b=nothing)
 
     if F == nothing
         A = SparseMatrixCOO()
@@ -24,8 +18,8 @@ function calc_nodal_values!(elements::Vector, field_name, field_dim, time;
                 add!(A, gdofs, gdofs, w*kron(N', N))
             end
         end
-        A = sparse(A)
         nz = get_nonzero_rows(A)
+        A = sparse(A)
         A = 1/2*(A + A')
         F = ldltfact(A[nz,nz])
     end
@@ -36,16 +30,14 @@ function calc_nodal_values!(elements::Vector, field_name, field_dim, time;
             gdofs = get_connectivity(element)
             for ip in get_integration_points(element)
                 if !haskey(ip, field_name)
-                    info("warning: integration point does not have field $field_name")
+                    warn("integration point does not have field $field_name")
                     continue
                 end
                 detJ = element(ip, time, Val{:detJ})
                 w = ip.weight*detJ
                 f = ip(field_name, time)
                 N = element(ip, time)
-                for dim=1:field_dim
-                    add!(b, gdofs, w*f[dim]*N, dim)
-                end
+                add!(b, gdofs, collect(1:length(f)), w*(f*N)')
             end
         end
         b = sparse(b)
@@ -53,14 +45,9 @@ function calc_nodal_values!(elements::Vector, field_name, field_dim, time;
 
     x = zeros(size(b)...)
     x[nz, :] = F \ b[nz, :]
-    nodal_values = Dict()
-    for i=1:size(x,1)
-        nodal_values[i] = vec(x[i,:])
-    end
+    nodal_values = Dict(i => vec(x[i,:]) for i=1:size(x,1))
     update!(elements, field_name, time => nodal_values)
-    if return_F_and_nz
-        return F, nz
-    end
+    return F, nz
 end
 
 """

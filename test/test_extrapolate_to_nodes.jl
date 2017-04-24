@@ -24,7 +24,7 @@ using JuliaFEM.Testing
     update!(get_integration_points(el2), "stress", time => [2.0, 3.0, 4.0])
     field_name = "stress"
     field_dim = 3
-    calc_nodal_values!(elements, field_name, field_dim, time)
+    calc_nodal_values!(elements, field_name, time)
     s1 = el1("stress", [0.0, 0.0], time)
     s2 = el2("stress", [0.0, 0.0], time)
     # visually checked, see blog post "Postprocessing stress"

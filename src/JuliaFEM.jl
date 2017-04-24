@@ -152,10 +152,19 @@ export aster_create_elements, parse_aster_med_file, is_aster_mail_keyword,
 end
 
 module Postprocess
+
+using JuliaFEM
+using FEMSparse
+using DataFrames
+using HDF5
+using LightXML
+using Formatting
+
 include("postprocess_utils.jl")
 export calc_nodal_values!, get_nodal_vector, get_nodal_dict, copy_field!,
        calculate_area, calculate_center_of_mass,
        calculate_second_moment_of_mass, extract
+
 end
 
 module Abaqus
