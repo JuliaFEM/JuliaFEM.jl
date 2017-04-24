@@ -296,42 +296,18 @@ function solve!(solver::Solver; empty_field_assemblies_before_solution=true, sym
 end
 
 """ Default assembler for solver. """
-function assemble!(solver::Solver; timing=true, with_mass_matrix=false)
-    info("Assembling problems ...")
+function assemble!(solver::Solver; with_mass_matrix=false)
 
-    function do_assemble(problem)
-        t00 = Base.time()
-        empty!(problem.assembly)
-        assemble!(problem, solver.time)
-        if with_mass_matrix && is_field_problem(problem)
-            assemble!(problem, solver.time, Val{:mass_matrix})
-        end
-        t11 = Base.time()
-        return t11-t00
-    end
-
-    t0 = Base.time()
-    assembly_times = map(do_assemble, solver.problems)
-    nproblems = length(assembly_times)
-
-    ndofs = 0
-    for problem in solver.problems
-        Ks = size(problem.assembly.K, 2)
-        Cs = size(problem.assembly.C1, 2)
-        ndofs = max(ndofs, Ks, Cs)
-    end
-
-    solver.ndofs = ndofs
-    t1 = round(Base.time()-t0, 2)
-    info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
-    if timing
-        info("Assembly times:")
-        for (i, problem) in enumerate(solver.problems)
-            pn = problem.name
-            pt = round(assembly_times[i], 2)
-            info("$i $pn $pt")
+    for problem in get_problems(solver)
+        timeit(to, "assemble $(problem.name)") do
+            empty!(problem.assembly)
+            assemble!(problem, solver.time)
+            if with_mass_matrix && is_field_problem(problem)
+                assemble!(problem, solver.time, Val{:mass_matrix})
+            end
         end
     end
+
 end
 
 function get_unknown_fields(solver::Solver)

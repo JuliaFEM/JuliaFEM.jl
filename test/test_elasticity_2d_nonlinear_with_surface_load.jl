@@ -52,3 +52,5 @@ using JuliaFEM.Testing
     info("u3 = $u3, u3_expected = $u3_expected")
     @test isapprox(u3, u3_expected, atol=1.0e-5)
 end
+
+print_statistics()
