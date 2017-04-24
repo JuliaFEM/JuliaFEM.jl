@@ -30,21 +30,21 @@ using DataFrames
 
     empty!(problem.assembly)
     solver()
-    @test isapprox(solver("temperature", 0.0)[3], 1.0)
+    @test isapprox(get_nodal_value(element, "temperature", 0.0, 3), 1.0)
 
     empty!(problem.assembly)
     solver()
-    @test isapprox(solver("temperature", 0.0)[3], 1.0)
+    @test isapprox(get_nodal_value(element, "temperature", 0.0, 3), 1.0)
 
     solver.time = 1.0
 
     empty!(problem.assembly)
     solver()
-    @test isapprox(solver("temperature", 1.0)[3], 2.0)
+    @test isapprox(get_nodal_value(element, "temperature", 1.0, 3), 2.0)
 
     empty!(problem.assembly)
     solver()
-    @test isapprox(solver("temperature", 1.0)[3], 2.0)
+    @test isapprox(get_nodal_value(element, "temperature", 1.0, 3), 2.0)
 
 end
 
@@ -73,20 +73,20 @@ end
 
     empty!(problem.assembly)
     solver()
-    @test isapprox(solver("temperature", 0.0)[3], 1.0)
+    @test isapprox(get_nodal_value(element, "temperature", 0.0, 3), 1.0)
 
     empty!(problem.assembly)
     solver()
-    @test isapprox(solver("temperature", 0.0)[3], 1.0)
+    @test isapprox(get_nodal_value(element, "temperature", 0.0, 3), 1.0)
 
     solver.time = 1.0
 
     empty!(problem.assembly)
     solver()
-    @test isapprox(solver("temperature", 1.0)[3], 2.0)
+    @test isapprox(get_nodal_value(element, "temperature", 1.0, 3), 2.0)
 
     empty!(problem.assembly)
     solver()
-    @test isapprox(solver("temperature", 1.0)[3], 2.0)
+    @test isapprox(get_nodal_value(element, "temperature", 1.0, 3), 2.0)
 
 end

@@ -45,7 +45,7 @@ end
 using FEMSparse
 
 include("fields.jl")
-export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment
+export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment, isconstant
 
 include("types.jl")  # data types: Point, IntegrationPoint, ...
 export AbstractPoint, Point, IntegrationPoint, IP, Node
@@ -54,7 +54,7 @@ export AbstractPoint, Point, IntegrationPoint, IP, Node
 include("elements.jl") # common element routines
 export Node, AbstractElement, Element, update!, get_connectivity, get_basis,
        get_dbasis, inside, get_local_coordinates, get_element_type,
-       filter_by_element_type, get_element_id
+       filter_by_element_type, get_element_id, get_nodal_value
 
 include("elements_lagrange.jl") # Continuous Galerkin (Lagrange) elements
 export get_reference_coordinates,

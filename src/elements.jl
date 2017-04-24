@@ -62,6 +62,43 @@ function setindex!(element::Element, data, field_name)
     element.fields[field_name] = Field(data)
 end
 
+function hasfield(element::Element, field_name::String)
+    return haskey(element.fields, field_name)
+end
+
+function hasconnectivity(element::Element, node_id::Int64)
+    return node_id in element.connectivity
+end
+
+""" Extract a field from element. """
+function getfield(element::Element, field_name::String)
+    return element.fields[field_name]
+end
+
+""" Get field nodal values from element.
+
+Returns
+-------
+Dict, id => value
+
+"""
+function get_nodal_values(element::Element, field_name::String, time::Float64)
+    hasfield(element, field_name) || error("get_nodal_values(): field $field_name not defined in element")
+    field = getfield(element, field_name)
+    field_data = field(time)
+    connectivity = get_connectivity(element)
+    if isconstant(field)
+        return Dict(c => field_data for c in connectivity)
+    else
+        return Dict(c => field_data[i] for (i, c) in enumerate(connectivity))
+    end
+end
+
+function get_nodal_value(element::Element, field_name::String, time::Float64, node_id::Int64)
+    hasconnectivity(element, node_id) || error("get_nodal_value(): node $node_id not in element")
+    return get_nodal_values(element, field_name, time)[node_id]
+end
+
 """ Return a Field object from element.
 
 Examples

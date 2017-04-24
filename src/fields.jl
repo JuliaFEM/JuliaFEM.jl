@@ -27,6 +27,14 @@ typealias CVTI Field{Continuous, Variable, TimeInvariant} # can be used to inter
 typealias CCTV Field{Continuous, Constant, TimeVariant} # can be used to interpolate in time
 typealias CVTV Field{Continuous, Variable, TimeVariant}
 
+function isconstant(f::Field)
+    return false
+end
+
+function isconstant{A,B<:Constant,C}(f::Field{A,B,C})
+    return true
+end
+
 # Discrete fields
 
 
