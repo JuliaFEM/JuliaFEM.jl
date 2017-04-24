@@ -23,7 +23,7 @@ using JuliaFEM.Postprocess
     update!(fixed, "temperature 1", 0.0)
     solver = LinearSolver(prob, face, fixed)
     solver()
-    T = prob.assembly.u
+    T = get_solution_vector(solver)
     info("Solution: $T")
     T_expected = [ # using code aster
         1.45606533688540E+01
@@ -230,7 +230,7 @@ end
         update!(p2, "temperature 1", 100.0)
         solver = LinearSolver(p1, p2)
         solver()
-        T_min = minimum(p1.assembly.u)
+        T_min = minimum(get_solution_vector(solver))
         return T_min
     end
     for model in ["Tet4", "Tet10", "Hex8", "Hex20", "Hex27"]
@@ -278,7 +278,7 @@ end
         update!(p2, "temperature 1", 100.0)
         solver = LinearSolver(p1, p2)
         solver()
-        return p1.assembly.u
+        return get_solution_vector(solver)
     end
 
     CA_sol = Dict(
