@@ -53,7 +53,7 @@ using JuliaFEM.Testing
     sig_expected = [ 4.50685020821470E-06, 4.62857140373777E+02, 0.0]
     u3_expected =  [-2.36237356855269E-01, 5.00000000000000E-01]
 
-    u3 = reshape(block.assembly.u, 2, 4)[:, 3]
+    u3 = reshape(get_solution_vector(solver), 2, 4)[:,3]
     info("u3 = $u3")
     #@test isapprox(u3, u3_expected, atol=1.0e-5)
 # end
