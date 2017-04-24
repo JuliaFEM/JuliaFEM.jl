@@ -27,25 +27,21 @@ end
 function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
                                         M_red::SparseMatrixCSC,
                                         problem::Problem{Dirichlet}, ndim::Int)
-    K = sparse(problem.assembly.K, ndim, ndim)
+    # only homogenenous boundary condition u=0 is implemented at the moment.
+    @assert nnz(problem.assembly.K) == 0
+    @assert nnz(problem.assembly.D) == 0
+    @assert nnz(problem.assembly.Kg) == 0
+    @assert nnz(problem.assembly.fg) == 0
+    @assert nnz(problem.assembly.f) == 0
+    @assert nnz(problem.assembly.g) == 0
+
     C1 = sparse(problem.assembly.C1, ndim, ndim)
     C2 = sparse(problem.assembly.C2, ndim, ndim)
-    D = sparse(problem.assembly.D, ndim, ndim)
-    f = sparse(problem.assembly.f, ndim, 1)
-    g = sparse(problem.assembly.g, ndim, 1)
-    Kg = sparse(problem.assembly.Kg, ndim, ndim)
-    fg = sparse(problem.assembly.fg, ndim, ndim)
-    # only homogenenous boundary condition u=0 is implemented at the moment.
-    @assert nnz(K) == 0
-    @assert nnz(D) == 0
-    @assert nnz(Kg) == 0
-    @assert nnz(fg) == 0
-    @assert nnz(f) == 0
-    @assert nnz(g) == 0
     @assert C1 == C2
     @assert isdiag(C1)
-    nz = get_nonzero_rows(C1)
-    info("bc $(problem.name): $(length(nz)) nonzeros, $nz")
+    nz = sort(unique(rowvals(C1)))
+    debug("bc $(problem.name): $(length(nz)) nonzeros, $nz")
+
     K_red[nz,:] = 0.0
     K_red[:,nz] = 0.0
     M_red[nz,:] = 0.0
@@ -55,15 +51,15 @@ end
 """ Given data vector, return slave displacements. """
 function calc_projection(problem::Problem{Mortar}, ndim::Int)
 
+    @assert nnz(problem.assembly.K) == 0
+    @assert nnz(problem.assembly.D) == 0
+    @assert nnz(problem.assembly.Kg) == 0
+    @assert nnz(problem.assembly.fg) == 0
+    @assert nnz(problem.assembly.f) == 0
+    @assert nnz(problem.assembly.g) == 0
+
     C1 = sparse(problem.assembly.C1, ndim, ndim)
     C2 = sparse(problem.assembly.C2, ndim, ndim)
-
-    @assert nnz(sparse(problem.assembly.K)) == 0
-    @assert nnz(sparse(problem.assembly.D)) == 0
-    @assert nnz(sparse(problem.assembly.Kg)) == 0
-    @assert nnz(sparse(problem.assembly.fg)) == 0
-    @assert nnz(sparse(problem.assembly.f)) == 0
-    @assert nnz(sparse(problem.assembly.g)) == 0
 
     @assert C1 == C2
     #@assert problem.properties.dual_basis == true
@@ -83,7 +79,6 @@ function calc_projection(problem::Problem{Mortar}, ndim::Int)
     else
         P = D_ \ M_
     end
-    info("Matrix P ready.")
 
     return S, M, P
 end
@@ -94,53 +89,24 @@ function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
                                         M_red::SparseMatrixCSC,
                                         problem::Problem{Mortar}, ndim::Int)
 
+    @assert nnz(problem.assembly.K) == 0
+    @assert nnz(problem.assembly.D) == 0
+    @assert nnz(problem.assembly.Kg) == 0
+    @assert nnz(problem.assembly.fg) == 0
+    @assert nnz(problem.assembly.f) == 0
+    @assert nnz(problem.assembly.g) == 0
+
     C1 = sparse(problem.assembly.C1, ndim, ndim)
     C2 = sparse(problem.assembly.C2, ndim, ndim)
 
-    @assert nnz(sparse(problem.assembly.K)) == 0
-    @assert nnz(sparse(problem.assembly.D)) == 0
-    @assert nnz(sparse(problem.assembly.Kg)) == 0
-    @assert nnz(sparse(problem.assembly.fg)) == 0
-    @assert nnz(sparse(problem.assembly.f)) == 0
-    @assert nnz(sparse(problem.assembly.g)) == 0
-
     @assert C1 == C2
-    #@assert problem.properties.dual_basis == true
     @assert problem.properties.adjust == false
 
-    info("Eliminating mesh tie constraint $(problem.name) using static condensation")
+    debug("Eliminating mesh tie constraint $(problem.name) using static condensation")
 
-    #=
-    # determine master and slave dofs
-    dim = get_unknown_field_dimension(problem)
-    M = Set{Int64}()
-    S = Set{Int64}()
-    slave_elements = get_slave_elements(problem)
-    master_elements = setdiff(get_elements(problem), slave_elements)
-
-    for element in slave_elements
-        for j in get_connectivity(element)
-            for i=1:dim
-                push!(S, dim*(j-1)+i)
-            end
-        end
-    end
-
-    for element in master_elements
-        for j in get_connectivity(element)
-            for i=1:dim
-                push!(M, dim*(j-1)+i)
-            end
-        end
-    end
-
-    S = sort(collect(S))
-    M = sort(collect(M))
-    =#
     S = get_nonzero_rows(C2)
     M = setdiff(get_nonzero_columns(C2), S)
-    #N = setdiff(get_nonzero_rows(K_red), get_nonzero_columns(C2))
-    info("# slave dofs = $(length(S)), # master dofs = $(length(M))")
+    debug("# slave dofs = $(length(S)), # master dofs = $(length(M))")
 
     # Construct matrix P = D^-1*M
     D_ = C2[S,S]
@@ -153,52 +119,19 @@ function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
     else
         P = D_ \ M_
     end
-    #@assert isdiag(D_)
-    info("Matrix P ready.")
+
     Id = ones(ndim)
-    #Id[S] = 0
-    #Id[M] = 0
     Q = spdiagm(Id)
     Q[M,S] += P'
-    info("Matrix Q ready.")
 
-    # testing
-    #K_red_orig = copy(K_red)    
-    #K_red[N,M] += K_red[N,S]*P
-    #K_red[M,N] += P'*K_red[S,N]
-    #K_red[M,M] += P'*K_red[S,S]*P
-    #K_red[S,:] = 0.0
-    #K_red[:,S] = 0.0
-    
-    info("K transform")
     K_red[:,:] = Q*K_red*Q'
     K_red[S,:] = 0.0
     K_red[:,S] = 0.0
 
-    #K_res = K_red - K_red_2
-    #SparseArrays.droptol!(K_res, 1.0e-9)
-
-    info("K transform ready")
-    #info("Create matrices, M")
-    #info("Sum matricse, M")
-    #M_red_orig = copy(M_red)
-    #M_red[N,M] += M_red[N,S]*P
-    #M_red[M,N] += P'*M_red[S,N]
-    #M_red[M,M] += P'*M_red[S,S]*P
-    #M_red[S,:] = 0.0
-    #M_red[:,S] = 0.0
-    info("M transform")
     M_red[:,:] = Q*M_red*Q'
     M_red[S,:] = 0.0
     M_red[:,S] = 0.0
-    info("M transform ready")
  
-    #M_res = M_red - M_red_2
-    #SparseArrays.droptol!(M_res, 1.0e-9)
-    #info("Diff")
-    #println(K_res)
-    #println(M_res)
-
     return true
 end
 
@@ -218,33 +151,33 @@ function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=tru
     info(repeat("-", 80))
     initialize!(solver)
     assemble!(solver; with_mass_matrix=true)
-    M, K, Kg, f = get_field_assembly(solver)
+    M, K, Kg, f, fg, c1, C2, D, g = get_assembly(solver)
+
+    K_red = sparse(K)
+    M_red = sparse(M)
     if solver.properties.geometric_stiffness
-        K += Kg
+        K_red += sparse(Kg)
     end
 
-    dim = size(K, 1)
+    dim = size(K_red, 1)
 
     nboundary_problems = length(get_boundary_problems(solver))
 
-    K_red = K
-    M_red = M
-
     if !(P == nothing)
-        tic()
         info("Using custom P to make transform K_red = P'*K*P and M_red = P'*M*P")
-        K_red = P'*K_red*P
-        M_red = P'*M_red*P
-        t1 = round(toq(), 2)
-        info("Transform ready in $t1 seconds.")
-    elseif nboundary_problems != 0
-        tic()
-        info("Eliminate boundary conditions from system.")
-        for boundary_problem in get_boundary_problems(solver)
-            eliminate_boundary_conditions!(K_red, M_red, boundary_problem, dim)
+        @timeit "Use custom P to transform K and M" begin
+            K_red = P'*K_red*P
+            M_red = P'*M_red*P
         end
-        t1 = round(toq(), 2)
-        info("Eliminated boundary conditions in $t1 seconds.")
+    elseif nboundary_problems != 0
+        info("Eliminate boundary conditions from system.")
+        @timeit "Eliminate boundary conditions from system." begin 
+            for boundary_problem in get_boundary_problems(solver)
+                timeit("Eliminate boundary condition $(boundary_problem.name)") do
+                    eliminate_boundary_conditions!(K_red, M_red, boundary_problem, dim)
+                end
+            end
+        end
     else
         info("No boundary Dirichlet boundary conditions found for system.")
     end
@@ -337,7 +270,7 @@ function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=tru
 
     props.eigvals = om2
     neigvals = length(om2)
-    props.eigvecs = zeros(ndofs, neigvals)
+    props.eigvecs = zeros(dim, neigvals)
     for i=1:neigvals
         props.eigvecs[nz,i] = X[:,i]
         for problem in get_boundary_problems(solver)
