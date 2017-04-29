@@ -174,8 +174,8 @@ function get_assembly(solver::Solver)
 
         # do a simple check that we do not have overconstrained dofs in system
         # this is just for case, we have tested this already
-        nz_C2 = FEMSparse.get_nonzero_rows(problem.assembly.C2)
-        nz_D = FEMSparse.get_nonzero_rows(problem.assembly.D)
+        nz_C2 = get_nonzero_rows(problem.assembly.C2)
+        nz_D = get_nonzero_rows(problem.assembly.D)
         new_constraints = union(nz_C2, nz_D)
         overconstrained_dofs = intersect(already_constrained_dofs, new_constraints)
         if length(overconstrained_dofs) != 0

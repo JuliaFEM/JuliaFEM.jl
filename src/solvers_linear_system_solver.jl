@@ -70,7 +70,9 @@ Solve linear system using LU factorization (UMFPACK). This version solves
 directly the saddle point problem without elimination of boundary conditions.
 If matrix has zero rows, diagonal term is added to that matrix is invertible.
 """
-function solve_linear_system!(la::LinearSystem, ::Type{Val{3}})
+function solve_linear_system!(ls::LinearSystem, ::Type{Val{3}})
+
+    K, C1, C2, D, f, g, du, la = ls.K, ls.C1, ls.C2, ls.D, ls.f, ls.g, ls.du, ls.la
 
     A = [K C1'; C2  D]
     b = [f; g]

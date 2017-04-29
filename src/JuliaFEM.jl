@@ -10,6 +10,9 @@ This is JuliaFEM -- Finite Element Package
 """
 module JuliaFEM
 
+using FEMSparse
+import FEMSparse: get_nonzero_rows, get_nonzero_columns
+
 # Magic stuff to make life with SparseMatrixCSC easier
 include("sparse.jl")
 
@@ -41,8 +44,6 @@ module Testing
     export @test, @testset, @test_throws
 
 end
-
-using FEMSparse
 
 include("fields.jl")
 export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment, isconstant

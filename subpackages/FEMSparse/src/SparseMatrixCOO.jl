@@ -2,7 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/SparseCOO.jl/blob/master/LICENSE.md
 
 import Base: convert, size, full, resize!, empty!, isempty, isapprox, findnz, getindex, sparse
-import Base.SparseArrays: nnz
+import Base.SparseArrays: nnz, dropzeros!
 
 global const SPARSEMATRIXCOO_DEFAULT_BLOCK_SIZE = 1024*1024
 
@@ -158,9 +158,17 @@ function add!(A::SparseMatrixCOO, B::SparseMatrixCSC)
 end
 
 function get_nonzero_rows(A::SparseMatrixCOO)
-    return unique(A.I[1:A.cnt])
+    nonzeros = find(A.V[1:A.cnt] .!= 0)
+    return unique(A.I[nonzeros])
 end
 
 function get_nonzero_columns(A::SparseMatrixCOO)
-    return unique(A.J[1:A.cnt])
+    nonzeros = find(A.V[1:A.cnt] .!= 0)
+    return unique(A.J[nonzeros])
+end
+
+""" Remove row. """
+function remove_row!{Tv,Ti<:Integer}(A::SparseMatrixCOO{Tv,Ti}, dof::Int64)
+    indices = find(A.I[1:A.cnt] .== dof)
+    A.V[indices] = Tv(0)
 end
