@@ -32,7 +32,9 @@ using JuliaFEM.Testing
     solver = Solver(Linear, p1, p2)
     solver()
 
-    u4 = reshape(get_solution_vector(solver), solver.ndim, solver.nnodes)[:,4]
+    u = get_solution_vector(solver)
+    println(u)
+    u4 = reshape(u, solver.ndim, solver.nnodes)[:,4]
     u4_expected = [-3.0/220.0, -9.0/220.0, 1.0/10.0]
     debug("tet4 + volume load: u4 = $u4, u4_expected = $u4_expected")
     @test isapprox(u4, u4_expected)
