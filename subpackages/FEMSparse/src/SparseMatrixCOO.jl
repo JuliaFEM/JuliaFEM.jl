@@ -52,7 +52,7 @@ end
 
 function size(A::SparseMatrixCOO)
     isempty(A) && return (0, 0)
-    return maximum(A.I), maximum(A.J)
+    return maximum(A.I[1:A.cnt]), maximum(A.J[1:A.cnt])
 end
 
 function size(A::SparseMatrixCOO, idx::Int)
