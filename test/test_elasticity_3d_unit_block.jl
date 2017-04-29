@@ -36,7 +36,7 @@ function calc_model(mesh_name; with_volume_load=false)
     solver = Solver(Linear, block, traction, bc)
     solver()
 
-    u = reshape(get_solution_vector(solver), solver.ndim, solver.nnodes)
+    u = get_solution_vector(solver)
     return block, u
 end
 
