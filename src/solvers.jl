@@ -96,6 +96,31 @@ function haskey(solver::Solver, field_name::String)
     return haskey(solver.fields, field_name)
 end
 
+function get_elements(solver::Solver)
+    elements = Element[]
+    for problem in get_problems(solver)
+        for element in get_elements(problem)
+            push!(elements, element)
+        end
+    end
+    return elements
+end
+
+""" Return a dictionary of field nodal values. """
+function get_nodal_values(solver::Solver, field_name::String, time::Float64)
+    nodal_values = Dict()
+    for element in get_elements(solver)
+        hasfield(element, field_name) || continue
+        for (c, v) in get_nodal_values(element, field_name, time)
+            if haskey(nodal_values, c)
+                @assert isapprox(nodal_values[c], v)
+            end
+            nodal_values[c] = v
+        end
+    end
+    return nodal_values
+end
+
 # one-liner helpers to identify problem types
 
 is_field_problem(problem) = false

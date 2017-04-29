@@ -303,7 +303,7 @@ function update_xdmf!(solver::Solver{Modal})
     xdmf = get(solver.xdmf)
 
     # geometry
-    X_ = solver("geometry", solver.time)
+    X_ = get_nodal_values(solver, "geometry", solver.time)
     node_ids = sort(collect(keys(X_)))
     X = hcat([X_[nid] for nid in node_ids]...)
     ndim, nnodes = size(X)
@@ -311,7 +311,7 @@ function update_xdmf!(solver::Solver{Modal})
 
     # topology
     nid_mapping = Dict(j=>i for (i, j) in enumerate(node_ids)) 
-    all_elements = get_all_elements(solver)
+    all_elements = get_elements(solver)
     nelements = length(all_elements)
     debug("Saving topology: $nelements elements total.")
     element_types = unique(map(get_element_type, all_elements))
