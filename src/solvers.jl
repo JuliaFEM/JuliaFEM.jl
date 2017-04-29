@@ -229,9 +229,14 @@ function solve!(solver::Solver; empty_field_assemblies_before_solution=true, sym
 
     if solver.ndofs == 0
         K_size = size(K)
+        if K_size[1] != K_size[2]
+            println(sparse(K))
+            println(full(K))
+            error("solve!(): K is not square, size(K) = $K_size")
+        end
         @assert K_size[1] == K_size[2]
         solver.ndofs = K_size[1]
-        info("solve!(): automatically determined problem dimension, ndofs = $(solver.ndofs)")
+        debug("solve!(): automatically determined problem dimension, ndofs = $(solver.ndofs)")
     end
 
     ls = solver.ls
