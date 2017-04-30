@@ -108,7 +108,7 @@ end
 
 """ Return a dictionary of field nodal values. """
 function get_nodal_values(solver::Solver, field_name::String, time::Float64)
-    nodal_values = Dict()
+    nodal_values = Dict{Int64,Union{Float64,Vector{Float64}}}()
     for element in get_elements(solver)
         hasfield(element, field_name) || continue
         for (c, v) in get_nodal_values(element, field_name, time)
