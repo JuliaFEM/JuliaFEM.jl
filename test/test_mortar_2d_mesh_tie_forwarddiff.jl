@@ -143,7 +143,7 @@ end
     p2.assembly.la = zeros(8)
     assemble!(p1, 0.0)
     assemble!(p2, 0.0)
-    @test isapprox(p1.assembly, p2.assembly)
+    @test isapprox(full(p1.assembly.C1), full(p2.assembly.C1))
 
     #=
     empty!(p1.assembly)
