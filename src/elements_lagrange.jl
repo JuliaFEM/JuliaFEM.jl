@@ -13,6 +13,7 @@ global const ELEMENT_DESCRIPTIONS = Dict(
     "Quad9" => "9 node quadratic quadrangle element",
     "Tet4" => "4 node linear tetrahedral element",
     "Tet10" => "10 node quadratic tetrahedral element",
+    "Pyr5" => "5 node linear pyramid element",
     "Wedge6" => "6 node linear prismatic element (wedge)",
     "Wedge15" => "15 node quadratic prismatic element (wedge)",
     "Hex8" => "8 node linear hexahedral element",
@@ -31,6 +32,7 @@ global const ELEMENT_SIZES = Dict(
     "Quad9" => (2, 9),
     "Tet4" => (3, 4),
     "Tet10" => (3, 10),
+    "Pyr5" => (3,5),
     "Wedge6" => (3, 6),
     "Wedge15" => (3, 15),
     "Hex8" => (3, 8),
@@ -355,6 +357,39 @@ end
 
 #
 
+type Pyr5 <: AbstractElement
+end
+
+
+function get_reference_coordinates(::Type{Pyr5})
+    Vector{Float64}[
+        [-1.0,-1.0,-1.0], # N1
+        [ 1.0,-1.0,-1.0], # N2
+        [ 1.0, 1.0,-1.0], # N3
+        [-1.0, 1.0,-1.0], # N4
+        [ 0.0, 0.0, 1.0]] # N5
+end
+
+function get_interpolation_polynomial(::Type{Pyr5}, xi)
+    [
+		1.0/8.0*(1.0-1.0*xi[1])*(1.0-1.0*xi[2])*(1.0-1.0*xi[3])
+		1.0/8.0*(1.0+1.0*xi[1])*(1.0-1.0*xi[2])*(1.0-1.0*xi[3])
+		1.0/8.0*(1.0+1.0*xi[1])*(1.0+1.0*xi[2])*(1.0-1.0*xi[3])
+		1.0/8.0*(1.0-1.0*xi[1])*(1.0+1.0*xi[2])*(1.0-1.0*xi[3])
+		1.0/2.0*(1.0+xi[3])
+    ]'
+end
+
+function get_interpolation_polynomial(::Type{Pyr5}, xi, ::Type{Val{:partial_derivatives}})
+    [
+		-0.125*(1.0-xi[2])*(1.0-xi[3])   0.125*(1.0-xi[2])*(1.0-xi[3])   0.125*(1.0+xi[2])*(1.0-xi[3])  -0.125*(1.0+xi[2])*(1.0-xi[3])  0.0
+		-0.125*(1.0-xi[1])*(1.0-xi[3])  -0.125*(1.0+xi[1])*(1.0-xi[3])   0.125*(1.0+xi[1])*(1.0-xi[3])   0.125*(1.0-xi[1])*(1.0-xi[3])  0.0
+		-0.125*(1.0-xi[1])*(1.0-xi[2])  -0.125*(1.0+xi[1])*(1.0-xi[2])  -0.125*(1.0+xi[1])*(1.0+xi[2])  -0.125*(1.0-xi[1])*(1.0+xi[2])  0.5
+    ]
+end
+
+#
+
 type Wedge6 <: AbstractElement
 end
 
@@ -576,6 +611,7 @@ end
 @create_basis Quad9
 @create_basis Tet4
 @create_basis Tet10
+@create_basis Pyr5
 @create_basis Wedge6
 @create_basis Wedge15
 @create_basis Hex8
@@ -583,7 +619,8 @@ end
 @create_basis Hex27
 
 function inside(::Union{Type{Seg2}, Type{Seg3}, Type{Quad4}, Type{Quad8},
-                        Type{Quad9}, Type{Hex8}, Type{Hex20}, Type{Hex27}}, xi)
+                        Type{Quad9}, Type{Pyr5}, Type{Hex8}, Type{Hex20},
+                        Type{Hex27}}, xi)
     return all(-1.0 .<= xi .<= 1.0)
 end
 
