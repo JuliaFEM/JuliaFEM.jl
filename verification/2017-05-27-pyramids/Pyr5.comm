@@ -1,0 +1,54 @@
+
+DEBUT();
+
+MA=DEFI_MATERIAU(ELAS=_F(E=288.0,
+                         NU=0.333333333333,),);
+
+MAIL=LIRE_MAILLAGE(FORMAT='MED',);
+
+MODE=AFFE_MODELE(MAILLAGE=MAIL,
+                 AFFE=_F(TOUT='OUI',
+                         PHENOMENE='MECANIQUE',
+                         MODELISATION='3D',),);
+
+MATE=AFFE_MATERIAU(MAILLAGE=MAIL,
+                   AFFE=_F(TOUT='OUI',
+                           MATER=MA,),);
+
+CHAR=AFFE_CHAR_MECA(MODELE=MODE,
+                    DDL_IMPO=_F(GROUP_MA='baseQuad',
+                                DX=0.0,
+                                DY=0.0,
+                                DZ=0.0,),
+                    FORCE_NODALE=_F(GROUP_NO='tipPoint',
+                                    FX=5.0,
+                                    FY=-7.0,
+                                    FZ=3.0,),);
+
+RESU=MECA_STATIQUE(MODELE=MODE,
+                   CHAM_MATER=MATE,
+                   EXCIT=_F(CHARGE=CHAR,),);
+
+RESU=CALC_CHAMP(reuse =RESU,
+                RESULTAT=RESU,
+                CONTRAINTE=('SIGM_ELNO','SIGM_NOEU',),
+                CRITERES=('SIEQ_ELNO','SIEQ_NOEU',),);
+
+TABLE1=CREA_TABLE(RESU=_F(RESULTAT=RESU,
+                          NOM_CHAM='DEPL',
+                          NOM_CMP=('DX','DY','DZ',),
+                          GROUP_NO='tipPoint',),);
+
+IMPR_TABLE(TABLE=TABLE1,
+           UNITE=29,
+           FORMAT_R='E16.16',
+           NOM_PARA=('DX','DY','DZ',),
+           TITRE='Displacement of Node 5',);
+
+IMPR_RESU(FORMAT='MED',
+          UNITE=80,
+          RESU=_F(RESULTAT=RESU,
+                  NOM_CHAM=('SIGM_NOEU','SIEQ_NOEU','DEPL',),),);
+
+FIN();
+#CHECKSUM:6d5681cc411c12890d7eabc8a131b2cc  -:FIN CHECKSUM

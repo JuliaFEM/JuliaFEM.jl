@@ -58,6 +58,7 @@ export Poi1,
        Tri3, Tri6, Tri7,
        Quad4, Quad8, Quad9,
        Tet4, Tet10,
+       Pyr5,
        Wedge6,
        Hex8, Hex20, Hex27
 
