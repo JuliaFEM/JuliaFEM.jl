@@ -176,6 +176,7 @@ end
 global const med_connectivity = Dict{Symbol, Vector{Int}}(
     :Tet4   => [4,3,1,2],
     :Tet10  => [4,3,1,2,10,7,8,9,6,5],
+    :Pyr5   => [1,4,3,2,5],
     :Wedge6 => [4,5,6,1,2,3],
     :Hex8   => [4,8,7,3,1,5,6,2],
     :Hex20  => [4,8,7,3,1,5,6,2,20,15,19,11,12,16,14,10,17,13,18,9],
@@ -209,8 +210,8 @@ global const mapping = Dict(
     :H20 => :Hex20,
     :H27 => :Hex27,
 
-    :PY5 => :Pyramid5,
-    :P13 => :Pyramid13,
+    :PY5 => :Pyr5,
+    :P13 => :Pyr13,
 
     )
 
