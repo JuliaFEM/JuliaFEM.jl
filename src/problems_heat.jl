@@ -67,7 +67,7 @@ function assemble!{E}(assembly::Assembly, problem::Problem{Heat}, element::Eleme
     info("Unknown element type $E for 3d heat problem!")
 end
 
-typealias Heat3DVolumeElements Union{Tet4, Tet10, Hex8, Hex20, Hex27}
+typealias Heat3DVolumeElements Union{Tet4, Tet10, Pyr5, Hex8, Hex20, Hex27}
 typealias Heat3DSurfaceElements Union{Tri3, Tri6, Quad4, Quad8, Quad9}
 
 function assemble!{E<:Heat3DVolumeElements}(assembly::Assembly, problem::Problem{Heat}, element::Element{E}, time, ::Type{Val{Symbol("3D")}})
