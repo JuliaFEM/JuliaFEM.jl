@@ -135,3 +135,22 @@ end
     @test isapprox(temp[15], 1.0)
     @test isapprox(temp[95], 2.0)
 end
+
+using JuliaFEM.Preprocess: MEDFile, get_element_sets
+
+@testset "test read element sets from med file, issue #111" begin
+    meshfile = joinpath(datadir, "hexmeshOverlappingGroups.med")
+    med = MEDFile(meshfile)
+    element_sets = get_element_sets(med, "Mesh_1")
+    @test element_sets[-10] == ["halfhex", "mosthex"]
+    @test element_sets[-11] == ["halfhex"]
+end
+
+using JuliaFEM.Preprocess: aster_read_mesh
+
+@testset "test read overlapping ets, issue #111" begin
+    mesh_file = joinpath(datadir, "hexmeshOverlappingGroups.med")
+    mesh = aster_read_mesh(mesh_file, "Mesh_1")
+    @test length(mesh.element_sets[:mosthex]) == 273
+    @test length(mesh.element_sets[:halfhex]) == 147
+end
