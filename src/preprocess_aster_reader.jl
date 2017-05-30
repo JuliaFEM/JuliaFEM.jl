@@ -47,7 +47,63 @@ function get_mesh_names(med::MEDFile)
     return sort(collect(keys(med.data["FAS"])))
 end
 
-function get_nodes(med::MEDFile, nsets, mesh_name)
+""" Convert vector of Int8 to ASCII string. """
+function to_ascii(data::Vector{Int8})
+    return ascii(unsafe_string(pointer(convert(Vector{UInt8}, data))))
+end
+
+function get_mesh(med::MEDFile, mesh_name::String)
+    if !haskey(med.data["FAS"], mesh_name)
+        warn("Mesh $mesh_name not found from med file.")
+        meshes = get_mesh_names(med)
+        all_meshes = join(meshes, ", ")
+        warn("Available meshes: $all_meshes")
+        error("Mesh $mesh_name not found.")
+    end
+    return med.data["FAS"][mesh_name]
+end
+
+""" Return node sets from med file.
+
+Notes
+-----
+One node set id can have multiple names.
+
+"""
+function get_node_sets(med::MEDFile, mesh_name::String)::Dict{Int64, Vector{String}}
+    mesh = get_mesh(med, mesh_name)
+    node_sets = Dict{Int64, Vector{String}}(0 => ["NALL"])
+    if !haskey(mesh, "NOEUD")
+        return node_sets
+    end
+    for (k, v) in mesh["NOEUD"]
+        nset_id = parse(Int, split(k, "_")[2])
+        node_sets[nset_id] = collect(to_ascii(d) for d in v["GRO"]["NOM"])
+    end
+    return node_sets
+end
+
+""" Return element sets from med file.
+
+Notes
+-----
+One element set id can have multiple names.
+
+"""
+function get_element_sets(med::MEDFile, mesh_name::String)::Dict{Int64, Vector{String}}
+    mesh = get_mesh(med, mesh_name)
+    element_sets = Dict{Int64, Vector{String}}()
+    if !haskey(mesh, "ELEME")
+        return element_sets
+    end
+    for (k, v) in mesh["ELEME"]
+        elset_id = parse(Int, split(k, '_')[2])
+        element_sets[elset_id] = collect(to_ascii(d) for d in v["GRO"]["NOM"])
+    end
+    return element_sets
+end
+
+function get_nodes(med::MEDFile, nsets::Dict{Int, Vector{String}}, mesh_name::String)
     increments = keys(med.data["ENS_MAA"][mesh_name])
     @assert length(increments) == 1
     increment = first(increments)
@@ -58,56 +114,23 @@ function get_nodes(med::MEDFile, nsets, mesh_name)
     node_coords = nodes["COO"]
     dim = round(Int, length(node_coords)/nnodes)
     node_coords = reshape(node_coords, nnodes, dim)'
-    d = Dict{Int64}{Tuple{Symbol, Vector{Float64}}}()
+    d = Dict{Int64}{Tuple{Vector{String}, Vector{Float64}}}()
     for i=1:nnodes
-        nset = Symbol(nsets[nset_ids[i]])
+        nset = nsets[nset_ids[i]]
         d[node_ids[i]] = (nset, node_coords[:, i])
     end
     return d
 end
 
-function get_node_sets(med::MEDFile, mesh_name)
-    ns = Dict{Int64, Symbol}(0 => :NALL)
-    if !haskey(med.data["FAS"], mesh_name)
-        warn("Mesh $mesh_name not found from med file.")
-        meshes = get_mesh_names(med)
-        all_meshes = join(meshes, ", ")
-        warn("Available meshes: $all_meshes")
-        error("Mesh $mesh_name not found.")
+function get_connectivity(med::MEDFile, elsets::Dict{Int64, Vector{String}}, mesh_name::String)
+    if !haskey(elsets, 0)
+        elsets[0] = ["OTHER"]
     end
-    haskey(med.data["FAS"][mesh_name], "NOEUD") || return ns
-    nsets = med.data["FAS"][mesh_name]["NOEUD"]
-    for nset in keys(nsets)
-        k = split(nset, "_")
-        nset_id = parse(Int, k[2])
-        nset_name = ascii(unsafe_string(pointer(convert(Vector{UInt8}, nsets[nset]["GRO"]["NOM"][1]))))
-        ns[nset_id] = Symbol(nset_name)
-    end
-    return ns
-end
-
-function get_element_sets(med::MEDFile, mesh_name)
-    es = Dict{Int64, Symbol}()
-    if !haskey(med.data["FAS"][mesh_name], "ELEME")
-        return es
-    end
-    elsets = med.data["FAS"][mesh_name]["ELEME"]
-    for elset in keys(elsets)
-        k = split(elset, '_')
-        elset_id = parse(Int, k[2])
-        elset_name = ascii(unsafe_string(pointer(convert(Vector{UInt8}, elsets[elset]["GRO"]["NOM"][1]))))
-        es[elset_id] = Symbol(elset_name)
-    end
-    return es
-end
-
-function get_connectivity(med::MEDFile, elsets, mesh_name)
-    elsets[0] = :OTHER
     increments = keys(med.data["ENS_MAA"][mesh_name])
     @assert length(increments) == 1
     increment = first(increments)
     all_elements = med.data["ENS_MAA"][mesh_name][increment]["MAI"]
-    d = Dict{Int64, Tuple{Symbol, Symbol, Vector{Int64}}}()
+    d = Dict{Int64, Tuple{Symbol, Vector{String}, Vector{Int64}}}()
     for eltype in keys(all_elements)
         elements = all_elements[eltype]
         elset_ids = elements["FAM"]
@@ -119,7 +142,7 @@ function get_connectivity(med::MEDFile, elsets, mesh_name)
         for i=1:nelements
             eltype = Symbol(eltype)
             elco = element_connectivity[:, i]
-            elset = Symbol(elsets[elset_ids[i]])
+            elset = elsets[elset_ids[i]]
             d[element_ids[i]] = (eltype, elset, elco)
         end
     end
@@ -150,12 +173,16 @@ function parse_aster_med_file(fn, mesh_name=nothing)
     else
         mesh_name in mesh_names || error("Mesh $mesh_name not found from mesh file $fn. Available meshes: $all_meshes")
     end
-    nsets = get_node_sets(med, mesh_name)
+
+    debug("Code Aster .med reader info:")
     elsets = get_element_sets(med, mesh_name)
-    elset_names = join(values(elsets), ", ")
-    debug("Code Aster .med reader: found $(length(elsets)) element sets: $elset_names")
-    nset_names = join(values(nsets), ", ")
-    debug("Code ASter .med reader: found $(length(nsets)) node sets: $nset_names")
+    for (k,v) in elsets
+        debug("ELSET $k => $v")
+    end
+    nsets = get_node_sets(med, mesh_name)
+    for (k,v) in nsets
+        debug("NSET $k => $v")
+    end
     nodes = get_nodes(med, nsets, mesh_name)
     conn = get_connectivity(med, elsets, mesh_name)
     result = Dict("nodes" => nodes, "connectivity" => conn)
@@ -215,17 +242,22 @@ global const mapping = Dict(
 
     )
 
+""" Read code aster mesh and return Mesh. """
 function aster_read_mesh(fn, mesh_name=nothing; reorder_element_connectivity=true)
     result = parse_aster_med_file(fn, mesh_name)
     mesh = Mesh()
-    for (nid, (nset, ncoords)) in result["nodes"]
+    for (nid, (nsets, ncoords)) in result["nodes"]
         add_node!(mesh, nid, ncoords)
-        add_node_to_node_set!(mesh, nset, nid)
+        for nset in nsets
+            add_node_to_node_set!(mesh, Symbol(nset), nid)
+        end
     end
-    for (elid, (eltype, elset, elcon)) in result["connectivity"]
+    for (elid, (eltype, elsets, elcon)) in result["connectivity"]
         haskey(mapping, eltype) || error("Code Aster .med reader: element type $eltype not found from mapping")
         add_element!(mesh, elid, mapping[eltype], elcon)
-        add_element_to_element_set!(mesh, elset, elid)
+        for elset in elsets
+            add_element_to_element_set!(mesh, Symbol(elset), elid)
+        end
     end
     if reorder_element_connectivity
         reorder_element_connectivity!(mesh, med_connectivity)
