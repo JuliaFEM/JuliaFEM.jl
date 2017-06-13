@@ -11,6 +11,7 @@ General linearized problem to solve
     (K₁+K₂)Δu  +   C1'*Δλ = f₁+f₂
          C2Δu  +     D*Δλ = g
 """
+
 type Assembly
 
     M :: SparseMatrixCOO  # mass matrix
@@ -103,10 +104,10 @@ julia> prob1 = Problem(Elasticity, "this is my problem", 3)
 julia> prob2 = Problem(Elasticity, 3)
 
 """
-function Problem{P<:FieldProblem}(::Type{P}, name::AbstractString, dimension::Int64)
+function Problem{P<:FieldProblem, I<:Integer}(::Type{P}, name::AbstractString, dimension::I)
     return Problem{P}(name, dimension, "none", [], Dict(), Assembly(), Dict(), Vector(), P())
 end
-function Problem{P<:FieldProblem}(::Type{P}, dimension::Int64)
+function Problem{P<:FieldProblem, I<:Integer}(::Type{P}, dimension::I)
     return Problem(P, "$P problem", dimension)
 end
 
