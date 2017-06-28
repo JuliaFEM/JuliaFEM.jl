@@ -468,15 +468,30 @@ function get_all_elements(solver::Solver)
     return [elements...;]
 end
 
+"""
+Return nodal field from all problems defined in solver.
+
+Examples
+--------
+To return e.g. geometry defined in nodal points at time t=0.0, one can write:
+
+julia> solver("geometry", 0.0)
+"""
 function (solver::Solver)(field_name::String, time::Float64)
     fields = []
     for problem in get_problems(solver)
         field = problem(field_name, time)
+        if field == nothing
+            continue
+        end
         if length(field) == 0
             warn("no field $field_name found for problem $(problem.name)")
-        else
-            push!(fields, field)
+            continue
         end
+        push!(fields, field)
+    end
+    if length(fields) == 0
+        return Dict{Integer, Vector{Float64}}()
     end
     return merge(fields...)
 end
