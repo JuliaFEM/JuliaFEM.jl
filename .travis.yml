@@ -20,9 +20,9 @@ before_script:
 script:
     - julia --color=yes -e 'Pkg.build("JuliaFEM")'
     - julia --color=yes -e 'Pkg.test("JuliaFEM", coverage=true)'
+after_success:
     - julia --color=yes -e 'cd(Pkg.dir("JuliaFEM", "test")); include("run_lint.jl")'
     - julia --color=yes -e 'cd(Pkg.dir("JuliaFEM", "docs")); include("make.jl")'
-after_success:
     - julia --color=yes -e 'cd(Pkg.dir("JuliaFEM")); using Coverage; Coveralls.submit(Coveralls.process_folder())'
     - julia --color=yes -e 'cd(Pkg.dir("JuliaFEM", "docs")); include("deploy.jl")'
 
