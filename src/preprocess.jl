@@ -251,7 +251,7 @@ function create_surface_elements(mesh::Mesh, surface_name::Symbol)
         elty = mesh.element_types[elid]
         elco = mesh.elements[elid]
         chel, chcon = AbaqusReader.create_surface_element(elty, elsi, elco)
-        ch = Element(getfield(JuliaFEM, child_element_type), chcon)
+        ch = Element(getfield(JuliaFEM, chel), chcon)
         push!(elements, ch)
     end
     update!(elements, "geometry", mesh.nodes)
