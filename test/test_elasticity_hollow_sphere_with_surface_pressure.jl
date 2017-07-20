@@ -38,16 +38,16 @@ function lsq_fit(elements, field, time)
         gdofs = get_connectivity(element)
         # increase integration order by 1 from default
         for ip in get_integration_points(element, 1)
-	        detJ = element(ip, time, Val{:detJ})
-	        w = ip.weight*detJ
-	        N = element(ip, time)
-	        f = field(element, ip, time)
-	        add!(A, gdofs, gdofs, w*kron(N', N))
-	        for i=1:length(f)
+            detJ = element(ip, time, Val{:detJ})
+            w = ip.weight*detJ
+            N = element(ip, time)
+            f = field(element, ip, time)
+            add!(A, gdofs, gdofs, w*kron(N', N))
+            for i=1:length(f)
                 add!(b, gdofs, w*f[i]*N, i)
             end
             volume += w
-	    end
+        end
     end
     info("Mass matrix for least-squares fit is assembled. Total volume to fit: $volume")
     A = sparse(A)
@@ -155,13 +155,13 @@ function test_wedge_sphere(model, u_CA, S_CA)
             break
         end
     end
-	# Stress state in M141 element
-	S_CA_gp = Dict()
+    # Stress state in M141 element
+    S_CA_gp = Dict()
     S_CA_gp[1] = [-2.31497155149131E+04, -2.30873958541450E+04, -2.59731750416165E+04, 1.16262216932559E+04, 1.05883267606309E+04, 1.04255059462671E+04]
     S_CA_gp[2] = [-2.20268425477595E+04, -2.59602179285979E+04, -2.45141753387488E+04, 1.08344827948196E+04, 1.02393080182646E+04, 1.18221520216293E+04]
     S_CA_gp[3] = [-2.12175032863505E+04, -2.38106746858742E+04, -2.75848287641255E+04, 1.23383626529382E+04, 9.45231798421561E+03, 1.04600859263009E+04]
     S_CA_gp[4] = [-2.88674347639302E+04, -2.90047144010521E+04, -3.19545639967296E+04, 1.24436733999204E+04, 1.14033189825355E+04, 1.09837505652098E+04]
-	S_CA_gp[5] = [-2.76741820176108E+04, -3.20576001061179E+04, -3.04041166591832E+04, 1.16023096459047E+04, 1.10324243354755E+04, 1.24679360552984E+04]
+    S_CA_gp[5] = [-2.76741820176108E+04, -3.20576001061179E+04, -3.04041166591832E+04, 1.16023096459047E+04, 1.10324243354755E+04, 1.24679360552984E+04]
     S_CA_gp[6] = [-2.68141147396280E+04, -2.97733271271234E+04, -3.36672334497799E+04, 1.32004501509553E+04, 1.01961070966382E+04, 1.10204979599285E+04]
 
     time = 0.0
@@ -169,12 +169,11 @@ function test_wedge_sphere(model, u_CA, S_CA)
         element.id == 141 || continue
         for (i, ip) in enumerate(get_integration_points(element))
             S = get_stress(element, ip, time)
-        	rtol = norm(S - S_CA_gp[i]) / max(norm(S), norm(S_CA_gp[i]))
+            rtol = norm(S - S_CA_gp[i]) / max(norm(S), norm(S_CA_gp[i]))
             info("$i $S, rtol=$rtol")
-			@test isapprox(S, S_CA_gp[i])
+            @test isapprox(S, S_CA_gp[i])
         end
     end
-
 end
 
 @testset """1/8 hollow sphere with surface load""" begin

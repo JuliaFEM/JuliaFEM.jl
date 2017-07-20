@@ -209,7 +209,7 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
             all_cells = get_cells(P, C0)
             info("Polygon is splitted to $(length(all_cells)) integration cells.")
             for (cell_id, cell) in enumerate(all_cells)
-            	C_area = 0.0
+                C_area = 0.0
                 virtual_element = Element(Tri3, Int[])
                 update!(virtual_element, "geometry", cell)
 
