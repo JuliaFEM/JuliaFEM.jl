@@ -1,9 +1,9 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-typealias Node Vector{Float64}
+const Node = Vector{Float64}
 
-abstract AbstractPoint
+abstract type AbstractPoint end
 
 type Point{P<:AbstractPoint}
     id :: Int
@@ -52,7 +52,7 @@ end
 type IntegrationPoint <: AbstractPoint
 end
 
-typealias IP Point{IntegrationPoint}
+const IP = Point{IntegrationPoint}
 
 function IP(id, weight, coords)
     return IP(id, weight, coords, Dict(), IntegrationPoint())

@@ -19,7 +19,7 @@ using JuliaFEM.Testing
     @test isapprox(f, 1.0)
     @test 2*f == 2.0 # multiply by constant
     @test f(1.0) == 1.0 # time interpolation
-    @test isapprox([2.0]''*f, 2.0) # wanted behavior?
+    @test isapprox(reshape([2.0],1,1)*f, 2.0) # wanted behavior?
 end
 
 @testset "discrete, variable, time invariant field" begin

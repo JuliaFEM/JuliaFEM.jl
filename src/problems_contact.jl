@@ -72,4 +72,4 @@ function assemble!(problem::Problem{Contact}, time::Real)
     problem.properties.iteration += 1
 end
 
-typealias ContactElements2D Union{Seg2}
+const ContactElements2D = Union{Seg2}

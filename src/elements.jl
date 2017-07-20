@@ -1,7 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-abstract AbstractElement
+abstract type AbstractElement end
 
 type Element{E<:AbstractElement}
     id :: Int

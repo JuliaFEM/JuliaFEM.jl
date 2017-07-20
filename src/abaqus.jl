@@ -9,12 +9,12 @@ using JuliaFEM.Postprocess
 
 ### Model definitions for ABAQUS data model
 
-abstract AbstractMaterial
-abstract AbstractMaterialProperty
-abstract AbstractProperty
-abstract AbstractStep
-abstract AbstractBoundaryCondition
-abstract AbstractOutputRequest
+abstract type AbstractMaterial end
+abstract type AbstractMaterialProperty end
+abstract type AbstractProperty end
+abstract type AbstractStep end
+abstract type AbstractBoundaryCondition end
+abstract type AbstractOutputRequest end
 
 type Model
     path :: AbstractString
@@ -261,12 +261,12 @@ end
 @register_abaqus_keyword("CLOAD")
 @register_abaqus_keyword("DLOAD")
 @register_abaqus_keyword("DSLOAD")
-typealias BOUNDARY_CONDITIONS Union{BOUNDARY, CLOAD, DLOAD, DSLOAD}
+const BOUNDARY_CONDITIONS = Union{BOUNDARY,CLOAD,DLOAD,DSLOAD}
 
 @register_abaqus_keyword("NODE PRINT")
 @register_abaqus_keyword("EL PRINT")
 @register_abaqus_keyword("SECTION PRINT")
-typealias OUTPUT_REQUESTS Union{NODE_PRINT, EL_PRINT, SECTION_PRINT}
+const OUTPUT_REQUESTS = Union{NODE_PRINT,EL_PRINT,SECTION_PRINT}
 
 ## Properties
 

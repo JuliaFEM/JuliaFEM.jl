@@ -1,31 +1,31 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-abstract AbstractField
+abstract type AbstractField end
 
-abstract Discrete <: AbstractField
-abstract Continuous <: AbstractField
-abstract Constant <: AbstractField
-abstract Variable <: AbstractField
-abstract TimeVariant <: AbstractField
-abstract TimeInvariant <: AbstractField
+abstract type Discrete<:AbstractField end
+abstract type Continuous<:AbstractField end
+abstract type Constant<:AbstractField end
+abstract type Variable<:AbstractField end
+abstract type TimeVariant<:AbstractField end
+abstract type TimeInvariant<:AbstractField end
 
 type Field{A<:Union{Discrete,Continuous}, B<:Union{Constant,Variable}, C<:Union{TimeVariant,TimeInvariant}}
     data
 end
 
-typealias FieldSet Dict{String, Field}
+const FieldSet = Dict{String,Field}
 
 ### Different field combinations and other typealiases
 
-typealias DCTI Field{Discrete,   Constant, TimeInvariant}
-typealias DVTI Field{Discrete,   Variable, TimeInvariant}
-typealias DCTV Field{Discrete,   Constant, TimeVariant}
-typealias DVTV Field{Discrete,   Variable, TimeVariant}
-typealias CCTI Field{Continuous, Constant, TimeInvariant}
-typealias CVTI Field{Continuous, Variable, TimeInvariant} # can be used to interpolate in spatial dimension
-typealias CCTV Field{Continuous, Constant, TimeVariant} # can be used to interpolate in time
-typealias CVTV Field{Continuous, Variable, TimeVariant}
+const DCTI = Field{Discrete,Constant,TimeInvariant}
+const DVTI = Field{Discrete,Variable,TimeInvariant}
+const DCTV = Field{Discrete,Constant,TimeVariant}
+const DVTV = Field{Discrete,Variable,TimeVariant}
+const CCTI = Field{Continuous,Constant,TimeInvariant}
+const CVTI = Field{Continuous,Variable,TimeInvariant} # can be used to interpolate in spatial dimension
+const CCTV = Field{Continuous,Constant,TimeVariant} # can be used to interpolate in time
+const CVTV = Field{Continuous,Variable,TimeVariant}
 
 # Discrete fields
 
@@ -199,7 +199,7 @@ end
 """ Take dot product of DVTI field and vector T. Vector length must match to the
 field length and this can be used mainly for interpolation purposes, i.e., u = ∑ Nᵢuᵢ.
 """
-function *(T::Vector, f::DVTI)
+function *(T::Union{Vector, RowVector}, f::DVTI)
     @assert length(T) <= length(f)
     return sum([T[i]*f[i] for i=1:length(T)])
 end

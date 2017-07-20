@@ -67,8 +67,8 @@ function assemble!{E}(assembly::Assembly, problem::Problem{Heat}, element::Eleme
     info("Unknown element type $E for 3d heat problem!")
 end
 
-typealias Heat3DVolumeElements Union{Tet4, Tet10, Pyr5, Hex8, Hex20, Hex27}
-typealias Heat3DSurfaceElements Union{Tri3, Tri6, Quad4, Quad8, Quad9}
+const Heat3DVolumeElements = Union{Tet4, Tet10, Pyr5, Hex8, Hex20, Hex27}
+const Heat3DSurfaceElements = Union{Tri3,Tri6,Quad4,Quad8,Quad9}
 
 function assemble!{E<:Heat3DVolumeElements}(assembly::Assembly, problem::Problem{Heat}, element::Element{E}, time, ::Type{Val{Symbol("3D")}})
     gdofs = get_gdofs(problem, element)
@@ -179,8 +179,8 @@ function assemble!{E}(assembly::Assembly, problem::Problem{Heat}, element::Eleme
     info("Unknown element type $E for 2d heat problem!")
 end
 
-typealias Heat2DVolumeElements Union{Tri3, Tri6, Quad4}
-typealias Heat2DSurfaceElements Union{Seg2, Seg3}
+const Heat2DVolumeElements = Union{Tri3,Tri6,Quad4}
+const Heat2DSurfaceElements = Union{Seg2,Seg3}
 
 function assemble!{E<:Heat2DVolumeElements}(assembly::Assembly, problem::Problem{Heat}, element::Element{E}, time, ::Type{Val{Symbol("2D")}})
     gdofs = get_gdofs(problem, element)
