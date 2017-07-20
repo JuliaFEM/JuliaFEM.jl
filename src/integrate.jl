@@ -271,6 +271,27 @@ function get_integration_points(element::TetrahedralElement, ::Type{Val{4}})
     return zip(weights, points)
 end
 
+# http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch12.d/AFEM.Ch12.pdf
+
+typealias PyramidalElement Union{Pyr5,}
+
+function get_integration_points(element::PyramidalElement, ::Type{Val{2}})
+    g1 =  0.5842373946721771876874344
+    g2 = -2.0/3.0
+    g3 =  2.0/5.0
+    w1 =  81.0/100.0
+    w2 =  125.0/27.0
+    weights = [w1, w1, w1, w1, w2]
+    points = Vector{Float64}[
+        [-g1, -g1, g2],
+        [ g1, -g1, g2],
+        [ g1,  g1, g2],
+        [-g1,  g1, g2],
+        [0.0, 0.0, g3],
+        ]
+    return zip(weights, points)
+end
+
 typealias PrismaticElement Union{Wedge6, Wedge15}
 
 function get_integration_points(element::PrismaticElement, ::Type{Val{2}})
@@ -408,14 +429,14 @@ function get_integration_points(element::PrismaticElement, ::Type{Val{3}})
 end
 
 function get_integration_points(element::Union{TriangularElement,
-            TetrahedralElement, PrismaticElement}, order::Int64)
+            TetrahedralElement, PyramidalElement, PrismaticElement}, order::Int64)
     return get_integration_points(element, Val{order})
 end
 
 ### default number of integration points for each element
 ### 2 for linear elements, 3 for quadratic
 
-typealias LinearElement Union{Seg2, Tri3, Quad4, Tet4, Wedge6, Hex8}
+typealias LinearElement Union{Seg2, Tri3, Quad4, Tet4, Pyr5, Wedge6, Hex8}
 
 typealias QuadraticElement Union{Seg3, Tri6, Tri7, Tet10, Quad8, Quad9, Wedge15, Hex20, Hex27}
 
