@@ -39,8 +39,14 @@ Parameters
 tol
     used to drop near zero values less than tol.
 """
-function sparse(A::SparseMatrixCOO, args...; tol=1.0e-12)
-    B = sparse(A.I, A.J, A.V, args...)
+function sparse(A::SparseMatrixCOO; tol=1.0e-12)
+    B = sparse(A.I, A.J, A.V)
+    SparseArrays.droptol!(B, tol)
+    return B
+end
+
+function sparse(A::SparseMatrixCOO, n::Int, m::Int; tol=1.0e-12)
+    B = sparse(A.I, A.J, A.V, n, m)
     SparseArrays.droptol!(B, tol)
     return B
 end
