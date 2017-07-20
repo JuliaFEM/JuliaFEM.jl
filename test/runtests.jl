@@ -1,113 +1,27 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM.Testing
+using Base.Test
+using TimerOutputs
 
-function run_tests(; verbose=true)
+pkg_dir = Pkg.dir("JuliaFEM")
+maybe_test_files = readdir(joinpath(pkg_dir, "test"))
+is_test_file(fn) = startswith(fn, "test_") & endswith(fn, ".jl")
+test_files = filter(is_test_file, maybe_test_files)
+info("$(length(test_files)) test files found.")
 
-    maybe_test_files = readdir(Pkg.dir("JuliaFEM")*"/test")
-    is_test_file(fn) = startswith(fn, "test_") & endswith(fn, ".jl")
-    test_files = filter(is_test_file, maybe_test_files)
-
-    verbose && info("Test files:")
-    for (i, test_file) in enumerate(test_files)
-        verbose && info("$i   $test_file")
-    end
-
-    t0 = Base.time()
-
-    body = quote
-        @testset "JuliaFEM" begin
-            for fn in $test_files
-                @testset "$fn" begin include(fn) end
-            end
+const to = TimerOutput()
+@testset "JuliaFEM.jl" begin
+    for fn in test_files
+        info("----- Running tests from file $fn -----")
+        t0 = time()
+        timeit(to, fn) do
+            include(fn)
         end
+        dt = round(time() - t0, 2)
+        info("----- Testing file $fn completed in $dt seconds -----")
     end
-    eval(body)
-
-    t1 = round(Base.time()-t0, 2)
-    info("Testing completed in $t1 seconds.")
 end
-
-run_tests()
-
-#=
-
-@testset "Testing if somebody used print, println(), @sprint in src directory" begin
-  # TODO: make better reqular expression. Currently it will match all print words
-  lines_with_print = Dict()
-  src_dir = joinpath(Pkg.dir("JuliaFEM"),"src")
-  src = readdir(src_dir)
-  for file_name in src
-    fil = open(joinpath(src_dir,file_name),"r")
-    for (line_number,line) in enumerate(readlines(fil))
-      if ismatch(r"print",line)
-        lines_with_print[file_name * ":$line_number"] = "print found in line: $line_number"
-      end
-    end
-    close(fil)
-  end
-  @test length(lines_with_print) == 0
-end
-
-@testset "Testing if we have non ascii characters in the src files" begin
-  # TODO: we should allow Greeck letters in documentation. Thus this test should skip docstrings
-  lines_with_non_ascii = []
-  src_dir = joinpath(Pkg.dir("JuliaFEM"),"src")
-  src = readdir(src_dir)
-  for file_name in src
-    fil = open(joinpath(src_dir,file_name),"r")
-    for (line_number,line) in enumerate(readlines(fil))
-      if ismatch(r"[^\x00-\x7F]",line)
-        push!(lines_with_non_ascii, file_name * ":line $line_number")
-      end
-    end
-    close(fil)
-  end
-  @test length(lines_with_non_ascii) == 0 # non ascii charecters found in src -> test is failing
-end
-
-=#
-
-@testset "Looking the [src,test] folders *.jl files header information" begin
-  files_no_license = []
-  pkg_dir = Pkg.dir("JuliaFEM")
-  dirs = ["test";"src"]
-  for folder in dirs
-    for file_name in readdir(joinpath(pkg_dir,folder))
-      if file_name[end-2:end] == ".jl"
-        fil = open(joinpath(pkg_dir,folder,file_name),"r")
-        head = readstring(fil)
-      else
-        continue
-      end
-      if ~ismatch(r"This file is a part of JuliaFEM",head)
-        push!(files_no_license,"$file_name is missing JuliaFEM statement")
-      end
-      if ~ismatch(r"MIT",head)
-        push!(files_no_license,"$file_name is missing MIT statement")
-      end
-      if ~ismatch(r"https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md",head)
-        push!(files_no_license,"$file_name is missing reference to LICENSE.md")
-      end
-      close(fil)
-    end
-  end
-  out_str = """License information missing or incorrect. Please use these two lines in the beginning of each file:
-
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
-
-  """
-
-  if length(files_no_license) != 0
-      info(out_str)
-  end
-
-  for line in files_no_license
-      info(line)
-  end
-
-  @test length(files_no_license) == 0
-end
-
+println()
+println("Test statistics:")
+println(to)
