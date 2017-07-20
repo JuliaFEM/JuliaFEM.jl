@@ -18,25 +18,25 @@ using JuliaFEM.Testing
     update!([element1,baseQuad,tipPoint], "geometry", mesh.nodes)
     update!([element1], "youngs modulus", 288.0)
     update!([element1], "poissons ratio", 1/3)
-	
+
     update!([tipPoint], "displacement traction force 1",  5.0)
     update!([tipPoint], "displacement traction force 2", -7.0)
     update!([tipPoint], "displacement traction force 3",  3.0)
-	
+
     elasticity_problem = Problem(Elasticity, "solve continuum block", 3)
     elasticity_problem.properties.finite_strain = false
     push!(elasticity_problem, element1)
     push!(elasticity_problem, tipPoint)
-	
+
     baseQuad[1]["displacement 1"] = 0.0
     baseQuad[1]["displacement 2"] = 0.0
     baseQuad[1]["displacement 3"] = 0.0
     boundary_problem = Problem(Dirichlet, "Boundary conditions", 3, "displacement")
     push!(boundary_problem, baseQuad)
-	
+
     solver = LinearSolver(elasticity_problem, boundary_problem)
     solver()
-	
+
     disp = element1[1]("displacement", [0.0, 0.0, 1.0], 0.0)
     info("########################################################")
     info("displacement at tip: $disp")
