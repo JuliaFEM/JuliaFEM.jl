@@ -16,8 +16,12 @@ before_script:
     - julia --color=yes -e 'Pkg.add("Coverage")'
     - julia --color=yes -e 'Pkg.add("Documenter")'
     - julia --color=yes -e 'Pkg.add("Lint")'
+    - julia --color=yes -e 'Pkg.clone("https://github.com/ahojukka5/CheckHeader.jl.git")'
+    - julia --color=yes -e 'Pkg.clone("https://github.com/ahojukka5/CheckTabs.jl.git")'
 script:
     - julia --color=yes -e 'Pkg.build("JuliaFEM")'
+    - julia --color=yes -e 'using CheckHeader; checkheader("JuliaFEM")'
+    - julia --color=yes -e 'using CheckTabs; checktabs("JuliaFEM")'
     - julia --color=yes -e 'Pkg.test("JuliaFEM", coverage=true)'
 after_success:
     - julia --color=yes -e 'cd(Pkg.dir("JuliaFEM", "test")); include("run_lint.jl")'
