@@ -66,15 +66,15 @@ function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::El
     add!(assembly.f, gdofs, f)
 end
 
-typealias Elasticity2DSurfaceElements Union{Poi1, Seg2, Seg3}
-typealias Elasticity2DVolumeElements Union{Tri3, Tri6, Quad4, Quad8, Quad9}
-typealias Elasticity3DSurfaceElements Union{Poi1, Tri3, Tri6, Quad4, Quad8, Quad9}
-typealias Elasticity3DVolumeElements Union{Tet4, Pyr5, Wedge6, Wedge15, Hex8, Tet10, Hex20, Hex27}
+const Elasticity2DSurfaceElements = Union{Poi1,Seg2,Seg3}
+const Elasticity2DVolumeElements = Union{Tri3,Tri6,Quad4,Quad8,Quad9}
+const Elasticity3DSurfaceElements = Union{Poi1,Tri3,Tri6,Quad4,Quad8,Quad9}
+const Elasticity3DVolumeElements = Union{Tet4, Pyr5, Wedge6, Wedge15, Hex8, Tet10, Hex20, Hex27}
 
 function initialize_internal_params!(params, ip, type_) #::Type{Val{:type_2d}})
     param_keys = keys(params)
     all_keys = ip.fields.keys
-    ip_fields = filter(x->isdefined(all_keys, x), collect(1:length(all_keys)))
+    ip_fields = filter(x->isassigned(all_keys, x), collect(1:length(all_keys)))
 
     if !("params_initialized" in ip_fields)
         for key in param_keys
@@ -96,7 +96,7 @@ end
 
 function get_keys(element)
     all_keys = element.fields.keys
-    idx = filter(x->isdefined(all_keys, x), collect(1:length(all_keys)))
+    idx = filter(x->isassigned(all_keys, x), collect(1:length(all_keys)))
     map(x -> all_keys[x], idx)
 end
 

@@ -1,7 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-typealias MortarElements2D Union{Seg2, Seg3}
+const MortarElements2D = Union{Seg2,Seg3}
 
 function newton(f, df, x; tol=1.0e-6, max_iterations=10)
     for i=1:max_iterations
@@ -137,7 +137,7 @@ function assemble!(problem::Problem{Mortar}, time::Float64, ::Type{Val{1}}, ::Ty
             # 3.1 calculate segmentation
             xi1a = project_from_master_to_slave(slave_element, X2[1], time)
             xi1b = project_from_master_to_slave(slave_element, X2[2], time)
-            xi1 = clamp([xi1a; xi1b], -1.0, 1.0)
+            xi1 = clamp.([xi1a; xi1b], -1.0, 1.0)
             l = 1/2*abs(xi1[2]-xi1[1])
             isapprox(l, 0.0) && continue # no contribution in this master element
 

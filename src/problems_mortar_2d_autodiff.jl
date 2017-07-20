@@ -144,7 +144,7 @@ function assemble!(problem::Problem{Mortar}, time::Float64, ::Type{Val{1}}, ::Ty
                 xi1b = project_from_master_to_slave(slave_element, x1, n1, x2[2], time)
 #               xi1a = project_from_master_to_slave(slave_element, X2[1], time)
 #               xi1b = project_from_master_to_slave(slave_element, X2[2], time)
-                xi1 = clamp([xi1a; xi1b], -1.0, 1.0)
+                xi1 = clamp.([xi1a; xi1b], -1.0, 1.0)
                 l = 1/2*abs(xi1[2]-xi1[1])
                 isapprox(l, 0.0) && continue # no contribution in this master element
 

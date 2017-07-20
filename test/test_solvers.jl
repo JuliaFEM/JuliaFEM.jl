@@ -59,7 +59,7 @@ end
     push!(s, p)
     get_field_assembly(s)
     @test s.ndofs == 0
-    add!(p.assembly.K, [4], [4], [4.0]'')
+    add!(p.assembly.K, [4], [4], reshape([4.0],1,1))
     get_field_assembly(s)
     @test s.ndofs == 4
 end
@@ -70,8 +70,8 @@ end
     p1 = Problem(Dirichlet, "bc1", 2, "displacement")
     p2 = Problem(Dirichlet, "bc2", 2, "displacement")
     # third dofs constrained 
-    add!(p1.assembly.C2, [3], [3], [1.0]'')
-    add!(p2.assembly.C2, [3], [4], [1.0]'')
+    add!(p1.assembly.C2, [3], [3], reshape([1.0],1,1))
+    add!(p2.assembly.C2, [3], [4], reshape([1.0],1,1))
     s.ndofs = 4
     push!(s, p1, p2)
     @test_throws ErrorException get_boundary_assembly(s)

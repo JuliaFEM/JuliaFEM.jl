@@ -1,7 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-typealias MortarElements3D Union{Tri3, Tri6, Quad4}
+const MortarElements3D = Union{Tri3,Tri6,Quad4}
 
 function project_vertex_to_auxiliary_plane(p::Vector, x0::Vector, n0::Vector)
     return p - dot(p-x0, n0)*n0

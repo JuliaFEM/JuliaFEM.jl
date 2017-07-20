@@ -36,8 +36,8 @@ function project_from_master_to_slave{E<:MortarElements2D}(
     dxi1 = 0.0
     for i=1:max_iterations
         dxi1 = -R(xi1)/dR(xi1)
-        dxi1 = clamp(dxi1, -0.3, 0.3)
-        xi1_next = clamp(xi1 + dxi1, -1.0, 1.0)
+        dxi1 = clamp.(dxi1, -0.3, 0.3)
+        xi1_next = clamp.(xi1 + dxi1, -1.0, 1.0)
         if norm(xi1_next - xi1) < tol
             return xi1_next
         end
@@ -176,7 +176,7 @@ function assemble!(problem::Problem{Contact}, time::Float64,
                 # calculate segmentation: we care only about endpoints
                 xi1a = project_from_master_to_slave(slave_element, x1, n1, x2[1])
                 xi1b = project_from_master_to_slave(slave_element, x1, n1, x2[2])
-                xi1 = clamp([xi1a; xi1b], -1.0, 1.0)
+                xi1 = clamp.([xi1a; xi1b], -1.0, 1.0)
                 l = 1/2*abs(xi1[2]-xi1[1])
                 isapprox(l, 0.0) && continue # no contribution in this master element
 
@@ -211,7 +211,7 @@ function assemble!(problem::Problem{Contact}, time::Float64,
                 # calculate segmentation: we care only about endpoints
                 xi1a = project_from_master_to_slave(slave_element, x1, n1, x2[1])
                 xi1b = project_from_master_to_slave(slave_element, x1, n1, x2[2])
-                xi1 = clamp([xi1a; xi1b], -1.0, 1.0)
+                xi1 = clamp.([xi1a; xi1b], -1.0, 1.0)
                 l = 1/2*abs(xi1[2]-xi1[1])
                 isapprox(l, 0.0) && continue # no contribution in this master element
 

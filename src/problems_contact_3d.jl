@@ -1,7 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-typealias ContactElements3D Union{Tri3, Tri6, Quad4, Quad8, Quad9}
+const ContactElements3D = Union{Tri3,Tri6,Quad4,Quad8,Quad9}
 
 function create_orthogonal_basis(n)
     I = eye(3)

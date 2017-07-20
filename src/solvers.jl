@@ -1,7 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-abstract AbstractSolver
+abstract type AbstractSolver end
 
 type Solver{S<:AbstractSolver}
     name :: AbstractString       # some descriptive name for problem
