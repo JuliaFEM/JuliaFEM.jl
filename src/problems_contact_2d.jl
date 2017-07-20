@@ -41,7 +41,7 @@ function create_contact_segmentation(problem::Problem{Contact}, slave_element::E
         # 3.1 calculate segmentation
         xi1a = project_from_master_to_slave(slave_element, x2[1], time)
         xi1b = project_from_master_to_slave(slave_element, x2[2], time)
-        xi1 = clamp([xi1a; xi1b], -1.0, 1.0)
+        xi1 = clamp.([xi1a; xi1b], -1.0, 1.0)
         l = 1/2*abs(xi1[2]-xi1[1])
         if isapprox(l, 0.0)
             continue # no contribution in this master element

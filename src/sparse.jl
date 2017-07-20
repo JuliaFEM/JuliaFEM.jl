@@ -10,7 +10,7 @@ type SparseMatrixCOO{T<:Real}
     V :: Vector{T}
 end
 
-typealias SparseVectorCOO SparseMatrixCOO
+const SparseVectorCOO = SparseMatrixCOO
 
 function SparseMatrixCOO()
     return SparseMatrixCOO{Float64}([], [], [])

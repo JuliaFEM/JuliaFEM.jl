@@ -1,10 +1,10 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-abstract AbstractProblem
-abstract FieldProblem <: AbstractProblem
-abstract BoundaryProblem <: AbstractProblem
-abstract MixedProblem <: AbstractProblem
+abstract type AbstractProblem end
+abstract type FieldProblem<:AbstractProblem end
+abstract type BoundaryProblem<:AbstractProblem end
+abstract type MixedProblem<:AbstractProblem end
 
 """
 General linearized problem to solve

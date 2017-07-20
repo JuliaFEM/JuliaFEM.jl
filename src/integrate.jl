@@ -62,9 +62,9 @@ function get_integration_points(element::Poi1)
     [ (1.0, [] ) ]
 end
 
-typealias CartesianLineElement Union{Seg2, Seg3, NSeg}
-typealias CartesianSurfaceElement Union{Quad4, Quad8, Quad9, NSurf}
-typealias CartesianVolumeElement Union{Hex8, Hex20, Hex27, NSolid}
+const CartesianLineElement = Union{Seg2,Seg3,NSeg}
+const CartesianSurfaceElement = Union{Quad4,Quad8,Quad9,NSurf}
+const CartesianVolumeElement = Union{Hex8,Hex20,Hex27,NSolid}
 
 function get_integration_points(element::CartesianLineElement, order::Int64)
     w, xi = get_integration_points(order)
@@ -86,7 +86,7 @@ end
 # http://math2.uncc.edu/~shaodeng/TEACHING/math5172/Lectures/Lect_15.PDF
 # http://libmesh.github.io/doxygen/quadrature__gauss__2D_8C_source.html
 
-typealias TriangularElement Union{Tri3, Tri6, Tri7}
+const TriangularElement = Union{Tri3,Tri6,Tri7}
 
 function get_integration_points(element::TriangularElement, ::Type{Val{1}})
     weights = [0.5]
@@ -203,7 +203,7 @@ end
 
 ### 3d elements
 
-typealias TetrahedralElement Union{Tet4, Tet10}
+const TetrahedralElement = Union{Tet4,Tet10}
 
 function get_integration_points(element::TetrahedralElement, ::Type{Val{1}})
     weights = 1.0/6.0*[1.0]
@@ -292,7 +292,7 @@ function get_integration_points(element::PyramidalElement, ::Type{Val{2}})
     return zip(weights, points)
 end
 
-typealias PrismaticElement Union{Wedge6, Wedge15}
+const PrismaticElement = Union{Wedge6,Wedge15}
 
 function get_integration_points(element::PrismaticElement, ::Type{Val{2}})
     weights = 1/6*[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
@@ -438,7 +438,7 @@ end
 
 typealias LinearElement Union{Seg2, Tri3, Quad4, Tet4, Pyr5, Wedge6, Hex8}
 
-typealias QuadraticElement Union{Seg3, Tri6, Tri7, Tet10, Quad8, Quad9, Wedge15, Hex20, Hex27}
+const QuadraticElement = Union{Seg3,Tri6,Tri7,Tet10,Quad8,Quad9,Wedge15,Hex20,Hex27}
 
 function get_integration_order(element::LinearElement)
     return 2
