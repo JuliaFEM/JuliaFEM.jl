@@ -5,7 +5,6 @@ using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
 using JuliaFEM.Testing
-using JuliaFEM.Abaqus: create_surface_elements
 
 tet4_meshfile = "test_problems_contact_3d/tet4.inp"
 tet10_meshfile = "test_problems_contact_3d/tet10.inp"

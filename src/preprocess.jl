@@ -31,6 +31,31 @@ function Mesh()
     return Mesh(Dict(), Dict(), Dict(), Dict(), Dict(), Dict(), Dict(), Dict())
 end
 
+"""
+    Mesh(m::Dict)
+
+Create new `Mesh` using data `m`. It is assumed that `m` is in format what
+`abaqus_read_mesh` in `AbaqusReader.jl` is returning.
+"""
+function Mesh(m::Dict)
+    mesh = Mesh()
+    mesh.nodes = m["nodes"]
+    mesh.elements = m["elements"]
+    mesh.element_types = m["element_types"]
+    mesh.surface_sets = m["surface_sets"]
+    mesh.surface_types = m["surface_types"]
+    for (nset_name, node_ids) in m["node_sets"]
+        mesh.node_sets[Symbol(nset_name)] = Set(node_ids)
+    end
+    for (elset_name, element_ids) in m["element_sets"]
+        mesh.element_sets[Symbol(elset_name)] = Set(element_ids)
+    end
+    for (surfset_name, surfaces) in m["surface_sets"]
+        mesh.surface_sets[Symbol(surfset_name)] = surfaces
+    end
+    return mesh
+end
+
 function add_node!(mesh::Mesh, nid::Int, ncoords::Vector{Float64})
     mesh.nodes[nid] = ncoords
 end
@@ -203,3 +228,47 @@ function JuliaFEM.Problem{P<:BoundaryProblem}(mesh::Mesh, ::Type{P}, name, dimen
     problem.elements = create_elements(mesh, name)
     return problem
 end
+
+using AbaqusReader
+
+function abaqus_read_mesh(fn::String)
+    m = AbaqusReader.abaqus_read_mesh(fn)
+    return Mesh(m)
+end
+
+""" 
+    create_surface_elements(mesh::Mesh, surface_name::Symbol)
+
+Create a set of surface elements from solid elements.
+
+Notation follow what is defined in ABAQUS. For example, if solid elements
+are Tet10, surface elements will be Tri6 and they can be used to define
+boundary conditions.
+"""
+function create_surface_elements(mesh::Mesh, surface_name::Symbol)
+    elements = Element[]
+    for (elid, elsi) in mesh.surface_sets[surface_name]
+        elty = mesh.element_types[elid]
+        elco = mesh.elements[elid]
+        chel, chcon = AbaqusReader.create_surface_element(elty, elsi, elco)
+        ch = Element(getfield(JuliaFEM, child_element_type), chcon)
+        push!(elements, ch)
+    end
+    update!(elements, "geometry", mesh.nodes)
+    return elements
+end
+
+""" 
+    create_surface_elements(mesh::Mesh, surface_name::String)
+
+Create a set of surface elements from solid elements.
+
+Notation follow what is defined in ABAQUS. For example, if solid elements
+are Tet10, surface elements will be Tri6 and they can be used to define
+boundary conditions.
+"""
+function create_surface_elements(mesh::Mesh, surface_name::String)
+    return create_surface_elements(mesh, Symbol(surface_name))
+end
+
+export abaqus_read_mesh, create_surface_elements

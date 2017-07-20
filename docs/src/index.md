@@ -6,6 +6,7 @@
 ```@meta
 DocTestSetup = quote
     using JuliaFEM
+    using JuliaFEM.Preprocess
 end
 ```
 
@@ -15,7 +16,9 @@ Add here.
 
 ## Functions
 
-Add here.
+```@docs
+JuliaFEM.Preprocess.create_surface_elements
+```
 
 ## Index
 
