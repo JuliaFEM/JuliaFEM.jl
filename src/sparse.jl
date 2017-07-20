@@ -51,6 +51,12 @@ function sparse(A::SparseMatrixCOO, n::Int, m::Int; tol=1.0e-12)
     return B
 end
 
+function sparse(A::SparseMatrixCOO, n::Int, m::Int, f::Function; tol=1.0e-12)
+    B = sparse(A.I, A.J, A.V, n, m, f)
+    SparseArrays.droptol!(B, tol)
+    return B
+end
+
 function push!(A::SparseMatrixCOO, I::Int, J::Int, V::Float64)
     push!(A.I, I)
     push!(A.J, J)

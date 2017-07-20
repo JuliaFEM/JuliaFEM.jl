@@ -199,7 +199,7 @@ end
 """ Take dot product of DVTI field and vector T. Vector length must match to the
 field length and this can be used mainly for interpolation purposes, i.e., u = ∑ Nᵢuᵢ.
 """
-function *(T::Vector, f::DVTI)
+function *(T::Union{Vector, RowVector}, f::DVTI)
     @assert length(T) <= length(f)
     return sum([T[i]*f[i] for i=1:length(T)])
 end
