@@ -2,8 +2,7 @@ language: julia
 os:
   - linux
 julia:
-  - release
-  - nightly
+  - 0.5
 notifications:
   email: false
   webhooks:
