@@ -5,7 +5,6 @@ using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
 using JuliaFEM.Testing
-using JuliaFEM.Abaqus: create_surface_elements
 
 @testset "forget to add elements to problem" begin
     X = Dict(

@@ -5,7 +5,6 @@ using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
 using JuliaFEM.Testing
-using JuliaFEM.Abaqus: create_surface_elements
 
 ### temperature patch tests, sl tet4, dl tet4, sl tet10, dl tet 10
 

@@ -18,6 +18,7 @@ before_script:
     - julia --color=yes -e 'Pkg.add("Lint")'
     - julia --color=yes -e 'Pkg.clone("https://github.com/ahojukka5/CheckHeader.jl.git")'
     - julia --color=yes -e 'Pkg.clone("https://github.com/ahojukka5/CheckTabs.jl.git")'
+    - julia --color=yes -e 'Pkg.clone("https://github.com/JuliaFEM/AbaqusReader.jl.git")'
 script:
     - julia --color=yes -e 'Pkg.build("JuliaFEM")'
     - julia --color=yes -e 'using CheckHeader; checkheader("JuliaFEM")'
