@@ -273,7 +273,7 @@ end
 
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch12.d/AFEM.Ch12.pdf
 
-typealias PyramidalElement Union{Pyr5,}
+const PyramidalElement = Union{Pyr5,}
 
 function get_integration_points(element::PyramidalElement, ::Type{Val{2}})
     g1 =  0.5842373946721771876874344
@@ -436,7 +436,7 @@ end
 ### default number of integration points for each element
 ### 2 for linear elements, 3 for quadratic
 
-typealias LinearElement Union{Seg2, Tri3, Quad4, Tet4, Pyr5, Wedge6, Hex8}
+const LinearElement = Union{Seg2, Tri3, Quad4, Tet4, Pyr5, Wedge6, Hex8}
 
 const QuadraticElement = Union{Seg3,Tri6,Tri7,Tet10,Quad8,Quad9,Wedge15,Hex20,Hex27}
 
