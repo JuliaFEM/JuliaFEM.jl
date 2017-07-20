@@ -75,7 +75,7 @@ end
          1,  2.649428       ,  -21.93735      ,  217.2934
          2,  27.54531       ,  1.108443       ,  228.8077
 """
-	fn = tempname() * ".inp"
+    fn = tempname() * ".inp"
     open(fn, "w") do fid write(fid, data) end
     mesh = abaqus_read_mesh(fn)
     @test length(mesh.nodes) == 2
