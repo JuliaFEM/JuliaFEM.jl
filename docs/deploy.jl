@@ -6,4 +6,5 @@ using JuliaFEM
 
 deploydocs(
     deps = Deps.pip("mkdocs", "python-markdown-math"),
-    repo = "github.com/JuliaFEM/JuliaFEM.jl.git")
+    repo = "github.com/JuliaFEM/JuliaFEM.jl.git",
+    julia = "0.5")
