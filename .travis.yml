@@ -12,21 +12,9 @@ notifications:
     on_failure: always  # options: [always|never|change] default: always
     on_start: false     # default: false
 before_script:
-    - julia --color=yes -e 'Pkg.clone(pwd())'
-    - julia --color=yes -e 'Pkg.add("Coverage")'
-    - julia --color=yes -e 'Pkg.add("Documenter")'
-    - julia --color=yes -e 'Pkg.add("Lint")'
-    - julia --color=yes -e 'Pkg.clone("https://github.com/ahojukka5/CheckHeader.jl.git")'
-    - julia --color=yes -e 'Pkg.clone("https://github.com/ahojukka5/CheckTabs.jl.git")'
-    - julia --color=yes -e 'Pkg.clone("https://github.com/JuliaFEM/AbaqusReader.jl.git")'
+    - julia --color=yes -e 'Pkg.clone("https://github.com/JuliaFEM/PkgTestSuite.jl.git")'
+    - julia --color=yes -e 'using PkgTestSuite; init()'
 script:
-    - julia --color=yes -e 'Pkg.build("JuliaFEM")'
-    - julia --color=yes -e 'using CheckHeader; checkheader("JuliaFEM")'
-    - julia --color=yes -e 'using CheckTabs; checktabs("JuliaFEM")'
-    - julia --color=yes -e 'Pkg.test("JuliaFEM", coverage=true)'
+    - julia --color=yes -e 'using PkgTestSuite; test()'
 after_success:
-    - julia --color=yes -e 'cd(Pkg.dir("JuliaFEM", "test")); include("run_lint.jl")'
-    - julia --color=yes -e 'cd(Pkg.dir("JuliaFEM", "docs")); include("make.jl")'
-    - julia --color=yes -e 'cd(Pkg.dir("JuliaFEM")); using Coverage; Coveralls.submit(Coveralls.process_folder())'
-    - julia --color=yes -e 'cd(Pkg.dir("JuliaFEM", "docs")); include("deploy.jl")'
-
+    - julia --color=yes -e 'using PkgTestSuite; deploy()'
