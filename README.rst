@@ -77,6 +77,6 @@ We strongly believe in the test driven development as well as building on top of
 Contributing
 ------------
 
-Interested in participating? Please start by reading `CONTRIBUTING.md <https://github.com/JuliaFEM/JuliaFEM/blob/master/CONTRIBUTING.md>`_.
+Interested in participating? Please start by reading `CONTRIBUTING.rst <https://github.com/JuliaFEM/JuliaFEM/blob/master/CONTRIBUTING.rst>`_.
 
 Contributors: see `contributors <https://github.com/JuliaFEM/JuliaFEM/blob/master/contributors>`_
