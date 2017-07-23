@@ -3,3 +3,5 @@
 
 Pkg.clone("https://github.com/JuliaFEM/AbaqusReader.jl.git")
 Pkg.build("AbaqusReader")
+Pkg.clone("https://github.com/JuliaFEM/FEMQuad.jl.git")
+Pkg.build("FEMQuad")
