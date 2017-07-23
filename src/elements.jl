@@ -315,11 +315,15 @@ function get_connectivity(element::Element)
     return element.connectivity
 end
 
-function get_integration_points(element::Element)
+function get_integration_points{E}(element::Element{E})
     # first time initialize default integration points
     if length(element.integration_points) == 0
         ips = get_integration_points(element.properties)
-        element.integration_points = [IP(i, w, xi) for (i, (w, xi)) in enumerate(ips)]
+        if E in (Seg2, Seg3, NSeg)
+            element.integration_points = [IP(i, w, [xi]) for (i, (w, xi)) in enumerate(ips)]
+        else
+            element.integration_points = [IP(i, w, xi) for (i, (w, xi)) in enumerate(ips)]
+        end
     end
     return element.integration_points
 end
@@ -327,11 +331,13 @@ end
 """ This is a special case, temporarily change order
 of integration scheme mainly for mass matrix.
 """
-function get_integration_points(element::Element, change_order::Int)
-    order = get_integration_order(element.properties)
-    order += change_order
-    ips = get_integration_points(element.properties, order)
-    return [IP(i, w, xi) for (i, (w, xi)) in enumerate(ips)]
+function get_integration_points{E}(element::Element{E}, change_order::Int)
+    ips = get_integration_points(element.properties, Val{change_order})
+    if E in (Seg2, Seg3, NSeg)
+        return [IP(i, w, [xi]) for (i, (w, xi)) in enumerate(ips)]
+    else
+        return [IP(i, w, xi) for (i, (w, xi)) in enumerate(ips)]
+    end
 end
 
 """ Return dual basis transformation matrix Ae. """
