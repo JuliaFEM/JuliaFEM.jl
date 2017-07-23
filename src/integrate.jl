@@ -51,3 +51,8 @@ for (E, R) in integration_rule_mapping
         eval(code)
     end
 end
+
+# All good codes needs a special case. Here we have it: Poi1
+function get_integration_points(element::Poi1)
+    [ (1.0, [] ) ]
+end
