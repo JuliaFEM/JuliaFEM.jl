@@ -148,8 +148,8 @@ end
     maxT = maximum(T)
     stdT = std(T)
     info("minT = $minT, maxT = $maxT, stdT = $stdT")
-    @test maxT - minT < 1.0e-10
-    @test isapprox(stdT, 0.0; atol=1.0e-10)
+    @test maxT - minT < 1.0e-6
+    @test isapprox(stdT, 0.0; atol=1.0e-6)
 
 end
 

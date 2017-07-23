@@ -142,7 +142,7 @@ function assemble!{E<:Heat3DSurfaceElements}(assembly::Assembly, problem::Proble
     nnodes = length(element)
     K = zeros(nnodes, nnodes)
     fq = zeros(nnodes)
-    for ip in get_integration_points(element, 1)
+    for ip in get_integration_points(element, 2)
         detJ = element(ip, time, Val{:detJ})
         w = ip.weight*detJ
         N = element(ip, time)

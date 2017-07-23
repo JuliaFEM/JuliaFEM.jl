@@ -55,5 +55,5 @@ end
 const IP = Point{IntegrationPoint}
 
 function IP(id, weight, coords)
-    return IP(id, weight, coords, Dict(), IntegrationPoint())
+    return IP(id, weight, [c for c in coords], Dict(), IntegrationPoint())
 end
