@@ -27,15 +27,18 @@ using JuliaFEM.Postprocess
     info("Solution: $T")
     T_expected = [ # using code aster
         1.45606533688540E+01
-        5.01315339269860E-17
-        3.02236827927507E-17
-       -2.01049663215778E-16
+        0.0
+        0.0
+        0.0
         1.05228712963739E+01
-        0.00000000000000E+00
+        0.0
         9.44202309239159E+00
         1.05228712963739E+01
-        4.44089209850063E-16
-        0.00000000000000E+00]
+        0.0
+        0.0]
+    info("Expected: $T_expected")
+    rtol = norm(T-T_expected)/max(norm(T), norm(T_expected))
+    info("rtol = $rtol")
     @test isapprox(T, T_expected; rtol=1.0e-6)
 end
 
