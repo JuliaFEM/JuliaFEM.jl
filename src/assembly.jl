@@ -59,7 +59,7 @@ function assemble!(problem::Problem, time::Real, ::Type{Val{:mass_matrix}}; dens
         end
         nnodes = length(element)
         M = zeros(nnodes, nnodes)
-        for ip in get_integration_points(element, 1)
+        for ip in get_integration_points(element, 2)
             detJ = element(ip, time, Val{:detJ})
             N = element(ip, time)
             rho = haskey(element, "density") ? element("density", ip, time) : density
