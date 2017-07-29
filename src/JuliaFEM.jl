@@ -136,7 +136,7 @@ include("preprocess.jl")
 export create_elements, Mesh, add_node!, add_nodes!, add_element!,
        add_elements!, add_element_to_element_set!, add_node_to_node_set!,
        find_nearest_nodes, find_nearest_node, reorder_element_connectivity!,
-       create_node_set_from_element_set!
+       create_node_set_from_element_set!, filter_by_element_set
 
 include("preprocess_abaqus_reader.jl")
 export abaqus_read_mesh, create_surface_elements
