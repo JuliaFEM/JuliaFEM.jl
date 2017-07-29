@@ -55,7 +55,7 @@ several meshes, a name of mesh must be given. By default elements are reordered
 so that they match to the conventions used in JuliaFEM.
 """
 function aster_read_mesh(filename::String, mesh_name=nothing; reorder_element_connectivity=true)
-    m = AsterReader.read_aster_mesh(filename, mesh_name)
+    m = AsterReader.aster_read_mesh(filename, mesh_name)
     mesh = Mesh(m)
     for (elid, eltype) in mesh.element_types
         haskey(med_element_names, eltype) || continue
