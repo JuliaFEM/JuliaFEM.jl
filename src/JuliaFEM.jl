@@ -138,6 +138,9 @@ export create_elements, Mesh, add_node!, add_nodes!, add_element!,
        find_nearest_nodes, find_nearest_node, reorder_element_connectivity!,
        create_node_set_from_element_set!
 
+include("preprocess_abaqus_reader.jl")
+export abaqus_read_mesh, create_surface_elements
+
 include("preprocess_aster_reader.jl")
 export aster_create_elements, parse_aster_med_file, is_aster_mail_keyword,
        parse_aster_header, aster_parse_nodes, aster_renumber_nodes!,
