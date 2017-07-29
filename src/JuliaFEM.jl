@@ -136,17 +136,13 @@ include("preprocess.jl")
 export create_elements, Mesh, add_node!, add_nodes!, add_element!,
        add_elements!, add_element_to_element_set!, add_node_to_node_set!,
        find_nearest_nodes, find_nearest_node, reorder_element_connectivity!,
-       create_node_set_from_element_set!
+       create_node_set_from_element_set!, filter_by_element_set
 
 include("preprocess_abaqus_reader.jl")
 export abaqus_read_mesh, create_surface_elements
 
 include("preprocess_aster_reader.jl")
-export aster_create_elements, parse_aster_med_file, is_aster_mail_keyword,
-       parse_aster_header, aster_parse_nodes, aster_renumber_nodes!,
-       aster_renumber_elements!, aster_combine_meshes, aster_read_mesh,
-       filter_by_element_set, filter_by_element_id, MEDFile, aster_read_data,
-       aster_read_mesh_names, aster_read_node_sets, aster_read_nodes, RMEDFile
+export aster_read_mesh
 
 end
 
