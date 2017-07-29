@@ -58,7 +58,7 @@ function aster_read_mesh(filename::String, mesh_name=nothing; reorder_element_co
     m = AsterReader.aster_read_mesh(filename, mesh_name)
     mesh = Mesh(m)
     for (elid, eltype) in mesh.element_types
-        mesh.elements_types[elid] = med_element_names[eltype]
+        mesh.element_types[elid] = med_element_names[eltype]
     end
     if reorder_element_connectivity
         reorder_element_connectivity!(mesh, med_connectivity)
