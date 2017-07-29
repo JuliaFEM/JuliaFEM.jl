@@ -5,6 +5,7 @@ using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
 using JuliaFEM.Testing
+using AsterReader: RMEDFile, aster_read_nodes, aster_read_data
 
 #=
 Two rings, RING1 = inner, RING2 = outer, RINGS combined mesh. Set T=1.0 for

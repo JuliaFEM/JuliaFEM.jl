@@ -6,6 +6,8 @@ using JuliaFEM.Preprocess
 using JuliaFEM.Postprocess
 using JuliaFEM.Testing
 
+using AsterReader: RMEDFile, aster_read_nodes, aster_read_data
+
 #=
 Two rings, RING1 is inner, RING2 is outer. Inner diameter is from 0.8 .. 0.9 and
 outer ring is 0.9 .. 1.0. Contact surface pair is RING1_OUTER <- RING2_INNER.
