@@ -45,46 +45,6 @@ end
     @test first(nid) == 13
 end
 
-@testset "code aster / parse nodes" begin
-    section = """
-    N9  2.0 3.0 4.0
-    COOR_3D
-    N1          0.0 0.0 0.0
-    N2          1.0 0.0 0.0
-    N3          1.0 1.0 0.0
-    N4          0.0 1.0 0.0
-    N5          0.0 0.0 1.0
-    N6          1.0 0.0 1.0
-    N7          1.0 1.0 1.0
-    N8          0.0 1.0 1.0
-    FINSF
-    absdflasdf
-    N12 3.0 4.0 5.0 6.0
-    N13 3.0 4.0 5.0
-    """
-    nodes = aster_parse_nodes(section)
-    @test nodes[1] == Float64[0.0, 0.0, 0.0]
-    @test nodes[8] == Float64[0.0, 1.0, 1.0]
-    @test length(nodes) == 8
-end
-
-@testset "test reading aster .med file" begin
-    meshfile = joinpath(datadir, "block_2d_1elem_quad4.med")
-    mesh = aster_read_mesh(meshfile)
-    @test length(mesh.element_sets) == 5
-    @test length(mesh.node_sets) == 4
-    @test length(mesh.elements) == 5
-    @test length(mesh.nodes) == 4
-    for elset in [:BLOCK, :TOP, :BOTTOM, :LEFT, :RIGHT]
-        @test haskey(mesh.element_sets, elset)
-        @test length(mesh.element_sets[elset]) == 1
-    end
-    for nset in [:TOP_LEFT, :TOP_RIGHT, :BOTTOM_LEFT, :BOTTOM_RIGHT]
-        @test haskey(mesh.node_sets, nset)
-        @test length(mesh.node_sets[nset]) == 1
-    end
-end
-
 @testset "test filter by element set" begin
     mesh = aster_read_mesh(joinpath(datadir, "block_2d_1elem_quad4.med"))
     mesh2 = filter_by_element_set(mesh, :BLOCK)
@@ -126,31 +86,4 @@ end
 #   @test isapprox(calculate_volume("WEDGE_WEDGE15_1", :Wedge15, 1/2))
 #   @test isapprox(calculate_volume("PYRAMID_PYRAMID5_1", :Pyramid5, ?))
 #   @test isapprox(calculate_volume("PYRAMID_PYRAMID13_1", :Pyramid13, ?))
-end
-
-@testset "read nodal field from code aster result file" begin
-    rmedfile = joinpath(datadir, "rings.rmed")
-    rmed = JuliaFEM.Preprocess.RMEDFile(rmedfile)
-    temp = JuliaFEM.Preprocess.aster_read_data(rmed, "TEMP")
-    @test isapprox(temp[15], 1.0)
-    @test isapprox(temp[95], 2.0)
-end
-
-using JuliaFEM.Preprocess: MEDFile, get_element_sets
-
-@testset "test read element sets from med file, issue #111" begin
-    meshfile = joinpath(datadir, "hexmeshOverlappingGroups.med")
-    med = MEDFile(meshfile)
-    element_sets = get_element_sets(med, "Mesh_1")
-    @test element_sets[-10] == ["halfhex", "mosthex"]
-    @test element_sets[-11] == ["halfhex"]
-end
-
-using JuliaFEM.Preprocess: aster_read_mesh
-
-@testset "test read overlapping ets, issue #111" begin
-    mesh_file = joinpath(datadir, "hexmeshOverlappingGroups.med")
-    mesh = aster_read_mesh(mesh_file, "Mesh_1")
-    @test length(mesh.element_sets[:mosthex]) == 273
-    @test length(mesh.element_sets[:halfhex]) == 147
 end
