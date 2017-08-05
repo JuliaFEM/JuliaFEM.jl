@@ -10,7 +10,7 @@ using JuliaFEM.Testing
     # from FENiCS tutorial, u(x,y) = 1 + x² + 2y² on [0x1]×[0,1]
     # and u₀(x,y) = 1 + x² + 2y², f(x,y) = -6
 
-    mesh_file = Pkg.dir("JuliaFEM")*"/test/testdata/primitives.med"
+    mesh_file = @__DIR__()*"/testdata/primitives.med"
     mesh = aster_read_mesh(mesh_file, "UNITSQUARE_6X4")
 
     field = Problem(Heat, "unit square, 6x4 triangular mesh", 1)

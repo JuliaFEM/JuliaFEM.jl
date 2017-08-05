@@ -122,7 +122,7 @@ FIN()
 
 @testset "splitted rod with tie contact" begin
     # CYLINDER_20_1_FACE1 -- CYLINDER_20_1_FACE2 -- CYLINDER_20_2_FACE_1 -- CYLINDER_20_2_FACE_2
-    mesh_file = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
+    mesh_file = @__DIR__() * "/testdata/primitives.med"
     mesh = aster_read_mesh(mesh_file, "CYLINDER_20_SPLITTED")
     body1 = Problem(mesh, Elasticity, "CYLINDER_20_1", 3)
     body2 = Problem(mesh, Elasticity, "CYLINDER_20_2", 3)

@@ -62,7 +62,7 @@ using JuliaFEM.Testing
 #end
 
 # function solve_rod_model_elasticity(eltype)
-#     fn = Pkg.dir("JuliaFEM") * "/test/testdata/rod_short.med"
+#     fn = @__DIR__() * "/testdata/rod_short.med"
 #     mesh = aster_read_mesh(fn, eltype)
 #     element_sets = join(keys(mesh.element_sets), ", ")
 #     info("element sets: $element_sets")

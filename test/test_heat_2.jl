@@ -7,7 +7,7 @@ using JuliaFEM.Postprocess
 using JuliaFEM.Testing
 
 @testset "3d rod" begin
-    mesh = aster_read_mesh(Pkg.dir("JuliaFEM")*"/test/testdata/primitives.med", "CYLINDER_20_TET4")
+    mesh = aster_read_mesh(@__DIR__()*"/testdata/primitives.med", "CYLINDER_20_TET4")
     problem = Problem(Heat, "rod of length 20", 1)
     problem.elements = create_elements(mesh, "CYLINDER")
     update!(problem, "temperature thermal conductivity", 200.0)

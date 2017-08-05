@@ -16,7 +16,7 @@ surface of outer ring. We should expect constant temperature in contact surface.
 This is conforming mesh so result should match to the conforming situation.
 =#
 @testset "test that curved interface transfers constant field without error, two rings problem" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
+    meshfile = @__DIR__() * "/testdata/primitives.med"
     mesh = aster_read_mesh(meshfile, "RINGS")
 
     ring1 = Problem(Heat, "RING1", 1)
@@ -44,7 +44,7 @@ This is conforming mesh so result should match to the conforming situation.
     solver = LinearSolver(ring1, ring2, bc_inner, bc_outer, interface)
     solver()
 
-    fn = Pkg.dir("JuliaFEM") * "/test/testdata/rings.rmed"
+    fn = @__DIR__() * "/testdata/rings.rmed"
     results = RMEDFile(fn)
     nodes = aster_read_nodes(results)
     temp_ca = aster_read_data(results, "TEMP")

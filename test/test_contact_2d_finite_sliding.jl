@@ -7,7 +7,7 @@ using JuliaFEM.Postprocess
 using JuliaFEM.Testing
 
 @testset "2d curved block with frictionless finite sliding contact using forwarddiff" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/block_2d_curved.med"
+    meshfile = @__DIR__() * "/testdata/block_2d_curved.med"
     mesh = aster_read_mesh(meshfile)
 
     upper = Problem(Elasticity, "upper", 2)

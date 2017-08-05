@@ -8,7 +8,7 @@ using JuliaFEM.Testing
 
 #= this has nothing to do here
 @testset "calculate cross-sectional properties" begin
-    mesh_file = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
+    mesh_file = @__DIR__() * "/testdata/primitives.med"
     mesh = aster_read_mesh(mesh_file, "CYLINDER_20_TET4")
     # calculate cross-sectional properties A and Iₓ
     fixed1 = Problem(Dirichlet, "left support", 3, "displacement")
@@ -65,7 +65,7 @@ numéro    fréquence (HZ)     norme d'erreur
 =#
 
 @testset "long rod natural frequencies" begin
-    mesh_file = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
+    mesh_file = @__DIR__() * "/testdata/primitives.med"
     mesh = aster_read_mesh(mesh_file, "CYLINDER_20_TET10")
 #   for (id, coords) in mesh.nodes
 #       mesh.nodes[id][1] *= 5.0
@@ -179,7 +179,7 @@ numéro    fréquence (HZ)     norme d'erreur
 end
 
 @testset "eigenvalues of cube (tet4)" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
+    meshfile = @__DIR__() * "/testdata/primitives.med"
     mesh = aster_read_mesh(meshfile, "CUBE_TET4")
     cube = Problem(mesh, Elasticity, "CUBE", 3)
     update!(cube.elements, "youngs modulus", 10000.0)

@@ -11,7 +11,7 @@ function get_model(::Type{Val{Symbol("mesh tie with curved 2d block")}};
             dual_basis=false, use_forwarddiff=true, finite_strain=false,
             geometric_stiffness=false)
 
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/block_2d_curved.med"
+    meshfile = @__DIR__() * "/testdata/block_2d_curved.med"
     mesh = aster_read_mesh(meshfile)
 
     upper = Problem(Elasticity, "upper", 2)

@@ -4,7 +4,7 @@
 using Base.Test
 using TimerOutputs
 
-pkg_dir = Pkg.dir("JuliaFEM")
+pkg_dir = dirname(@__DIR__)
 maybe_test_files = readdir(joinpath(pkg_dir, "test"))
 is_test_file(fn) = startswith(fn, "test_") & endswith(fn, ".jl")
 test_files = filter(is_test_file, maybe_test_files)
