@@ -14,5 +14,6 @@ makedocs(modules=[JuliaFEM],
          sitename = "JuliaFEM",
          pages = [
                   "Introduction" => "index.md",
+                  "Examples" => "examples.md",
                   "API" => "api.md"
                  ])
