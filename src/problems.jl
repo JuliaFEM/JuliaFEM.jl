@@ -141,6 +141,24 @@ function get_assembly(problem)
     return problem.assembly
 end
 
+"""
+    update!(problem.properties, attr...)
+
+Update properties for a problem.
+
+# Example
+
+```julia
+update!(body.properties, "finite_strain" => "false")
+```
+"""
+function update!{P<:AbstractProblem}(problem::P, attr::Pair{String, String}...)
+    for (name, value) in attr
+        debug("$P: set $name to $value")
+        setfield!(problem, parse(name), parse(value))
+    end
+end
+
 """ Initialize element ready for calculation. """
 function initialize!(problem::Problem, element::Element, time::Float64)
     field_name = get_unknown_field_name(problem)
