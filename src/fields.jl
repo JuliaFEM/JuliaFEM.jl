@@ -416,7 +416,7 @@ function (field::CCTV)(xi::Vector, time::Number)
     return field.data(time)
 end
 
-function (field::CVTV)(xi::Vector, time::Number)
+function (field::CVTV)(xi, time)
     return field.data(xi, time)
 end
 

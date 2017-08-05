@@ -122,7 +122,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
     Q3 = create_rotation_matrix(slave_element, time)
 
     # project slave nodes to auxiliary plane (x0, Q)
-    xi = mean(get_reference_coordinates(slave_element))
+    xi = get_mean_xi(slave_element)
     N = vec(get_basis(slave_element, xi, time))
     x0 = N*X1
     n0 = N*n1
@@ -280,7 +280,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
             #la = sub_slave_element("lambda", time)
 
             # create auxiliary plane
-            xi = mean(get_reference_coordinates(sub_slave_element))
+            xi = get_mean_xi(sub_slave_element)
             N = vec(get_basis(sub_slave_element, xi, time))
             x0 = N*X1
             n0 = N*n1
@@ -356,7 +356,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
         n1 = sub_slave_element("normal", time)
             
         # create auxiliary plane
-        xi = mean(get_reference_coordinates(sub_slave_element))
+        xi = get_mean_xi(sub_slave_element)
         N = vec(get_basis(sub_slave_element, xi, time))
         x0 = N*X1
         n0 = N*n1

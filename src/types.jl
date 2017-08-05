@@ -33,6 +33,18 @@ function (point::Point)(field_name, time=0.0)
     point.fields[field_name](time).data
 end
 
+function start(point::Point)
+    return start(point.coords)
+end
+
+function done(point::Point, i)
+    return done(point.coords, i)
+end
+
+function next(point::Point, i)
+    return next(point.coords, i)
+end
+
 function update!{T}(point::Point, field_name, val::Pair{Float64, T})
     if haskey(point, field_name)
         update!(point[field_name], val)

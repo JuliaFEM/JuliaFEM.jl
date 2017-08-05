@@ -1,9 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-abstract type AbstractElement end
-
-type Element{E<:AbstractElement}
+type Element{E<:AbstractBasis}
     id :: Int
     connectivity :: Vector{Int}
     integration_points :: Vector{IP}
@@ -17,8 +15,21 @@ Examples
 --------
 julia> element = Element(Tri3, [1, 2, 3])
 """
-function Element{E<:AbstractElement}(::Type{E}, connectivity::Vector{Int})
+function Element{E<:AbstractBasis}(::Type{E}, connectivity::Vector{Int})
     return Element{E}(-1, connectivity, [], Dict(), E())
+end
+
+"""
+    length(element::Element)
+
+Return the number of nodes in element.
+"""
+function length{B}(element::Element{B})
+    return length(B)
+end
+
+function size{B}(element::Element{B})
+    return size(B)
 end
 
 function getindex(element::Element, field_name::AbstractString)

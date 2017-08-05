@@ -56,7 +56,7 @@ function assemble!(problem::Problem{Dirichlet}, time::Float64=0.0;
             for i=1:field_dim
                 haskey(element, field_name*" $i") || continue
                 ldofs = gdofs[i:field_dim:end]
-                xis = get_reference_coordinates(typeof(element.properties))
+                xis = get_reference_coordinates(element)
                 vals = Float64[]
                 for xi in xis
                     g = element(field_name*" $i", xi, time)
