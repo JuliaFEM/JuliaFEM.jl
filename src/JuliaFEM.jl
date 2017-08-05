@@ -19,6 +19,12 @@ import Base: getindex, setindex!, convert, length, size, isapprox, similar,
              start, first, next, done, last, endof, vec, ==, +, -, *, /, haskey, copy,
              push!, isempty, empty!, append!, sparse, full, read
 
+using FEMBasis
+using FEMBasis: AbstractBasis
+using FEMQuad
+using AbaqusReader
+using AsterReader
+
 using Logging
 
 Logging.configure(level=INFO)
@@ -45,7 +51,7 @@ export AbstractPoint, Point, IntegrationPoint, IP, Node
 
 ### ELEMENTS ###
 include("elements.jl") # common element routines
-export Node, AbstractElement, Element, update!, get_connectivity, get_basis,
+export Node, Element, update!, get_connectivity, get_basis,
        get_dbasis, inside, get_local_coordinates, get_element_type,
        filter_by_element_type, get_element_id
 
@@ -61,11 +67,6 @@ export Poi1,
        Pyr5,
        Wedge6,
        Hex8, Hex20, Hex27
-
-include("elements_nurbs.jl")
-export NSeg, NSurf, NSolid, is_nurbs
-
-#include("hierarchical.jl") # P-elements
 
 include("integrate.jl")  # default integration points for elements
 export get_integration_points
