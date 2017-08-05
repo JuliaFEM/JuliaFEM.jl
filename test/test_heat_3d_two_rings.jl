@@ -13,7 +13,7 @@ inner ring and T=2.0 for outer ring, measure temperature from middle of ring.
 Results are calculated using Code Aster for comparison.
 =#
 @testset "test 3d heat, two rings, and compare to CA solution" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
+    meshfile = @__DIR__() * "/testdata/primitives.med"
     mesh = aster_read_mesh(meshfile, "RINGS_UNION")
 
     rings = Problem(Heat, "RINGS", 1)
@@ -33,7 +33,7 @@ Results are calculated using Code Aster for comparison.
 
     temp_jf = rings("temperature", 0.0)
 
-    fn = Pkg.dir("JuliaFEM") * "/test/testdata/rings.rmed"
+    fn = @__DIR__() * "/testdata/rings.rmed"
     results = RMEDFile(fn)
     nodes = aster_read_nodes(results)
     temp_ca = aster_read_data(results, "TEMP")

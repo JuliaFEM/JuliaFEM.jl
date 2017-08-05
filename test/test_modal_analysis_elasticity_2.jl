@@ -7,7 +7,7 @@ using JuliaFEM.Postprocess
 using JuliaFEM.Testing
 
 @testset "eigenvalues of CYLINDER1" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
+    meshfile = @__DIR__() * "/testdata/primitives.med"
     mesh = aster_read_mesh(meshfile, "CYLINDER_1_TET4")
     cylinder = Problem(mesh, Elasticity, "CYLINDER", 3)
     update!(cylinder.elements, "youngs modulus", 10000.0)
@@ -35,7 +35,7 @@ using JuliaFEM.Testing
 end
 
 @testset "eigenvalues of CYLINDER20" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
+    meshfile = @__DIR__() * "/testdata/primitives.med"
     mesh = aster_read_mesh(meshfile, "CYLINDER_20_TET4")
     cylinder = Problem(mesh, Elasticity, "CYLINDER", 3)
     #update!(cylinder.elements, "youngs modulus", 10.0e6)

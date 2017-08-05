@@ -7,7 +7,7 @@ using JuliaFEM.Postprocess
 using JuliaFEM.Testing
 
 @testset "zero eigenmode model" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
+    meshfile = @__DIR__() * "/testdata/primitives.med"
     mesh = aster_read_mesh(meshfile, "TETRA_TET10_1")
     model = Problem(mesh, Elasticity, "TET", 3)
     update!(model.elements, "youngs modulus", 10.0)

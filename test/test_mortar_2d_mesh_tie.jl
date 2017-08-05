@@ -57,7 +57,7 @@ end
 end
 
 @testset "test that interface transfers constant field without error" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/block_2d.med"
+    meshfile = @__DIR__() * "/testdata/block_2d.med"
     mesh = aster_read_mesh(meshfile)
 
     upper = Problem(Heat, "upper", 1)
@@ -132,7 +132,7 @@ end
 =#
 
 @testset "test mesh tie with splitted block and plane stress elasticity" begin
-    meshfile = Pkg.dir("JuliaFEM") * "/test/testdata/block_2d.med"
+    meshfile = @__DIR__() * "/testdata/block_2d.med"
     mesh = aster_read_mesh(meshfile)
 
     upper = Problem(Elasticity, "upper", 2)
