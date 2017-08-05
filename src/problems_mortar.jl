@@ -146,7 +146,7 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
         n1 = Field([normals[j] for j in slave_element_nodes])
 
         # project slave nodes to auxiliary plane (x0, Q)
-        xi = mean(get_reference_coordinates(slave_element))
+        xi = get_mean_xi(slave_element)
         N = vec(get_basis(slave_element, xi, time))
         x0 = N*X1
         n0 = N*n1

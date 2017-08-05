@@ -103,11 +103,11 @@ function approx_in{T}(q::T, P::Vector{T}; rtol=1.0e-4, atol=0.0)
     return false
 end
 
-function get_polygon_clip(xs, xm, n)
+function get_polygon_clip{T}(xs::Vector{T}, xm::Vector{T}, n::T)
     # objective: search does line xm1 - xm2 clip xs
     nm = length(xm)
     ns = length(xs)
-    P = Vector[]
+    P = T[]
 
     # 1. test is master point inside slave, if yes, add to clip
     for i=1:nm
@@ -330,6 +330,17 @@ function split_quadratic_elements(elements::Vector, time::Float64)
     return new_elements
 end
 
+function get_mean_xi(element::Element)
+    xi = zeros(2)
+    coords = get_reference_coordinates(element)
+    for (xi1,xi2) in coords
+        xi[1] += xi1
+        xi[2] += xi2
+    end
+    xi /= length(coords)
+    return xi
+end
+
 """ Assemble linear surface element to problem.
 
 Dual basis is constructed such that partially integrated slave segments are taken into account in a proper way.
@@ -357,7 +368,7 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
     n1 = slave_element("normal", time)
 
     # project slave nodes to auxiliary plane (x0, Q)
-    xi = mean(get_reference_coordinates(slave_element))
+    xi = get_mean_xi(slave_element)
     first_slave_element && debug("midpoint xi = $xi")
     N = vec(get_basis(slave_element, xi, time))
     x0 = N*X1
@@ -465,7 +476,7 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
         all_cells = get_cells(P, C0)
         for cell in all_cells
             virtual_element = Element(Tri3, Int[])
-            update!(virtual_element, "geometry", cell)
+            virtual_element.fields["geometry"] = DVTI(cell)
 
             # 5. loop integration point of integration cell
             for ip in get_integration_points(virtual_element, 3)
@@ -579,7 +590,7 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
             n1 = sub_slave_element("normal", time)
 
             # create auxiliary plane
-            xi = mean(get_reference_coordinates(sub_slave_element))
+            xi = get_mean_xi(sub_slave_element)
             first_slave_element && debug("midpoint xi = $xi")
             N = vec(get_basis(sub_slave_element, xi, time))
             x0 = N*X1
@@ -662,7 +673,7 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
         n1 = sub_slave_element("normal", time)
 
         # create auxiliary plane
-        xi = mean(get_reference_coordinates(sub_slave_element))
+        xi = get_mean_xi(sub_slave_element)
         first_slave_element && debug("midpoint xi = $xi")
         N = vec(get_basis(sub_slave_element, xi, time))
         x0 = N*X1

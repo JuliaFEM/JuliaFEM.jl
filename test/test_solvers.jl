@@ -41,7 +41,7 @@ using JuliaFEM.Testing
 
     # Postprocess.
     # Interpolate temperature field along boundary of Γ₁ at time t=1.0
-    xi = [0.0, -1.0]
+    xi = (0.0, )
     X = el2("geometry", xi, 1.0)
     T = el2("temperature", xi, 1.0)
     info("Temperature at point X = $X is T = $T")
