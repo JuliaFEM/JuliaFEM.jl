@@ -88,7 +88,7 @@ if a=0.9, b=1.0, ν=1/3, E = 24580 and p = 7317 equation yields
 http://mms2.ensmp.fr/emms_paris/plasticite3D/exercices/eSpherePress.pdf
 =#
 function test_wedge_sphere(model, u_CA, S_CA)
-    mesh_file = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
+    mesh_file = @__DIR__() * "/testdata/primitives.med"
     mesh = aster_read_mesh(mesh_file, model)
     body = Problem(Elasticity, "hollow sphere 1/8 model", 3)
     body.elements = create_elements(mesh, "HOLLOWSPHERE8")

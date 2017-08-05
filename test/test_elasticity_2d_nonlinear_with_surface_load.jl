@@ -7,7 +7,7 @@ using JuliaFEM.Testing
 
 @testset "test 2d nonlinear elasticity with surface load" begin
     meshfile = "/geometry/2d_block/BLOCK_1elem.med"
-    mesh = aster_read_mesh(Pkg.dir("JuliaFEM")*meshfile)
+    mesh = aster_read_mesh(dirname(@__DIR__)*meshfile)
 
     # field problem
     block = Problem(Elasticity, "BLOCK", 2)

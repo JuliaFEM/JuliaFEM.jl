@@ -8,7 +8,7 @@ using JuliaFEM.Postprocess
 
 @testset "Tet10 + convection" begin
     # For some reason Tet10 fails, maybe because of convection.
-    mesh_file = Pkg.dir("JuliaFEM") * "/test/testdata/primitives.med"
+    mesh_file = @__DIR__() * "/testdata/primitives.med"
     mesh = aster_read_mesh(mesh_file, "TETRA_TET10_1")
     prob = Problem(Heat, "tet", 1)
     face = Problem(Heat, "face 4", 1)
@@ -146,7 +146,7 @@ end
 =#
 
 @testset "compare simple 3d heat problem to code aster solution" begin
-    fn = Pkg.dir("JuliaFEM") * "/test/testdata/rod_short.med"
+    fn = @__DIR__() * "/testdata/rod_short.med"
     mesh = aster_read_mesh(fn, "Hex8")
     element_sets = join(keys(mesh.element_sets), ", ")
     info("element sets: $element_sets")
@@ -221,7 +221,7 @@ end
 
 @testset "compare simple 3d heat problem to analytical solution" begin
     function calc_3d_heat_model(mesh_name)
-        fn = Pkg.dir("JuliaFEM") * "/test/testdata/rod_short.med"
+        fn = @__DIR__() * "/testdata/rod_short.med"
         mesh = aster_read_mesh(fn, mesh_name)
         p1 = Problem(Heat, "rod", 1)
         p2 = Problem(Dirichlet, "left support T=100", 1, "temperature")
@@ -248,7 +248,7 @@ end
 @testset "compare simple 3d heat problem to code aster solution" begin
 
     function calc_3d_heat_model(mesh_name)
-        fn = Pkg.dir("JuliaFEM") * "/test/testdata/rod_short.med"
+        fn = @__DIR__() * "/testdata/rod_short.med"
         mesh = aster_read_mesh(fn, mesh_name)
         element_sets = join(keys(mesh.element_sets), ", ")
         info("element sets: $element_sets")

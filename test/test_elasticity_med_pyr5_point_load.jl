@@ -6,7 +6,7 @@ using JuliaFEM.Preprocess
 using JuliaFEM.Testing
 
 @testset "test Pyr5 elasticity with point load" begin
-    fn = Pkg.dir("JuliaFEM") * "/geometry/3d_pyr/Pyr5.med"
+    fn = dirname(@__DIR__) * "/geometry/3d_pyr/Pyr5.med"
     mesh = aster_read_mesh(fn)
     element_sets = join(keys(mesh.element_sets), ", ")
     info("element sets: $element_sets")
