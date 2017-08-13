@@ -25,7 +25,7 @@ function get_integration_order(element::Poi1)
 end
 
 function get_integration_points(element::Poi1, order::Int64)
-    return [ (1.0, [] ) ]
+    return [ (1.0, 0.0) ]
 end
 
 function size(::Type{Poi1})

@@ -8,7 +8,7 @@ abstract type AbstractPoint end
 type Point{P<:AbstractPoint}
     id :: Int
     weight :: Float64
-    coords :: Vector{Float64}
+    coords :: Tuple{Vararg{Float64}}
     fields :: Dict{AbstractString, Field}
     properties :: P
 end
@@ -66,6 +66,11 @@ end
 
 const IP = Point{IntegrationPoint}
 
-function IP(id, weight, coords)
+function IP(id, weight, coords::Tuple)
+    return IP(id, weight, coords, Dict(), IntegrationPoint())
+end
+
+function IP(id, weight, coords::Vector)
+    warn("Consider giving coords as Tuple.")
     return IP(id, weight, [c for c in coords], Dict(), IntegrationPoint())
 end
