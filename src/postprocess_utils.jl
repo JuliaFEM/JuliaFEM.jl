@@ -44,7 +44,7 @@ function calc_nodal_values!(elements::Vector, field_name, field_dim, time;
                 f = ip(field_name, time)
                 N = element(ip, time)
                 for dim=1:field_dim
-                    add!(b, gdofs, w*f[dim]*N, dim)
+                    add!(b, gdofs, [dim], w*f[dim]*N')
                 end
             end
         end
@@ -79,35 +79,6 @@ function get_nodal_vector(elements::Vector, field_name::AbstractString, time::Fl
     node_ids = sort(collect(keys(f)))
     field = [f[nid] for nid in node_ids]
     return node_ids, field
-end
-
-
-function to_dataframe(u::Dict, abbreviation::Symbol)
-    length(u) != 0 || return DataFrame()
-    node_ids = collect(keys(u))
-    column_names = [:NODE]
-    n = length(u[first(node_ids)])
-    index = [Symbol("N$id") for id in node_ids]
-    result = Any[index]
-    for dof=1:n
-        push!(result, [u[id][dof] for id in node_ids])
-        push!(column_names, Symbol("$abbreviation$dof"))
-    end
-    df = DataFrame(result, column_names)
-    sort!(df, cols=[:NODE])
-    return df
-end
-
-function (solver::Solver)(::Type{DataFrame}, field_name::AbstractString,
-              abbreviation::Symbol, time::Float64=0.0)
-    fields = [problem(field_name, time) for problem in get_problems(solver)]
-    fields = filter(f -> f != nothing, fields)
-    if length(fields) != 0
-        u = merge(fields...)
-    else
-        u = Dict()
-    end
-    return to_dataframe(u, abbreviation)
 end
 
 """ Interpolate field from a set of elements. """
@@ -156,20 +127,6 @@ function calculate_area(problem::Problem, X=[0.0, 0.0], time=0.0)
         end
     end
     return A
-end
-
-""" Calculate volume of body. """
-function calculate_volume(problem::Problem, X=[0.0, 0.0, 0.0], time=0.0)
-    V = 0.0
-    for element in get_elements(problem)
-        elsize = size(element)
-        elsize[1] == 3 || error("wrong dimension of problem for area calculation, element size = $elsize")
-        for ip in get_integration_points(element)
-            w = ip.weight*element(ip, time, Val{:detJ})
-            V += w
-        end
-    end
-    return V
 end
 
 """ Calculate center of mass of body with respect to X.
