@@ -330,8 +330,8 @@ function get_integration_points{E}(element::Element{E})
     # first time initialize default integration points
     if length(element.integration_points) == 0
         ips = get_integration_points(element.properties)
-        if E in (Seg2, Seg3, NSeg)
-            element.integration_points = [IP(i, w, [xi]) for (i, (w, xi)) in enumerate(ips)]
+        if E in (Poi1, Seg2, Seg3, NSeg)
+            element.integration_points = [IP(i, w, (xi,)) for (i, (w, xi)) in enumerate(ips)]
         else
             element.integration_points = [IP(i, w, xi) for (i, (w, xi)) in enumerate(ips)]
         end
@@ -344,8 +344,8 @@ of integration scheme mainly for mass matrix.
 """
 function get_integration_points{E}(element::Element{E}, change_order::Int)
     ips = get_integration_points(element.properties, Val{change_order})
-    if E in (Seg2, Seg3, NSeg)
-        return [IP(i, w, [xi]) for (i, (w, xi)) in enumerate(ips)]
+    if E in (Poi1, Seg2, Seg3, NSeg)
+        return [IP(i, w, (xi,)) for (i, (w, xi)) in enumerate(ips)]
     else
         return [IP(i, w, xi) for (i, (w, xi)) in enumerate(ips)]
     end
