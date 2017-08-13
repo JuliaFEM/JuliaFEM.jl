@@ -217,7 +217,9 @@ function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=tru
     info("Increment time t=$(round(solver.time, 3))")
     info(repeat("-", 80))
     initialize!(solver)
-    assemble!(solver; with_mass_matrix=true)
+    @timeit to "assemble matrices" begin
+        assemble!(solver; with_mass_matrix=true)
+    end
     M, K, Kg, f = get_field_assembly(solver)
     if solver.properties.geometric_stiffness
         K += Kg
@@ -297,7 +299,9 @@ function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=tru
     passed = false
 
     try
-        om2, X = eigs(K_red + sigma*I, M_red; nev=props.nev, which=props.which)
+        @timeit to "solve eigenvalue problem using `eigs`" begin
+            om2, X = eigs(K_red + sigma*I, M_red; nev=props.nev, which=props.which)
+        end
         passed = true
     catch
         info("failed to calculate eigenvalues for problem. Maybe stiffness matrix is not positive definite, checking...")
@@ -350,7 +354,9 @@ function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=tru
         end
     end
 
-    update_xdmf!(solver)
+    @timeit to "save results to Xdmf" begin
+        update_xdmf!(solver)
+    end
     
     return true
 
