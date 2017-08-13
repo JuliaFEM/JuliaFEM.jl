@@ -73,3 +73,11 @@ function assemble!(problem::Problem, time::Real, ::Type{Val{:mass_matrix}}; dens
     end
 end
 
+function assemble!(assembly::Assembly, problem::Problem, elements::Vector{Element}, time::Real)
+    warn("assemble!() this is default assemble operation, decreased performance can be expected without preallocation of memory!")
+    for element in elements
+        assemble!(assembly, problem, element, time)
+    end
+    return nothing
+end
+
