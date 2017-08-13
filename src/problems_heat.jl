@@ -56,7 +56,7 @@ function get_unknown_field_name(problem::Problem{Heat})
     return "temperature"
 end
 
-function assemble!(assembly::Assembly, problem::Problem{Heat}, element::Element, time)
+function assemble!(assembly::Assembly, problem::Problem{Heat}, element::Element, time::Float64)
     formulation = Val{Symbol(problem.properties.formulation)}
     assemble!(assembly, problem, element, time, formulation)
 end
@@ -103,37 +103,6 @@ function assemble!{E<:Heat3DVolumeElements}(assembly::Assembly, problem::Problem
     fq -= K*T
     add!(assembly.K, gdofs, gdofs, K)
     add!(assembly.f, gdofs, fq)
-end
-
-function postprocess!{E}(assembly::Assembly, problem::Problem{Heat}, element::Element{E}, time)
-    haskey(element, "temperature thermal conductivity") || return
-    gdofs = get_gdofs(problem, element)
-    field_name = get_unknown_field_name(problem)
-    nnodes = length(element)
-    Me = zeros(nnodes, nnodes)
-    De = zeros(nnodes, nnodes)
-    f = zeros(nnodes, 3)
-    for ip in get_integration_points(element)
-        detJ = element(ip, time, Val{:detJ})
-        w = ip.weight*detJ
-        N = element(ip, time)
-        De += w*diagm(vec(N))
-        Me += w*N'*N
-    end
-    Ae = De*inv(Me)
-    for ip in get_integration_points(element)
-        detJ = element(ip, time, Val{:detJ})
-        w = ip.weight*detJ
-        N = vec(element(ip, time))
-        Phi = transpose(Ae*N)
-        k = element("temperature thermal conductivity", ip, time)
-        gradT = element(field_name, ip, time, Val{:Grad})
-        q = -vec(k*gradT)
-        update!(ip, "heat flux", time => q)
-        f += w*Phi'*q'
-    end
-    add!(assembly.M, gdofs, gdofs, De)
-    add!(assembly.f, gdofs, [1, 2, 3], f)
 end
 
 function assemble!{E<:Heat3DSurfaceElements}(assembly::Assembly, problem::Problem{Heat}, element::Element{E}, time, ::Type{Val{Symbol("3D")}})
