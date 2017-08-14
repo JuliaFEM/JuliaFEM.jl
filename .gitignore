@@ -12,3 +12,5 @@ docs/site/
 *.tex
 *.export
 *.jld
+*.mem
+*.cov
