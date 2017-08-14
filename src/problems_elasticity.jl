@@ -140,12 +140,15 @@ function assemble!{El<:Elasticity3DVolumeElements}(assembly::Assembly,
         Km = zeros(ndofs, ndofs)
         Kg = zeros(ndofs, ndofs)
         f = zeros(ndofs)
+        bi = BasisInfo(El)
 
         for ip in get_integration_points(element)
-            detJ = element(ip, time, Val{:detJ})
+            X = element("geometry", time)
+            eval_basis!(bi, X, ip)
+            detJ = bi.detJ
+            N = bi.N
+            dN = bi.grad
             w = ip.weight*detJ
-            N = element(ip, time)
-            dN = element(ip, time, Val{:Grad})
 
             # kinematics; calculate deformation gradient and strain
 
