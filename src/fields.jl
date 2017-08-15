@@ -10,22 +10,25 @@ abstract type Variable<:AbstractField end
 abstract type TimeVariant<:AbstractField end
 abstract type TimeInvariant<:AbstractField end
 
-type Field{A<:Union{Discrete,Continuous}, B<:Union{Constant,Variable}, C<:Union{TimeVariant,TimeInvariant}}
-    data
+type Field{A<:Union{Discrete, Continuous},
+           B<:Union{Constant, Variable},
+           C<:Union{TimeVariant, TimeInvariant},
+          T}
+    data :: T
 end
 
-const FieldSet = Dict{String,Field}
+const FieldSet = Dict{String, Field}
 
 ### Different field combinations and other typealiases
 
-const DCTI = Field{Discrete,Constant,TimeInvariant}
-const DVTI = Field{Discrete,Variable,TimeInvariant}
-const DCTV = Field{Discrete,Constant,TimeVariant}
-const DVTV = Field{Discrete,Variable,TimeVariant}
-const CCTI = Field{Continuous,Constant,TimeInvariant}
-const CVTI = Field{Continuous,Variable,TimeInvariant} # can be used to interpolate in spatial dimension
-const CCTV = Field{Continuous,Constant,TimeVariant} # can be used to interpolate in time
-const CVTV = Field{Continuous,Variable,TimeVariant}
+const DCTI{T} = Field{Discrete, Constant, TimeInvariant, T}
+const DVTI{T} = Field{Discrete, Variable, TimeInvariant, T}
+const DCTV{T} = Field{Discrete, Constant, TimeVariant, T}
+const DVTV{T} = Field{Discrete, Variable, TimeVariant, T}
+const CCTI{T} = Field{Continuous, Constant, TimeInvariant, T}
+const CVTI{T} = Field{Continuous, Variable, TimeInvariant, T}
+const CCTV{T} = Field{Continuous, Constant, TimeVariant, T}
+const CVTV{T} = Field{Continuous, Variable, TimeVariant, T}
 
 # Discrete fields
 
@@ -61,12 +64,44 @@ function DCTI()
     return DCTI(nothing)
 end
 
+function DCTI{T}(a::T)
+    return DCTI{T}(a)
+end
+
+function DVTI{T}(a::T)
+    return DVTI{T}(a)
+end
+
+function DCTV{T}(a::T)
+    return DCTV{T}(a)
+end
+
+function DVTV{T}(a::T)
+    return DVTV{T}(a)
+end
+
+function CCTI{T}(a::T)
+    return CCTI{T}(a)
+end
+
+function CVTI{T}(a::T)
+    return CVTI{T}(a)
+end
+
+function CCTV{T}(a::T)
+    return CCTV{T}(a)
+end
+
+function CVTV{T}(a::T)
+    return CVTV{T}(a)
+end
+
 function Field()
     return DCTI()
 end
 
-function Field(data)
-    return DCTI(data)
+function Field{T}(data::T)
+    return DCTI{T}(data)
 end
 
 function ==(x::DCTI, y::DCTI)
