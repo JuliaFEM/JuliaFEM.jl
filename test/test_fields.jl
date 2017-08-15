@@ -5,16 +5,10 @@ using JuliaFEM
 using JuliaFEM.Testing
 
 @testset "discrete, constant, time invariant field" begin
-    @test isa(DCTI(), DCTI)
     @test DCTI(0.0).data == 0.0
     @test isa(Field(0.0), DCTI)
-    @test isa(Field(), DCTI)
-    f = DCTI()
+    f = DCTI(0.0)
     update!(f, 1.0)
-    @test f.data == 1.0
-    @test DCTI(1) == 1
-    @test length(DCTI(1)) == 1
-    @test f == DCTI(1.0)
     @test isapprox(f, DCTI(1.0))
     @test isapprox(f, 1.0)
     @test 2*f == 2.0 # multiply by constant
@@ -23,11 +17,10 @@ using JuliaFEM.Testing
 end
 
 @testset "discrete, variable, time invariant field" begin
-    @test isa(DVTI(), DVTI)
     @test DVTI([1.0, 2.0]).data == [1.0, 2.0]
     @test isa(Field([1.0, 2.0]), DVTI)
     
-    f = DVTI()
+    f = DVTI(zeros(2))
     update!(f, [2.0, 3.0])
     @test isapprox(f.data, [2.0, 3.0])
     @test length(f) == 2
@@ -77,7 +70,6 @@ end
 end
 
 @testset "discrete, constant, time-variant field" begin
-    @test isa(DCTV(), DCTV)
     f = Field(0.0 => 1.0)
     @test isa(f, DCTV)
     @test last(f).time == 0.0
@@ -107,7 +99,6 @@ end
 end
 
 @testset "discrete, variable, time-variant field" begin
-    @test isa(DVTV(), DVTV)
     f = Field(0.0 => [1.0, 2.0])
     @test isa(f, DVTV)
     @test last(f).time == 0.0
