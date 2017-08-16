@@ -8,7 +8,7 @@ abstract type MixedProblem<:AbstractProblem end
 
 """
 General linearized problem to solve
-    (K₁+K₂)Δu  +   C1'*Δλ = f₁+f₂
+    (K₁+K₂)Δu  +   C1*Δλ = f₁+f₂
          C2Δu  +     D*Δλ = g
 """
 type Assembly
@@ -280,6 +280,17 @@ function update!{P<:BoundaryProblem}(problem::Problem{P}, assembly::Assembly, el
         connectivity = get_connectivity(element)
         update!(element, parent_field_name, time => u[connectivity])
         update!(element, field_name, time => la[connectivity])
+    end
+end
+
+"""
+    add_elements!(problem::Problem, elements)
+
+Add new elements into the problem.
+"""
+function add_elements!(problem::Problem, elements)
+    for element in elements
+        push!(problem.elements, element)
     end
 end
 
