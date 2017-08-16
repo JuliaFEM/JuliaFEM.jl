@@ -106,9 +106,6 @@ julia> prob2 = Problem(Elasticity, 3)
 function Problem{P<:FieldProblem}(::Type{P}, name::AbstractString, dimension::Int64)
     return Problem{P}(name, dimension, "none", [], Dict(), Assembly(), Dict(), Vector(), P())
 end
-function Problem{P<:FieldProblem}(::Type{P}, dimension::Int64)
-    return Problem(P, "$P problem", dimension)
-end
 
 """ Construct a new boundary problem.
 
@@ -120,12 +117,6 @@ julia> bc1 = Problem(Dirichlet, "support", 3, "displacement")
 solver.
 """
 function Problem{P<:BoundaryProblem}(::Type{P}, name, dimension, parent_field_name)
-    return Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), Dict(), Vector(), P())
-end
-function Problem{P<:BoundaryProblem}(::Type{P}, main_problem::Problem)
-    name = "$P problem"
-    dimension = get_unknown_field_dimension(main_problem)
-    parent_field_name = get_unknown_field_name(main_problem)
     return Problem{P}(name, dimension, parent_field_name, [], Dict(), Assembly(), Dict(), Vector(), P())
 end
 
