@@ -6,7 +6,7 @@ using JuliaFEM.Testing
 
 @testset "test initialize scalar field problem" begin
     el = Element(Seg2, [1, 2])
-    pr = Problem(Heat, 1)
+    pr = Problem(Heat, "heat problem", 1)
     push!(pr, el)
     initialize!(pr)
     @test haskey(el, "temperature")
@@ -19,7 +19,7 @@ end
 
 @testset "test initialize vector field problem" begin
     el = Element(Seg2, [1, 2])
-    pr = Problem(Elasticity, 2)
+    pr = Problem(Elasticity, "elasticity problem", 2)
     push!(pr, el)
     initialize!(pr)
     @test haskey(el, "displacement")

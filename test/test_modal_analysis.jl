@@ -25,10 +25,10 @@ function get_model()
     update!(e2, "displacement 1" => 0.0)
     update!(e2, "displacement 2" => 0.0)
     update!(e2, "displacement 3" => 0.0)
-    p1 = Problem(Elasticity, 3)
+    p1 = Problem(Elasticity, "test problem", 3)
     p1.properties.finite_strain = false
     p1.properties.geometric_stiffness = false
-    p2 = Problem(Dirichlet, p1)
+    p2 = Problem(Dirichlet, "boundary condition", 3, "displacement")
     push!(p1, e1)
     push!(p2, e2)
     solver = Solver(Modal)
