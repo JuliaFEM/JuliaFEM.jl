@@ -28,7 +28,7 @@ end
     @test mesh.nodes == dic
 
     vec = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    add_elements!(mesh,Dict(1=>(:Tet10,vec),
+    JuliaFEM.Preprocess.add_elements!(mesh,Dict(1=>(:Tet10,vec),
                             11=>(:Tet10,vec)))
     @test mesh.elements[1] == vec
     @test mesh.elements[11] == vec
