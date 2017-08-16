@@ -78,7 +78,7 @@ export add!, SparseMatrixCOO, SparseVectorCOO, get_nonzero_rows, get_nonzero_col
 include("problems.jl") # common problem routines
 export Problem, AbstractProblem, FieldProblem, BoundaryProblem,
        get_unknown_field_dimension, get_gdofs, Assembly,
-       get_parent_field_name, get_elements
+       get_parent_field_name, get_elements, add_elements!
 
 include("problems_elasticity.jl")
 export Elasticity
