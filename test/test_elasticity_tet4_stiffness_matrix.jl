@@ -2,7 +2,6 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM.Preprocess
 using JuliaFEM.Testing
 
 @testset "test tet4 stiffness matrix" begin
@@ -17,8 +16,9 @@ using JuliaFEM.Testing
     el["geometry"] = Vector{Float64}[x1, x2, x3, x4]
     u = Vector{Float64}[u1, u2, u3, u4]
     pr = Problem(Elasticity, "tet4", 3)
-    as = Assembly()
-    assemble!(as, pr, el, 0.0)
+    add_elements!(pr, [el])
+    assemble!(pr)
+    as = pr.assembly
     Kt = full(as.K)
     Kt_expected = [
          149.0   108.0   24.0   -1.0    6.0   12.0  -54.0   -48.0    0.0  -94.0   -66.0  -36.0

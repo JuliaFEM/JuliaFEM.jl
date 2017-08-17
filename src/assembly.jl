@@ -37,9 +37,7 @@ function assemble!(problem::Problem, time=0.0; auto_initialize=true)
     if method_exists(assemble_prehook!, Tuple{typeof(problem), Float64})
         assemble_prehook!(problem, time)
     end
-    for element in get_elements(problem)
-        assemble!(problem.assembly, problem, element, time)
-    end
+    assemble!(get_assembly(problem), problem, get_elements(problem), time)
     if method_exists(assemble_posthook!, Tuple{typeof(problem), Float64})
         assemble_posthook!(problem, time)
     end
@@ -73,7 +71,7 @@ function assemble!(problem::Problem, time::Real, ::Type{Val{:mass_matrix}}; dens
     end
 end
 
-function assemble!(assembly::Assembly, problem::Problem, elements::Vector{Element}, time::Real)
+function assemble!(assembly::Assembly, problem::Problem, elements::Vector{Element}, time)
     warn("assemble!() this is default assemble operation, decreased performance can be expected without preallocation of memory!")
     for element in elements
         assemble!(assembly, problem, element, time)

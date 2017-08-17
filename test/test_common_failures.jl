@@ -7,8 +7,9 @@ using JuliaFEM.Testing
 @testset "geometry missing" begin
     el = Element(Quad4, [1, 2, 3, 4])
     pr = Problem(Elasticity, "problem", 2)
+    add_elements!(pr, [el])
     # this throws KeyError: geometry not found.
     # it's descriptive enough to give hint to user
     # what went wrong
-    @test_throws KeyError assemble!(pr, el)
+    @test_throws KeyError assemble!(pr)
 end
