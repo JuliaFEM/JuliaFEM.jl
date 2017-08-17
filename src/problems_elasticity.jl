@@ -54,18 +54,23 @@ function get_formulation_type(problem::Problem{Elasticity})
 end
 
 """
+    assemble!(assembly:Assembly, problem::Problem{Elasticity}, elements, time)
+
 Start finite element assembly procedure for Elasticity problem.
+
+Function groups elements to arrays by their type and assembles one element type
+at time. This makes it possible to pre-allocate matrices common to same type
+of elements.
 """
 function assemble!(assembly::Assembly, problem::Problem{Elasticity}, elements::Vector{Element}, time)
-    assemble!(assembly, problem, elements, time, Val{problem.properties.formulation})
-end
-
-"""
-This is for backward compatibility, will be removed asap.
-"""
-function assemble!(assembly::Assembly, problem::Problem{Elasticity}, element::Element, time)
-    warn("try to avoid single element assembly function as it's not possible to preallocate causing a slow code")
-    assemble!(assembly, problem, [element], time, Val{problem.properties.formulation})
+    formulation = Val{problem.properties.formulation}
+    element_types = unique(map(get_element_type, elements))
+    for element_type in element_types
+        elements_subset = filter_by_element_type(element_type, elements)
+        elements_subset = [element for element in elements_subset]
+        nelements = length(elements_subset)
+        assemble!(assembly, problem, elements_subset, time, formulation)
+    end
 end
 
 include("problems_elasticity_2d.jl")
@@ -100,26 +105,6 @@ function get_keys(element)
     all_keys = element.fields.keys
     idx = filter(x->isassigned(all_keys, x), collect(1:length(all_keys)))
     map(x -> all_keys[x], idx)
-end
-
-""" Continuum elements assembly entry point.
-
-This splits elements to arrays by their type and assemble one element type
-at time. This makes it possible to pre-allocate matrices common to same type
-of elements.
-"""
-function assemble!(assembly::Assembly, problem::Problem{Elasticity},
-                   all_elements::Vector{Element}, time, ::Type{Val{:continuum}})
-    element_types = unique(map(get_element_type, all_elements))
-    for element_type in element_types
-        elements = filter_by_element_type(element_type, all_elements)
-        # FIXME: there must be better way to do this
-        # to promote array for certain elemene type
-        elements = [element for element in elements]
-        nelements = length(elements)
-        debug("elasticity 3d: assembling $nelements of type $element_type")
-        assemble!(assembly, problem, elements, time, Val{:continuum})
-    end
 end
 
 

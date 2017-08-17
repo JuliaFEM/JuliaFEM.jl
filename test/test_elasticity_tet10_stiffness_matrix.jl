@@ -2,7 +2,6 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM.Preprocess
 using JuliaFEM.Testing
 
 @testset "test tet10 stiffness matrix" begin
@@ -29,8 +28,9 @@ using JuliaFEM.Testing
     update!(el, "geometry", X)
     update!(el, "displacement", u)
     pr = Problem(Elasticity, "tet10", 3)
-    ass = Assembly()
-    assemble!(ass, pr, el, 0.0)
+    add_elements!(pr, [el])
+    assemble!(pr)
+    ass = pr.assembly
     Kt = full(ass.K)
     eigs = real(eigvals(Kt))
     eigs_expected = [8809.45, 4936.01, 2880.56, 2491.66, 2004.85,
