@@ -24,8 +24,9 @@ using JuliaFEM.Testing
     update!(element, "displacement load", DCTI([4.0, 8.0]))
 
     problem = Problem(Elasticity, "[0x1] x [0x1] block", 2)
-    problem.properties.formulation = :plane_stress
-    assemble!(problem, element)
+    update!(problem.properties, "formulation" => "plane_stress")
+    add_elements!(problem, [element])
+    assemble!(problem)
     K = full(problem.assembly.K)
     f = vec(full(problem.assembly.f))
 
