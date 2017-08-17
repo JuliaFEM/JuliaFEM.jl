@@ -42,3 +42,19 @@ boundary conditions.
 function create_surface_elements(mesh::Mesh, surface_name::String)
     return create_surface_elements(mesh, Symbol(surface_name))
 end
+
+"""
+    create_nodal_elements(mesh::Mesh, node_set_name::String)
+
+Create a set of "nodal" elements from node set.
+
+Nodal elements are of type Poi1. In principle they don't have volume and it's
+not possible to integrate over them. It is however possible to add boundary
+conditions to them.
+"""
+function create_nodal_elements(mesh::Mesh, node_set_name::String)
+    node_ids = mesh.node_sets[Symbol(node_set_name)]
+    elements = [Element(Poi1, [j]) for j in node_ids]
+    update!(elements, "geometry", mesh.nodes)
+    return elements
+end
