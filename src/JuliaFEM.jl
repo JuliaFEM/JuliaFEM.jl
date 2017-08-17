@@ -138,7 +138,7 @@ export create_elements, Mesh, add_node!, add_nodes!, add_element!,
        create_node_set_from_element_set!, filter_by_element_set
 
 include("preprocess_abaqus_reader.jl")
-export abaqus_read_mesh, create_surface_elements
+export abaqus_read_mesh, create_surface_elements, create_nodal_elements
 
 include("preprocess_aster_reader.jl")
 export aster_read_mesh
