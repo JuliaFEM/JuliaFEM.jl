@@ -23,7 +23,7 @@ using JuliaFEM.Testing
     solver.properties.nev = 3
     push!(solver, cylinder, bcs)
     solver()
-    freqs_jf = sqrt(solver.properties.eigvals)/(2.0*pi)
+    freqs_jf = sqrt.(solver.properties.eigvals)/(2.0*pi)
     freqs_ca = [4.84532E+00, 4.90698E+00, 8.33813E+00]
     passed = []
     for (f1, f2) in zip(freqs_jf, freqs_ca)
@@ -53,7 +53,7 @@ end
     solver.properties.nev = 3
     push!(solver, cylinder, bcs)
     solver()
-    freqs_jf = sqrt(solver.properties.eigvals)/(2.0*pi)
+    freqs_jf = sqrt.(solver.properties.eigvals)/(2.0*pi)
     #freqs_ca = [8.82848E-01, 8.85353E-01, 5.30286E+00] # only face1 fixed
     #freqs_ca = [5.33185E+00, 5.34920E+00, 1.36820E+01] # face1 and face2 fixed
     freqs_ca = [1.19789E+00, 1.20179E+00, 3.07391E+00]

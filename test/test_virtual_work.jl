@@ -4,7 +4,7 @@
 using JuliaFEM
 using JuliaFEM.Testing
 
-abstract PlaneStressElasticityProblem <: AbstractProblem
+abstract type PlaneStressElasticityProblem <: AbstractProblem end
 
 function PlaneStressElasticityProblem(dim::Int=2, elements=[])
     return Problem{PlaneStressElasticityProblem}(dim, elements)

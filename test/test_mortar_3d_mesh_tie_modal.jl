@@ -148,7 +148,7 @@ FIN()
     solver.properties.nev = 5
     solver.properties.which = :SM
     solver()
-    freqs_jf = sqrt(solver.properties.eigvals)/(2*pi)
+    freqs_jf = sqrt.(solver.properties.eigvals)/(2*pi)
 
     freqs_ca = [1.12946E+00, 1.13141E+00, 2.93779E+00, 2.94143E+00, 4.51684E+00]
     for (i, freq) in enumerate(freqs_jf)
