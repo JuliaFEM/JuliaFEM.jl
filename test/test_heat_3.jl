@@ -40,7 +40,7 @@ using JuliaFEM.Testing
         push!(T_acc, 1.0 + X[1]^2 + 2*X[2]^2)
     end
 
-    @test maximum(abs(T_fem-T_acc)) < 1.0e-12
+    @test maximum(abs.(T_fem-T_acc)) < 1.0e-12
 
     # gradient of field is
     gradT(X) = [2*X[1] 4*X[2]]

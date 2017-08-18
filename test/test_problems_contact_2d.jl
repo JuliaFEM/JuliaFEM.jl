@@ -222,15 +222,15 @@ end
     node_ids, lambda = get_nodal_vector(get_slave_elements(interface), "lambda", 0.0)
     u2 = [u[2] for u in displacement]
     f2 = [f[2] for f in lambda]
-    maxabsu2 = maximum(abs(u2))
-    stdabsu2 = std(abs(u2))
+    maxabsu2 = maximum(abs.(u2))
+    stdabsu2 = std(abs.(u2))
     info("max(abs(u2)) = $maxabsu2, std(abs(u2)) = $stdabsu2")
     @test isapprox(stdabsu2, 0.0; atol=1.0e-12)
-    maxabsf2 = maximum(abs(f2))
-    stdabsf2 = std(abs(f2))
+    maxabsf2 = maximum(abs.(f2))
+    stdabsf2 = std(abs.(f2))
     info("max(abs(f2)) = $maxabsf2, std(abs(f2)) = $stdabsf2")
     @test isapprox(stdabsf2, 0.0; atol=1.0e-12)
-    @test isapprox(mean(abs(f2)), 28.8; atol=1.0e-12)
+    @test isapprox(mean(abs.(f2)), 28.8; atol=1.0e-12)
 end
 
 @testset "small sliding 2d patch test, linear Seg2 elements, dual basis" begin
@@ -245,13 +245,13 @@ end
     node_ids, lambda = get_nodal_vector(get_slave_elements(interface), "lambda", 0.0)
     u2 = [u[2] for u in displacement]
     f2 = [f[2] for f in lambda]
-    maxabsu2 = maximum(abs(u2))
-    stdabsu2 = std(abs(u2))
+    maxabsu2 = maximum(abs.(u2))
+    stdabsu2 = std(abs.(u2))
     info("max(abs(u2)) = $maxabsu2, std(abs(u2)) = $stdabsu2")
     @test isapprox(stdabsu2, 0.0; atol=1.0e-12)
-    maxabsf2 = maximum(abs(f2))
-    stdabsf2 = std(abs(f2))
+    maxabsf2 = maximum(abs.(f2))
+    stdabsf2 = std(abs.(f2))
     info("max(abs(f2)) = $maxabsf2, std(abs(f2)) = $stdabsf2")
     @test isapprox(stdabsf2, 0.0; atol=1.0e-12)
-    @test isapprox(mean(abs(f2)), 28.8; atol=1.0e-12)
+    @test isapprox(mean(abs.(f2)), 28.8; atol=1.0e-12)
 end
