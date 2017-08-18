@@ -56,6 +56,24 @@ function filter_by_element_type(element_type, elements)
     return filter(element -> is_element_type(element, element_type), elements)
 end
 
+"""
+    group_by_element_type(elements::Vector{Element})
+
+Given a vector of elements, group elements by element type to several vectors.
+Returns a dictionary, where key is the element type and value is a vector
+containing all elements of type `element_type`.
+"""
+function group_by_element_type(elements::Vector{Element})
+    results = Dict{DataType, Any}()
+    basis_types = map(element -> typeof(element.properties), elements)
+    for basis in unique(basis_types)
+        element_type = Element{basis}
+        subset = filter(element -> isa(element, element_type), elements)
+        results[element_type] = convert(Vector{element_type}, subset)
+    end
+    return results
+end
+
 function setindex!(element::Element, data::Function, field_name)
     if method_exists(data, Tuple{Element, Vector, Float64})
         # create enclosure to pass element as argument
