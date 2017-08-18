@@ -4,65 +4,7 @@
 using JuliaFEM
 using JuliaFEM.Testing
 
-#= TODO: Fix test
-function test_interpolate()
-    el = get_element()
-    @test isapprox(el("geometry", [0.0, 0.0]), [0.5, 0.5])
-    @test isapprox(el("geometry", [0.0, 0.0], 0.0), [0.5, 0.5])
-    @test isapprox(el([0.0, 0.0]), [0.25 0.25 0.25 0.25])
-    @test isapprox(el([0.0, 0.0], Val{:grad}), [-0.5 0.5 0.5 -0.5; -0.5 -0.5 0.5 0.5])
-    gradT = el("temperature", [0.0, 0.0], 1.0, Val{:grad})
-    info("gradT = $gradT")
-    X = [0.5, 0.5]
-    gradT_expected = [1-2*X[2] 3-2*X[1]]
-    info("gradT(expected) = $gradT_expected")
-    @test isapprox(gradT, gradT_expected)
-
-#   @test isapprox(el("temperature", [0.0, 0.0], 0.5), 1/2*gradT_expected)
-
-#   gradT = el("temperature", [0.0, 0.0], 0.5, Val{:grad})
-#   info("gradT = $gradT")
-#   @test isapprox(gradT, 1/2*gradT_expected)
-end
-=#
-
-#= TODO: Fix test
-function test_calculate_normal_tangential_coordinates()
-    el = Tri3([1, 2, 3])
-    el["geometry"] = Vector{Float64}[
-        [0.0, 0.0, 0.0],
-        [1.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0]]
-    calculate_normal_tangential_coordinates!(el, 0.0)
-    n = [0.0 0.0 1.0]'
-    t1 = [1.0 0.0 0.0]'
-    t2 = [0.0 1.0 0.0]'
-    R = [n t1 t2]
-    @test isapprox(el("normal-tangential coordinates", [0.0, 0.0], 0.0), R)
-end
-=#
-
-#= TODO: Fix test
-function test_manifold_determinant()
-    el = Quad4([1, 2, 3, 4])
-    #el["geometry"] = Vector{Float64}[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
-    el["geometry"] = Vector{Float64}[[0.0, 0.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 1.0], [0.0, 1.0, 1.0]]
-    # mother element area = 2*2 = 4, this element is 1, determinant should be 1/4 everywhere
-    d = det(el, [0.1, 0.2], 0.0)
-    d_expected = 0.25
-    @test d == d_expected
-end
-=#
-
-#= TODO: Fix test
-@testset "add new discrete constant time-variant field and interpolate it" begin
-    element = Element(Quad4, [1, 2, 3, 4])
-    element["my field"] = (0.0 => 0.0, 1.0 => 1.0)
-    @test isapprox(element("my field", [0.0, 0.0], 0.5), 0.5)
-    update!(element, "my field 2", 0.0 => 0.0, 1.0 => 1.0)
-    @test isapprox(element("my field 2", [0.0, 0.0], 0.5), 0.5)
-end
-=#
+using JuliaFEM: group_by_element_type
 
 @testset "add time dependent field to element" begin
     el = Element(Seg2, [1, 2])
@@ -106,16 +48,6 @@ end
     @test isapprox(fb, 1.0)
 end
 
-#= unnecessary feature 
-@testset "add two time dependent fields to element at once" begin
-    el = Element(Seg2, [1, 2])
-    update!(el, "foo1", 1.0 => 1.0)
-    update!(el, "foo1", 2.0 => 2.0)
-    update!(el, "foo2", 1.0 => 1.0, 2.0 => 2.0)
-    @test isapprox(el("foo1", 1.5), el("foo2", 1.5))
-end
-=#
-
 @testset "add elements to elements" begin
     el1 = Element(Seg2, [1, 2])
     el2 = Element(Seg2, [3, 4])
@@ -130,4 +62,14 @@ end
         0.25 0.00 0.25 0.00 0.25 0.00 0.25 0.00
         0.00 0.25 0.00 0.25 0.00 0.25 0.00 0.25]
     @test isapprox(el([0.0, 0.0], 0.0, 2), expected)
+end
+
+@testset "group elements" begin
+    e1 = Element(Seg2, [1, 2])
+    e2 = Element(Quad4, [1, 2, 3, 4])
+    elements = [e1, e2]
+    r = group_by_element_type(elements)
+    @test length(r) == 2
+    @test first(r[Element{Seg2}]) == e1
+    @test first(r[Element{Quad4}]) == e2
 end
