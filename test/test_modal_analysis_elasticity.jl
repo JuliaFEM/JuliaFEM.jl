@@ -146,7 +146,7 @@ numéro    fréquence (HZ)     norme d'erreur
     solver.properties.nev = 5
     solver.xdmf = Xdmf()
     solver()
-    freqs_jf = sqrt(solver.properties.eigvals)/(2.0*pi)
+    freqs_jf = sqrt.(solver.properties.eigvals)/(2.0*pi)
     # with Tet4 elements
     #freqs_ca = [1.19789E+00, 1.20179E+00, 3.07391E+00, 3.08813E+00, 4.87370E+00]
     # with Tet10 elements
@@ -197,7 +197,7 @@ end
     solver.properties.nev = 5
     push!(solver, cube, bcs)
     solver()
-    freqs_jf = sqrt(solver.properties.eigvals)/(2.0*pi)
+    freqs_jf = sqrt.(solver.properties.eigvals)/(2.0*pi)
     freqs_ca = [3.73724E+00, 3.73724E+00, 4.93519E+00, 6.59406E+00, 7.65105E+00]
     for (f1, f2) in zip(freqs_jf, freqs_ca)
         rtol = norm(f1-f2) / max(f1,f2)

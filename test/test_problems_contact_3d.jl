@@ -79,8 +79,8 @@ end
     postprocess!(interface, 0.0, Val{Symbol("contact pressure")})
     node_ids, contact_pressure = get_nodal_vector(interface.elements, "contact pressure", 0.0)
     u3 = [u[3] for u in displacement]
-    maxabsu3 = maximum(abs(u3))
-    stdabsu3 = std(abs(u3))
+    maxabsu3 = maximum(abs.(u3))
+    stdabsu3 = std(abs.(u3))
     maxpres = maximum(contact_pressure)
     stdpres = std(contact_pressure)
     info("max(abs(u3)) = $maxabsu3, std(abs(u3)) = $stdabsu3")
@@ -98,8 +98,8 @@ end
     node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 0.0)
     node_ids, geometry = get_nodal_vector(interface.elements, "geometry", 0.0)
     u3 = [u[3] for u in displacement]
-    maxabsu3 = maximum(abs(u3))
-    stdabsu3 = std(abs(u3))
+    maxabsu3 = maximum(abs.(u3))
+    stdabsu3 = std(abs.(u3))
     info("max(abs(u3)) = $maxabsu3, std(abs(u3)) = $stdabsu3")
     @test isapprox(stdabsu3, 0.0; atol=1.0e-12)
 end
@@ -113,8 +113,8 @@ end
     node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 0.0)
     node_ids, geometry = get_nodal_vector(interface.elements, "geometry", 0.0)
     u3 = [u[3] for u in displacement]
-    maxabsu3 = maximum(abs(u3))
-    stdabsu3 = std(abs(u3))
+    maxabsu3 = maximum(abs.(u3))
+    stdabsu3 = std(abs.(u3))
     info("max(abs(u3)) = $maxabsu3, std(abs(u3)) = $stdabsu3")
     @test isapprox(stdabsu3, 0.0; atol=1.0e-10)
 end
@@ -129,8 +129,8 @@ end
     node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 0.0)
     node_ids, geometry = get_nodal_vector(interface.elements, "geometry", 0.0)
     u3 = [u[3] for u in displacement]
-    maxabsu3 = maximum(abs(u3))
-    stdabsu3 = std(abs(u3))
+    maxabsu3 = maximum(abs.(u3))
+    stdabsu3 = std(abs.(u3))
     info("max(abs(u3)) = $maxabsu3, std(abs(u3)) = $stdabsu3")
     @test isapprox(stdabsu3, 0.0; atol=1.0e-10)
 end

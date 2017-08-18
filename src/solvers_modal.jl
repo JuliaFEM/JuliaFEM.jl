@@ -20,7 +20,7 @@ type Modal <: AbstractSolver
 end
 
 function Modal(nev=10, which=:SM)
-    solver = Modal(false, Vector(), Matrix(), nev, which)
+    solver = Modal(false, Vector(), Matrix(0,0), nev, which)
 end
 
 """ Eliminate Dirichlet boundary condition from matrices K, M. """
@@ -369,7 +369,7 @@ function update_xdmf!(solver::Solver{Modal})
         return
     end
 
-    if maximum(abs(imag(solver.properties.eigvals))) > 1.0e-9
+    if maximum(abs.(imag(solver.properties.eigvals))) > 1.0e-9
         error("Writing imaginary eigenvalues for Xdmf not supported.")
     end
 

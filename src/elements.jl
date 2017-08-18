@@ -49,7 +49,7 @@ function get_element_id{E}(element::Element{E})
 end
 
 function is_element_type{E}(element::Element{E}, element_type)
-    return is(E, element_type)
+    return E === element_type
 end
 
 function filter_by_element_type(element_type, elements)

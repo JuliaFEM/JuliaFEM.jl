@@ -79,14 +79,14 @@ end
     node_ids, la = get_nodal_vector(get_slave_elements(interface), "lambda", 1.0)
     u2 = [u[2] for u in displacement]
     f2 = [f[2] for f in la]
-    maxabsu2 = maximum(abs(u2))
-    stdabsu2 = std(abs(u2))
+    maxabsu2 = maximum(abs.(u2))
+    stdabsu2 = std(abs.(u2))
     info("max(abs(u2)) = $maxabsu2, std(abs(u2)) = $stdabsu2")
     @test isapprox(stdabsu2, 0.0; atol=1.0e-12)
-    maxabsf2 = maximum(abs(f2))
-    stdabsf2 = std(abs(f2))
+    maxabsf2 = maximum(abs.(f2))
+    stdabsf2 = std(abs.(f2))
     info("max(abs(f2)) = $maxabsf2, std(abs(f2)) = $stdabsf2")
     @test isapprox(stdabsf2, 0.0; atol=1.0e-12)
     # for linear case pressure 28.8
-    @test isapprox(mean(abs(f2)), 27.76616800689944; rtol=1.0e-3)
+    @test isapprox(mean(abs.(f2)), 27.76616800689944; rtol=1.0e-3)
 end

@@ -75,8 +75,8 @@ datadir = first(splitext(basename(@__FILE__)))
     node_ids, geometry = get_nodal_vector(interface.elements, "geometry", 0.0)
     # node_ids, pressure = get_nodal_vector(interface.elements, "contact pressure", 0.0)
     u3 = [u[3] for u in displacement]
-    maxabsu3 = maximum(abs(u3))
-    stdabsu3 = std(abs(u3))
+    maxabsu3 = maximum(abs.(u3))
+    stdabsu3 = std(abs.(u3))
     info("max(abs(u3)) = $maxabsu3, std(abs(u3)) = $stdabsu3")
     @test isapprox(stdabsu3, 0.0; atol=1.0e-12)
     upper_X = [0.5, 0.5, 0.75]
