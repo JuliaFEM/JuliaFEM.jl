@@ -49,5 +49,3 @@ using JuliaFEM
     u3_expected = f/E*[-nu, 1] + g/(2*E)*[-nu, 1]
     @test isapprox(u3, u3_expected)
 end
-
-print_statistics()

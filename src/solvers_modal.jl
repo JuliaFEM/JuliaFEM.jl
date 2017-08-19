@@ -217,12 +217,13 @@ function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=tru
     info("Increment time t=$(round(solver.time, 3))")
     info(repeat("-", 80))
     initialize!(solver)
-    @timeit to "assemble matrices" begin
+
+    @timeit "assemble matrices" begin
         assemble!(solver; with_mass_matrix=true)
-    end
-    M, K, Kg, f = get_field_assembly(solver)
-    if solver.properties.geometric_stiffness
-        K += Kg
+        M, K, Kg, f = get_field_assembly(solver)
+        if solver.properties.geometric_stiffness
+            K += Kg
+        end
     end
 
     dim = size(K, 1)
@@ -232,23 +233,19 @@ function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=tru
     K_red = K
     M_red = M
 
-    if !(P == nothing)
-        tic()
-        info("Using custom P to make transform K_red = P'*K*P and M_red = P'*M*P")
-        K_red = P'*K_red*P
-        M_red = P'*M_red*P
-        t1 = round(toq(), 2)
-        info("Transform ready in $t1 seconds.")
-    elseif nboundary_problems != 0
-        tic()
-        info("Eliminate boundary conditions from system.")
-        for boundary_problem in get_boundary_problems(solver)
-            eliminate_boundary_conditions!(K_red, M_red, boundary_problem, dim)
+    @timeit "eliminate boundary conditions" begin
+        if !(P == nothing)
+            info("Using custom P to make transform K_red = P'*K*P and M_red = P'*M*P")
+            K_red = P'*K_red*P
+            M_red = P'*M_red*P
+        elseif nboundary_problems != 0
+            info("Eliminate boundary conditions from system.")
+            for boundary_problem in get_boundary_problems(solver)
+                eliminate_boundary_conditions!(K_red, M_red, boundary_problem, dim)
+            end
+        else
+            info("No boundary Dirichlet boundary conditions found for system.")
         end
-        t1 = round(toq(), 2)
-        info("Eliminated boundary conditions in $t1 seconds.")
-    else
-        info("No boundary Dirichlet boundary conditions found for system.")
     end
 
     # free up some memory before solution
@@ -299,7 +296,7 @@ function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=tru
     passed = false
 
     try
-        @timeit to "solve eigenvalue problem using `eigs`" begin
+        @timeit "solve eigenvalue problem using `eigs`" begin
             om2, X = eigs(K_red + sigma*I, M_red; nev=props.nev, which=props.which)
         end
         passed = true
@@ -354,9 +351,7 @@ function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=tru
         end
     end
 
-    @timeit to "save results to Xdmf" begin
-        update_xdmf!(solver)
-    end
+    @timeit "save results to Xdmf" update_xdmf!(solver)
     
     return true
 
