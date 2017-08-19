@@ -363,24 +363,33 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
     return
 end
 
-""" Default assembler for solver. """
-function assemble!(solver::Solver; timing=true, with_mass_matrix=false)
+"""
+    assemble!(solver; with_mass_matrix=false)
+
+Default assembler for solver.
+
+This function loops over all problems defined in problem and launches
+standard assembler for them. As a result, each problem.assembly is
+populated with global stiffness matrix, force vector, and, optionally,
+mass matrix.
+"""
+function assemble!(solver::Solver; with_mass_matrix=false)
     info("Assembling problems ...")
 
-    function do_assemble(problem)
-        t00 = Base.time()
-        empty!(problem.assembly)
-        assemble!(problem, solver.time)
-        if with_mass_matrix && is_field_problem(problem)
-            assemble!(problem, solver.time, Val{:mass_matrix})
+    for problem in get_problems(solver)
+        timeit("assemble $(problem.name)") do
+            empty!(problem.assembly)
+            assemble!(problem, solver.time)
         end
-        t11 = Base.time()
-        return t11-t00
     end
 
-    t0 = Base.time()
-    assembly_times = map(do_assemble, solver.problems)
-    nproblems = length(assembly_times)
+    if with_mass_matrix
+        for problem in get_field_problems(solver)
+            timeit("assemble $(problem.name) mass matrix") do
+                assemble!(problem, solver.time, Val{:mass_matrix})
+            end
+        end
+    end
 
     ndofs = 0
     for problem in solver.problems
@@ -388,18 +397,9 @@ function assemble!(solver::Solver; timing=true, with_mass_matrix=false)
         Cs = size(problem.assembly.C1, 2)
         ndofs = max(ndofs, Ks, Cs)
     end
-
     solver.ndofs = ndofs
-    t1 = round(Base.time()-t0, 2)
-    info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
-    if timing
-        info("Assembly times:")
-        for (i, problem) in enumerate(solver.problems)
-            pn = problem.name
-            pt = round(assembly_times[i], 2)
-            info("$i $pn $pt")
-        end
-    end
+
+    info("Assembly done!")
 end
 
 function get_unknown_fields(solver::Solver)
@@ -688,10 +688,10 @@ function (solver::Solver{Linear})()
     info("Starting linear solver")
     info("Increment time t=$(round(solver.time, 3))")
     info(repeat("-", 80))
-    @timeit to "initialize solver" initialize!(solver)
-    @timeit to "assemble problems" assemble!(solver)
-    @timeit to "solve linear system" solve!(solver)
-    @timeit to "update problems" update!(solver)
+    @timeit "initialize solver" initialize!(solver)
+    @timeit "assemble problems" assemble!(solver)
+    @timeit "solve linear system" solve!(solver)
+    @timeit "update problems" update!(solver)
     t1 = round(Base.time()-t0, 2)
     info("Linear solver ready in $t1 seconds.")
 end
