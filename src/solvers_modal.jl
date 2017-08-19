@@ -44,12 +44,13 @@ function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
     @assert nnz(g) == 0
     @assert C1 == C2
     @assert isdiag(C1)
-    nz = get_nonzero_rows(C1)
-    info("bc $(problem.name): $(length(nz)) nonzeros, $nz")
-    K_red[nz,:] = 0.0
-    K_red[:,nz] = 0.0
-    M_red[nz,:] = 0.0
-    M_red[:,nz] = 0.0
+    fixed_dofs = get_nonzero_rows(C1)
+    P = ones(ndim)
+    P[fixed_dofs] = 0.0
+    Q = spdiagm(P)
+    K_red[:,:] = Q' * K_red * Q
+    M_red[:,:] = Q' * M_red * Q
+    return
 end
 
 """ Given data vector, return slave displacements. """
