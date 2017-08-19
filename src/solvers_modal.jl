@@ -111,39 +111,10 @@ function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
 
     info("Eliminating mesh tie constraint $(problem.name) using static condensation")
 
-    #=
-    # determine master and slave dofs
-    dim = get_unknown_field_dimension(problem)
-    M = Set{Int64}()
-    S = Set{Int64}()
-    slave_elements = get_slave_elements(problem)
-    master_elements = setdiff(get_elements(problem), slave_elements)
-
-    for element in slave_elements
-        for j in get_connectivity(element)
-            for i=1:dim
-                push!(S, dim*(j-1)+i)
-            end
-        end
-    end
-
-    for element in master_elements
-        for j in get_connectivity(element)
-            for i=1:dim
-                push!(M, dim*(j-1)+i)
-            end
-        end
-    end
-
-    S = sort(collect(S))
-    M = sort(collect(M))
-    =#
     S = get_nonzero_rows(C2)
     M = setdiff(get_nonzero_columns(C2), S)
-    #N = setdiff(get_nonzero_rows(K_red), get_nonzero_columns(C2))
     info("# slave dofs = $(length(S)), # master dofs = $(length(M))")
 
-    # Construct matrix P = D^-1*M
     D_ = C2[S,S]
     M_ = -C2[S,M]
 
@@ -154,52 +125,18 @@ function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
     else
         P = D_ \ M_
     end
-    #@assert isdiag(D_)
-    info("Matrix P ready.")
     Id = ones(ndim)
-    #Id[S] = 0
-    #Id[M] = 0
     Q = spdiagm(Id)
     Q[M,S] += P'
-    info("Matrix Q ready.")
 
-    # testing
-    #K_red_orig = copy(K_red)    
-    #K_red[N,M] += K_red[N,S]*P
-    #K_red[M,N] += P'*K_red[S,N]
-    #K_red[M,M] += P'*K_red[S,S]*P
-    #K_red[S,:] = 0.0
-    #K_red[:,S] = 0.0
-    
-    info("K transform")
     K_red[:,:] = Q*K_red*Q'
     K_red[S,:] = 0.0
     K_red[:,S] = 0.0
 
-    #K_res = K_red - K_red_2
-    #SparseArrays.droptol!(K_res, 1.0e-9)
-
-    info("K transform ready")
-    #info("Create matrices, M")
-    #info("Sum matricse, M")
-    #M_red_orig = copy(M_red)
-    #M_red[N,M] += M_red[N,S]*P
-    #M_red[M,N] += P'*M_red[S,N]
-    #M_red[M,M] += P'*M_red[S,S]*P
-    #M_red[S,:] = 0.0
-    #M_red[:,S] = 0.0
-    info("M transform")
     M_red[:,:] = Q*M_red*Q'
     M_red[S,:] = 0.0
     M_red[:,S] = 0.0
-    info("M transform ready")
  
-    #M_res = M_red - M_red_2
-    #SparseArrays.droptol!(M_res, 1.0e-9)
-    #info("Diff")
-    #println(K_res)
-    #println(M_res)
-
     return true
 end
 
@@ -366,24 +303,41 @@ function update_xdmf!(solver::Solver{Modal})
     end
 
     if maximum(abs.(imag(solver.properties.eigvals))) > 1.0e-9
-        error("Writing imaginary eigenvalues for Xdmf not supported.")
+        info("Writing imaginary eigenvalues for Xdmf not supported.")
+        return
     end
 
     xdmf = get(solver.xdmf)
 
-    # geometry
-    X_ = solver("geometry", solver.time)
-    node_ids = sort(collect(keys(X_)))
-    X = hcat([X_[nid] for nid in node_ids]...)
-    ndim, nnodes = size(X)
+    @timeit "fetch geometry" X_ = solver("geometry", solver.time)
+    node_ids = keys(X_)
+    @timeit "create node permutation" P = Dict(j=>i for (i, j) in enumerate(node_ids))
+    nnodes = length(X_)
+    ndim = length(X_[first(node_ids)])
+    @timeit "create ncoords array" begin
+        X = zeros(ndim, nnodes)
+        for j in node_ids
+            X[:, P[j]] = X_[j]
+        end
+    end
     geom_type = (ndim == 2 ? "XY" : "XYZ")
-
-    # topology
-    nid_mapping = Dict(j=>i for (i, j) in enumerate(node_ids)) 
     all_elements = get_all_elements(solver)
-    nelements = length(all_elements)
-    debug("Saving topology: $nelements elements total.")
     element_types = unique(map(get_element_type, all_elements))
+    nelements = length(all_elements)
+
+    elcon_arrays  = Dict()
+    @timeit "create topology arrays" for element_type in element_types
+        elements = filter_by_element_type(element_type, all_elements)
+        nelements = length(elements)
+        eldim = length(element_type)
+        element_conn = zeros(Int, eldim, nelements)
+        for (i, element) in enumerate(elements)
+            for (j, conn) in enumerate(get_connectivity(element))
+                element_conn[j,i] = P[conn]-1
+            end
+        end
+        elcon_arrays[element_type] = element_conn
+    end
 
     xdmf_element_mapping = Dict(
         "Poi1" => "Polyvertex",
@@ -405,10 +359,10 @@ function update_xdmf!(solver::Solver{Modal})
     # save modes
 
     temporal_collection = get_temporal_collection(xdmf)
-
     unknown_field_name = ucfirst(get_unknown_field_name(solver))
     frames = []
-    for (j, eigval) in enumerate(real(solver.properties.eigvals))
+
+    @timeit "save modes" for (j, eigval) in enumerate(real(solver.properties.eigvals))
         if eigval < 0.0
             warn("negative real eigenvalue found, om2=$eigval, setting to zero.")
             eigval = 0.0
@@ -421,53 +375,54 @@ function update_xdmf!(solver::Solver{Modal})
         time = new_child(frame, "Time")
         set_attribute(time, "Value", freq)
 
-        # add geometry
         geometry = new_element("Geometry")
         set_attribute(geometry, "Type", geom_type)
-        data_node_ids = new_dataitem(xdmf, "/Node IDs", node_ids)
+        data_node_ids = new_dataitem(xdmf, "/Node IDs", collect(node_ids))
         data_geometry = new_dataitem(xdmf, "/Geometry", X)
         add_child(geometry, data_geometry)
         add_child(frame, geometry)
 
-        # add topology
         for element_type in element_types
-            elements = filter_by_element_type(element_type, all_elements)
-            nelements = length(elements)
-            debug("Xdmf save: $nelements elements of type $element_type")
-            sort!(elements, by=get_element_id)
-            element_ids = map(get_element_id, elements)
-            element_conn = map(element -> [nid_mapping[j]-1 for j in get_connectivity(element)], elements)
-            element_conn = hcat(element_conn...)
-            element_code = split(string(element_type), ".")[end]
-            dataitem = new_dataitem(xdmf, "/Topology/$element_code/Element IDs", element_ids)
-            dataitem = new_dataitem(xdmf, "/Topology/$element_code/Connectivity", element_conn)
-            topology = new_element("Topology")
-            set_attribute(topology, "TopologyType", xdmf_element_mapping[element_code])
-            set_attribute(topology, "NumberOfElements", length(elements))
-            add_child(topology, dataitem)
-            add_child(frame, topology)
+            timeit("save topology of element type $element_type") do
+                elements = filter_by_element_type(element_type, all_elements)
+                nelements = length(elements)
+                element_ids = map(get_element_id, elements)
+                element_conn = elcon_arrays[element_type]
+                #@timeit "creaet element_conn" element_conn = map(element -> [nid_mapping[j]-1 for j in get_connectivity(element)], elements)
+                #@timeit "hcat elcon" element_conn = hcat(element_conn...)
+                element_code = split(string(element_type), ".")[end]
+                dataitem = new_dataitem(xdmf, "/Topology/$element_code/Element IDs", element_ids)
+                dataitem = new_dataitem(xdmf, "/Topology/$element_code/Connectivity", element_conn)
+                topology = new_element("Topology")
+                set_attribute(topology, "TopologyType", xdmf_element_mapping[element_code])
+                set_attribute(topology, "NumberOfElements", nelements)
+                add_child(topology, dataitem)
+                add_child(frame, topology)
+            end
         end
 
-        mode = zeros(X)
-        mode_ = solver.properties.eigvecs[:,j]
-        mode_ = reshape(mode_, ndim, round(Int, length(mode_)/ndim))
-        for nid in node_ids
-            loc = nid_mapping[nid]
-            mode[:,loc] = mode_[:,nid]
+        @timeit "store eigenmode" begin
+            mode_ = solver.properties.eigvecs[:,j]
+            mode_ = reshape(mode_, ndim, round(Int, length(mode_)/ndim))
+            @timeit "create mode array" begin
+                mode = zeros(ndim, nnodes)
+                for i in node_ids
+                    mode[:,P[i]] = mode_[:,i]
+                end
+            end
+            field_type = ndim == 1 ? "Scalar" : "Vector"
+            field_center = "Node"
+            attribute = new_child(frame, "Attribute")
+            set_attribute(attribute, "Name", unknown_field_name)
+            set_attribute(attribute, "Center", field_center)
+            set_attribute(attribute, "AttributeType", field_type)
+            dataitem = new_dataitem(xdmf, path, mode)
+            add_child(attribute, dataitem)
+            add_child(frame, attribute)
+            add_child(temporal_collection, frame)
         end
 
-        field_type = ndim == 1 ? "Scalar" : "Vector"
-        field_center = "Node"
-        attribute = new_child(frame, "Attribute")
-        set_attribute(attribute, "Name", unknown_field_name)
-        set_attribute(attribute, "Center", field_center)
-        set_attribute(attribute, "AttributeType", field_type)
-        dataitem = new_dataitem(xdmf, path, mode)
-        add_child(attribute, dataitem)
-        add_child(frame, attribute)
-        add_child(temporal_collection, frame)
     end
-    
-    info("Saving Xdmf")
+
     save!(xdmf)
 end
