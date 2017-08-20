@@ -44,38 +44,54 @@ function assemble!(problem::Problem, time=0.0; auto_initialize=true)
     return true
 end
 
-function assemble!(problem::Problem, time::Real, ::Type{Val{:mass_matrix}}; density=0.0, dual_basis=false, dim=0)
-    if !isempty(problem.assembly.M)
-        warn("problem.assembly.M is not empty and assembling, are you sure you know what are you doing?")
-    end
-    if dim == 0
-        dim = get_unknown_field_dimension(problem)
-    end
-    for element in get_elements(problem)
-        if !haskey(element, "density") && density == 0.0
-            error("Failed to assemble mass matrix, density not defined!")
-        end
-        nnodes = length(element)
-        M = zeros(nnodes, nnodes)
-        for ip in get_integration_points(element, 2)
-            detJ = element(ip, time, Val{:detJ})
-            N = element(ip, time)
-            rho = haskey(element, "density") ? element("density", ip, time) : density
-            M += ip.weight*rho*N'*N*detJ
-        end
-        gdofs = get_gdofs(problem, element)
-        for j=1:dim
-            ldofs = gdofs[j:dim:end]
-            add!(problem.assembly.M, ldofs, ldofs, M)
-        end
-    end
-end
-
 function assemble!(assembly::Assembly, problem::Problem, elements::Vector{Element}, time)
     warn("assemble!() this is default assemble operation, decreased performance can be expected without preallocation of memory!")
     for element in elements
         assemble!(assembly, problem, element, time)
     end
     return nothing
+end
+
+function assemble!(problem::Problem, time, ::Type{Val{:mass_matrix}})
+    if !isempty(problem.assembly.M)
+        info("Mass matrix for $(problem.name) is already assembled, skipping assemble routine")
+        return
+    end
+    elements = get_elements(problem)
+    for (element_type, elements) in group_by_element_type(get_elements(problem))
+        assemble_mass_matrix!(problem::Problem, elements, time)
+    end
+    return
+end
+
+function assemble_mass_matrix!{Basis}(problem::Problem, elements::Vector{Element{Basis}}, time)
+    nnodes = length(Basis)
+    dim = get_unknown_field_dimension(problem)
+    M = zeros(nnodes, nnodes)
+    N = zeros(1, nnodes)
+    NtN = zeros(nnodes, nnodes)
+    ldofs = zeros(Int, nnodes)
+    for element in elements
+        fill!(M, 0.0)
+        for ip in get_integration_points(element, 1)
+            detJ = element(ip, time, Val{:detJ})
+            rho = element("density", time)
+            w = ip.weight*rho*detJ
+            eval_basis!(Basis, N, ip)
+            N = element(ip, time)
+            At_mul_B!(NtN, N, N)
+            scale!(NtN, w)
+            for i=1:nnodes^2
+                M[i] += NtN[i]
+            end
+        end
+        for (i, j) in enumerate(get_connectivity(element))
+            @inbounds ldofs[i] = (j-1)*dim
+        end
+        for i=1:dim
+            add!(problem.assembly.M, ldofs+i, ldofs+i, M)
+        end
+    end
+    return
 end
 
