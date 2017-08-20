@@ -52,7 +52,7 @@ function assemble!(assembly::Assembly, problem::Problem, elements::Vector{Elemen
     return nothing
 end
 
-function assemble!(problem::Problem, time, ::Type{Val{:mass_matrix}})
+function assemble_mass_matrix!(problem::Problem, time)
     if !isempty(problem.assembly.M)
         info("Mass matrix for $(problem.name) is already assembled, skipping assemble routine")
         return
@@ -73,7 +73,7 @@ function assemble_mass_matrix!{Basis}(problem::Problem, elements::Vector{Element
     ldofs = zeros(Int, nnodes)
     for element in elements
         fill!(M, 0.0)
-        for ip in get_integration_points(element, 1)
+        for ip in get_integration_points(element, 2)
             detJ = element(ip, time, Val{:detJ})
             rho = element("density", time)
             w = ip.weight*rho*detJ
