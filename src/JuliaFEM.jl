@@ -147,4 +147,6 @@ export calc_nodal_values!, get_nodal_vector, get_nodal_dict, copy_field!,
        calculate_second_moment_of_mass, extract
 end
 
+include("deprecations.jl")
+
 end
