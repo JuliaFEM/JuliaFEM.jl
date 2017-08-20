@@ -138,20 +138,10 @@ function assemble!{El<:Elasticity3DVolumeElements}(assembly::Assembly,
         for ip in get_integration_points(element)
             X = element("geometry", time)
             eval_basis!(bi, X, ip)
-            detJ = bi.detJ
+            w = ip.weight*bi.detJ
             N = bi.N
-            dN = bi.grad
-            w = ip.weight*detJ
-
-            # calculate displacement gradient
-            fill!(gradu, 0.0)
-            for i=1:dim
-                for j=1:dim
-                    for k=1:nnodes
-                        gradu[i,j] += bi.grad[j,k]*u[k][i]
-                    end
-                end
-            end
+            dN = bi.grad  # deriatives of basis functions w.r.t. X, i.e. ∂N/∂X
+            grad!(bi, gradu, u)  # displacement gradient ∇u
 
             # calculate strain tensor and deformation gradient
             fill!(strain, 0.0)
