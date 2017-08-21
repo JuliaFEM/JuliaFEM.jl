@@ -4,3 +4,7 @@
 function assemble!(problem::Problem, time, ::Type{Val{:mass_matrix}})
     assemble_mass_matrix!(problem, time)
 end
+
+module Abaqus
+using JuliaFEM.Preprocess: create_surface_elements
+end
