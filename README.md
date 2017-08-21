@@ -1,82 +1,99 @@
+# JuliaFEM.jl - an open source solver for both industrial and academia usage
 
-.. image:: https://raw.githubusercontent.com/JuliaFEM/JuliaFEM.jl/master/docs/logo/JuliaFEMLogo_256x256.png
-  :target: https://github.com/JuliaFEM/JuliaFEM.jl
+[![logo](https://raw.githubusercontent.com/JuliaFEM/JuliaFEM.jl/master/docs/logo/JuliaFEMLogo_256x256.png)](https://github.com/JuliaFEM/JuliaFEM.jl)
 
-========
-JuliaFEM
-========
+[![License](https://img.shields.io/github/license/JuliaFEM/JuliaFEM.jl.svg)](https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md)
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/JuliaFEM/JuliaFEM.jl)
+[![Build Status](https://travis-ci.org/JuliaFEM/JuliaFEM.jl.svg?branch=master)](https://travis-ci.org/JuliaFEM/JuliaFEM.jl)
+[![Coverage Status](https://coveralls.io/repos/github/JuliaFEM/JuliaFEM.jl/badge.svg?branch=master)](https://coveralls.io/github/JuliaFEM/JuliaFEM.jl?branch=master)
+[![Stable documentation](https://img.shields.io/badge/docs-stable-blue.svg)](https://juliafem.github.io/JuliaFEM.jl/stable)
+[![Latest documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://juliafem.github.io/JuliaFEM.jl/latest)
+[![Issues](https://img.shields.io/github/issues/JuliaFEM/JuliaFEM.jl.svg)](https://github.com/JuliaFEM/JuliaFEM.jl/issues)
 
-The JuliaFEM project develops open-source software for reliable, scalable, distributed Finite Element Method.
+JuliaFEM organization web-page: [http://www.juliafem.org](http://www.juliafem.org)
 
-.. image:: https://img.shields.io/github/license/JuliaFEM/Juliafem.jl.svg
-  :target: https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+The JuliaFEM project develops open-source software for reliable, scalable,
+distributed Finite Element Method.
 
-.. image:: https://badges.gitter.im/Join%20Chat.svg
-  :target: https://gitter.im/JuliaFEM/JuliaFEM?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+The JuliaFEM software library is a framework that allows for the distributed
+processing of large Finite Element Models across clusters of computers using
+simple programming models. It is designed to scale up from single servers to
+thousands of machines, each offering local computation and storage. The basic
+design principle is: everything is nonlinear. All physics models are nonlinear
+from which the linearization are made as a special cases.
 
-.. image:: https://travis-ci.org/JuliaFEM/JuliaFEM.jl.svg?branch=master
-  :target: https://travis-ci.org/JuliaFEM/JuliaFEM.jl
+At the moment, users can perform the following analyses with JuliaFEM: elasticity,
+thermal, eigenvalue, contact mechanics, and quasi-static solutions. Typical examples
+in industrial applications include non-linear solid mechanics, contact mechanics,
+finite strains, and fluid structure interaction problems. For visualization,
+JuliaFEM uses ParaView which prefers XDMF file format using XML to store light
+data and HDF to store large data-sets, which is more or less the open-source standard.
 
-.. image:: https://coveralls.io/repos/JuliaFEM/JuliaFEM.jl/badge.svg?branch=master
-  :target: https://coveralls.io/r/JuliaFEM/JuliaFEM.jl?branch=master
+## Vision
 
-.. image:: http://juliafem.org/_static/notebooks-status.svg?ts=1
-  :target: http://juliafem.org/tutorials/index.html
+On one hand, the vision of the JuliaFEM includes the opportunity for massive
+parallelization using multiple computers with MPI and threading as well as cloud
+computing resources in Amazon, Azure and Google Cloud services together with a
+company internal server. And on the other hand, the real application complexity
+including the simulation model complexity as well as geometric complexity. Not
+to forget that the reuse of the existing material models as well as the whole
+simulation models are considered crucial features of the JuliaFEM package. 
 
-.. image:: http://juliafem.org/_static/doctests-status.svg?ts=1
+Recreating the wheel again is definitely not anybody's goal, and thus we try
+to use and embrace good practices and formats as much as possible. We have
+implemented Abaqus / CalculiX input-file format support and maybe will in the
+future extend to other FEM solver formats. Using modern development environments
+encourages the user towards fast development time and high productivity. For
+developing and creating new ideas and tutorials, we have used Jupyter notebooks
+to make easy-to-use handouts.
 
-.. image:: http://juliafem.org/_static/unittests-status.svg?ts=1
+The user interface for JuliaFEM is Jupyter Notebook, and Julia language itself
+is a real programming language. This makes it possible to use JuliaFEM as a part
+of a bigger solution cycle, including for example data mining, automatic geometry
+modifications, mesh generation, solution, and post-processing and enabling
+efficient optimization loops.
 
-.. image:: http://juliafem.org/_static/lint-status.svg?ts=1
-  :target: http://juliafem.org/quality/index.html#lint-report
+## Installing JuliaFEM
 
-.. image:: https://img.shields.io/github/issues/JuliaFEM/JuliaFEM.jl.svg
-  :target: https://github.com/JuliaFEM/JuliaFEM.jl/issues
+Inside Julia REPL, type:
+```julia
+Pkg.add("JuliaFEM")
+```
 
-Documentation: http://www.juliaFEM.org
+## Initial road map
 
-GitHub repository: https://github.com/JuliaFEM/JuliaFEM.jl
+JuliaFEM current status: **project planning**
 
-IRC: #juliafem @ FreeNode, https://webchat.freenode.net/
-
-
-The JuliaFEM software library is a framework that allows for the distributed processing of large Finite Element Models across clusters of computers using simple programming models. It is designed to scale up from single servers to thousands of machines, each offering local computation and storage. The basic design principle is: everything is nonlinear. All physics models are nonlinear from which the linearization are made as a special cases. 
-
-JuliaFEM current status: project planning
-
-Initial road map for JuliaFEM:
-
-+---------+-----------------------------+-----------------+
-| version | number of degree of freedom | number of cores |
-+=========+=============================+=================+
+| Version | Number of degree of freedom | Number of cores |
+| ------: | --------------------------: | --------------: |
 |   0.1.0 |                   1 000 000 |              10 |
-+---------+-----------------------------+-----------------+
 |   0.2.0 |                  10 000 000 |             100 |
-+---------+-----------------------------+-----------------+
 |   1.0.0 |                 100 000 000 |           1 000 |
-+---------+-----------------------------+-----------------+
 |   2.0.0 |               1 000 000 000 |          10 000 |
-+---------+-----------------------------+-----------------+
 |   3.0.0 |              10 000 000 000 |         100 000 |
-+---------+-----------------------------+-----------------+
 
-We strongly believe in the test driven development as well as building on top of previous work. Thus all the new code in this project should be 100% tested. Also other people have wisdom in style as well:
+We strongly believe in the test driven development as well as building on top
+of previous work. Thus all the new code in this project should be 100% tested.
+Also other people have wisdom in style as well:
 
-`The Zen of Python <https://www.python.org/dev/peps/pep-0020/>`_
+[The Zen of Python](https://www.python.org/dev/peps/pep-0020/):
 
-| Beautiful is better than ugly.
-| Explicit is better than implicit.
-| Simple is better than complex.
-| Complex is better than complicated.
-| Flat is better than nested.
-| Sparse is better than dense.
-| Readability counts.
-| Errors should never pass silently.
-|
+```
+Beautiful is better than ugly.
+Explicit is better than implicit.
+Simple is better than complex.
+Complex is better than complicated.
+Flat is better than nested.
+Sparse is better than dense.
+Readability counts.
+Errors should never pass silently.
+```
 
-Contributing
-------------
+## Contributing
 
-Interested in participating? Please start by reading `CONTRIBUTING.rst <https://github.com/JuliaFEM/JuliaFEM/blob/master/CONTRIBUTING.rst>`_.
+Developing JuliaFEM encourages good practices, starting from unit testing both
+for smaller and larger functions and continuing to full integration testing of
+different platforms. 
 
-Contributors: see `contributors <https://github.com/JuliaFEM/JuliaFEM/blob/master/contributors>`_
+Interested in participating? Please start by reading
+[contributing](http://www.juliafem.org/contributing).
