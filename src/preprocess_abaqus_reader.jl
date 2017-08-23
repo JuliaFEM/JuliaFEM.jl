@@ -3,6 +3,13 @@
 
 using AbaqusReader
 
+"""
+    abaqus_read_mesh(fn::String)
+
+Read and parse ABAQUS `.inp` file.
+
+`fn` (filename) is the name of the file to parse.
+"""
 function abaqus_read_mesh(fn::String)
     m = AbaqusReader.abaqus_read_mesh(fn)
     return Mesh(m)

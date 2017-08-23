@@ -34,7 +34,7 @@ end
 """
     Mesh(m::Dict)
 
-Create new `Mesh` using data `m`. It is assumed that `m` is in format what
+Create a new `Mesh` using data `m`. It is assumed that `m` is in format what
 `abaqus_read_mesh` in `AbaqusReader.jl` is returning.
 """
 function Mesh(m::Dict)
@@ -56,16 +56,33 @@ function Mesh(m::Dict)
     return mesh
 end
 
+"""
+    add_node!(mesh, nid, ncoords)
+
+Add node into the mesh. `nid` is node id and `ncoords` are the node
+coordinates.
+"""
 function add_node!(mesh::Mesh, nid::Int, ncoords::Vector{Float64})
     mesh.nodes[nid] = ncoords
 end
 
+"""
+    add_nodes!(mesh, nodes)
+
+Add nodes into the mesh.
+"""
 function add_nodes!(mesh::Mesh, nodes::Dict{Int, Vector{Float64}})
     for (nid, ncoords) in nodes
         add_node!(mesh, nid, ncoords)
     end
 end
 
+"""
+    add_node_to_node_set!(mesh, nid, ncoords)
+
+Add nodes into a node set. `set_name` is the name of the set and `nids...`
+are all the node id:s that wants to be added.
+"""
 function add_node_to_node_set!(mesh::Mesh, set_name, nids...)
     if !haskey(mesh.node_sets, set_name)
         mesh.node_sets[set_name] = Set{Int}()
@@ -74,7 +91,12 @@ function add_node_to_node_set!(mesh::Mesh, set_name, nids...)
     return
 end
 
-""" Create a new node set from nodes in element set. """
+"""
+    create_node_set_from_element_set!(mesh, set_names...)
+
+Create a new node set from the nodes in an element set. ´set_names...´ are all
+the set names to be inserted in the function.
+"""
 function create_node_set_from_element_set!(mesh::Mesh, set_names::String...)
     for set_name in set_names
         set_name = Symbol(set_name)
@@ -88,21 +110,43 @@ function create_node_set_from_element_set!(mesh::Mesh, set_names::String...)
     return
 end
 
+"""
+    create_node_set_from_element_set!(mesh, set_name)
+
+Create a new node set from an element set.
+"""
 function create_node_set_from_element_set!(mesh::Mesh, set_name::Symbol)
     create_node_set_from_element_set!(mesh, string(set_name))
 end
 
+"""
+    add_element!(mesh, elid, eltype, connectivity)
+
+Add an element into the mesh. ´elid´ is the element id, ´eltype´ is the type of
+the element and ´connectivity´ is the connectivity of the element.
+"""
 function add_element!(mesh::Mesh, elid::Int, eltype::Symbol, connectivity::Vector{Int})
     mesh.elements[elid] = connectivity
     mesh.element_types[elid] = eltype
 end
 
+"""
+    add_elements!(mesh, elements)
+
+Add elements into the mesh.
+"""
 function add_elements!(mesh::Mesh, elements::Dict{Int, Tuple{Symbol, Vector{Int}}})
     for (elid, (eltype, elcon)) in elements
         add_element!(mesh, elid, eltype, elcon)
     end
 end
 
+"""
+    add_element_to_element_set!(mesh, set_name, elids...)
+
+Add elements into the mesh. ´set_name´ is the name of the element set and
+´elids..´ are id:s of all the elements that wants to be added.
+"""
 function add_element_to_element_set!(mesh::Mesh, set_name, elids...)
     if !haskey(mesh.element_sets, set_name)
         mesh.element_sets[set_name] = Set{Int}()
@@ -110,6 +154,11 @@ function add_element_to_element_set!(mesh::Mesh, set_name, elids...)
     push!(mesh.element_sets[set_name], elids...)
 end
 
+"""
+    copy(mesh)
+
+Copy the mesh.
+"""
 function copy(mesh::Mesh)
     mesh2 = Mesh()
     mesh2.nodes = copy(mesh.nodes)
@@ -120,6 +169,11 @@ function copy(mesh::Mesh)
     return mesh2
 end
 
+"""
+    filter_by_element_id(mesh, element_ids)
+
+Filter elements by their id's.
+"""
 function filter_by_element_id(mesh::Mesh, element_ids::Vector{Int})
     mesh2 = copy(mesh)
     mesh2.elements = Dict()
@@ -131,10 +185,20 @@ function filter_by_element_id(mesh::Mesh, element_ids::Vector{Int})
     return mesh2
 end
 
+"""
+    filter_by_element_set(mesh, set_name)
+
+Filter elements by an element set.
+"""
 function filter_by_element_set(mesh::Mesh, set_name)
     filter_by_element_id(mesh::Mesh, collect(mesh.element_sets[set_name]))
 end
 
+"""
+    create_element(mesh, id)
+
+Create an element from the mesh by it's id.
+"""
 function create_element(mesh::Mesh, id::Int)
     connectivity = mesh.elements[id]
     element_type = getfield(JuliaFEM, mesh.element_types[id])
@@ -144,6 +208,11 @@ function create_element(mesh::Mesh, id::Int)
     return element
 end
 
+"""
+    create_elements(mesh, element_type=nothing)
+
+Create elements from the mesh filtered by their type.
+"""
 function create_elements(mesh::Mesh; element_type=nothing)
     element_ids = collect(keys(mesh.elements))
     if element_type != nothing
@@ -177,7 +246,11 @@ function create_elements(mesh::Mesh, element_sets::AbstractString...; element_ty
 end
 
 
-""" find npts nearest nodes from mesh and return id numbers as list. """
+"""
+    find_nearest_nodes(mesh, coords, npts=1; node_set=nothing)
+
+find npts nearest nodes from the mesh and return their id numbers as a list.
+"""
 function find_nearest_nodes(mesh::Mesh, coords::Vector{Float64}, npts::Int=1; node_set=nothing)
     dist = Dict{Int, Float64}()
     for (nid, c) in mesh.nodes
@@ -197,9 +270,11 @@ function find_nearest_node(mesh::Mesh, coords::Vector{Float64}; node_set=nothing
 end
 
 """
-Apply new node ordering to elements. In JuliaFEM same node ordering is used
-than in ABAQUS and if mesh is parsed from FEM format with other node ordering
-this can be used to reorder nodes.
+    reorder_element_connectivity!(mesh, mapping)
+
+Apply a new node ordering to elements. JuliaFEM uses the same node ordering as
+ABAQUS. If the mesh is parsed from FEM format with some other node ordering,
+this function can be used to reorder the nodes.
 
 Parameters
 ----------
