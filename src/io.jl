@@ -24,12 +24,16 @@ function xmffile(xdmf::Xdmf)
     return xdmf.name*".xmf"
 end
 
-""" Initialize a new Xdmf object. """
+"""
+    Xdmf(name, version="3.0", overwrite=false)
+
+Initialize a new Xdmf object.
+"""
 function Xdmf(name::String; version="3.0", overwrite=false)
     xdmf = new_element("Xdmf")
     h5file = "$name.h5"
     xmlfile = "$name.xmf"
-    
+
     if isfile(h5file)
         if overwrite
             info("Result file $h5file exists, removing old file.")
@@ -38,7 +42,7 @@ function Xdmf(name::String; version="3.0", overwrite=false)
             error("Result file $h5file exists, use Xdmf($name; overwrite=true) to rewrite results")
         end
     end
-    
+
     if isfile(xmlfile)
         if overwrite
             info("Result file $xmlfile exists, removing old file.")
@@ -55,7 +59,11 @@ function Xdmf(name::String; version="3.0", overwrite=false)
     return Xdmf(name, xdmf, hdf, 1, "HDF")
 end
 
-""" Return the basic structure of Xdmf document. Creates a new TemporalCollection if not found.
+"""
+    get_temporal_collection(xdmf)
+
+Return the basic structure of Xdmf document.
+Creates a new TemporalCollection if not found.
 Basic structure for XML part of Xdmf file is
 <?xml version="1.0" encoding="utf-8"?>
 <Xdmf xmlns:xi="http://www.w3.org/2001/XInclude" Version="2.1">
@@ -79,7 +87,10 @@ function get_temporal_collection(xdmf::Xdmf)
     return grid
 end
 
-""" Returns some spesific child xml element from a array of XMLElement based on,
+"""
+    xdmf_filter(child_elements, child_name)
+
+Returns some spesific child xml element from an array of XMLElement based on,
 "Xdmf extensions" see [1] for details.
 
 Parameters
@@ -93,8 +104,8 @@ Returns
 -------
 nothing if nothing is found, otherwise XMLElement matching to filtering
 
-Examples
---------
+#Examples
+
 julia> grid1 = new_element("Grid")
 julia> add_text(grid1, "I am first grid")
 julia> grid2 = new_element("Grid")
@@ -176,8 +187,13 @@ function xdmf_filter(child_elements, child_name)
     return nothing
 end
 
-""" Traverse XML path. Xdmf filtering can be used, so it's possible to find
-data from xml using syntax e.g. 
+"""
+    traverse(xdmf, x, attr_name)
+
+Traverse XML path. Xdmf filtering can be used, so it's possible to find
+data from xml using syntax e.g.
+
+#Example
 
 julia> traverse(xdmf, x, "/Domain/Grid[2]/Grid[@Name=Frame 1]/DataItem")
 """
@@ -203,12 +219,17 @@ function traverse(xdmf::Xdmf, x::XMLElement, attr_name::String)
         new_path = join(items[2:end], '/')
         return traverse(xdmf, new_item, new_path)
     end
-    
+
     child = xdmf_filter(childs, attr_name)
     return child
 end
 
-""" Read data from Xdmf file.
+"""
+    read(xdmf, path)
+
+Read data from Xdmf file.
+
+#Example
 
 Traversing is supported, so one can easily traverse XML tree e.g.
 julia> read(xdmf, "/Domain/Grid/Grid[2]/Geometry")
@@ -230,7 +251,11 @@ function read(xdmf::Xdmf, path::String)
     end
 end
 
+"""
+    save!(xdmf)
 
+Save the xdmf file.
+"""
 function save!(xdmf::Xdmf)
     doc = XMLDocument()
     set_root(doc, xdmf.xml)
@@ -264,7 +289,11 @@ function new_dataitem{T,N}(xdmf::Xdmf, path::String, data::Array{T,N})
     return dataitem
 end
 
-""" Create a new DataItem element, hdf path automatically determined. """
+"""
+    new_dataitem(xdmf, data)
+
+Create a new DataItem element, hdf path automatically determined.
+"""
 function new_dataitem{T,N}(xdmf::Xdmf, data::Array{T,N})
     if xdmf.format == "XML"
         # Path can be whatever as XML format does not store to HDF at all
@@ -298,10 +327,12 @@ global const xdmf_element_mapping = Dict(
         "Wedge15" => "Wedge_15",
         "Hex20" => "Hex_20")
 
-""" Write new fields to Xdmf file.
+"""
+    update_xdmf!(xdmf, problem, time, fields)
 
-Examples
---------
+Write new fields to Xdmf file.
+
+#Example
 
 To write displacement and temperature fields from p1 at time t=0.0:
 
@@ -359,7 +390,7 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
         time_element = new_child(spatial_collection, "Time")
         set_attribute(time_element, "Value", time)
     end
-    
+
     # 3.1 make sure that Grid element we found really is SpatialCollection
     collection_type = attribute(spatial_collection, "CollectionType"; required=true)
     @assert collection_type == "Spatial"
