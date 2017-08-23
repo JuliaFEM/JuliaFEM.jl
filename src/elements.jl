@@ -9,11 +9,21 @@ type Element{E<:AbstractBasis}
     properties :: E
 end
 
-""" Construct a new element of type E.
+"""
+    Element(element_type, connectivity_vector)
+
+Construct a new element where element_type is the type of the element
+and connectivity_vector is the vector of nodes that the element is connected to.
 
 Examples
 --------
-julia> element = Element(Tri3, [1, 2, 3])
+In the example a new element (E in the figure below) of type Tri3 is created.
+This spesific element connects to nodes 89, 43, 12 in the finite element mesh.
+
+```@example
+element = Element(Tri3, [89, 43, 12])
+```
+![img](figs/mesh.png)
 """
 function Element{E<:AbstractBasis}(::Type{E}, connectivity::Vector{Int})
     return Element{E}(-1, connectivity, [], Dict(), E())

@@ -8,7 +8,7 @@ abstract type MixedProblem<:AbstractProblem end
 
 """
 General linearized problem to solve
-    (K₁+K₂)Δu  +   C1*Δλ = f₁+f₂
+    (K₁+K₂)Δu  +   C1'*Δλ = f₁+f₂
          C2Δu  +     D*Δλ = g
 """
 type Assembly
@@ -81,37 +81,59 @@ function isempty(assembly::Assembly)
     return T
 end
 
+"""
+Defines types for Problem variables.
+
+# Examples
+
+The type of 'elements' is Vector{Element}
+
+Add elements into the Problem element list.
+```@example
+a = [1, 2, 3]
+Problem.elements = a
+```
+
+"""
 type Problem{P<:AbstractProblem}
-    name :: AbstractString           # descriptive name for problem
+    name :: AbstractString           # descriptive name for the problem
     dimension :: Int                 # degrees of freedom per node
-    parent_field_name :: AbstractString # (optional) name of parent field e.g. "displacement"
+    parent_field_name :: AbstractString # (optional) name of the parent field e.g. "displacement"
     elements :: Vector{Element}
-    dofmap :: Dict{Element, Vector{Int64}} # connects element local dofs to global dofs
+    dofmap :: Dict{Element, Vector{Int64}} # connects the element local dofs to the global dofs
     assembly :: Assembly
     fields :: Dict{AbstractString, Field}
     postprocess_fields :: Vector{String}
     properties :: P
 end
 
-""" Construct a new field problem.
+"""
+    Problem(problem_type, problem_name::String, problem_dimension)
 
-Examples
---------
-Create vector-valued (dim=3) elasticity problem:
+Construct a new field problem where `problem_type` is the type of the problem
+(Elasticity, Dirichlet, etc.), `problem_name` is the name of the problem and
+`problem_dimension` is the number of DOF:s in one node (2 in a 2D problem, 3
+in an elastic 3D problem, 6 in a 3D beam problem, etc.).
 
-julia> prob1 = Problem(Elasticity, "this is my problem", 3)
-julia> prob2 = Problem(Elasticity, 3)
+# Examples
+
+Create a vector-valued (dim=3) elasticity problem:
+
+```@example
+prob1 = Problem(Elasticity, "this is my problem", 3)
+```
 
 """
 function Problem{P<:FieldProblem}(::Type{P}, name::AbstractString, dimension::Int64)
     return Problem{P}(name, dimension, "none", [], Dict(), Assembly(), Dict(), Vector(), P())
 end
 
-""" Construct a new boundary problem.
+"""
+Construct a new boundary problem.
 
 Examples
 --------
-Create Dirichlet boundary problem for vector-valued (dim=3) elasticity problem.
+Create a Dirichlet boundary problem for a vector-valued (dim=3) elasticity problem.
 
 julia> bc1 = Problem(Dirichlet, "support", 3, "displacement")
 solver.
@@ -150,7 +172,14 @@ function update!{P<:AbstractProblem}(problem::P, attr::Pair{String, String}...)
     end
 end
 
-""" Initialize element ready for calculation. """
+"""
+    function initialize!(problem_type, element_name, time)
+
+Initialize the element ready for calculation, where `problem_type` is the type
+of the problem (Elasticity, Dirichlet, etc.), `element_name` is the name of a
+constructed element (see Element(element_type, connectivity_vector)) and `time`
+is the starting time of the initializing process.
+"""
 function initialize!(problem::Problem, element::Element, time::Float64)
     field_name = get_unknown_field_name(problem)
     field_dim = get_unknown_field_dimension(problem)
@@ -165,7 +194,7 @@ function initialize!(problem::Problem, element::Element, time::Float64)
         end
     end
 
-    # if boundary problem, initialize field for main problem too
+    # if a boundary problem, initialize also a field for the main problem
     is_boundary_problem(problem) || return
     field_name = get_parent_field_name(problem)
     if !haskey(element, field_name)
@@ -183,7 +212,11 @@ function initialize!(problem::Problem, time::Float64=0.0)
     end
 end
 
-""" Update problem solution vector for assembly. """
+"""
+    update!(problem, assembly, u, la)
+
+Update the problem solution vector for assembly.
+"""
 function update!(problem::Problem, assembly::Assembly, u::Vector, la::Vector)
 
     # resize & fill with zeros vectors if length mismatch with current solution
@@ -227,13 +260,16 @@ function update!(problem::Problem, assembly::Assembly, u::Vector, la::Vector)
     return assembly.u, assembly.la
 end
 
-""" Return global solution (u, la) for problem.
+"""
+    get_global_solution(problem, assembly)
+
+Return a global solution (u, la) for a problem.
 
 Notes
 -----
-If length of solution vector != number of nodes, i.e. field dimension is
-something other than 1, reshape vectors so it's length matches to the
-number of nodes so that one can easily get nodal results.
+If the length of solution vector != number of nodes, i.e. the field dimension is
+something else than 1, reshape vectors so that their length matches to the
+number of nodes. This helps to get nodal results easily.
 """
 function get_global_solution(problem::Problem, assembly::Assembly)
     u = assembly.u
@@ -251,7 +287,11 @@ function get_global_solution(problem::Problem, assembly::Assembly)
     end
 end
 
-""" Update solution from assebly to elements. """
+"""
+    update!(problem, assembly, elements, time)
+
+Update a solution from the assebly to elements.
+"""
 function update!{P<:FieldProblem}(problem::Problem{P}, assembly::Assembly, elements::Vector{Element}, time::Float64)
     u, la = get_global_solution(problem, assembly)
     field_name = get_unknown_field_name(problem)
