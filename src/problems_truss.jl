@@ -32,7 +32,7 @@ Function groups elements to arrays by their type and assembles one element type
 at time. This makes it possible to pre-allocate matrices common to same type
 of elements.
 """
-import JuliaFEM: assemble!
+import JuliaFEM:assemble!
 
 
 function assemble!(assembly::Assembly, problem::Problem{Truss},
@@ -47,17 +47,17 @@ function assemble!(assembly::Assembly, problem::Problem{Truss},
 end
 
 function assemble!(assembly::Assembly, problem::Problem{Truss},
-                   element::Element, time, ::Type{Val{:plane_stress}})
-    #Require that the num ber pof nodes = 2
-    nnodes = length(element)
-    K = ones(4, 4)
-    K[1,2]=K[2,1]=-1
-    E = element("youngs modulus", 1, time) # Should we do it this way
-    A = element("cross section area", 1, time)
-    # Do I need to find the length of the Truss
-    L=1.0
-    K += E*A/L
+                   element::Element{Seg2}, time, ::Type{Val{:plane_stress}})
+    #Require that the number of nodes = 2 ?
+    for ip in get_integration_points(element)
+        dN = element(ip, time, Val{:Grad})
+        detJ = element(ip, time, Val{:detJ})
+        A = element("cross section area", ip, time)
+        E = element("youngs modulus", ip, time)
+        K += ip.weight*E*A*dN'*dN*detJ
+    end
+    # How do we transform to the global system for 2d/3D
     gdofs = get_gdofs(problem, element)
     add!(assembly.K, gdofs, gdofs, K)
-    add!(assembly.f, gdofs, f)
+    #add!(assembly.f, gdofs, f)
 end
