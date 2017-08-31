@@ -18,6 +18,7 @@ using JuliaFEM.Testing
   @test isapprox(K_truss, [2.88 -2.88;-2.88 2.88])
 
   # Need some boundary conditions and forces
+  # simple truss along x axis
   b1 = Element(Poi1, [1])
   update!(b1, "displacement 1", 0.0)
   f1 = Element(Poi1, [2]) # Point load
