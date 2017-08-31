@@ -10,7 +10,7 @@ using JuliaFEM.Testing
 
   update!(elem1, "geometry", X)
   update!(elem1, "youngs modulus", 288.0)
-  update!(elem1, "cross section area", 0.1)
+  update!(elem1, "cross section area", DVTI([0.1, 0.1]))
   p1 = Problem(Truss, "my truss problem", 1) # 1 dofs/node;
   empty!(p1.assembly)
   assemble!(p1.assembly, p1, elem1)

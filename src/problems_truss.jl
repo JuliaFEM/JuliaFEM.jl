@@ -49,6 +49,8 @@ end
 function assemble!(assembly::Assembly, problem::Problem{Truss},
                    element::Element{Seg2}, time, ::Type{Val{:plane_stress}})
     #Require that the number of nodes = 2 ?
+
+    K = zeros(2,2)
     for ip in get_integration_points(element)
         dN = element(ip, time, Val{:Grad})
         detJ = element(ip, time, Val{:detJ})
