@@ -117,6 +117,9 @@ export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
 include("solvers_modal.jl")
 export Modal
 
+### Simple truss system
+include("problems_truss.jl")
+export Truss
 ### Mortar methods, contact mechanics extension ###
 include("problems_contact.jl")
 include("problems_contact_2d.jl")
