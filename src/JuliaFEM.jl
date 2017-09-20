@@ -102,6 +102,9 @@ export calculate_normals, calculate_normals!, project_from_slave_to_master,
        project_from_master_to_slave, Mortar, get_slave_elements,
        get_polygon_clip
 
+include("problems_truss.jl")
+export Truss
+
 include("io.jl")
 export Xdmf, h5file, xmffile, xdmf_filter, new_dataitem, update_xdmf!, save!
 
@@ -117,9 +120,6 @@ export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
 include("solvers_modal.jl")
 export Modal
 
-### Simple truss system
-include("problems_truss.jl")
-export Truss
 ### Mortar methods, contact mechanics extension ###
 include("problems_contact.jl")
 include("problems_contact_2d.jl")
