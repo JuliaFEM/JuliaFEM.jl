@@ -2,6 +2,7 @@
 
 [![logo](https://raw.githubusercontent.com/JuliaFEM/JuliaFEM.jl/master/docs/logo/JuliaFEMLogo_256x256.png)](https://github.com/JuliaFEM/JuliaFEM.jl)
 
+[![DOI](https://zenodo.org/badge/35573493.svg)](https://zenodo.org/badge/latestdoi/35573493)
 [![License](https://img.shields.io/github/license/JuliaFEM/JuliaFEM.jl.svg)](https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/JuliaFEM/JuliaFEM.jl)
 [![Build Status](https://travis-ci.org/JuliaFEM/JuliaFEM.jl.svg?branch=master)](https://travis-ci.org/JuliaFEM/JuliaFEM.jl)
