@@ -52,12 +52,6 @@ function haskey(solver::Solver, field_name::String)
     return haskey(solver.fields, field_name)
 end
 
-# one-liner helpers to identify problem types
-
-is_field_problem(problem) = false
-is_field_problem{P<:FieldProblem}(problem::Problem{P}) = true
-is_boundary_problem(problem) = false
-is_boundary_problem{P<:BoundaryProblem}(problem::Problem{P}) = true
 get_field_problems(solver::Solver) = filter(is_field_problem, get_problems(solver))
 get_boundary_problems(solver::Solver) = filter(is_boundary_problem, get_problems(solver))
 
