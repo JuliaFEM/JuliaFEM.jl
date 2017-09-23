@@ -8,91 +8,50 @@ This is JuliaFEM -- Finite Element Package
 """
 module JuliaFEM
 
+using FEMBase
+using FEMBase: SparseMatrixCOO, SparseVectorCOO, Node, BasisInfo,
+               Discrete, Variable, TimeVariant, TimeInvariant, Field,
+               DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment,
+               IP, AbstractProblem, IntegrationPoint
+using FEMBase: is_field_problem, is_boundary_problem, get_elements,
+               get_connectivity, assemble_prehook!, assemble_posthook!,
+               get_parent_field_name, get_reference_coordinates,
+               get_assembly, get_nonzero_rows, get_nonzero_columns,
+               eval_basis!, get_basis, get_dbasis, grad!, get_dualbasis,
+               assemble_mass_matrix!, get_local_coordinates, inside,
+               get_element_type, filter_by_element_type, get_element_id,
+               optimize!, resize_sparse, resize_sparsevec
+import FEMBase: get_unknown_field_name, get_unknown_field_dimension,
+                assemble!, update!, initialize!
+
+
+# from other packages TimerOutputs.jl and Logging.jl
 using TimerOutputs
 export @timeit, print_timer
-
-import Base: getindex, setindex!, convert, length, size, isapprox, similar,
-             start, first, next, done, last, endof, vec, ==, +, -, *, /, haskey, copy,
-             push!, isempty, empty!, append!, sparse, full, read
-
-using FEMBasis
-using FEMBasis: AbstractBasis
-using FEMQuad
-using AbaqusReader
-using AsterReader
-
 using Logging
-
-Logging.configure(level=INFO)
-
-if haskey(ENV, "JULIAFEM_LOGLEVEL")
-    Logging.configure(level=LogLevel(ENV["JULIAFEM_LOGLEVEL"]))
-end
-
 export info, debug
 
+import Base: getindex, setindex!, convert, length, size, isapprox,
+             similar, start, first, next, done, last, endof, vec,
+             ==, +, -, *, /, haskey, copy, push!, isempty, empty!,
+             append!, sparse, full, read
+
 module Testing
-
-    using Base.Test
-
-    export @test, @testset, @test_throws
-
+using Base.Test
+export @test, @testset, @test_throws
 end
 
-include("fields.jl")
-export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment
-
-include("types.jl")  # data types: Point, IntegrationPoint, ...
-export AbstractPoint, Point, IntegrationPoint, IP, Node
-
-### ELEMENTS ###
-include("elements.jl") # common element routines
-export Node, Element, update!, get_connectivity, get_basis,
-       get_dbasis, inside, get_local_coordinates, get_element_type,
-       filter_by_element_type, get_element_id
-
-include("elements_lagrange.jl") # Continuous Galerkin (Lagrange) elements
-export get_reference_coordinates,
-       get_interpolation_polynomial,
-       description
-export Poi1,
-       Seg2, Seg3,
-       Tri3, Tri6, Tri7,
-       Quad4, Quad8, Quad9,
-       Tet4, Tet10,
-       Pyr5,
-       Wedge6,
-       Hex8, Hex20, Hex27
-
-include("integrate.jl")  # default integration points for elements
-export get_integration_points
-
-include("sparse.jl")
-export add!, SparseMatrixCOO, SparseVectorCOO, get_nonzero_rows, get_nonzero_columns, optimize!, resize_sparse, resize_sparsevec
-
-include("problems.jl") # common problem routines
-export Problem, AbstractProblem, FieldProblem, BoundaryProblem,
-       get_unknown_field_dimension, get_gdofs, Assembly,
-       get_parent_field_name, get_elements, add_elements!
-
+using AbaqusReader
+using AsterReader
 include("problems_elasticity.jl")
 export Elasticity
-
 include("materials_plasticity.jl")
 export plastic_von_mises
-
 include("problems_dirichlet.jl")
 export Dirichlet
-
 include("problems_heat.jl")
 export Heat
-
 export assemble!, postprocess!
-
-function assemble!(problem::Problem, element::Element, time=0.0)
-    assemble!(problem.assembly, problem, element, time)
-end
-
 ### Mortar methods ###
 include("problems_mortar.jl")
 include("problems_mortar_2d.jl")
@@ -101,12 +60,8 @@ include("problems_mortar_2d_autodiff.jl")
 export calculate_normals, calculate_normals!, project_from_slave_to_master,
        project_from_master_to_slave, Mortar, get_slave_elements,
        get_polygon_clip
-
 include("io.jl")
 export Xdmf, h5file, xmffile, xdmf_filter, new_dataitem, update_xdmf!, save!
-
-### ASSEMBLY + SOLVE ###
-include("assembly.jl")
 include("solvers.jl")
 export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
        get_unknown_field_name, get_formulation_type, get_problems,
@@ -116,8 +71,6 @@ export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
        is_field_problem, is_boundary_problem
 include("solvers_modal.jl")
 export Modal
-
-### Mortar methods, contact mechanics extension ###
 include("problems_contact.jl")
 include("problems_contact_2d.jl")
 include("problems_contact_3d.jl")
@@ -125,22 +78,26 @@ include("problems_contact_2d_autodiff.jl")
 #include("problems_contact_3d_autodiff.jl")
 export Contact
 
+# Preprocess module
+
 module Preprocess
+using FEMBase
 include("preprocess.jl")
 export create_elements, Mesh, add_node!, add_nodes!, add_element!,
        add_elements!, add_element_to_element_set!, add_node_to_node_set!,
        find_nearest_nodes, find_nearest_node, reorder_element_connectivity!,
        create_node_set_from_element_set!, filter_by_element_set
-
 include("preprocess_abaqus_reader.jl")
 export abaqus_read_mesh, create_surface_elements, create_nodal_elements
-
 include("preprocess_aster_reader.jl")
 export aster_read_mesh
-
 end
 
+# Postprocess module
+
 module Postprocess
+using FEMBase
+using FEMBase: get_elements
 include("postprocess_utils.jl")
 export calc_nodal_values!, get_nodal_vector, get_nodal_dict, copy_field!,
        calculate_area, calculate_center_of_mass,
@@ -148,5 +105,19 @@ export calc_nodal_values!, get_nodal_vector, get_nodal_dict, copy_field!,
 end
 
 include("deprecations.jl")
+
+export SparseMatrixCOO, SparseVectorCOO, optimize!, resize_sparse
+export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment
+export FieldProblem, BoundaryProblem, Problem, Node, Element, Assembly
+export Poi1, Seg2, Seg3, Tri3, Tri6, Tri7, Quad4, Quad8, Quad9,
+       Tet4, Tet10, Pyr5, Wedge6, Wedge15, Hex8, Hex20, Hex27
+export update!, add_elements!, get_unknown_field_name, add!,
+       is_field_problem, is_boundary_problem, get_gdofs,
+       initialize!, get_integration_points, group_by_element_type,
+       get_unknown_field_dimension, get_connectivity
+
+export get_nonzero_rows, get_local_coordinates, inside, IP, get_element_type,
+       get_elements, AbstractProblem, IntegrationPoint, filter_by_element_type,
+       get_element_id, get_nonzero_columns, resize_sparse, resize_sparsevec
 
 end
