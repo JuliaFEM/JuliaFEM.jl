@@ -3,11 +3,13 @@
 
 using Documenter, JuliaFEM
 
+#=
 if haskey(ENV, "TRAVIS")
     println("inside TRAVIS, installing PyPlot + matplotlib")
     Pkg.add("PyPlot")
     run(`pip install matplotlib`)
 end
+=#
 
 makedocs(modules=[JuliaFEM],
          format = :html,
