@@ -9,16 +9,6 @@ This is JuliaFEM -- Finite Element Package
 module JuliaFEM
 
 using FEMBase
-using FEMBase: SparseMatrixCOO, SparseVectorCOO, Node, BasisInfo,
-               IP, AbstractProblem, IntegrationPoint
-using FEMBase: is_field_problem, is_boundary_problem, get_elements,
-               get_connectivity, assemble_prehook!, assemble_posthook!,
-               get_parent_field_name, get_reference_coordinates,
-               get_assembly, get_nonzero_rows, get_nonzero_columns,
-               eval_basis!, get_basis, get_dbasis, grad!,
-               assemble_mass_matrix!, get_local_coordinates, inside,
-               get_element_type, filter_by_element_type, get_element_id,
-               optimize!, resize_sparse, resize_sparsevec
 import FEMBase: get_unknown_field_name, get_unknown_field_dimension,
                 assemble!, update!, initialize!
 
@@ -105,7 +95,7 @@ end
 include("deprecations.jl")
 
 export SparseMatrixCOO, SparseVectorCOO, optimize!, resize_sparse
-export Field, DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment
+export DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment
 export FieldProblem, BoundaryProblem, Problem, Node, Element, Assembly
 export Poi1, Seg2, Seg3, Tri3, Tri6, Tri7, Quad4, Quad8, Quad9,
        Tet4, Tet10, Pyr5, Wedge6, Wedge15, Hex8, Hex20, Hex27
@@ -113,7 +103,6 @@ export update!, add_elements!, get_unknown_field_name, add!,
        is_field_problem, is_boundary_problem, get_gdofs,
        initialize!, get_integration_points, group_by_element_type,
        get_unknown_field_dimension, get_connectivity
-
 export get_nonzero_rows, get_local_coordinates, inside, IP, get_element_type,
        get_elements, AbstractProblem, IntegrationPoint, filter_by_element_type,
        get_element_id, get_nonzero_columns, resize_sparse, resize_sparsevec

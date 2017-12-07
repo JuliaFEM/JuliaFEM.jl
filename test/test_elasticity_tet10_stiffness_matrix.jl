@@ -2,7 +2,8 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM.Testing
+using JuliaFEM: add_elements!
+using Base.Test
 
 @testset "test tet10 stiffness matrix" begin
     el = Element(Tet10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])

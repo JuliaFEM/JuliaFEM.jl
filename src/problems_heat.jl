@@ -99,7 +99,7 @@ function assemble!{E<:Heat3DVolumeElements}(assembly::Assembly, problem::Problem
             fq += w*N'*f
         end
     end
-    T = vec(element[field_name](time))
+    T = [interpolate(element[field_name], time)...]
     fq -= K*T
     add!(assembly.K, gdofs, gdofs, K)
     add!(assembly.f, gdofs, fq)

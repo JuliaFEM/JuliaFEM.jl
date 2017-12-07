@@ -2,8 +2,8 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM: assemble_mass_matrix!
-using JuliaFEM.Testing
+using JuliaFEM: assemble_mass_matrix!, add_elements!
+using Base.Test
 
 @testset "test tet10 mass matrix" begin
     X = Dict(
