@@ -143,13 +143,13 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
         info("Slave element connectivity = $slave_element_nodes")
         nsl = length(slave_element)
         X1 = slave_element("geometry", time)
-        n1 = Field([normals[j] for j in slave_element_nodes])
+        n1 = tuple(collect(normals[j] for j in slave_element_nodes)...)
 
         # project slave nodes to auxiliary plane (x0, Q)
         xi = get_mean_xi(slave_element)
         N = vec(get_basis(slave_element, xi, time))
-        x0 = N*X1
-        n0 = N*n1
+        x0 = interpolate(N,X1)
+        n0 = interpolate(N,n1)
         info("Auxiliary plane x0 = $x0, n0 = $n0")
         S = Vector[project_vertex_to_auxiliary_plane(X1[i], x0, n0) for i=1:nsl]
         check_orientation!(S, n0)
@@ -211,7 +211,7 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
             for (cell_id, cell) in enumerate(all_cells)
                 C_area = 0.0
                 virtual_element = Element(Tri3, Int[])
-                update!(virtual_element, "geometry", cell)
+                update!(virtual_element, "geometry", tuple(cell...))
 
                 # 5. loop integration point of integration cell
                 for ip in get_integration_points(virtual_element, 3)

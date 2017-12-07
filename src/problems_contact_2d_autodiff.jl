@@ -19,14 +19,20 @@ xi
     projected master
  
 """
-function project_from_master_to_slave{E<:MortarElements2D}(
+function project_from_master_to_slave_ad{E<:MortarElements2D}(
     slave_element::Element{E}, x1_::DVTI, n1_::DVTI, x2::Vector;
     tol=1.0e-10, max_iterations=20, debug=false)
 
-    x1(xi1) = vec(get_basis(slave_element, [xi1], time))*x1_
-    dx1(xi1) = vec(get_dbasis(slave_element, [xi1], time))*x1_
-    n1(xi1) = vec(get_basis(slave_element, [xi1], time))*n1_
-    dn1(xi1) = vec(get_dbasis(slave_element, [xi1], time))*n1_
+    """ Multiply basis / dbasis at `xi` with field. """
+    function mul(func, xi, field)
+        B = func(slave_element, [xi], time)
+        return sum(B[i]*field[i] for i=1:length(B))
+    end
+
+    x1(xi1) = mul(get_basis, xi1, x1_)
+    dx1(xi1) = mul(get_dbasis, xi1, x1_)
+    n1(xi1) = mul(get_basis, xi1, n1_)
+    dn1(xi1) = mul(get_dbasis, xi1, n1_)
     cross2(a, b) = cross([a; 0], [b; 0])[3]
     R(xi1) = cross2(x1(xi1)-x2, n1(xi1))
     dR(xi1) = cross2(dx1(xi1), n1(xi1)) + cross2(x1(xi1)-x2, dn1(xi1))
@@ -62,12 +68,12 @@ function project_from_master_to_slave{E<:MortarElements2D}(
 
 end
 
-function project_from_slave_to_master{E<:MortarElements2D}(
-    master_element::Element{E}, x1::Vector, n1::Vector, x2_::DVTI;
+function project_from_slave_to_master_ad{E<:MortarElements2D}(
+    master_element::Element{E}, x1, n1, x2_;
     tol=1.0e-10, max_iterations=20)
 
-    x2(xi2) = vec(get_basis(master_element, [xi2], time))*x2_
-    dx2(xi2) = vec(get_dbasis(master_element, [xi2], time))*x2_
+    x2(xi2) = interpolate(vec(get_basis(master_element, [xi2], time)), x2_)
+    dx2(xi2) = interpolate(vec(get_dbasis(master_element, [xi2], time)), x2_)
     cross2(a, b) = cross([a; 0], [b; 0])[3]
     R(xi2) = cross2(x2(xi2)-x1, n1)
     dR(xi2) = cross2(dx2(xi2), n1)
@@ -119,8 +125,7 @@ function assemble!(problem::Problem{Contact}, time::Float64,
             push!(S, conn...)
             gdofs = get_gdofs(element, field_dim)
             X_el = element("geometry", time)
-            u_el = Field(Vector[u[:,i] for i in conn])
-            x_el = X_el + u_el
+            x_el = tuple( (X_el[i] + u[:,j] for (i,j) in enumerate(conn))... )
             #=
             for ip in get_integration_points(element, 3)
                 dN = get_dbasis(element, ip, time)
@@ -157,10 +162,10 @@ function assemble!(problem::Problem{Contact}, time::Float64,
 
             slave_element_nodes = get_connectivity(slave_element)
             X1 = slave_element("geometry", time)
-            u1 = Field(Vector[u[:,i] for i in slave_element_nodes])
-            x1 = X1 + u1
-            la1 = Field(Vector[la[:,i] for i in slave_element_nodes])
-            n1 = Field(Vector[normals[:,i] for i in slave_element_nodes])
+            u1 = ((u[:,i] for i in slave_element_nodes)...)
+            x1 = ((Xi+ui for (Xi,ui) in zip(X1,u1))...)
+            la1 = ((la[:,i] for i in slave_element_nodes)...)
+            n1 = ((normals[:,i] for i in slave_element_nodes)...)
             nnodes = size(slave_element, 2)
 
             # construct dual basis
@@ -170,12 +175,12 @@ function assemble!(problem::Problem{Contact}, time::Float64,
 
                 master_element_nodes = get_connectivity(master_element)
                 X2 = master_element("geometry", time)
-                u2 = Field(Vector[u[:,i] for i in master_element_nodes])
-                x2 = X2 + u2
+                u2 = ((u[:,i] for i in master_element_nodes)...)
+                x2 = ((Xi+ui for (Xi,ui) in zip(X2,u2))...)
 
                 # calculate segmentation: we care only about endpoints
-                xi1a = project_from_master_to_slave(slave_element, x1, n1, x2[1])
-                xi1b = project_from_master_to_slave(slave_element, x1, n1, x2[2])
+                xi1a = project_from_master_to_slave_ad(slave_element, field(x1), field(n1), x2[1])
+                xi1b = project_from_master_to_slave_ad(slave_element, field(x1), field(n1), x2[2])
                 xi1 = clamp.([xi1a; xi1b], -1.0, 1.0)
                 l = 1/2*abs(xi1[2]-xi1[1])
                 isapprox(l, 0.0) && continue # no contribution in this master element
@@ -200,8 +205,8 @@ function assemble!(problem::Problem{Contact}, time::Float64,
 
                 master_element_nodes = get_connectivity(master_element)
                 X2 = master_element("geometry", time)
-                u2 = Field(Vector[u[:,i] for i in master_element_nodes])
-                x2 = X2 + u2
+                u2 = ((u[:,i] for i in master_element_nodes)...)
+                x2 = ((Xi+ui for (Xi,ui) in zip(X2,u2))...)
 
                 #x1_midpoint = 1/2*(x1[1]+x1[2])
                 #x2_midpoint = 1/2*(x2[1]+x2[2])
@@ -209,8 +214,8 @@ function assemble!(problem::Problem{Contact}, time::Float64,
                 #distance > props.maximum_distance && continue
 
                 # calculate segmentation: we care only about endpoints
-                xi1a = project_from_master_to_slave(slave_element, x1, n1, x2[1])
-                xi1b = project_from_master_to_slave(slave_element, x1, n1, x2[2])
+                xi1a = project_from_master_to_slave_ad(slave_element, field(x1), field(n1), x2[1])
+                xi1b = project_from_master_to_slave_ad(slave_element, field(x1), field(n1), x2[2])
                 xi1 = clamp.([xi1a; xi1b], -1.0, 1.0)
                 l = 1/2*abs(xi1[2]-xi1[1])
                 isapprox(l, 0.0) && continue # no contribution in this master element
@@ -229,15 +234,15 @@ function assemble!(problem::Problem{Contact}, time::Float64,
                     xi = ip.coords[1]
                     xi_s = dot([1/2*(1-xi); 1/2*(1+xi)], xi1)
                     N1 = vec(get_basis(slave_element, xi_s, time))
-                    x_s = N1*x1 # coordinate in gauss point
-                    n_s = N1*n1 # normal direction in gauss point
+                    x_s = interpolate(N1, x1) # coordinate in gauss point
+                    n_s = interpolate(N1, n1) # normal direction in gauss point
                     t_s = Q'*n_s # tangent direction in gauss point
-                    xi_m = project_from_slave_to_master(master_element, x_s, n_s, x2)
+                    xi_m = project_from_slave_to_master_ad(master_element, x_s, n_s, x2)
                     N2 = vec(get_basis(master_element, xi_m, time))
-                    x_m = N2*x2
+                    x_m = interpolate(N2, x2)
                     Phi = Ae*N1
 
-                    la_s = Phi*la1 # traction force in gauss point
+                    la_s = interpolate(Phi, la1) # traction force in gauss point
                     gn = -dot(n_s, x_s - x_m) # normal gap
 
                     fc[:,slave_element_nodes] += w*la_s*N1'

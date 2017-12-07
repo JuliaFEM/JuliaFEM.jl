@@ -24,12 +24,12 @@ function get_slave_elements(problem::Problem)
 end
 
 function project_from_master_to_slave{E<:MortarElements2D}(slave_element::Element{E}, x2, time)
-    x1_ = slave_element["geometry"](time)
-    n1_ = slave_element["normal"](time)
-    x1(xi1) = vec(get_basis(slave_element, [xi1], time))*x1_
-    dx1(xi1) = vec(get_dbasis(slave_element, [xi1], time))*x1_
-    n1(xi1) = vec(get_basis(slave_element, [xi1], time))*n1_
-    dn1(xi1) = vec(get_dbasis(slave_element, [xi1], time))*n1_
+    x1_ = slave_element("geometry", time)
+    n1_ = slave_element("normal", time)
+    x1(xi1) = interpolate(vec(get_basis(slave_element, [xi1], time)), x1_)
+    dx1(xi1) = interpolate(vec(get_dbasis(slave_element, [xi1], time)), x1_)
+    n1(xi1) = interpolate(vec(get_basis(slave_element, [xi1], time)), n1_)
+    dn1(xi1) = interpolate(vec(get_dbasis(slave_element, [xi1], time)), n1_)
     R(xi1) = cross2(x1(xi1)-x2, n1(xi1))
     dR(xi1) = cross2(dx1(xi1), n1(xi1)) + cross2(x1(xi1)-x2, dn1(xi1))
     xi1 = nothing
@@ -55,9 +55,9 @@ function project_from_master_to_slave{E<:MortarElements2D}(slave_element::Elemen
 end
 
 function project_from_slave_to_master{E<:MortarElements2D}(master_element::Element{E}, x1, n1, time)
-    x2_ = master_element["geometry"](time)
-    x2(xi2) = vec(get_basis(master_element, [xi2], time))*x2_
-    dx2(xi2) = vec(get_dbasis(master_element, [xi2], time))*x2_
+    x2_ = master_element("geometry", time)
+    x2(xi2) = interpolate(vec(get_basis(master_element, [xi2], time)), x2_)
+    dx2(xi2) = interpolate(vec(get_dbasis(master_element, [xi2], time)), x2_)
     cross2(a, b) = cross([a; 0], [b; 0])[3]
     R(xi2) = cross2(x2(xi2)-x1, n1)
     dR(xi2) = cross2(dx2(xi2), n1)
@@ -173,11 +173,11 @@ function assemble!(problem::Problem{Mortar}, time::Float64, ::Type{Val{1}}, ::Ty
                 N1 = vec(get_basis(slave_element, xi_s, time))
                 Phi = Ae*N1
                 # project gauss point from slave element to master element in direction n_s
-                X_s = N1*X1 # coordinate in gauss point
-                n_s = N1*n1 # normal direction in gauss point
+                X_s = interpolate(N1, X1) # coordinate in gauss point
+                n_s = interpolate(N1, n1) # normal direction in gauss point
                 xi_m = project_from_slave_to_master(master_element, X_s, n_s, time)
                 N2 = vec(get_basis(master_element, xi_m, time))
-                X_m = N2*X2
+                X_m = interpolate(N2, X2)
                 De += w*Phi*N1'
                 Me += w*Phi*N2'
                 if props.adjust
@@ -187,8 +187,8 @@ function assemble!(problem::Problem{Mortar}, time::Float64, ::Type{Val{1}}, ::Ty
                     norm(mean(X1) - X2[2]) / norm(X1[2] - X1[1]) < props.distval || continue
                     u1 = slave_element("displacement", time)
                     u2 = master_element("displacement", time)
-                    x_s = X_s + N1*u1
-                    x_m = X_m + N2*u2
+                    x_s = X_s + interpolate(N1, u1)
+                    x_m = X_m + interpolate(N2, u2)
                     ge += w*vec((x_m-x_s)*Phi')
                 end
             end

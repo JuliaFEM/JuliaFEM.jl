@@ -154,14 +154,23 @@ function get_polygon_clip{T}(xs::Vector{T}, xm::Vector{T}, n::T)
 end
 
 """ Project some vertex p to surface of element E using Newton's iterations. """
-function project_vertex_to_surface{E}(p::Vector, x0::Vector, n0::Vector,
-                                      element::Element{E}, x::DVTI, time::Real;
-                                      max_iterations::Int=10, iter_tol::Float64=1.0e-6)
+function project_vertex_to_surface{E}(p, x0, n0,
+                                      element::Element{E}, x, time;
+                                      max_iterations=10, iter_tol=1.0e-6)
     basis(xi) = get_basis(element, xi, time)
-    dbasis(xi) = get_dbasis(element, xi, time)
+    function dbasis(xi)
+        return get_dbasis(element, xi, time)
+    end
     nnodes = length(element)
-    f(theta) = basis(theta[1:2])*x - theta[3]*n0 - p
-    L(theta) = inv3([dbasis(theta[1:2])*x -n0])
+    mul(a,b) = sum((a[:,i]*b[i]')' for i=1:length(b))
+
+    function f(theta)
+        b = [basis(theta[1:2])*collect(x)...;]
+        b = b - theta[3]*n0 - p
+        return b
+    end
+
+    L(theta) = inv3([mul(dbasis(theta[1:2]), x) -n0])
     theta = zeros(3)
     dtheta = zeros(3)
     for i=1:max_iterations
@@ -371,8 +380,8 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
     xi = get_mean_xi(slave_element)
     first_slave_element && debug("midpoint xi = $xi")
     N = vec(get_basis(slave_element, xi, time))
-    x0 = N*X1
-    n0 = N*n1
+    x0 = interpolate(N, X1)
+    n0 = interpolate(N, n1)
     S = Vector[project_vertex_to_auxiliary_plane(X1[i], x0, n0) for i=1:nsl]
 
     master_elements = slave_element("master elements", time)
@@ -412,7 +421,7 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
             all_cells = get_cells(P, C0)
             for cell in all_cells
                 virtual_element = Element(Tri3, Int[])
-                update!(virtual_element, "geometry", cell)
+                update!(virtual_element, "geometry", tuple(cell...))
                 for ip in get_integration_points(virtual_element, 3)
                     detJ = virtual_element(ip, time, Val{:detJ})
                     w = ip.weight*detJ
@@ -476,7 +485,7 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
         all_cells = get_cells(P, C0)
         for cell in all_cells
             virtual_element = Element(Tri3, Int[])
-            virtual_element.fields["geometry"] = DVTI(cell)
+            update!(virtual_element, "geometry", tuple(cell...))
 
             # 5. loop integration point of integration cell
             for ip in get_integration_points(virtual_element, 3)
@@ -499,8 +508,8 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
                 if props.adjust && haskey(slave_element, "displacement") && haskey(master_element, "displacement")
                     u1 = slave_element("displacement", time)
                     u2 = master_element("displacement", time)
-                    x_s = N1*(X1+u1)
-                    x_m = N2*(X2+u2)
+                    x_s = interpolate(N1, map(+,X1,u1))
+                    x_m = interpolate(N2, map(+,X2,u2))
                     ge += w*vec((x_m-x_s)*Phi')
                 end
                 area += w
@@ -593,8 +602,8 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
             xi = get_mean_xi(sub_slave_element)
             first_slave_element && debug("midpoint xi = $xi")
             N = vec(get_basis(sub_slave_element, xi, time))
-            x0 = N*X1
-            n0 = N*n1
+            x0 = interpolate(N, X1)
+            n0 = interpolate(N, n1)
         
             # project slave nodes to auxiliary plane
             S = Vector[project_vertex_to_auxiliary_plane(X1[i], x0, n0) for i=1:nsl]
@@ -633,7 +642,7 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
                     all_cells = get_cells(P, C0)
                     for cell in all_cells
                         virtual_element = Element(Tri3, Int[])
-                        update!(virtual_element, "geometry", cell)
+                        update!(virtual_element, "geometry", tuple(cell...))
                         for ip in get_integration_points(virtual_element, 3)
                             x_gauss = virtual_element("geometry", ip, time)
                             xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, Xs, time)
@@ -676,8 +685,8 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
         xi = get_mean_xi(sub_slave_element)
         first_slave_element && debug("midpoint xi = $xi")
         N = vec(get_basis(sub_slave_element, xi, time))
-        x0 = N*X1
-        n0 = N*n1
+        x0 = interpolate(N, X1)
+        n0 = interpolate(N, n1)
     
         # project slave nodes to auxiliary plane
         S = Vector[project_vertex_to_auxiliary_plane(X1[i], x0, n0) for i=1:nsl]
@@ -736,7 +745,7 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
                 all_cells = get_cells(P, C0)
                 for cell in all_cells
                     virtual_element = Element(Tri3, Int[])
-                    update!(virtual_element, "geometry", cell)
+                    update!(virtual_element, "geometry", tuple(cell...))
 
                     # 5. loop integration point of integration cell
                     for ip in get_integration_points(virtual_element, 3)
@@ -758,8 +767,8 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
                         if props.adjust && haskey(slave_element, "displacement") && haskey(master_element, "displacement")
                             u1 = slave_element("displacement", time)
                             u2 = master_element("displacement", time)
-                            xs = N1*(Xs+u1)
-                            xm = N2*(Xm+u2)
+                            xs = interpolate(N1, map(+,Xs,u1))
+                            xm = interpolate(N2, map(+,Xm,u2))
                             ge += w*vec((xm-xs)*Phi')
                         end
                         area += w

@@ -327,7 +327,7 @@ function update_xdmf!(solver::Solver{Modal})
 
     elcon_arrays  = Dict()
     @timeit "create topology arrays" for element_type in element_types
-        elements = filter_by_element_type(element_type, all_elements)
+        elements = collect(filter_by_element_type(element_type, all_elements))
         nelements = length(elements)
         eldim = length(element_type)
         element_conn = zeros(Int, eldim, nelements)
@@ -384,7 +384,7 @@ function update_xdmf!(solver::Solver{Modal})
 
         for element_type in element_types
             timeit("save topology of element type $element_type") do
-                elements = filter_by_element_type(element_type, all_elements)
+                elements = collect(filter_by_element_type(element_type, all_elements))
                 nelements = length(elements)
                 element_ids = map(get_element_id, elements)
                 element_conn = elcon_arrays[element_type]

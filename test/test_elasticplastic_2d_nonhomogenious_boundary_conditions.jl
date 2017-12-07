@@ -5,7 +5,8 @@ using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Testing
 
-# @testset "2d nonlinear elasticity: test nonhomogeneous boundary conditions and stress calculation" begin
+#=
+@testset "2d nonlinear elasticity: test nonhomogeneous boundary conditions and stress calculation" begin
 
     # field problem
     block = Problem(Elasticity, "BLOCK", 2)
@@ -55,5 +56,7 @@ using JuliaFEM.Testing
 
     u3 = reshape(block.assembly.u, 2, 4)[:, 3]
     info("u3 = $u3")
-    #@test isapprox(u3, u3_expected, atol=1.0e-5)
-# end
+    @test isapprox(u3, u3_expected, atol=1.0e-5)
+end
+
+=#
