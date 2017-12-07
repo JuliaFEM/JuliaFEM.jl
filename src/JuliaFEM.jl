@@ -10,14 +10,12 @@ module JuliaFEM
 
 using FEMBase
 using FEMBase: SparseMatrixCOO, SparseVectorCOO, Node, BasisInfo,
-               Discrete, Variable, TimeVariant, TimeInvariant, Field,
-               DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment,
                IP, AbstractProblem, IntegrationPoint
 using FEMBase: is_field_problem, is_boundary_problem, get_elements,
                get_connectivity, assemble_prehook!, assemble_posthook!,
                get_parent_field_name, get_reference_coordinates,
                get_assembly, get_nonzero_rows, get_nonzero_columns,
-               eval_basis!, get_basis, get_dbasis, grad!, get_dualbasis,
+               eval_basis!, get_basis, get_dbasis, grad!,
                assemble_mass_matrix!, get_local_coordinates, inside,
                get_element_type, filter_by_element_type, get_element_id,
                optimize!, resize_sparse, resize_sparsevec
