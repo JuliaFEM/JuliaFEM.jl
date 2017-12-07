@@ -108,8 +108,8 @@ function test_wedge_sphere(model, u_CA, S_CA)
     solver = LinearSolver(body, bc, lo)
     solver()
 
-    X = lo("geometry")
-    u = lo("displacement")
+    X = lo("geometry", 0.0)
+    u = lo("displacement", 0.0)
     nids = sort(collect(keys(X)))
     umag = Float64[norm(u[id]) for id in nids]
     um = mean(umag)

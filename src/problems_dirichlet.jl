@@ -15,6 +15,21 @@ function Dirichlet()
     Dirichlet(:incremental, false, false, 1)
 end
 
+""" Return dual basis transformation matrix Ae. """		
+function get_dualbasis(element::Element, time::Float64, order=1)		
+    nnodes = length(element)		
+    De = zeros(nnodes, nnodes)		
+    Me = zeros(nnodes, nnodes)		
+    for ip in get_integration_points(element, order)		
+        detJ = element(ip, time, Val{:detJ})		
+        w = ip.weight*detJ		
+        N = element(ip, time)		
+        De += w*diagm(vec(N))		
+        Me += w*N'*N		
+    end		
+    return De, Me, De*inv(Me)		
+end
+
 function get_formulation_type(problem::Problem{Dirichlet})
     return problem.properties.formulation
 end
