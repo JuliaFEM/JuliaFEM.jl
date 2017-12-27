@@ -1,5 +1,5 @@
 julia 0.6
-FEMBase
+FEMBase 0.0 0.1-
 ForwardDiff
 LightXML 0.4
 HDF5 0.7
