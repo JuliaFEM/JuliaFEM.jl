@@ -80,7 +80,7 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{1}}, ::T
         la1 = slave_element("lambda", time)
         n1 = slave_element("normal", time)
         t1 = slave_element("tangent", time)
-        x1 = X1 + u1
+        x1 = map(+, X1, u1)
         
         contact_area = 0.0
         contact_error = 0.0
@@ -116,7 +116,7 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{1}}, ::T
             nm = length(master_element)
             X2 = master_element("geometry", time)
             u2 = master_element("displacement", time)
-            x2 = X2 + u2
+            x2 = map(+, X2, u2)
             
             # 3.3. loop integration points of one integration segment and calculate
             # local mortar matrices
@@ -136,20 +136,20 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{1}}, ::T
                 Phi = Ae*N1
 
                 # project gauss point from slave element to master element in direction n_s
-                X_s = N1*X1 # coordinate in gauss point
-                n_s = N1*n1 # normal direction in gauss point
-                t_s = N1*t1 # tangent condition in gauss point
+                X_s = interpolate(N1, X1) # coordinate in gauss point
+                n_s = interpolate(N1, n1) # normal direction in gauss point
+                t_s = interpolate(N1, t1) # tangent condition in gauss point
                 n_s /= norm(n_s)
                 t_s /= norm(t_s)
                 xi_m = project_from_slave_to_master(master_element, X_s, n_s, time)
                 N2 = vec(get_basis(master_element, xi_m, time))
-                X_m = N2*X2
+                X_m = interpolate(N2, X2)
 
-                u_s = N1*u1
-                u_m = N2*u2
-                x_s = X_s + u_s
-                x_m = X_m + u_m
-                la_s = Phi*la1
+                u_s = interpolate(N1, u1)
+                u_m = interpolate(N2, u2)
+                x_s = map(+, X_s, u_s)
+                x_m = map(+, X_m, u_m)
+                la_s = interpolate(Phi, la1)
 
                 # virtual work
                 De += w*Phi*N1'

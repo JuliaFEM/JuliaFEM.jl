@@ -14,7 +14,7 @@ type Solver{S<:AbstractSolver}
     u :: Vector{Float64}
     la :: Vector{Float64}
     alpha :: Float64             # generalized alpha time integration coefficient
-    fields :: Dict{AbstractString, Field}
+    fields :: Dict{String, AbstractField}
     properties :: S
 end
 
@@ -314,9 +314,9 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
     end
     
     if !haskey(solver, "fint")
-        solver.fields["fint"] = Field(time => f)
+        solver.fields["fint"] = field(solver.time => f)
     else
-        update!(solver.fields["fint"], time => f)
+        update!(solver.fields["fint"], solver.time => f)
     end
 
     fint = solver.fields["fint"]
@@ -327,7 +327,7 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
         debug("Using generalized-α time integration, α=$alpha")
         K = (1-alpha)*K
         C1 = (1-alpha)*C1
-        f = (1-alpha)*f + alpha*fint[end-1].data
+        f = (1-alpha)*f + alpha*fint.data[end-1].second
     end
 
     ndofs = solver.ndofs

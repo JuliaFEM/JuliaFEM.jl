@@ -5,14 +5,14 @@ using ForwardDiff
 
 # forwarddiff version of mesh tying in 2d
 
-function project_from_master_to_slave{E<:MortarElements2D}(
-    slave_element::Element{E}, x1_::DVTI, n1_::DVTI, x2::Vector, time::Float64;
+function project_from_master_to_slave_ad{E<:MortarElements2D}(
+    slave_element::Element{E}, x1_, n1_, x2, time;
     tol=1.0e-10, max_iterations=20)
 
-    x1(xi1) = vec(get_basis(slave_element, [xi1], time))*x1_
-    dx1(xi1) = vec(get_dbasis(slave_element, [xi1], time))*x1_
-    n1(xi1) = vec(get_basis(slave_element, [xi1], time))*n1_
-    dn1(xi1) = vec(get_dbasis(slave_element, [xi1], time))*n1_
+    x1(xi1) = interpolate(vec(get_basis(slave_element, [xi1], time)), x1_)
+    dx1(xi1) = interpolate(vec(get_dbasis(slave_element, [xi1], time)), x1_)
+    n1(xi1) = interpolate(vec(get_basis(slave_element, [xi1], time)), n1_)
+    dn1(xi1) = interpolate(vec(get_dbasis(slave_element, [xi1], time)), n1_)
     cross2(a, b) = cross([a; 0], [b; 0])[3]
     R(xi1) = cross2(x1(xi1)-x2, n1(xi1))
     dR(xi1) = cross2(dx1(xi1), n1(xi1)) + cross2(x1(xi1)-x2, dn1(xi1))
@@ -37,12 +37,12 @@ function project_from_master_to_slave{E<:MortarElements2D}(
 
 end
 
-function project_from_slave_to_master{E<:MortarElements2D}(
-    master_element::Element{E}, x1::Vector, n1::Vector, x2_::DVTI, time::Float64;
+function project_from_slave_to_master_ad{E<:MortarElements2D}(
+    master_element::Element{E}, x1, n1, x2_, time;
     tol=1.0e-10, max_iterations=20)
 
-    x2(xi2) = vec(get_basis(master_element, [xi2], time))*x2_
-    dx2(xi2) = vec(get_dbasis(master_element, [xi2], time))*x2_
+    x2(xi2) = interpolate(vec(get_basis(master_element, [xi2], time)), x2_)
+    dx2(xi2) = interpolate(vec(get_dbasis(master_element, [xi2], time)), x2_)
     cross2(a, b) = cross([a; 0], [b; 0])[3]
     R(xi2) = cross2(x2(xi2)-x1, n1)
     dR(xi2) = cross2(dx2(xi2), n1)
@@ -93,8 +93,8 @@ function assemble!(problem::Problem{Mortar}, time::Float64, ::Type{Val{1}}, ::Ty
             conn = get_connectivity(element)
             push!(S, conn...)
             X1 = element("geometry", time)
-            u1 = Field([u[:,i] for i in conn])
-            x1 = X1 + u1
+            u1 = ((u[:,i] for i in conn)...)
+            x1 = map(+, X1, u1)
             dN = get_dbasis(element, [0.0], time)
             tangent = sum([kron(dN[:,i], x1[i]') for i=1:length(x1)])
             for nid in conn
@@ -123,11 +123,11 @@ function assemble!(problem::Problem{Mortar}, time::Float64, ::Type{Val{1}}, ::Ty
 
             nsl = length(slave_element)
             slave_element_nodes = get_connectivity(slave_element)
-            X1 = slave_element["geometry"](time)
-            u1 = Field(Vector[u[:,i] for i in slave_element_nodes])
-            x1 = X1 + u1
-            la1 = Field(Vector[la[:,i] for i in slave_element_nodes])
-            n1 = Field(Vector[normals[:,i] for i in slave_element_nodes])
+            X1 = slave_element("geometry", time)
+            u1 = ((u[:,i] for i in slave_element_nodes)...)
+            x1 = map(+, X1, u1)
+            la1 = ((la[:,i] for i in slave_element_nodes)...)
+            n1 = ((normals[:,i] for i in slave_element_nodes)...)
 
 
             # 3. loop all master elements
@@ -136,12 +136,12 @@ function assemble!(problem::Problem{Mortar}, time::Float64, ::Type{Val{1}}, ::Ty
                 nm = length(master_element)
                 master_element_nodes = get_connectivity(master_element)
                 X2 = master_element("geometry", time)
-                u2 = Field(Vector[u[:,i] for i in master_element_nodes])
-                x2 = X2 + u2
+                u2 = ((u[:,i] for i in master_element_nodes)...)
+                x2 = map(+, X2, u2)
 
                 # 3.1 calculate segmentation
-                xi1a = project_from_master_to_slave(slave_element, x1, n1, x2[1], time)
-                xi1b = project_from_master_to_slave(slave_element, x1, n1, x2[2], time)
+                xi1a = project_from_master_to_slave_ad(slave_element, x1, n1, x2[1], time)
+                xi1b = project_from_master_to_slave_ad(slave_element, x1, n1, x2[2], time)
 #               xi1a = project_from_master_to_slave(slave_element, X2[1], time)
 #               xi1b = project_from_master_to_slave(slave_element, X2[2], time)
                 xi1 = clamp.([xi1a; xi1b], -1.0, 1.0)
@@ -181,20 +181,20 @@ function assemble!(problem::Problem{Mortar}, time::Float64, ::Type{Val{1}}, ::Ty
                     N1 = vec(get_basis(slave_element, xi_s, time))
                     Phi = Ae*N1
                     # project gauss point from slave element to master element in direction n_s
-                    x_s = N1*x1 # coordinate in gauss point
-                    n_s = N1*n1 # normal direction in gauss point
+                    x_s = interpolate(N1, x1) # coordinate in gauss point
+                    n_s = interpolate(N1, n1) # normal direction in gauss point
                     #xi_m = project_from_slave_to_master(master_element, X_s, n_s, time)
-                    xi_m = project_from_slave_to_master(master_element, x_s, n_s, x2, time)
+                    xi_m = project_from_slave_to_master_ad(master_element, x_s, n_s, x2, time)
                     N2 = vec(get_basis(master_element, xi_m, time))
-                    x_m = N2*x2 
+                    x_m = interpolate(N2, x2) 
 
-                    la_s = Phi*la1
+                    la_s = interpolate(Phi, la1)
                     gn = dot(n_s, x_s-x_m)
 
-                    u_s = N1*u1
-                    u_m = N2*u2
-                    X_s = N1*X1
-                    X_m = N2*X2
+                    u_s = interpolate(N1, u1)
+                    u_m = interpolate(N2, u2)
+                    X_s = interpolate(N1, X1)
+                    X_m = interpolate(N2, X2)
 
                     fc[:,slave_element_nodes] += w*la_s*N1'
                     fc[:,master_element_nodes] -= w*la_s*N2'
