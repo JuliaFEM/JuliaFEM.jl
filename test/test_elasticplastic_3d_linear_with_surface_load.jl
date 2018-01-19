@@ -5,7 +5,9 @@ using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Testing
 
-#@testset "test continuum 3d linear elasticity with surface load" begin
+#=
+
+@testset "test continuum 3d linear elasticity with surface load" begin
     nodes = Dict{Int64, Node}(
     1 => [0.0, 0.0, 0.0],
     2 => [1.0, 0.0, 0.0],
@@ -58,8 +60,10 @@ using JuliaFEM.Testing
     disp = element("displacement", [1.0, 1.0, 1.0], 1.0)
     info("displacement at tip: $disp")
     u_expected = 2.0 * [-1/3, -1/3, 1.0]
-    # @test isapprox(disp, u_expected)
-#end
+     @test isapprox(disp, u_expected)
+end
+
+=#
 
 # function solve_rod_model_elasticity(eltype)
 #     fn = @__DIR__() * "/testdata/rod_short.med"

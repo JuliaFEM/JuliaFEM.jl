@@ -35,7 +35,7 @@ using JuliaFEM.Testing
 
     T_fem = Float64[]
     T_acc = Float64[]
-    for (nid, X) in field("geometry")
+    for (nid, X) in field("geometry", 0.0)
         push!(T_fem, field("temperature", X)[1])
         push!(T_acc, 1.0 + X[1]^2 + 2*X[2]^2)
     end

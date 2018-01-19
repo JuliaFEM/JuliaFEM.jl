@@ -83,13 +83,13 @@ function create_contact_segmentation(slave_element, master_elements, x0, n0, tim
     result = []
     x1 = slave_element("geometry", time)
     if deformed
-        x1 += slave_element("displacement", time)
+        x1 = map(+, x1, slave_element("displacement", time))
     end
     S = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in x1]
     for master_element in master_elements
         x2 = master_element("geometry", time)
         if deformed
-            x2 += master_element("displacement", time)
+            x2 = map(+, x2, master_element("displacement", time))
         end
         M = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in x2]
         P = get_polygon_clip(S, M, n0)
@@ -115,7 +115,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
     nsl = length(slave_element)
     X1 = slave_element("geometry", time)
     u1 = slave_element("displacement", time)
-    x1 = X1 + u1
+    x1 = map(+, X1, u1)
     n1 = slave_element("normal", time)
     la = slave_element("lambda", time)
 
@@ -124,8 +124,8 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
     # project slave nodes to auxiliary plane (x0, Q)
     xi = get_mean_xi(slave_element)
     N = vec(get_basis(slave_element, xi, time))
-    x0 = N*X1
-    n0 = N*n1
+    x0 = interpolate(N, X1)
+    n0 = interpolate(N, n1)
 
     # create contact segmentation
     segmentation = create_contact_segmentation(slave_element, slave_element("master elements", time), x0, n0, time)
@@ -147,7 +147,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
             # loop integration cells
             for cell in get_cells(P, C0)
                 virtual_element = Element(Tri3, Int[])
-                update!(virtual_element, "geometry", cell)
+                update!(virtual_element, "geometry", tuple(cell...))
                 for ip in get_integration_points(virtual_element, 3)
                     detJ = virtual_element(ip, time, Val{:detJ})
                     w = ip.weight*detJ
@@ -173,7 +173,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
         nm = length(master_element)
         X2 = master_element("geometry", time)
         u2 = master_element("displacement", time)
-        x2 = X2 + u2
+        x2 = map(+, X2, u2)
 
         De = zeros(nsl, nsl)
         Me = zeros(nsl, nm)
@@ -183,7 +183,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
         # loop integration cells
         for cell in get_cells(P, C0)
             virtual_element = Element(Tri3, Int[])
-            update!(virtual_element, "geometry", cell)
+            update!(virtual_element, "geometry", tuple(cell...))
             # loop integration point of integration cell
             for ip in get_integration_points(virtual_element, 3)
 
@@ -202,8 +202,8 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
                 De += w*Phi*N1'
                 Me += w*Phi*N2'
                 
-                x_s = N1*(X1+u1)
-                x_m = N2*(X2+u2)
+                x_s = interpolate(N1, map(+,X1,u1))
+                x_m = interpolate(N2, map(+,X2,u2))
                 ge += w*vec((x_m-x_s)*Phi')
             
             end # integration points done
@@ -282,8 +282,8 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
             # create auxiliary plane
             xi = get_mean_xi(sub_slave_element)
             N = vec(get_basis(sub_slave_element, xi, time))
-            x0 = N*X1
-            n0 = N*n1
+            x0 = interpolate(N, X1)
+            n0 = interpolate(N, n1)
 
             # project slave nodes to auxiliary plane
             S = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in X1]
@@ -323,7 +323,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
                     # 4. loop integration cells
                     for cell in get_cells(P, C0)
                         virtual_element = Element(Tri3, Int[])
-                        update!(virtual_element, "geometry", cell)
+                        update!(virtual_element, "geometry", tuple(cell...))
                         for ip in get_integration_points(virtual_element, 3)
                             detJ = virtual_element(ip, time, Val{:detJ})
                             w = ip.weight*detJ
@@ -358,8 +358,8 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
         # create auxiliary plane
         xi = get_mean_xi(sub_slave_element)
         N = vec(get_basis(sub_slave_element, xi, time))
-        x0 = N*X1
-        n0 = N*n1
+        x0 = interpolate(N, X1)
+        n0 = interpolate(N, n1)
             
         # project slave nodes to auxiliary plane
         S = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in X1]
@@ -406,7 +406,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
                 # 4. loop integration cells
                 for cell in get_cells(P, C0)
                     virtual_element = Element(Tri3, Int[])
-                    update!(virtual_element, "geometry", cell)
+                    update!(virtual_element, "geometry", tuple(cell...))
 
                     # 5. loop integration point of integration cell
                     for ip in get_integration_points(virtual_element, 3)
@@ -429,8 +429,8 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
                
                         us = slave_element("displacement", time)
                         um = master_element("displacement", time)
-                        xs = N1*(Xs+us)
-                        xm = N2*(Xs+um)
+                        xs = interpolate(N1, map(+,Xs,us))
+                        xm = interpolate(N2, map(+,Xs,um))
                         ge += w*vec((xm-xs)*Phi')
             
                     end # integration points done

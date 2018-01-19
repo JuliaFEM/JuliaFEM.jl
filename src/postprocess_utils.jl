@@ -69,7 +69,7 @@ Return node ids + vector of values
 function get_nodal_vector(elements::Vector, field_name::AbstractString, time::Float64)
     f = Dict()
     for element in elements
-        for (c, v) in zip(get_connectivity(element), element[field_name](time))
+        for (c, v) in zip(get_connectivity(element), element(field_name, time))
             if haskey(f, c)
                 @assert isapprox(f[c], v)
             end

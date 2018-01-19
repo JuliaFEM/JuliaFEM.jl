@@ -4,7 +4,8 @@
 # http://ahojukka5.github.io/posts/finite-element-solution-for-one-element-problem/
 
 using JuliaFEM
-using JuliaFEM.Testing
+using JuliaFEM: add_elements!
+using Base.Test
 
 @testset "test 2d linear elasticity local matrices" begin
     element = Element(Quad4, [1, 2, 3, 4])
@@ -20,8 +21,9 @@ using JuliaFEM.Testing
         4 => [0.0, 0.0])
     update!(element, "geometry", X)
     update!(element, "displacement", u)
-    update!(element, "youngs modulus" =>  288.0, "poissons ratio" => 1/3)
-    update!(element, "displacement load", DCTI([4.0, 8.0]))
+    update!(element, "youngs modulus", 288.0)
+    update!(element, "poissons ratio", 1/3)
+    update!(element, "displacement load", [4.0, 8.0])
 
     problem = Problem(Elasticity, "[0x1] x [0x1] block", 2)
     update!(problem.properties, "formulation" => "plane_stress")

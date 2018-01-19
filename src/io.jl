@@ -429,7 +429,7 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
     info("Xdmf: Saving topology of $nelements elements total, $nelement_types different element types.")
 
     for element_type in element_types
-        elements = filter_by_element_type(element_type, all_elements)
+        elements = collect(filter_by_element_type(element_type, all_elements))
         nelements = length(elements)
         info("Xdmf: $nelements elements of type $element_type")
         sort!(elements, by=get_element_id)
