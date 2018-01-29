@@ -17,10 +17,18 @@ type Modal <: AbstractSolver
     eigvecs :: Matrix
     nev :: Int
     which :: Symbol
+    bc_invertible :: Bool
+    P :: Vector{SparseMatrixCSC}
+    symmetric :: Bool
+    empty_assemblies_before_solution :: Bool
+    dense :: Bool
+    info_matrices :: Bool
+    sigma :: Float64
 end
 
 function Modal(nev=10, which=:SM)
-    solver = Modal(false, Vector(), Matrix(0,0), nev, which)
+    solver = Modal(false, [], Matrix{Float64}(0,0), nev, which,
+                   false, [], true, true, false, false, 0.0)
 end
 
 """ Eliminate Dirichlet boundary condition from matrices K, M. """
@@ -140,31 +148,24 @@ function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
     return true
 end
 
-"""
-Parameters
-----------
-
-sigma
-    Shift stiffness matrix by adding diagonal term, i.e. K_shifted = K + sigma*I
-"""
-function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=true,
-              empty_assemblies_before_solution=true, dense=false,
-              info_matrices=false, sigma=0.0)
+function solve!(solver::Solver{Modal}, time::Float64)
+    problems = get_problems(solver)
+    properties = solver.properties
     info(repeat("-", 80))
     info("Starting natural frequency solver")
-    info("Increment time t=$(round(solver.time, 3))")
+    info("Increment time t=$(round(time, 3))")
     info(repeat("-", 80))
-    initialize!(solver)
 
     @timeit "assemble matrices" begin
-        assemble!(solver; with_mass_matrix=true)
+        assemble!(solver, time; with_mass_matrix=true)
         M, K, Kg, f = get_field_assembly(solver)
-        if solver.properties.geometric_stiffness
+        if properties.geometric_stiffness
             K += Kg
         end
     end
 
     dim = size(K, 1)
+    ndofs = size(K, 1)
 
     nboundary_problems = length(get_boundary_problems(solver))
 
@@ -172,10 +173,12 @@ function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=tru
     M_red = M
 
     @timeit "eliminate boundary conditions" begin
-        if !(P == nothing)
+        if length(properties.P) > 0
             info("Using custom P to make transform K_red = P'*K*P and M_red = P'*M*P")
-            K_red = P'*K_red*P
-            M_red = P'*M_red*P
+            for P in properties.P
+                K_red = P'*K_red*P
+                M_red = P'*M_red*P
+            end
         elseif nboundary_problems != 0
             info("Eliminate boundary conditions from system.")
             for boundary_problem in get_boundary_problems(solver)
@@ -187,7 +190,7 @@ function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=tru
     end
 
     # free up some memory before solution
-    if empty_assemblies_before_solution
+    if properties.empty_assemblies_before_solution
         for problem in get_field_problems(solver)
             empty!(problem.assembly)
         end
@@ -200,30 +203,29 @@ function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=tru
     K_red = K_red[nz,nz]
     M_red = M_red[nz,nz]
 
-    if sigma != 0.0
+    if properties.sigma != 0.0
         info("Adding diagonal term $sigma to stiffness matrix")
     end
 
-    ndofs = solver.ndofs
     props = solver.properties
 
     info("Calculate $(props.nev) eigenvalues...")
 
     tic()
  
-    if symmetric
+    if properties.symmetric
         K_red = 1/2*(K_red + transpose(K_red))
         M_red = 1/2*(M_red + transpose(M_red))
     end
 
-    if info_matrices
+    if properties.info_matrices
         info("is K symmetric? ", issymmetric(K_red))
         info("is M symmetric? ", issymmetric(M_red))
         info("is K positive definite? ", isposdef(K_red))
         info("is M positive definite? ", isposdef(M_red))
     end
 
-    if dense
+    if properties.dense
         K_red = full(K_red)
         M_red = full(M_red)
     end
@@ -253,7 +255,7 @@ function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=tru
             om2 = eigvals(full(K_red))
             info("squared eigenvalues om2 = $om2")
         end
-        if sigma != 0.0
+        if properties.sigma != 0.0
             info("sigma is manually set and did not work, giving up, try increase sigma.")
             rethrow()
         end
@@ -270,7 +272,7 @@ function (solver::Solver{Modal})(; bc_invertible=false, P=nothing, symmetric=tru
             rethrow()
         end
     end
-    
+
     t1 = round(toq(), 2)
     info("Eigenvalues computed in $t1 seconds. Squared eigenvalues: $om2")
 
@@ -297,17 +299,19 @@ end
 
 function update_xdmf!(solver::Solver{Modal})
 
-    if isnull(solver.xdmf)
-        info("update_xdmf: xdmf not attached to solver, not writing file output.")
+    results_writers = get_results_writers(solver)
+    if length(results_writers) == 0
+        info("Xdmf is not attached to solver, not writing output to a file.")
+        info("To write results to Xdmf file, attach Xdmf to Solver, i.e.")
+        info("add_results_writer!(solver, Xdmf(\"results\"))")
         return
     end
-
     if maximum(abs.(imag(solver.properties.eigvals))) > 1.0e-9
         info("Writing imaginary eigenvalues for Xdmf not supported.")
         return
     end
 
-    xdmf = get(solver.xdmf)
+    xdmf = first(results_writers)
 
     @timeit "fetch geometry" X_ = solver("geometry", solver.time)
     node_ids = keys(X_)

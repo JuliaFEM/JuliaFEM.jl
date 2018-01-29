@@ -501,7 +501,16 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
     is_stick = Dict{Int64, Int}()
 
     la = problem.assembly.la
-    ndofs = length(la)
+
+    # FIXME: for matrix operations, we need to know the dimensions of the
+    # final matrices
+    ndofs = 0
+    ndofs = max(ndofs, size(problem.assembly.K, 2))
+    ndofs = max(ndofs, size(problem.assembly.C1, 2))
+    ndofs = max(ndofs, size(problem.assembly.C2, 2))
+    ndofs = max(ndofs, size(problem.assembly.D, 2))
+    ndofs = max(ndofs, size(problem.assembly.g, 2))
+    ndofs = max(ndofs, size(problem.assembly.c, 2))
 
     C1 = sparse(problem.assembly.C1, ndofs, ndofs)
     C2 = sparse(problem.assembly.C2, ndofs, ndofs)

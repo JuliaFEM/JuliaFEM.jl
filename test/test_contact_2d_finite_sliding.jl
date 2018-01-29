@@ -45,6 +45,9 @@ using JuliaFEM.Testing
     contact_master_elements = create_elements(mesh, "UPPER_BOTTOM")
     update!(contact_slave_elements, "master elements", contact_master_elements)
     contact.elements = [contact_master_elements; contact_slave_elements]
+    nnodes = length(mesh.nodes)
+    contact.assembly.u = zeros(2*nnodes)
+    contact.assembly.la = zeros(2*nnodes)
 
     solver = NonlinearSolver(upper, lower, bc_upper, bc_lower, contact)
     solver()

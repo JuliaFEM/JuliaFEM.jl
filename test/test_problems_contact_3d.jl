@@ -69,7 +69,7 @@ end
 
 @testset "small sliding contact patch test, tet4 + standard basis" begin
     solver = get_model(tet4_meshfile)
-    solver.xdmf = Xdmf("contact_sl_lin_disp_results"; overwrite=true)
+    add_results_writer!(solver, Xdmf("contact_sl_lin_disp_results"; overwrite=true))
     interface = solver["LOWER_TO_UPPER"]
     interface.properties.dual_basis = false
     solver()
@@ -91,7 +91,7 @@ end
 
 @testset "small sliding contact patch test, tet4 + dual basis" begin
     solver = get_model(tet4_meshfile)
-    solver.xdmf = Xdmf("contact_dl_lin_disp_results"; overwrite=true)
+    add_results_writer!(solver, Xdmf("contact_dl_lin_disp_results"; overwrite=true))
     interface = solver["LOWER_TO_UPPER"]
     interface.properties.dual_basis = true
     solver()
@@ -106,7 +106,7 @@ end
 
 @testset "small sliding contact patch test, tet10 + standard basis" begin
     solver = get_model(tet10_meshfile)
-    solver.xdmf = Xdmf("contact_sl_quad_disp_results"; overwrite=true)
+    add_results_writer!(solver, Xdmf("contact_sl_quad_disp_results"; overwrite=true))
     interface = solver["LOWER_TO_UPPER"]
     interface.properties.dual_basis = false
     solver()
@@ -121,7 +121,7 @@ end
 
 @testset "small sliding contact patch test, tet10 + dual basis, alpha=0.2" begin
     solver = get_model(tet10_meshfile)
-    solver.xdmf = Xdmf("contact_dl_quad_disp_results"; overwrite=true)
+    add_results_writer!(solver, Xdmf("contact_dl_quad_disp_results"; overwrite=true))
     interface = solver["LOWER_TO_UPPER"]
     interface.properties.dual_basis = true
     interface.properties.alpha = 0.2
