@@ -46,7 +46,7 @@ using JuliaFEM.Testing
     gradT(X) = [2*X[1] 4*X[2]]
     X = [0.5, 0.5]
     gradT1 = gradT(X)
-    gradT2 = field("temperature", X, solver.time, Val{:Grad})
+    gradT2 = field("temperature", X, 0.0, Val{:Grad})
     info("gradT1 = $gradT1, gradT2 = $gradT2")
     # [1.1666666666666625 1.5000000000000018] quite big difference ..?
     @test isapprox(gradT1, gradT2; rtol=25.0e-2)

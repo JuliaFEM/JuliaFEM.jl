@@ -68,7 +68,8 @@ datadir = first(splitext(basename(@__FILE__)))
 
     solver = NonlinearSolver(upper, lower, bc_upper, bc_lower, bc_sym13, bc_sym23, interface)
 
-    solver.xdmf = Xdmf("contact_two_blocks_postprocess"; overwrite=true)
+    xdmf = Xdmf("contact_two_blocks_postprocess"; overwrite=true)
+    add_results_writer!(solver, xdmf)
     solver()
 
     node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 0.0)
