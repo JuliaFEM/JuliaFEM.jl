@@ -38,8 +38,9 @@ using JuliaFEM
     update!(bc.elements[1], "displacement 2", 0.0)
     update!(bc.elements[2], "displacement 1", 0.0)
 
-    solver = Solver(Linear, block, traction, bc)
-    solver()
+    solver = Solver(Linear, "solve 2d linear elasticity problem")
+    add_problems!(solver, [block, traction, bc])
+    solve!(solver, 0.0)
 
     f = 288.0
     g = 576.0

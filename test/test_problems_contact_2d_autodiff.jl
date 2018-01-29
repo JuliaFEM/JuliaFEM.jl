@@ -11,7 +11,7 @@ datadir = first(splitext(basename(@__FILE__)))
 function get_model()
     meshfile = joinpath(datadir, "block_2d.med")
     mesh = aster_read_mesh(meshfile)
-    println(mesh.nodes[1])
+    #error("mesh has $(length(mesh.nodes)) nodes")
 
     upper = Problem(mesh, Elasticity, "UPPER", 2)
     lower = Problem(mesh, Elasticity, "LOWER", 2)
@@ -59,6 +59,8 @@ end
 
     solver = get_model()
     interface = solver["interface"]
+    interface.assembly.u = zeros(48)
+    interface.assembly.la = zeros(48)
     upper = solver["UPPER"]
     lower = solver["LOWER"]
     for body in [upper, lower]
@@ -70,8 +72,7 @@ end
 
     for time in [0.0, 1/3, 2/3, 1.0]
         interface.properties.iteration = 1
-        solver.time = time
-        solver()
+        solve!(solver, time)
     end
 
     node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 1.0)

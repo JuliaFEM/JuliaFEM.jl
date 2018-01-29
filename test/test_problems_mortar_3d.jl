@@ -38,7 +38,7 @@ tet10_meshfile = "test_problems_mortar_3d/tet10.inp"
 
     JuliaFEM.diagnose_interface(interface, 0.0)
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, interface)
-    solver.xdmf = Xdmf("sl_lin_temp_results")
+    add_results_writer!(solver, Xdmf("sl_lin_temp_results"; overwrite=true))
 
     solver()
     
@@ -92,7 +92,7 @@ end
 
     JuliaFEM.diagnose_interface(interface, 0.0)
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, interface)
-    solver.xdmf = Xdmf("dl_lin_temp_results")
+    add_results_writer!(solver, Xdmf("dl_lin_temp_results"; overwrite=true))
 
     solver()
     
@@ -138,7 +138,7 @@ end
 #   JuliaFEM.diagnose_interface(interface, 0.0)
 
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, interface)
-    solver.xdmf = Xdmf("sl_quad_temp_results")
+    add_results_writer!(solver, Xdmf("sl_quad_temp_results"; overwrite=true))
     solver()
     
     node_ids, temperature = get_nodal_vector(interface.elements, "temperature", 0.0)
@@ -185,7 +185,7 @@ end
     interface.properties.alpha = 0.2
 
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, interface)
-    solver.xdmf = Xdmf("dl_quad_temp_results")
+    add_results_writer!(solver, Xdmf("dl_quad_temp_results"; overwrite=true))
     solver()
     
     node_ids, temperature = get_nodal_vector(interface.elements, "temperature", 0.0)
@@ -257,7 +257,7 @@ end
     interface.properties.dual_basis = false
 
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, bc_sym13, bc_sym23, interface)
-    solver.xdmf = Xdmf("sl_lin_disp_results")
+    add_results_writer!(solver, Xdmf("sl_lin_disp_results"; overwrite=true))
     solver()
 
     node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 0.0)
@@ -319,7 +319,7 @@ end
     interface.properties.dual_basis = true
 
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, bc_sym13, bc_sym23, interface)
-    solver.xdmf = Xdmf("dl_lin_disp_results")
+    add_results_writer!(solver, Xdmf("dl_lin_disp_results"; overwrite=true))
     solver()
 
     node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 0.0)
@@ -382,7 +382,7 @@ end
     interface.properties.dual_basis = false
 
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, bc_sym13, bc_sym23, interface)
-    solver.xdmf = Xdmf("sl_quad_disp_results")
+    add_results_writer!(solver, Xdmf("sl_quad_disp_results"; overwrite=true))
     solver()
 
     node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 0.0)
@@ -447,7 +447,7 @@ end
     interface.properties.alpha = 0.2
 
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, bc_sym13, bc_sym23, interface)
-    solver.xdmf = Xdmf("dl_quad_disp_results")
+    add_results_writer!(solver, Xdmf("dl_quad_disp_results"; overwrite=true))
     solver()
 
     node_ids, displacement = get_nodal_vector(interface.elements, "displacement", 0.0)

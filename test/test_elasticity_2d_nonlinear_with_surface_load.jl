@@ -32,9 +32,9 @@ using JuliaFEM.Testing
     update!(bc_elements_bottom, "displacement 2", 0.0)
     push!(bc_sym, bc_elements_left..., bc_elements_bottom...)
 
-    solver = NonlinearSolver("solve block problem")
-    push!(solver, block, bc_sym)
-    solver()
+    solver = Solver(Nonlinear, "solve block problem")
+    add_problems!(solver, [block, bc_sym])
+    solve!(solver, 0.0)
 
     # from code aster
     u3_expected = [-4.92316106779943E-01, 7.96321884292103E-01]

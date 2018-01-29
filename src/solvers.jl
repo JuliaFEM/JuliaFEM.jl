@@ -1,38 +1,21 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-abstract type AbstractSolver end
+const Solver = Analysis
+const AbstractSolver = AbstractAnalysis
 
-type Solver{S<:AbstractSolver}
-    name :: AbstractString       # some descriptive name for problem
-    time :: Float64              # current time
-    problems :: Vector{Problem}
-    norms :: Vector{Tuple}       # solution norms for convergence studies
-    ndofs :: Int                 # number of degrees of freedom in problem
-    xdmf :: Nullable{Xdmf}       # input/output handle
-    initialized :: Bool
-    u :: Vector{Float64}
-    la :: Vector{Float64}
-    alpha :: Float64             # generalized alpha time integration coefficient
-    fields :: Dict{String, AbstractField}
-    properties :: S
-end
-
-
+#=
 function Solver{S<:AbstractSolver}(::Type{S}, name="solver", properties...)
     variant = S(properties...)
     solver = Solver{S}(name, 0.0, [], [], 0, nothing, false, [], [], 0.0, Dict(), variant)
     return solver
 end
+=#
 
 function Solver{S<:AbstractSolver}(::Type{S}, problems::Problem...)
     solver = Solver(S, "$(S)Solver")
     push!(solver.problems, problems...)
     return solver
-end
-
-function get_problems(solver::Solver)
-    return solver.problems
 end
 
 function push!(solver::Solver, problem::Problem)
@@ -88,19 +71,17 @@ function get_field_assembly(solver::Solver)
         append!(fg, problem.assembly.fg)
     end
 
-    if solver.ndofs == 0
-        solver.ndofs = size(K, 1)
-        info("automatically determined problem dimension, ndofs = $(solver.ndofs)")
-    end
+    N = size(K, 1)
 
-    M = sparse(M, solver.ndofs, solver.ndofs)
-    K = sparse(K, solver.ndofs, solver.ndofs)
+    M = sparse(M, N, N)
+    K = sparse(K, N, N)
     if nnz(K) == 0
-        warn("Field assembly seems to be empty. Check that elements are pushed to problem and formulation is correct.")
+        warn("Field assembly seems to be empty. Check that elements are ",
+             "pushed to problem and formulation is correct.")
     end
-    Kg = sparse(Kg, solver.ndofs, solver.ndofs)
-    f = sparse(f, solver.ndofs, 1)
-    fg = sparse(fg, solver.ndofs, 1)
+    Kg = sparse(Kg, N, N)
+    f = sparse(f, N, 1)
+    fg = sparse(fg, N, 1)
 
     return M, K, Kg, f, fg
 end
@@ -149,26 +130,24 @@ Returns
 K, C1, C2, D, f, g :: SparseMatrixCSC
 
 """
-function get_boundary_assembly(solver::Solver)
+function get_boundary_assembly(solver::Solver, N)
 
     check_for_overconstrained_dofs(solver)
 
-    ndofs = solver.ndofs
-    @assert ndofs != 0
-    K = spzeros(ndofs, ndofs)
-    C1 = spzeros(ndofs, ndofs)
-    C2 = spzeros(ndofs, ndofs)
-    D = spzeros(ndofs, ndofs)
-    f = spzeros(ndofs, 1)
-    g = spzeros(ndofs, 1)
+    K = spzeros(N, N)
+    C1 = spzeros(N, N)
+    C2 = spzeros(N, N)
+    D = spzeros(N, N)
+    f = spzeros(N, 1)
+    g = spzeros(N, 1)
     for problem in get_boundary_problems(solver)
         assembly = problem.assembly
-        K_ = sparse(assembly.K, ndofs, ndofs)
-        C1_ = sparse(assembly.C1, ndofs, ndofs)
-        C2_ = sparse(assembly.C2, ndofs, ndofs)
-        D_ = sparse(assembly.D, ndofs, ndofs)
-        f_ = sparse(assembly.f, ndofs, 1)
-        g_ = sparse(assembly.g, ndofs, 1)
+        K_ = sparse(assembly.K, N, N)
+        C1_ = sparse(assembly.C1, N, N)
+        C2_ = sparse(assembly.C2, N, N)
+        D_ = sparse(assembly.D, N, N)
+        f_ = sparse(assembly.f, N, 1)
+        g_ = sparse(assembly.g, N, 1)
         for dof in assembly.removed_dofs
             info("$(problem.name): removing dof $dof from assembly")
             C1_[dof,:] = 0.0
@@ -248,16 +227,17 @@ function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{2}})
 
     A = [K C1'; C2  D]
     b = [f; g]
+    ndofs = size(K, 2)
 
     nz1 = get_nonzero_rows(A)
     nz2 = get_nonzero_columns(A)
     nz1 == nz2 || return false
     
-    x = zeros(2*solver.ndofs)
+    x = zeros(2*ndofs)
     x[nz1] = lufact(A[nz1,nz2]) \ full(b[nz1])
 
-    u[:] = x[1:solver.ndofs]
-    la[:] = x[solver.ndofs+1:end]
+    u[:] = x[1:ndofs]
+    la[:] = x[ndofs+1:end]
 
     return true
 end
@@ -272,14 +252,15 @@ function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{3}})
     A = [K C1'; C2  D]
     b = [f; g]
 
-    nz = ones(2*solver.ndofs)
+    ndofs = size(K, 2)
+    nz = ones(2*ndofs)
     nz[get_nonzero_rows(A)] = 0.0
     A += spdiagm(nz)
 
     x = lufact(A) \ full(b)
 
-    u[:] = x[1:solver.ndofs]
-    la[:] = x[solver.ndofs+1:end]
+    u[:] = x[1:ndofs]
+    la[:] = x[ndofs+1:end]
 
     return true
 end
@@ -296,7 +277,8 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
     # M2, K2, Kg2, f2, fg2, C12, C22, D2, g2 = get_boundary_assembly(solver)
 
     M, K, Kg, f, fg = get_field_assembly(solver)
-    Kb, C1, C2, D, fb, g = get_boundary_assembly(solver)
+    N = size(K, 2)
+    Kb, C1, C2, D, fb, g = get_boundary_assembly(solver, N)
     K = K + Kg + Kb
     f = f + fg + fb
 
@@ -312,7 +294,8 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
         end
         gc()
     end
-    
+ 
+    #=
     if !haskey(solver, "fint")
         solver.fields["fint"] = field(solver.time => f)
     else
@@ -329,8 +312,9 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
         C1 = (1-alpha)*C1
         f = (1-alpha)*f + alpha*fint.data[end-1].second
     end
+    =#
 
-    ndofs = solver.ndofs
+    ndofs = N
     u = zeros(ndofs)
     la = zeros(ndofs)
     is_solved = false
@@ -346,15 +330,15 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
     end
     t1 = round(Base.time()-t0, 2)
     norms = (norm(u), norm(la))
-    push!(solver.norms, norms)
+    #push!(solver.norms, norms)
 
-    solver.u = u
-    solver.la = la
+    #solver.u = u
+    #solver.la = la
 
     info("Solved problems in $t1 seconds using solver $i.")
     info("Solution norms = $norms.")
 
-    return
+    return u, la
 end
 
 """
@@ -367,24 +351,25 @@ standard assembler for them. As a result, each problem.assembly is
 populated with global stiffness matrix, force vector, and, optionally,
 mass matrix.
 """
-function assemble!(solver::Solver; with_mass_matrix=false)
+function assemble!(solver::Solver, time::Float64; with_mass_matrix=false)
     info("Assembling problems ...")
 
     for problem in get_problems(solver)
         timeit("assemble $(problem.name)") do
             empty!(problem.assembly)
-            assemble!(problem, solver.time)
+            assemble!(problem, time)
         end
     end
 
     if with_mass_matrix
         for problem in get_field_problems(solver)
             timeit("assemble $(problem.name) mass matrix") do
-                assemble!(problem, solver.time, Val{:mass_matrix})
+                assemble!(problem, time, Val{:mass_matrix})
             end
         end
     end
 
+    #=
     ndofs = 0
     for problem in solver.problems
         Ks = size(problem.assembly.K, 2)
@@ -392,7 +377,7 @@ function assemble!(solver::Solver; with_mass_matrix=false)
         ndofs = max(ndofs, Ks, Cs)
     end
     solver.ndofs = ndofs
-
+    =#
     info("Assembly done!")
 end
 
@@ -491,9 +476,9 @@ function (solver::Solver)(field_name::String, time::Float64)
 end
 
 """ Default update for solver. """
-function update!{S}(solver::Solver{S})
-    u = solver.u
-    la = solver.la
+function update!{S}(solver::Solver{S}, u, la, time)
+    #u = solver.u
+    #la = solver.la
 
     info("Updating problems ...")
     t0 = Base.time()
@@ -504,7 +489,7 @@ function update!{S}(solver::Solver{S})
         # update solution, first for assembly (u,la) ...
         update!(problem, assembly, u, la)
         # .. and then from assembly (u,la) to elements
-        update!(problem, assembly, elements, solver.time)
+        update!(problem, assembly, elements, time)
     end
 
     t1 = round(Base.time()-t0, 2)
@@ -515,35 +500,42 @@ end
 functions to calculate secondary fields, i.e. contact pressure, stress,
 heat flux, reaction force etc. quantities.
 """
-function postprocess!(solver::Solver)
+function postprocess!(solver::Solver, time)
     info("Running postprocess scripts for solver...")
     for problem in get_problems(solver)
         for field_name in problem.postprocess_fields
             field = Val{Symbol(field_name)}
             info("Running postprocess for problem $(problem.name), field $field_name")
-            postprocess!(problem, solver.time, field)
+            postprocess!(problem, time, field)
         end
     end
 end
 
-""" Default xdmf update for solver. Loop all problems and write them individually
+"""
+    write_results!(solver, time)
+
+Default xdmf update for solver. Loop all problems and write them individually
 to Xdmf file. By default write the main unknown field (displacement, temperature,
 ...) and any fields requested separately in `problem.postprocess_fields` vector
 (stress, strain, ...)
 """
-function update_xdmf!(solver::Solver)
-    if isnull(solver.xdmf)
-        info("update_xdmf: xdmf not attached to solver, not writing output to file.")
-        info("turn Xdmf writing on to solver by typing: solver.xdmf = Xdmf(\"results\")")
+function write_results!(solver, time)
+    results_writers = get_results_writers(solver)
+    if length(results_writers) == 0
+        info("Xdmf is not attached to solver, not writing output to a file.")
+        info("To write results to Xdmf file, attach Xdmf to Solver, i.e.")
+        info("add_results_writer!(solver, Xdmf(\"results\"))")
         return
     end
-    xdmf = get(solver.xdmf)
-    for problem in get_problems(solver)
-        fields = [get_unknown_field_name(problem); problem.postprocess_fields]
-        if is_boundary_problem(problem)
-            fields = [fields; get_parent_field_name(problem)]
+    # FIXME: result writer can be anything, not only Xdmf
+    for xdmf in results_writers
+        for problem in get_problems(solver)
+            fields = [get_unknown_field_name(problem); problem.postprocess_fields]
+            if is_boundary_problem(problem)
+                fields = [fields; get_parent_field_name(problem)]
+            end
+            update_xdmf!(xdmf, problem, time, fields)
         end
-        update_xdmf!(xdmf, problem, solver.time, fields)
     end
 end
 
@@ -588,36 +580,42 @@ function has_converged(solver::Solver{Nonlinear})
 end
 
 """ Default solver for quasistatic nonlinear problems. """
-function (solver::Solver{Nonlinear})()
+function solve!(solver::Solver{Nonlinear}, time::Float64)
 
+    problems = get_problems(solver)
     properties = solver.properties
 
     # 1. initialize each problem so that we can start nonlinear iterations
-    initialize!(solver)
+    for problem in problems
+        initialize!(problem, time)
+    end
 
     # 2. start non-linear iterations
     for properties.iteration=1:properties.max_iterations
         info(repeat("-", 80))
         info("Starting nonlinear iteration #$(properties.iteration)")
-        info("Increment time t=$(round(solver.time, 3))")
+        info("Increment time t=$(round(time, 3))")
         info(repeat("-", 80))
 
         # 2.1 update assemblies
-        assemble!(solver)
+        for problem in problems
+            empty!(problem.assembly)
+            assemble!(problem, time)
+        end
 
         # 2.2 call solver for linearized system
-        solve!(solver)
+        u, la = solve!(solver)
 
         # 2.3 update solution back to elements
-        update!(solver)
+        update!(solver, u, la, time)
 
         # 2.4 check convergence
         if properties.iteration >= properties.min_iterations && has_converged(solver)
             info("Converged in $(properties.iteration) iterations.")
             # 2.4.1 run any postprocessing of problems
-            postprocess!(solver)
+            postprocess!(solver, time)
             # 2.4.2 update Xdmf output
-            update_xdmf!(solver)
+            write_results!(solver, time)
             return true
         end
     end
@@ -627,21 +625,6 @@ function (solver::Solver{Nonlinear})()
         error("nonlinear iteration did not converge in $(properties.iteration) iterations!")
     end
 end
-
-""" Convenience function to call nonlinear solver. """
-function NonlinearSolver(problems...)
-    solver = Solver(Nonlinear, "default nonlinear solver")
-    if length(problems) != 0
-        push!(solver, problems...)
-    end
-    return solver
-end
-function NonlinearSolver(name::AbstractString, problems::Problem...)
-    solver = NonlinearSolver(problems...)
-    solver.name = name
-    return solver
-end
-
 
 ### Linear quasistatic solver
 
@@ -657,51 +640,41 @@ Main differences in this solver, compared to nonlinear solver are:
 type Linear <: AbstractSolver
 end
 
-function assemble!(solver::Solver{Linear})
-    info("Assembling problems ...")
-    tic()
-    nproblems = 0
-    ndofs = 0
-    for problem in get_problems(solver)
-        if isempty(problem.assembly)
-            assemble!(problem, solver.time)
-            nproblems += 1
-        else
-            info("$(problem.name) already assembled, skipping.")
-        end
-        ndofs = max(ndofs, size(problem.assembly.K, 2))
+function solve!(solver::Solver{Linear}, time::Float64)
+    problems = get_problems(solver)
+    N = 0
+    @timeit "assemble problems" for problem in problems
+        isempty(problem.assembly) || continue
+        initialize!(problem, time)
+        assemble!(problem, time)
     end
-    solver.ndofs = ndofs
-    t1 = round(toq(), 2)
-    info("Assembled $nproblems problems in $t1 seconds. ndofs = $ndofs.")
+    @timeit "solve linear system" u, la = solve!(solver)
+    @timeit "update problems" update!(solver, u, la, time)
 end
 
-function (solver::Solver{Linear})()
-    t0 = Base.time()
-    info(repeat("-", 80))
-    info("Starting linear solver")
-    info("Increment time t=$(round(solver.time, 3))")
-    info(repeat("-", 80))
-    @timeit "initialize solver" initialize!(solver)
-    @timeit "assemble problems" assemble!(solver)
-    @timeit "solve linear system" solve!(solver)
-    @timeit "update problems" update!(solver)
-    t1 = round(Base.time()-t0, 2)
-    info("Linear solver ready in $t1 seconds.")
+# Convenience functions
+
+function LinearSolver(name::String="Linear solver")
+    return Solver(Linear, name)
 end
 
-""" Convenience function to call linear solver. """
 function LinearSolver(problems::Problem...)
-    solver = Solver(Linear, "default linear solver")
-    if length(problems) != 0
-        push!(solver, problems...)
-    end
-    return solver
-end
-function LinearSolver(name::AbstractString, problems::Problem...)
-    solver = LinearSolver(problems...)
-    solver.name = name
+    solver = LinearSolver()
+    add_problems!(solver, collect(problems))
     return solver
 end
 
-### End of linear quasistatic solver
+function NonlinearSolver(name::String="Nonlinear solver")
+    return Solver(Nonlinear, name)
+end
+
+function NonlinearSolver(problems::Problem...)
+    solver = NonlinearSolver()
+    add_problems!(solver, collect(problems))
+    return solver
+end
+
+# will be deprecated
+function (solver::Solver)(time::Float64=0.0)
+    solve!(solver, time)
+end

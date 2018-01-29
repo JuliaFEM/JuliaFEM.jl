@@ -144,7 +144,6 @@ numéro    fréquence (HZ)     norme d'erreur
 
     solver = Solver(Modal, body, fixed1, fixed2)
     solver.properties.nev = 5
-    solver.xdmf = Xdmf()
     solver()
     freqs_jf = sqrt.(solver.properties.eigvals)/(2.0*pi)
     # with Tet4 elements

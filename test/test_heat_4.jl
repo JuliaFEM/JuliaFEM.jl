@@ -26,20 +26,16 @@ using DataFrames
     push!(bc, boundary_element)
     solver = Solver(Linear, problem, bc)
 
-    solver.time = 0.0
-
     empty!(problem.assembly)
-    solver()
+    solve!(solver, 0.0)
     @test isapprox(solver("temperature", 0.0)[3], 1.0)
 
     empty!(problem.assembly)
     solver()
     @test isapprox(solver("temperature", 0.0)[3], 1.0)
 
-    solver.time = 1.0
-
     empty!(problem.assembly)
-    solver()
+    solve!(solver, 1.0)
     @test isapprox(solver("temperature", 1.0)[3], 2.0)
 
     empty!(problem.assembly)
@@ -69,24 +65,20 @@ end
     push!(bc, boundary_element)
     solver = Solver(Nonlinear, problem, bc)
 
-    solver.time = 0.0
-
     empty!(problem.assembly)
-    solver()
+    solve!(solver, 0.0)
     @test isapprox(solver("temperature", 0.0)[3], 1.0)
 
     empty!(problem.assembly)
     solver()
     @test isapprox(solver("temperature", 0.0)[3], 1.0)
 
-    solver.time = 1.0
-
     empty!(problem.assembly)
-    solver()
+    solve!(solver, 1.0)
     @test isapprox(solver("temperature", 1.0)[3], 2.0)
 
     empty!(problem.assembly)
-    solver()
+    solve!(solver, 1.0)
     @test isapprox(solver("temperature", 1.0)[3], 2.0)
 
 end

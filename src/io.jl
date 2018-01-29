@@ -4,7 +4,7 @@
 using HDF5
 using LightXML
 
-type Xdmf
+type Xdmf <: AbstractResultsWriter
     name :: String
     xml :: XMLElement
     hdf :: HDF5File
