@@ -123,7 +123,7 @@ function assemble!(problem::Problem{Contact}, time::Float64,
         for element in slave_elements
             conn = get_connectivity(element)
             push!(S, conn...)
-            gdofs = get_gdofs(element, field_dim)
+            gdofs = get_gdofs(problem, element)
             X_el = element("geometry", time)
             x_el = tuple( (X_el[i] + u[:,j] for (i,j) in enumerate(conn))... )
             #=
@@ -220,8 +220,8 @@ function assemble!(problem::Problem{Contact}, time::Float64,
                 l = 1/2*abs(xi1[2]-xi1[1])
                 isapprox(l, 0.0) && continue # no contribution in this master element
 
-                slave_dofs = get_gdofs(slave_element, field_dim)
-                master_dofs = get_gdofs(master_element, field_dim)
+                slave_dofs = get_gdofs(problem, slave_element)
+                master_dofs = get_gdofs(problem, master_element)
 
                 # 4. loop integration points of segment
                 for ip in get_integration_points(slave_element, 3)

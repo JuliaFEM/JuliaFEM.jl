@@ -106,7 +106,7 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet},
     nnodes = length(element)
     field_dim = get_unknown_field_dimension(problem)
     field_name = get_parent_field_name(problem)
-    gdofs = get_gdofs(element, field_dim)
+    gdofs = get_gdofs(problem, element)
     props = problem.properties
 
     if problem.properties.dual_basis

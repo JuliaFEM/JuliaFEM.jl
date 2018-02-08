@@ -87,7 +87,7 @@ end
     # Set constant flux g=6 on boundary. Accurate solution is
     # u(x,y) = x which equals T=1 on boundary.
     # at time t=1.0 all loads should be on.
-    empty!(problem)
+    empty!(problem.assembly)
     assemble!(problem, 1.0)
     A = full(problem.assembly.K)
     b = full(problem.assembly.f)
