@@ -12,6 +12,7 @@ julia> push!(solver, problems...)
 julia> solver()
 """
 type Modal <: AbstractSolver
+    time :: Float64
     geometric_stiffness :: Bool
     eigvals :: Vector
     eigvecs :: Matrix
@@ -27,7 +28,7 @@ type Modal <: AbstractSolver
 end
 
 function Modal(nev=10, which=:SM)
-    solver = Modal(false, [], Matrix{Float64}(0,0), nev, which,
+    solver = Modal(0.0, false, [], Matrix{Float64}(0,0), nev, which,
                    false, [], true, true, false, false, 0.0)
 end
 
@@ -313,7 +314,7 @@ function update_xdmf!(solver::Solver{Modal})
 
     xdmf = first(results_writers)
 
-    @timeit "fetch geometry" X_ = solver("geometry", solver.time)
+    @timeit "fetch geometry" X_ = solver("geometry", solver.properties.time)
     node_ids = keys(X_)
     @timeit "create node permutation" P = Dict(j=>i for (i, j) in enumerate(node_ids))
     nnodes = length(X_)
