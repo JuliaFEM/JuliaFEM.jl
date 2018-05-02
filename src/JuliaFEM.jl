@@ -39,8 +39,11 @@ include("materials_plasticity.jl")
 export plastic_von_mises
 include("problems_dirichlet.jl")
 export Dirichlet
-include("problems_heat.jl")
-export Heat
+
+#include("problems_heat.jl")
+#export Heat
+@reexport using HeatTransfer
+
 export assemble!, postprocess!
 ### Mortar methods ###
 include("problems_mortar.jl")
