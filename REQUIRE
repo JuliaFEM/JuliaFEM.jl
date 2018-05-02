@@ -3,7 +3,6 @@ FEMBase 0.1 0.2-
 ForwardDiff
 LightXML 0.4
 HDF5 0.7
-DataFrames
 Formatting
 Logging
 TimerOutputs

@@ -2,7 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using DataFrames
+#using DataFrames
 using HDF5
 using LightXML
 using Formatting
