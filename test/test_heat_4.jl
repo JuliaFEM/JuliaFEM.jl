@@ -3,7 +3,6 @@
 
 using JuliaFEM
 using JuliaFEM.Testing
-using DataFrames
 
 @testset "two increments, linear solver" begin
     X = Dict{Int, Vector{Float64}}(
