@@ -19,7 +19,7 @@ Results are calculated using Code Aster for comparison.
     rings = Problem(Heat, "RINGS", 1)
 #   rings.elements = create_elements(mesh; element_type=:Tet4)
     rings.elements = create_elements(mesh, "RING1", "RING2")
-    update!(rings.elements, "temperature thermal conductivity", 1.0)
+    update!(rings.elements, "thermal conductivity", 1.0)
     bc_inner = Problem(Dirichlet, "INNER SURFACE", 1, "temperature")
     bc_inner.elements = create_elements(mesh, "RING1_INNER")
     bc_outer = Problem(Dirichlet, "OUTER SURFACE", 1, "temperature")
@@ -49,4 +49,3 @@ Results are calculated using Code Aster for comparison.
     end
     @test passed
 end
-

@@ -14,18 +14,18 @@ using JuliaFEM.Postprocess
     face = Problem(Heat, "face 4", 1)
     fixed = Problem(Dirichlet, "fixed face 3", 1, "temperature")
     prob.elements = create_elements(mesh, "TET")
-    update!(prob, "temperature thermal conductivity", 50.0)
-    face.elements = create_elements(mesh, "FACE4") 
-    update!(face, "temperature external temperature", 20.0)
-    update!(face, "temperature heat transfer coefficient", 60.0)
+    update!(prob, "thermal conductivity", 50.0)
+    face.elements = create_elements(mesh, "FACE4")
+    update!(face, "external temperature", 20.0)
+    update!(face, "heat transfer coefficient", 60.0)
     fixed.elements = create_elements(mesh, "FACE2")
     info("# of elements in fixed set: $(length(fixed))")
     update!(fixed, "temperature 1", 0.0)
     solver = LinearSolver(prob, face, fixed)
     solver()
-    T = prob.assembly.u
-    info("Solution: $T")
-    T_expected = [ # using code aster
+    Temp = prob.assembly.u
+    info("Solution: $Temp")
+    Temp_expected = [ # using code aster
         1.45606533688540E+01
         0.0
         0.0
@@ -36,10 +36,10 @@ using JuliaFEM.Postprocess
         1.05228712963739E+01
         0.0
         0.0]
-    info("Expected: $T_expected")
-    rtol = norm(T-T_expected)/max(norm(T), norm(T_expected))
+    info("Expected: $Temp_expected")
+    rtol = norm(Temp-Temp_expected)/max(norm(Temp), norm(Temp_expected))
     info("rtol = $rtol")
-    @test isapprox(T, T_expected; rtol=1.0e-6)
+    @test isapprox(Temp, Temp_expected; rtol=1.0e-6)
 end
 
 @testset "2d heat problem (one element)" begin
@@ -54,19 +54,18 @@ end
     el1 = Element(Quad4, [1, 2, 3, 4])
 
     update!(el1, "geometry", X)
-    update!(el1, "temperature thermal conductivity", 6.0)
-    update!(el1, "temperature load", 12.0)
+    update!(el1, "thermal conductivity", 6.0)
+    update!(el1, "heat source", 12.0)
 
     # define boundary element for flux
     el2 = Element(Seg2, [1, 2])
     update!(el2, "geometry", X)
     # linear ramp from 0 -> 6 in time 0 -> 1
-    update!(el2, "temperature flux", 0.0 => 0.0)
-    update!(el2, "temperature flux", 1.0 => 6.0)
+    update!(el2, "heat flux", 0.0 => 0.0)
+    update!(el2, "heat flux", 1.0 => 6.0)
 
     # define heat problem and push elements to problem
-    problem = Problem(Heat, "one element heat problem", 1)
-    problem.properties.formulation = "2D"
+    problem = Problem(PlaneHeat, "one element heat problem", 1)
     push!(problem, el1, el2)
 
     # Set constant source f=12 with k=6. Accurate solution is
@@ -94,57 +93,6 @@ end
     @test isapprox(A[free_dofs, free_dofs] \ b[free_dofs], [2.0, 2.0])
 end
 
-#=
-@testset "test 1d heat problem" begin
-
-    function T_acc(x)
-        # accurate solution
-        a = 0.01
-        L = 0.20
-        k = 50.0
-        Tᵤ = 20.0
-        h = 10.0
-        P = 4*a
-        A = a^2
-        α = h
-        β = sqrt((h*P)/(k*A))
-        T̂ = 100.0
-        C = [1.0 1.0; (α+k*β)*exp(β*L) (α-k*β)*exp(-β*L)] \ [T̂-Tᵤ, 0.0]
-        return dot(C, [exp(β*x), exp(-β*x)]) + Tᵤ
-    end
-
-    X = Dict{Int, Vector{Float64}}(
-        1 => [0.0, 0.0, 0.0],
-        2 => [0.1, 0.0, 0.0],
-        3 => [0.2, 0.0, 0.0])
-    e1 = Element(Seg2, [1, 2])
-    e2 = Element(Seg2, [2, 3])
-    e3 = Element(Poi1, [3])
-
-    p1 = Problem(Heat, "1d heat problem", 1)
-    p1.properties.formulation = "1D"
-    push!(p1, e1, e2, e3)
-    update!(p1, "geometry", X)
-    a = 0.010
-    update!(p1, "cross-section area", a^2)
-    update!(p1, "cross-section perimeter", 4*a)
-    update!(p1, "temperature thermal conductivity", 50.0) # k [W/(m∘C)]
-    update!(p1, "temperature heat transfer coefficient", 10.0) # h [W/(m²∘C)]
-    update!(p1, "temperature external temperature", 20.0)
-
-    p2 = Problem(Dirichlet, "left boundary", 1, "temperature")
-    e3 = Element(Poi1, [1])
-    update!(e3, "geometry", X)
-    update!(e3, "temperature 1", 100.0)
-    push!(p2, e3)
-
-    solver = LinearSolver(p1, p2)
-    solver()
-    T_min = minimum(p1.assembly.u)
-    @test isapprox(T_max, T_acc(0.2); rtol=4.5e-2)
-end
-=#
-
 @testset "compare simple 3d heat problem to code aster solution" begin
     fn = @__DIR__() * "/testdata/rod_short.med"
     mesh = aster_read_mesh(fn, "Hex8")
@@ -158,17 +106,17 @@ end
     face4 = create_elements(mesh, "FACE4")
     face5 = create_elements(mesh, "FACE5")
     face6 = create_elements(mesh, "FACE6")
-    update!(rod, "temperature thermal conductivity", 50.0)
-    update!(face2, "temperature external temperature", 20.0)
-    update!(face2, "temperature heat transfer coefficient", 60.0)
-    update!(face3, "temperature external temperature", 30.0)
-    update!(face3, "temperature heat transfer coefficient", 50.0)
-    update!(face4, "temperature external temperature", 40.0)
-    update!(face4, "temperature heat transfer coefficient", 40.0)
-    update!(face5, "temperature external temperature", 50.0)
-    update!(face5, "temperature heat transfer coefficient", 30.0)
-    update!(face6, "temperature external temperature", 60.0)
-    update!(face6, "temperature heat transfer coefficient", 20.0)
+    update!(rod, "thermal conductivity", 50.0)
+    update!(face2, "external temperature", 20.0)
+    update!(face2, "heat transfer coefficient", 60.0)
+    update!(face3, "external temperature", 30.0)
+    update!(face3, "heat transfer coefficient", 50.0)
+    update!(face4, "external temperature", 40.0)
+    update!(face4, "heat transfer coefficient", 40.0)
+    update!(face5, "external temperature", 50.0)
+    update!(face5, "heat transfer coefficient", 30.0)
+    update!(face6, "external temperature", 60.0)
+    update!(face6, "heat transfer coefficient", 20.0)
     push!(p1, rod, face2, face3, face4, face5, face6)
 
     p2 = Problem(Dirichlet, "left support T=100", 1, "temperature")
@@ -197,7 +145,7 @@ end
         6 => [1.74615686370955E+04, -3.73021966895897E+02, -1.38038931136833E+02],
         7 => [1.74479150854902E+04, -9.99509347888065E+01, -3.70268090662933E+01],
         8 => [1.74479150854901E+04, -3.73021966895874E+02, -1.38185932677561E+02])
-    FLUX_NOEU = Dict{Int64, Vector{Float64}}(   
+    FLUX_NOEU = Dict{Int64, Vector{Float64}}(
         1 => [1.74596669275930E+04,  7.55555618070503E-11,  3.68594044175552E-12],
         2 => [1.74684148339734E+04,  1.10418341137120E-11,  3.48876483258209E-12],
         3 => [1.74360055518019E+04,  7.91828824731056E-11,  1.95399252334028E-13],
@@ -207,10 +155,10 @@ end
         7 => [1.74360055518019E+04, -4.73227515822118E+02, -1.75280965396335E+02],
         8 => [1.74447696000717E+04, -4.72904678032179E+02, -1.75280965396335E+02])
 
-    T = p1("temperature", 0.0)
+    Temp = p1("temperature", 0.0)
 
-    for j in sort(collect(keys(T)))
-        T1 = T[j][1]
+    for j in sort(collect(keys(Temp)))
+        T1 = Temp[j][1]
         T2 = TEMP[j]
         rtol = norm(T1-T2)/max(T1,T2)*100.0
         @printf "node %i temp, JF: %e, CA: %e, rtol: %10.6f %%\n" j T1 T2 rtol
@@ -227,9 +175,9 @@ end
         p2 = Problem(Dirichlet, "left support T=100", 1, "temperature")
         p1.elements = create_elements(mesh, "ROD", "FACE2")
         p2.elements = create_elements(mesh, "FACE1")
-        update!(p1, "temperature thermal conductivity", 100.0)
-        update!(p1, "temperature external temperature", 0.0)
-        update!(p1, "temperature heat transfer coefficient", 1000.0)
+        update!(p1, "thermal conductivity", 100.0)
+        update!(p1, "external temperature", 0.0)
+        update!(p1, "heat transfer coefficient", 1000.0)
         update!(p2, "temperature 1", 100.0)
         solver = LinearSolver(p1, p2)
         solver()
@@ -264,17 +212,17 @@ end
         face4 = create_elements(mesh, "FACE4")
         face5 = create_elements(mesh, "FACE5")
         face6 = create_elements(mesh, "FACE6")
-        update!(rod, "temperature thermal conductivity", 50.0)
-        update!(face2, "temperature external temperature", 20.0)
-        update!(face2, "temperature heat transfer coefficient", 60.0)
-        update!(face3, "temperature external temperature", 30.0)
-        update!(face3, "temperature heat transfer coefficient", 50.0)
-        update!(face4, "temperature external temperature", 40.0)
-        update!(face4, "temperature heat transfer coefficient", 40.0)
-        update!(face5, "temperature external temperature", 50.0)
-        update!(face5, "temperature heat transfer coefficient", 30.0)
-        update!(face6, "temperature external temperature", 60.0)
-        update!(face6, "temperature heat transfer coefficient", 20.0)
+        update!(rod, "thermal conductivity", 50.0)
+        update!(face2, "external temperature", 20.0)
+        update!(face2, "heat transfer coefficient", 60.0)
+        update!(face3, "external temperature", 30.0)
+        update!(face3, "heat transfer coefficient", 50.0)
+        update!(face4, "external temperature", 40.0)
+        update!(face4, "heat transfer coefficient", 40.0)
+        update!(face5, "external temperature", 50.0)
+        update!(face5, "heat transfer coefficient", 30.0)
+        update!(face6, "external temperature", 60.0)
+        update!(face6, "heat transfer coefficient", 20.0)
         push!(p1, rod, face2, face3, face4, face5, face6)
         p2 = Problem(Dirichlet, "left support T=100", 1, "temperature")
         p2.elements = create_elements(mesh, "FACE1")
@@ -294,8 +242,8 @@ end
     models = ["Tet4", "Hex8", "Hex20", "Hex27", "Tet10"]
 
     for model in models
-        T = calc_3d_heat_model(model)
-        T_min = minimum(T)
+        Temp = calc_3d_heat_model(model)
+        T_min = minimum(Temp)
         T_ca = CA_sol[model]
         rtol = norm(T_min-T_ca)/max(T_min,T_ca)*100.0
         @printf "%-10s : T_min = % g, T_ca = % g, rtol = %g %%\n" model T_min T_ca rtol

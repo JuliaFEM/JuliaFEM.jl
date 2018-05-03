@@ -15,8 +15,10 @@ const to = TimerOutput()
     for fn in test_files
         info("----- Running tests from file $fn -----")
         t0 = time()
-        timeit(to, fn) do
-            include(fn)
+        @testset "$fn" begin
+            timeit(to, fn) do
+                include(fn)
+            end
         end
         dt = round(time() - t0, 2)
         info("----- Testing file $fn completed in $dt seconds -----")

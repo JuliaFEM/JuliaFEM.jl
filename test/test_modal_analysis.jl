@@ -69,10 +69,9 @@ end
     el4 = Element(Seg2, [7, 8])
     update!([el1, el2, el3, el4], "geometry", X)
     update!([el1, el2], "density", 6.0)
-    update!([el1, el2], "temperature thermal conductivity", 36.0)
+    update!([el1, el2], "thermal conductivity", 36.0)
     update!([el3, el4], "temperature 1", 0.0)
-    p1 = Problem(Heat, "combined body", 1)
-    p1.properties.formulation = "2D"
+    p1 = Problem(PlaneHeat, "combined body", 1)
     p2 = Problem(Dirichlet, "fixed ends", 1, "temperature")
     push!(p1, el1, el2)
     push!(p2, el3, el4)
@@ -100,13 +99,11 @@ end
     el6 = Element(Seg2, [5, 6])
     update!([el1, el2, el3, el4, el5, el6], "geometry", X)
     update!([el1, el2], "density", 6.0)
-    update!([el1, el2], "temperature thermal conductivity", 36.0)
+    update!([el1, el2], "thermal conductivity", 36.0)
     update!([el3, el4], "temperature 1", 0.0)
     update!(el5, "master elements", [el6])
-    p1 = Problem(Heat, "body 1", 1)
-    p2 = Problem(Heat, "body 2", 1)
-    p1.properties.formulation = "2D"
-    p2.properties.formulation = "2D"
+    p1 = Problem(PlaneHeat, "body 1", 1)
+    p2 = Problem(PlaneHeat, "body 2", 1)
     p3 = Problem(Dirichlet, "fixed ends", 1, "temperature")
     p4 = Problem(Mortar, "interface between bodies", 1, "temperature")
     p4.properties.dimension = 1

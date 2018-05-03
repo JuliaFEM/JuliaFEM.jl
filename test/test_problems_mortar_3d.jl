@@ -16,11 +16,11 @@ tet10_meshfile = "test_problems_mortar_3d/tet10.inp"
 
     upper = Problem(Heat, "UPPER", 1)
     upper.elements = create_elements(mesh, "UPPER")
-    update!(upper, "temperature thermal conductivity", 1.0)
+    update!(upper, "thermal conductivity", 1.0)
 
     lower = Problem(Heat, "LOWER", 1)
     lower.elements = create_elements(mesh, "LOWER")
-    update!(lower, "temperature thermal conductivity", 1.0)
+    update!(lower, "thermal conductivity", 1.0)
 
     bc_upper = Problem(Dirichlet, "UPPER_TOP", 1, "temperature")
     bc_upper.elements = create_surface_elements(mesh, "UPPER_TOP")
@@ -41,7 +41,7 @@ tet10_meshfile = "test_problems_mortar_3d/tet10.inp"
     add_results_writer!(solver, Xdmf("sl_lin_temp_results"; overwrite=true))
 
     solver()
-    
+
     node_ids, temperature = get_nodal_vector(interface.elements, "temperature", 0.0)
     T = [t[1] for t in temperature]
     minT = minimum(T)
@@ -68,11 +68,11 @@ end
 
     upper = Problem(Heat, "UPPER", 1)
     upper.elements = create_elements(mesh, "UPPER")
-    update!(upper, "temperature thermal conductivity", 1.0)
+    update!(upper, "thermal conductivity", 1.0)
 
     lower = Problem(Heat, "LOWER", 1)
     lower.elements = create_elements(mesh, "LOWER")
-    update!(lower, "temperature thermal conductivity", 1.0)
+    update!(lower, "thermal conductivity", 1.0)
 
     bc_upper = Problem(Dirichlet, "UPPER_TOP", 1, "temperature")
     bc_upper.elements = create_surface_elements(mesh, "UPPER_TOP")
@@ -95,7 +95,7 @@ end
     add_results_writer!(solver, Xdmf("dl_lin_temp_results"; overwrite=true))
 
     solver()
-    
+
     node_ids, temperature = get_nodal_vector(interface.elements, "temperature", 0.0)
     T = [t[1] for t in temperature]
     minT = minimum(T)
@@ -111,11 +111,11 @@ end
 
     upper = Problem(Heat, "UPPER", 1)
     upper.elements = create_elements(mesh, "UPPER")
-    update!(upper, "temperature thermal conductivity", 1.0)
+    update!(upper, "thermal conductivity", 1.0)
 
     lower = Problem(Heat, "LOWER", 1)
     lower.elements = create_elements(mesh, "LOWER")
-    update!(lower, "temperature thermal conductivity", 1.0)
+    update!(lower, "thermal conductivity", 1.0)
 
     bc_upper = Problem(Dirichlet, "UPPER_TOP", 1, "temperature")
     bc_upper.elements = create_surface_elements(mesh, "UPPER_TOP")
@@ -130,7 +130,7 @@ end
     interface_master_elements = create_surface_elements(mesh, "UPPER_TO_LOWER")
     update!(interface_slave_elements, "master elements", interface_master_elements)
     interface.elements = [interface_master_elements; interface_slave_elements]
-    
+
     interface.properties.linear_surface_elements = false
     interface.properties.split_quadratic_slave_elements = false
     interface.properties.split_quadratic_master_elements = false
@@ -140,10 +140,10 @@ end
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, interface)
     add_results_writer!(solver, Xdmf("sl_quad_temp_results"; overwrite=true))
     solver()
-    
+
     node_ids, temperature = get_nodal_vector(interface.elements, "temperature", 0.0)
     T = [t[1] for t in temperature]
-    
+
     minT = minimum(T)
     maxT = maximum(T)
     stdT = std(T)
@@ -158,11 +158,11 @@ end
 
     upper = Problem(Heat, "UPPER", 1)
     upper.elements = create_elements(mesh, "UPPER")
-    update!(upper, "temperature thermal conductivity", 1.0)
+    update!(upper, "thermal conductivity", 1.0)
 
     lower = Problem(Heat, "LOWER", 1)
     lower.elements = create_elements(mesh, "LOWER")
-    update!(lower, "temperature thermal conductivity", 1.0)
+    update!(lower, "thermal conductivity", 1.0)
 
     bc_upper = Problem(Dirichlet, "UPPER_TOP", 1, "temperature")
     bc_upper.elements = create_surface_elements(mesh, "UPPER_TOP")
@@ -177,7 +177,7 @@ end
     interface_master_elements = create_surface_elements(mesh, "UPPER_TO_LOWER")
     update!(interface_slave_elements, "master elements", interface_master_elements)
     interface.elements = [interface_master_elements; interface_slave_elements]
-    
+
     interface.properties.linear_surface_elements = false
     interface.properties.split_quadratic_slave_elements = false
     interface.properties.split_quadratic_master_elements = false
@@ -187,7 +187,7 @@ end
     solver = LinearSolver(upper, lower, bc_upper, bc_lower, interface)
     add_results_writer!(solver, Xdmf("dl_quad_temp_results"; overwrite=true))
     solver()
-    
+
     node_ids, temperature = get_nodal_vector(interface.elements, "temperature", 0.0)
     #node_ids, temperature = get_nodal_vector(interface_slave_elements, "temperature", 0.0)
     #=
@@ -458,4 +458,3 @@ end
     info("tet10 block: max(abs(u3)) = $maxabsu3, std(abs(u3)) = $stdabsu3")
     @test isapprox(stdabsu3, 0.0; atol=1.0e-6)
 end
-
