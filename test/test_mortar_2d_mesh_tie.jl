@@ -60,15 +60,13 @@ end
     meshfile = @__DIR__() * "/testdata/block_2d.med"
     mesh = aster_read_mesh(meshfile)
 
-    upper = Problem(Heat, "upper", 1)
-    upper.properties.formulation = "2D"
+    upper = Problem(PlaneHeat, "upper", 1)
     upper.elements = create_elements(mesh, "UPPER")
-    update!(upper.elements, "temperature thermal conductivity", 1.0)
+    update!(upper.elements, "thermal conductivity", 1.0)
 
-    lower = Problem(Heat, "lower", 1)
-    lower.properties.formulation = "2D"
+    lower = Problem(PlaneHeat, "lower", 1)
     lower.elements = create_elements(mesh, "LOWER")
-    update!(lower.elements, "temperature thermal conductivity", 1.0)
+    update!(lower.elements, "thermal conductivity", 1.0)
 
     bc_upper = Problem(Dirichlet, "upper boundary", 1, "temperature")
     bc_upper.elements = create_elements(mesh, "UPPER_TOP")
@@ -171,7 +169,7 @@ end
 
     solver = Solver(Linear)
     push!(solver, upper, lower, bc_upper, bc_lower, interface, bc_corner)
-    
+
     solver()
     slave_elements = get_slave_elements(interface)
     node_ids, la = get_nodal_vector(slave_elements, "lambda", 0.0)

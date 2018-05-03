@@ -33,14 +33,15 @@ end
 
 using AbaqusReader
 using AsterReader
+
+@reexport using HeatTransfer
 include("problems_elasticity.jl")
 export Elasticity
 include("materials_plasticity.jl")
 export plastic_von_mises
 include("problems_dirichlet.jl")
 export Dirichlet
-include("problems_heat.jl")
-export Heat
+
 export assemble!, postprocess!
 ### Mortar methods ###
 include("problems_mortar.jl")
