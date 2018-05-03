@@ -13,9 +13,8 @@ using JuliaFEM.Testing
     mesh_file = @__DIR__()*"/testdata/primitives.med"
     mesh = aster_read_mesh(mesh_file, "UNITSQUARE_6X4")
 
-    field = Problem(Heat, "unit square, 6x4 triangular mesh", 1)
+    field = Problem(PlaneHeat, "unit square, 6x4 triangular mesh", 1)
     field.elements = create_elements(mesh, "UNITSQUARE")
-    field.properties.formulation = "2D"
     update!(field, "thermal conductivity", 1.0)
     update!(field, "heat source", -6.0)
 

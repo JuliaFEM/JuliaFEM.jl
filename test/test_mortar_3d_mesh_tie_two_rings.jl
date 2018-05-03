@@ -21,11 +21,11 @@ This is conforming mesh so result should match to the conforming situation.
 
     ring1 = Problem(Heat, "RING1", 1)
     ring1.elements = create_elements(mesh, "RING1")
-    update!(ring1.elements, "temperature thermal conductivity", 1.0)
+    update!(ring1.elements, "thermal conductivity", 1.0)
 
     ring2 = Problem(Heat, "RING2", 1)
     ring2.elements = create_elements(mesh, "RING2")
-    update!(ring2.elements, "temperature thermal conductivity", 1.0)
+    update!(ring2.elements, "thermal conductivity", 1.0)
 
     bc_inner = Problem(Dirichlet, "INNER SURFACE", 1, "temperature")
     bc_inner.elements = create_elements(mesh, "RING1_INNER")
@@ -60,4 +60,3 @@ This is conforming mesh so result should match to the conforming situation.
     end
     @test passed
 end
-

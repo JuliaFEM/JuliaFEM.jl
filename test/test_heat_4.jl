@@ -2,7 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM.Testing
+using Base.Test
 
 @testset "two increments, linear solver" begin
     X = Dict{Int, Vector{Float64}}(
@@ -12,11 +12,10 @@ using JuliaFEM.Testing
         4 => [0.0,1.0])
     element = Element(Quad4, [1, 2, 3, 4])
     update!(element, "geometry", X)
-    update!(element, "temperature thermal conductivity", 6.0)
-    update!(element, "temperature load", 0.0 => 12.0)
-    update!(element, "temperature load", 1.0 => 24.0)
-    problem = Problem(Heat, "one element heat problem", 1)
-    problem.properties.formulation = "2D"
+    update!(element, "thermal conductivity", 6.0)
+    update!(element, "heat source", 0.0 => 12.0)
+    update!(element, "heat source", 1.0 => 24.0)
+    problem = Problem(PlaneHeat, "one element heat problem", 1)
     push!(problem, element)
     boundary_element = Element(Seg2, [1, 2])
     update!(boundary_element, "geometry", X)
@@ -51,11 +50,10 @@ end
         4 => [0.0,1.0])
     element = Element(Quad4, [1, 2, 3, 4])
     update!(element, "geometry", X)
-    update!(element, "temperature thermal conductivity", 6.0)
-    update!(element, "temperature load", 0.0 => 12.0)
-    update!(element, "temperature load", 1.0 => 24.0)
-    problem = Problem(Heat, "one element heat problem", 1)
-    problem.properties.formulation = "2D"
+    update!(element, "thermal conductivity", 6.0)
+    update!(element, "heat source", 0.0 => 12.0)
+    update!(element, "heat source", 1.0 => 24.0)
+    problem = Problem(PlaneHeat, "one element heat problem", 1)
     push!(problem, element)
     boundary_element = Element(Seg2, [1, 2])
     update!(boundary_element, "geometry", X)
