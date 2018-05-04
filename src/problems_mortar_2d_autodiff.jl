@@ -3,6 +3,8 @@
 
 using ForwardDiff
 
+const MortarElements2D = Union{Seg2,Seg3}
+
 # forwarddiff version of mesh tying in 2d
 
 function project_from_master_to_slave_ad{E<:MortarElements2D}(
@@ -175,7 +177,7 @@ function assemble!(problem::Problem{Mortar}, time::Float64, ::Type{Val{1}}, ::Ty
                     #dN = get_dbasis(slave_element, ip, time)
                     #j = sum([kron(dN[:,i], x1[i]') for i=1:length(x1)])
                     #w = ip.weight*norm(j)*l
-                    
+
                     xi = ip.coords[1]
                     xi_s = dot([1/2*(1-xi); 1/2*(1+xi)], xi1)
                     N1 = vec(get_basis(slave_element, xi_s, time))
@@ -186,7 +188,7 @@ function assemble!(problem::Problem{Mortar}, time::Float64, ::Type{Val{1}}, ::Ty
                     #xi_m = project_from_slave_to_master(master_element, X_s, n_s, time)
                     xi_m = project_from_slave_to_master_ad(master_element, x_s, n_s, x2, time)
                     N2 = vec(get_basis(master_element, xi_m, time))
-                    x_m = interpolate(N2, x2) 
+                    x_m = interpolate(N2, x2)
 
                     la_s = interpolate(Phi, la1)
                     gn = dot(n_s, x_s-x_m)

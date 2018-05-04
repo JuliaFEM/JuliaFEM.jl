@@ -78,7 +78,7 @@ function calc_projection(problem::Problem{Mortar}, ndim::Int)
     @assert C1 == C2
     #@assert problem.properties.dual_basis == true
     @assert problem.properties.adjust == false
- 
+
     S = get_nonzero_rows(C2)
     M = setdiff(get_nonzero_columns(C2), S)
 
@@ -102,7 +102,8 @@ end
 """ Eliminate mesh tie constraints from matrices K, M. """
 function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
                                         M_red::SparseMatrixCSC,
-                                        problem::Problem{Mortar}, ndim::Int)
+                                        problem::Union{Problem{Mortar}, Problem{Mortar2D}},
+                                        ndim::Int)
 
     C1 = sparse(problem.assembly.C1, ndim, ndim)
     C2 = sparse(problem.assembly.C2, ndim, ndim)
@@ -145,7 +146,7 @@ function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
     M_red[:,:] = Q*M_red*Q'
     M_red[S,:] = 0.0
     M_red[:,S] = 0.0
- 
+
     return true
 end
 
@@ -213,7 +214,7 @@ function solve!(solver::Solver{Modal}, time::Float64)
     info("Calculate $(props.nev) eigenvalues...")
 
     tic()
- 
+
     if properties.symmetric
         K_red = 1/2*(K_red + transpose(K_red))
         M_red = 1/2*(M_red + transpose(M_red))
@@ -293,7 +294,7 @@ function solve!(solver::Solver{Modal}, time::Float64)
     end
 
     @timeit "save results to Xdmf" update_xdmf!(solver)
-    
+
     return true
 
 end

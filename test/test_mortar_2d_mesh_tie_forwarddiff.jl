@@ -131,18 +131,19 @@ end
     update!([sel1, mel1], "geometry", X)
     update!([sel1, mel1], "displacement", u)
     update!(sel1, "master elements", [mel1])
-    p1 = Problem(Mortar, "test 1", 2, "displacement")
+
+    p1 = Problem(Mortar2D, "test 1", 2, "displacement")
+    add_slave_elements!(p1, [sel1])
+    add_master_elements!(p1, [mel1])
+    assemble!(p1, 0.0)
+
     p2 = Problem(Mortar, "test 2", 2, "displacement")
-    push!(p1, sel1, mel1)
     push!(p2, sel1, mel1)
-    #p1.properties.adjust = true
     p2.properties.use_forwarddiff = true
-    #p1.properties.dual_basis = true
-    #p2.properties.dual_basis = true
     p2.assembly.u = zeros(8)
     p2.assembly.la = zeros(8)
-    assemble!(p1, 0.0)
     assemble!(p2, 0.0)
+
     @test isapprox(p1.assembly, p2.assembly)
 
     #=
@@ -175,4 +176,3 @@ end
     @test isapprox(p1.assembly, p2.assembly)
     =#
 end
-

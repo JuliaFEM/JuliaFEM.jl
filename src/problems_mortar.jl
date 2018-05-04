@@ -66,6 +66,11 @@ function assemble!(problem::Problem{Mortar}, time::Float64)
     assemble!(problem, time, dimension, use_forwarddiff)
 end
 
+function get_slave_elements(problem::Problem)
+    cond(el) = haskey(el, "master elements") || haskey(el, "potential master elements")
+    return filter(cond, get_elements(problem))
+end
+
 """ Given a CCW ordered set of vertices, calculate area of polygon.
 
 Examples
@@ -99,7 +104,7 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
     field_dim = get_unknown_field_dimension(problem)
     field_name = get_parent_field_name(problem)
     slave_elements = get_slave_elements(problem)
-    
+
     I_area = 0.0
 
     if props.split_quadratic_slave_elements
@@ -125,7 +130,7 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
         info(repeat("-", 80))
         info("Processing slave element $(slave_element.id), type = $(get_element_type(slave_element))")
         info(repeat("-", 80))
-    
+
         S_area = 0.0
         S_area_in_contact = 0.0
         for ip in get_integration_points(slave_element)
@@ -245,7 +250,7 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
         I_area += S_area_in_contact
 
     end # slave elements done, contact virtual work ready
-    
+
     info("Area of interface: $I_area")
     info("Smallest cell area: $(minimum(C_areas))")
     info("Smallest polygon area: $(minimum(P_areas))")
