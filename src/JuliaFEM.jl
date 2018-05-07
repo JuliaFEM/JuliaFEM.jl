@@ -43,9 +43,12 @@ include("problems_dirichlet.jl")
 export Dirichlet
 
 export assemble!, postprocess!
+
 ### Mortar methods ###
+
+@reexport using MortarContact2D
+
 include("problems_mortar.jl")
-include("problems_mortar_2d.jl")
 include("problems_mortar_3d.jl")
 include("problems_mortar_2d_autodiff.jl")
 export calculate_normals, calculate_normals!, project_from_slave_to_master,
@@ -63,10 +66,8 @@ export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
 include("solvers_modal.jl")
 export Modal
 include("problems_contact.jl")
-include("problems_contact_2d.jl")
 include("problems_contact_3d.jl")
 include("problems_contact_2d_autodiff.jl")
-#include("problems_contact_3d_autodiff.jl")
 export Contact
 
 # Preprocess module

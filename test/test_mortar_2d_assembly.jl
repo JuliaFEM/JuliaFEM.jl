@@ -23,9 +23,9 @@ end
 @testset "calculate flat 2d assembly" begin
     (sel1, sel2), (mel1, mel2) = get_test_2d_model()
 
-    bc = Problem(Mortar, "test interface", 1, "temperature")
-    update!([sel1, sel2], "master elements", [mel1, mel2])
-    bc.elements = [sel1, sel2, mel1, mel2]
+    bc = Problem(Mortar2D, "test interface", 1, "temperature")
+    add_slave_elements!(bc, [sel1, sel2])
+    add_master_elements!(bc, [mel1, mel2])
 
     B_expected = zeros(3, 6)
 
@@ -98,9 +98,9 @@ end
     mel1 = Element(Seg2, [3, 4])
     sel1 = Element(Seg2, [5, 6])
     update!([mel1, sel1], "geometry", X)
-    update!(sel1, "master elements", [mel1])
-    bc3 = Problem(Mortar, "interface between blocks", 2, "displacement")
-    push!(bc3, sel1, mel1)
+    bc3 = Problem(Mortar2D, "interface between blocks", 2, "displacement")
+    add_slave_elements!(bc3, [sel1])
+    add_master_elements!(bc3, [mel1])
 
     solver = LinearSolver(body1, body2, bc1, bc2, bc3)
     solver()
