@@ -205,8 +205,10 @@ function solve!(solver::Solver{Modal}, time::Float64)
     K_red = K_red[nz,nz]
     M_red = M_red[nz,nz]
 
+    sigma = 0.0
     if properties.sigma != 0.0
-        info("Adding diagonal term $sigma to stiffness matrix")
+        info("Adding diagonal term $(properties.sigma) to stiffness matrix")
+        sigma = properties.sigma
     end
 
     props = solver.properties
