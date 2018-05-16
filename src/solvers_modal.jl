@@ -33,9 +33,9 @@ function Modal(nev=10, which=:SM)
 end
 
 """ Eliminate Dirichlet boundary condition from matrices K, M. """
-function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
-                                        M_red::SparseMatrixCSC,
-                                        problem::Problem{Dirichlet}, ndim::Int)
+function FEMBase.eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
+                                                M_red::SparseMatrixCSC,
+                                                problem::Problem{Dirichlet}, ndim::Int)
     K = sparse(problem.assembly.K, ndim, ndim)
     C1 = sparse(problem.assembly.C1, ndim, ndim)
     C2 = sparse(problem.assembly.C2, ndim, ndim)
@@ -100,10 +100,10 @@ end
 
 
 """ Eliminate mesh tie constraints from matrices K, M. """
-function eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
-                                        M_red::SparseMatrixCSC,
-                                        problem::Union{Problem{Mortar}, Problem{Mortar2D}},
-                                        ndim::Int)
+function FEMBase.eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
+                                                M_red::SparseMatrixCSC,
+                                                problem::Union{Problem{Mortar}, Problem{Mortar2D}},
+                                                ndim::Int)
 
     C1 = sparse(problem.assembly.C1, ndim, ndim)
     C2 = sparse(problem.assembly.C2, ndim, ndim)
