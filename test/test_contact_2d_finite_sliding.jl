@@ -36,15 +36,13 @@ using JuliaFEM.Testing
     update!(bc_lower, "displacement 1", 0.0)
     update!(bc_lower, "displacement 2", 0.0)
 
-    contact = Problem(Contact, "contact between upper and lower block", 2, "displacement")
+    contact = Problem(Contact2DAD, "contact between upper and lower block", 2, "displacement")
     contact.properties.rotate_normals = true
-    contact.properties.finite_sliding = true
-    contact.properties.friction = false
-    contact.properties.use_forwarddiff = true
     contact_slave_elements = create_elements(mesh, "LOWER_TOP")
     contact_master_elements = create_elements(mesh, "UPPER_BOTTOM")
-    update!(contact_slave_elements, "master elements", contact_master_elements)
-    contact.elements = [contact_master_elements; contact_slave_elements]
+    add_slave_elements!(contact, contact_slave_elements)
+    add_master_elements!(contact, contact_master_elements)
+
     nnodes = length(mesh.nodes)
     contact.assembly.u = zeros(2*nnodes)
     contact.assembly.la = zeros(2*nnodes)
