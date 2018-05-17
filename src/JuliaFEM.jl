@@ -47,10 +47,10 @@ export assemble!, postprocess!
 ### Mortar methods ###
 
 @reexport using MortarContact2D
+@reexport using MortarContact2DAD
 
 include("problems_mortar.jl")
 include("problems_mortar_3d.jl")
-include("problems_mortar_2d_autodiff.jl")
 export calculate_normals, calculate_normals!, project_from_slave_to_master,
        project_from_master_to_slave, Mortar, get_slave_elements,
        get_polygon_clip
@@ -67,7 +67,7 @@ include("solvers_modal.jl")
 export Modal
 include("problems_contact.jl")
 include("problems_contact_3d.jl")
-include("problems_contact_2d_autodiff.jl")
+#include("problems_contact_3d_autodiff.jl")
 export Contact
 
 # Preprocess module
