@@ -457,7 +457,7 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
             for nid in field_node_ids
                 field_dict[nid] = [field_dict[nid]; 0.0]
             end
-            field_dim == 3
+            field_dim = 3
         end
         field_type = Dict(1 => "Scalar", 3 => "Vector", 6 => "Tensor6")[field_dim]
         info("Xdmf: Saving field $field_name, type = $field_type, dimension = $field_dim, center = $field_center")
