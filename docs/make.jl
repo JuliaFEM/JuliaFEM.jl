@@ -3,6 +3,11 @@
 
 using Documenter, JuliaFEM
 
+if !haskey(Pkg.installed(), "Literate")
+    Pkg.add("Literate")
+end
+using Literate
+
 """
     copy_docs(pkg_name)
 
@@ -96,6 +101,21 @@ if copy_docs("HeatTransfer")
     add_page!(PACKAGES, "HeatTransfer/index.md")
 end
 
+# Generate examples using Literate.jl
+
+function license_stripper(s)
+    return replace(s, r"# This file is a part of JuliaFEM.*?\n\n"sm, "")
+end
+EXAMPLES = []
+docs_src = Pkg.dir("JuliaFEM", "docs", "src")
+ex_src = Pkg.dir("JuliaFEM", "examples")
+ex_dst = joinpath(docs_src, "examples")
+for ex_file in readdir(ex_src)
+    dst_file = Literate.markdown(joinpath(ex_src, ex_file), ex_dst;
+                                 documenter=true, preprocess=license_stripper)
+    push!(EXAMPLES, relpath(dst_file, docs_src))
+end
+
 # API documentation
 LIBRARY = ["api.md"]
 
@@ -105,7 +125,10 @@ push!(PAGES, "Home" => "index.md")
 #push!(PAGES, "User's guide" => USER_GUIDE)
 push!(PAGES, "Developer's guide" => DEVELOPER_GUIDE)
 push!(PAGES, "Description of packages" => PACKAGES)
+push!(PAGES, "Examples" => EXAMPLES)
 #push!("API documentation" => LIBRARY)
+
+println(PAGES)
 
 makedocs(modules=[JuliaFEM],
          format = :html,
