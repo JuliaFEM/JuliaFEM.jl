@@ -35,7 +35,7 @@ function copy_docs(pkg_name)
     # if can find pkg_name/docs/src =>
     # copy that to docs/src/packages/pkg_name
     if isdir(src_dir)
-        cp(src_dir, dst_dir; remove_destination=true)
+        isdir(dst_dir) || cp(src_dir, dst_dir)
         info("Copied documentation of package $pkg_name from $src_dir succesfully.")
         return true
     end
@@ -45,7 +45,8 @@ function copy_docs(pkg_name)
     readme_file = Pkg.dir(pkg_name, "README.md")
     if isfile(readme_file)
         isdir(dst_dir) || mkpath(dst_dir)
-        cp(readme_file, joinpath(dst_dir, "README.md"))
+        dst_file = joinpath(dst_dir, "index.md")
+        isfile(dst_file) || cp(readme_file, dst_file)
         info("Copied README.md of package $pkg_name from $readme_file succesfully.")
         return true
     end
@@ -149,8 +150,16 @@ docs_src = Pkg.dir("JuliaFEM", "docs", "src")
 ex_src = Pkg.dir("JuliaFEM", "examples")
 ex_dst = joinpath(docs_src, "examples")
 for ex_file in readdir(ex_src)
+    endswith(ex_file, ".jl") || continue
+    startswith(ex_file, "test_") && continue
     dst_file = Literate.markdown(joinpath(ex_src, ex_file), ex_dst;
                                  documenter=true, preprocess=license_stripper)
+    ex_dir = joinpath(ex_src, first(splitext(ex_file)))
+    dst_ex_dir = joinpath(ex_dst, first(splitext(ex_file)))
+    if isdir(ex_dir) && !isdir(dst_ex_dir)
+        info("Copy $ex_dir to $dst_ex_dir")
+        cp(ex_dir, dst_ex_dir)
+    end
     add_page!(EXAMPLES, relpath(dst_file, docs_src))
 end
 
