@@ -4,6 +4,7 @@
 docs/build/
 docs/site/
 docs/src/examples
+docs/src/packages
 *.swp
 *.lnk
 *.mess
