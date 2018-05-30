@@ -148,6 +148,8 @@ add_results_writer!(step, xdmf)
 
 step()
 
+# # Results
+
 # Results are stored in `2d_hertz_results.xmf` and `2d_hertz_results.h5` for
 # visual inspection. We can also postprocess results programmatically because
 # we are inside a real scripting / programming environment all the time.  For
@@ -174,6 +176,46 @@ using Base.Test
 @test isapprox(Rn, 35.0e3)
 @test isapprox(Rt, 0.0)
 
-close(xdmf.hdf)
-
+# Visualization of the results can be done using ParaView:
 # ![](2d_hertz_contact/results_displacement.png)
+
+# For optimization loops, we want to programmatically find, for example, maximum
+# contact pressure. We can, for example, get all the values in nodes:
+
+lambda = contact("lambda", time)
+normal = contact("normal", time)
+p0 = 0.0
+p0_acc = 3585.0
+for (nid, n) in normal
+    lan = dot(n, lambda[nid])
+    println("$nid => $lan")
+    p0 = max(p0, lan)
+end
+p0 = round(p0, 2)
+rtol = round(norm(p0-p0_acc)/max(p0,p0_acc)*100, 2)
+println("Maximum contact pressure p0 = $p0, p0_acc = $p0_acc, rtol = $rtol %")
+
+# To get rough approximation where does the contact open, we can find the element
+# from slave contact surface, where contact pressure is zero in the other node
+# and something nonzero in the other node.
+
+a_rad = 0.0
+for element in contact_slave_elements
+    la1, la2 = element("lambda", time)
+    p1, p2 = norm(la1), norm(la2)
+    a, b = isapprox(p1, 0.0), isapprox(p2, 0.0)
+    if (a && !b) || (b && !a)
+        X1, X2 = element("geometry", time)
+        println("Contact opening element geometry: X1 = $X1, X2 = $X2")
+        println("Contact opening element lambda: la1 = $la1, la2 = $la2")
+        x11, y11 = X1
+        x12, y12 = X2
+        a_rad = 1/2*abs(x11+x12)
+        break
+    end
+end
+println("Contact radius: $a_rad")
+
+# This example briefly described some of the core features of JuliaFEM.
+
+close(xdmf.hdf) # src
