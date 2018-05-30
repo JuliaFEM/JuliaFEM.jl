@@ -143,7 +143,15 @@ copy_docs("UMAT")                   && add_page!(PACKAGES, "UMAT/index.md")
 # Generate examples using Literate.jl
 
 function license_stripper(s)
-    return replace(s, r"# This file is a part of JuliaFEM.*?\n\n"sm, "")
+    # return replace(s, r"# This file is a part of JuliaFEM.*?\n\n"sm, "")
+    lines = split(s, '\n')
+    function myfilt(line)
+        contains(line, "# This file is a part of JuliaFEM.") && return false
+        contains(line, "# License is MIT") && return false
+        return true
+    end
+    new_s = join(filter(myfilt, lines), '\n')
+    return new_s
 end
 EXAMPLES = []
 docs_src = Pkg.dir("JuliaFEM", "docs", "src")
