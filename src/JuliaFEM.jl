@@ -44,6 +44,9 @@ export Dirichlet
 
 export assemble!, postprocess!
 
+# Structural elements: beams
+@reexport using FEMBeam
+
 ### Mortar methods ###
 
 @reexport using MortarContact2D

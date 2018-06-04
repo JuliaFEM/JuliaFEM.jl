@@ -32,125 +32,72 @@ function Modal(nev=10, which=:SM)
                    false, [], true, true, false, false, 0.0)
 end
 
-""" Eliminate Dirichlet boundary condition from matrices K, M. """
-function FEMBase.eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
-                                                M_red::SparseMatrixCSC,
-                                                problem::Problem{Dirichlet}, ndim::Int)
-    K = sparse(problem.assembly.K, ndim, ndim)
-    C1 = sparse(problem.assembly.C1, ndim, ndim)
-    C2 = sparse(problem.assembly.C2, ndim, ndim)
-    D = sparse(problem.assembly.D, ndim, ndim)
-    f = sparse(problem.assembly.f, ndim, 1)
-    g = sparse(problem.assembly.g, ndim, 1)
-    Kg = sparse(problem.assembly.Kg, ndim, ndim)
-    fg = sparse(problem.assembly.fg, ndim, ndim)
-    # only homogenenous boundary condition u=0 is implemented at the moment.
-    @assert nnz(K) == 0
-    @assert nnz(D) == 0
-    @assert nnz(Kg) == 0
-    @assert nnz(fg) == 0
-    @assert nnz(f) == 0
-    @assert nnz(g) == 0
+"""
+    calc_projection(problem, ndim)
+
+A helper function to calculate P = D^-1*M
+"""
+function calc_projection(problem::T) where
+        {T<:Union{Problem{Mortar}, Problem{Mortar2D}}}
+
+    C1 = sparse(problem.assembly.C1)
+    C2 = sparse(problem.assembly.C2)
     @assert C1 == C2
-    @assert isdiag(C1)
-    fixed_dofs = get_nonzero_rows(C1)
-    P = ones(ndim)
-    P[fixed_dofs] = 0.0
-    Q = spdiagm(P)
-    K_red[:,:] = Q' * K_red * Q
-    M_red[:,:] = Q' * M_red * Q
-    return
-end
-
-""" Given data vector, return slave displacements. """
-function calc_projection(problem::Problem{Mortar}, ndim::Int)
-
-    C1 = sparse(problem.assembly.C1, ndim, ndim)
-    C2 = sparse(problem.assembly.C2, ndim, ndim)
-
-    @assert nnz(sparse(problem.assembly.K)) == 0
-    @assert nnz(sparse(problem.assembly.D)) == 0
-    @assert nnz(sparse(problem.assembly.Kg)) == 0
-    @assert nnz(sparse(problem.assembly.fg)) == 0
-    @assert nnz(sparse(problem.assembly.f)) == 0
-    @assert nnz(sparse(problem.assembly.g)) == 0
-
-    @assert C1 == C2
-    #@assert problem.properties.dual_basis == true
     @assert problem.properties.adjust == false
 
-    S = get_nonzero_rows(C2)
-    M = setdiff(get_nonzero_columns(C2), S)
+    s = get_nonzero_rows(C2)
+    m = setdiff(get_nonzero_columns(C2), s)
 
     # Construct matrix P = D^-1*M
-    D_ = C2[S,S]
-    M_ = -C2[S,M]
-    P = nothing
+    D = C2[s,s]
+    M = -C2[s,m]
 
-    if !isdiag(D_)
-        warn("D is not diagonal, is dual basis used? This might take a long time.")
-        P = ldltfact(1/2*(D_ + D_')) \ M_
+    if !isdiag(D)
+        warn("Mortar matrix D is not diagonal. This might take a long time.")
+        P = ldltfact(1/2*(D + D')) \ M
     else
-        P = D_ \ M_
+        P = D \ M
     end
-    info("Matrix P ready.")
 
-    return S, M, P
+    return s, m, P
 end
 
+function FEMBase.eliminate_boundary_conditions!(problem::P, K, M, f) where {P}
+    isempty(problem.assembly.C2) && return nothing
+    C1 = sparse(problem.assembly.C1)
+    C2 = sparse(problem.assembly.C2)
+    C1 == C2 || error("Cannot eliminate boundary condition $P: C1 != C2.")
+    isdiag(C1) || error("Cannot eliminate boundary condition $P: C is not diagonal")
+    info("Eliminating boundary condition $(problem.name) from global system.")
+    fixed_dofs = get_nonzero_rows(C1)
+    K[fixed_dofs,:] = K[:,fixed_dofs] = 0.0
+    M[fixed_dofs,:] = M[:,fixed_dofs] = 0.0
+    dropzeros!(K)
+    dropzeros!(M)
+    return nothing
+end
 
-""" Eliminate mesh tie constraints from matrices K, M. """
-function FEMBase.eliminate_boundary_conditions!(K_red::SparseMatrixCSC,
-                                                M_red::SparseMatrixCSC,
-                                                problem::Union{Problem{Mortar}, Problem{Mortar2D}},
-                                                ndim::Int)
+"""
+    eliminate_boundary_conditions!(problem, K, M, f)
 
-    C1 = sparse(problem.assembly.C1, ndim, ndim)
-    C2 = sparse(problem.assembly.C2, ndim, ndim)
-
-    @assert nnz(sparse(problem.assembly.K)) == 0
-    @assert nnz(sparse(problem.assembly.D)) == 0
-    @assert nnz(sparse(problem.assembly.Kg)) == 0
-    @assert nnz(sparse(problem.assembly.fg)) == 0
-    @assert nnz(sparse(problem.assembly.f)) == 0
-    @assert nnz(sparse(problem.assembly.g)) == 0
-
-    @assert C1 == C2
-    #@assert problem.properties.dual_basis == true
-    @assert problem.properties.adjust == false
-
+Eliminate Mortar boundary condition from matrices K, M and force vector f.
+"""
+function FEMBase.eliminate_boundary_conditions!(problem::T, K, M, f) where
+                            {T <: Union{Problem{Mortar}, Problem{Mortar2D}}}
     info("Eliminating mesh tie constraint $(problem.name) using static condensation")
-
-    S = get_nonzero_rows(C2)
-    M = setdiff(get_nonzero_columns(C2), S)
-    info("# slave dofs = $(length(S)), # master dofs = $(length(M))")
-
-    D_ = C2[S,S]
-    M_ = -C2[S,M]
-
-    P = nothing
-    if !isdiag(D_)
-        warn("D is not diagonal, is dual basis used? This might take a long time.")
-        P = ldltfact(1/2*(D_ + D_')) \ M_
-    else
-        P = D_ \ M_
-    end
+    s, m, P = calc_projection(problem)
+    ndim = size(K, 1)
     Id = ones(ndim)
+    Id[s] = 0.0
     Q = spdiagm(Id)
-    Q[M,S] += P'
-
-    K_red[:,:] = Q*K_red*Q'
-    K_red[S,:] = 0.0
-    K_red[:,S] = 0.0
-
-    M_red[:,:] = Q*M_red*Q'
-    M_red[S,:] = 0.0
-    M_red[:,S] = 0.0
-
-    return true
+    Q[s,m] += P
+    K[:,:] = Q'*K*Q
+    M[:,:] = Q'*M*Q
+    return nothing
 end
 
-function solve!(solver::Solver{Modal}, time::Float64)
+function FEMBase.run!(solver::Solver{Modal})
+    time = solver.properties.time
     problems = get_problems(solver)
     properties = solver.properties
     info(repeat("-", 80))
@@ -169,26 +116,17 @@ function solve!(solver::Solver{Modal}, time::Float64)
     dim = size(K, 1)
     ndofs = size(K, 1)
 
-    nboundary_problems = length(get_boundary_problems(solver))
-
     K_red = K
     M_red = M
 
-    @timeit "eliminate boundary conditions" begin
-        if length(properties.P) > 0
-            info("Using custom P to make transform K_red = P'*K*P and M_red = P'*M*P")
-            for P in properties.P
-                K_red = P'*K_red*P
-                M_red = P'*M_red*P
-            end
-        elseif nboundary_problems != 0
-            info("Eliminate boundary conditions from system.")
-            for boundary_problem in get_boundary_problems(solver)
-                eliminate_boundary_conditions!(K_red, M_red, boundary_problem, dim)
-            end
-        else
-            info("No boundary Dirichlet boundary conditions found for system.")
-        end
+    for P in properties.P
+        info("Using P to make transformation K_red = P'*K*P and M_red = P'*M*P")
+        K_red[:,:] = P'*K_red*P
+        M_red[:,:] = P'*M_red*P
+    end
+
+    for problem in get_problems(solver)
+        eliminate_boundary_conditions!(problem, K_red, M_red, f)
     end
 
     # free up some memory before solution
@@ -234,7 +172,6 @@ function solve!(solver::Solver{Modal}, time::Float64)
         M_red = full(M_red)
     end
 
-
     om2 = nothing
     X = nothing
     passed = false
@@ -245,34 +182,39 @@ function solve!(solver::Solver{Modal}, time::Float64)
         end
         passed = true
     catch
-        info("failed to calculate eigenvalues for problem. Maybe stiffness matrix is not positive definite, checking...")
-        info("is K symmetric? ", issymmetric(K_red))
-        info("is M symmetric? ", issymmetric(M_red))
-        info("is K positive definite? ", isposdef(K_red))
-        info("is M positive definite? ", isposdef(M_red))
-        info("Probably the reason is that stiffness matrix is not positive definite and Cholesky factorization is failing.")
-        info("To work around this problem, use arguments `sigma = <some small value>` when calling solver, i.e.")
-        info("solver(; sigma=1.0e-9")
-        info("Be aware that using sigma shifts eigenvalues up and a bit different results can be expected.")
-        if size(K_red, 1) < 2000
-            info("stiffness matrix is small, using dense eigenvalue solver to check eigenvalues ...")
-            om2 = eigvals(full(K_red))
-            info("squared eigenvalues om2 = $om2")
-        end
+        info("Failed to calculate eigenvalues for problem.")
+        b1 = issymmetric(K_red)
+        b2 = issymmetric(M_red)
+        b3 = isposdef(K_red)
+        b4 = isposdef(M_red)
+        info("Is K symmetric? $b1")
+        info("Is M symmetric? $b2")
+        info("Is K positive definite? $b3")
+        info("Is M positive definite? $b4")
         if properties.sigma != 0.0
-            info("sigma is manually set and did not work, giving up, try increase sigma.")
+            if !b3
+                info("Stiffness matrix is not positive definite and Cholesky ",
+                     "factorization is failing. Model is not supported enough ",
+                     "with boundary conditions. To work around this problem, ",
+                     "use `problem.properties.sigma = <some small value>` ",
+                     "To add artificial stiffness to model. (Or add boundary ",
+                     "conditions.)")
+            end
             rethrow()
         end
     end
 
     if !passed
-        sigma = 1.0e-9
-        info("Calculation of eigenvalues failed, trying again using sigma value sigma=$sigma")
+        sigma = problem.properties.sigma = 1.0e-9
+        info("Calculation of eigenvalues failed. Stiffness matrix is not ",
+             "positive definite and Cholesky factorization is failing. Trying ",
+             "again by adjusting problem.properties.sigma to $sigma.")
         try
             om2, X = eigs(K_red + sigma*I, M_red; nev=props.nev, which=props.which)
             passed = true
         catch
-            info("Failed to calculate eigenvalues with sigma=$sigma, manually set sigma to something larger and try again.")
+            info("Failed to calculate eigenvalues with sigma value $sigma. ",
+                 "Manually set sigma to something larger and try again.")
             rethrow()
         end
     end
@@ -287,11 +229,11 @@ function solve!(solver::Solver{Modal}, time::Float64)
         props.eigvecs[nz,i] = X[:,i]
         for problem in get_boundary_problems(solver)
             isa(problem, Problem{Mortar}) || continue
-            S, M, P = calc_projection(problem, dim)
+            s, m, P = calc_projection(problem)
             # FIXME: store projection to boundary problem, i.e.
             # update!(problem, "master-slave projection", time => P)
             # us = P*um
-            props.eigvecs[S,i] = P*props.eigvecs[M,i]
+            props.eigvecs[s,i] = P*props.eigvecs[m,i]
         end
     end
 
@@ -321,7 +263,11 @@ function update_xdmf!(solver::Solver{Modal})
     node_ids = keys(X_)
     @timeit "create node permutation" P = Dict(j=>i for (i, j) in enumerate(node_ids))
     nnodes = length(X_)
+    ndofs = round(Int, size(solver.properties.eigvecs, 1)/nnodes)
     ndim = length(X_[first(node_ids)])
+    info("Number of nodes: $nnodes. ",
+         "Number of dofs/node: $ndofs. ",
+         "Dimension of geometry: $ndim.")
     @timeit "create ncoords array" begin
         X = zeros(ndim, nnodes)
         for j in node_ids
@@ -410,15 +356,26 @@ function update_xdmf!(solver::Solver{Modal})
         end
 
         @timeit "store eigenmode" begin
-            mode_ = solver.properties.eigvecs[:,j]
-            mode_ = reshape(mode_, ndim, round(Int, length(mode_)/ndim))
+            mode_ = reshape(solver.properties.eigvecs[:,j], ndofs, nnodes)
             @timeit "create mode array" begin
-                mode = zeros(ndim, nnodes)
-                for i in node_ids
-                    mode[:,P[i]] = mode_[:,i]
+                mode = zeros(ndofs, nnodes)
+                for nid in node_ids
+                    mode[:,P[nid]] = mode_[:,nid]
                 end
             end
-            field_type = ndim == 1 ? "Scalar" : "Vector"
+            if ndofs == 1
+                field_type = "Scalar"
+            elseif ndofs == 2 # extend to 3d
+                field_type = "Vector"
+                mode = vcat(mode, zeros(1, nnodes))
+            elseif ndofs == 3
+                field_type = "Vector"
+            elseif ndofs == 6 # has rotation dofs, drop them
+                field_type = "Vector"
+                mode = mode[1:3, :]
+            else
+                error("Number of dofs / node = $ndofs, I don't know how to store results to Xdmf!")
+            end
             field_center = "Node"
             attribute = new_child(frame, "Attribute")
             set_attribute(attribute, "Name", unknown_field_name)
@@ -433,4 +390,10 @@ function update_xdmf!(solver::Solver{Modal})
     end
 
     save!(xdmf)
+end
+
+function solve!(solver::Solver{Modal}, time::Float64)
+    info("solve!(analysis, time) is deprecated. Use run!(analysis) instead.")
+    solver.properties.time = time
+    run!(solver)
 end
