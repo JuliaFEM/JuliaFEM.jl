@@ -581,7 +581,7 @@ function has_converged(solver::Solver{Nonlinear})
 end
 
 """ Default solver for quasistatic nonlinear problems. """
-function run!(solver::Solver{Nonlinear})
+function FEMBase.run!(solver::Solver{Nonlinear})
 
     time = solver.properties.time
     problems = get_problems(solver)
@@ -640,9 +640,15 @@ Main differences in this solver, compared to nonlinear solver are:
 
 """
 type Linear <: AbstractSolver
+    time :: Float64
 end
 
-function solve!(solver::Solver{Linear}, time::Float64)
+function Linear()
+    return Linear(0.0)
+end
+
+function FEMBase.run!(solver::Analysis{Linear})
+    time = solver.properties.time
     problems = get_problems(solver)
     N = 0
     @timeit "assemble problems" for problem in problems
@@ -684,7 +690,7 @@ function (solver::Solver)(time::Float64=0.0)
     run!(solver)
 end
 
-function solve!(solver::Solver{Nonlinear}, time::Float64)
+function solve!(solver::Solver, time::Float64)
     warn("solve!(analysis, time) is deprecated. Instead, use run!(analysis)")
     solver.properties.time = time
     run!(solver)
