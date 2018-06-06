@@ -192,7 +192,7 @@ function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{1}})
     B2 = get_nonzero_columns(C2)
     B == B2 || return false
     I = setdiff(A, B)
-    
+
     debug("# A = $(length(A))")
     debug("# B = $(length(B))")
     debug("# I = $(length(I))")
@@ -232,7 +232,7 @@ function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{2}})
     nz1 = get_nonzero_rows(A)
     nz2 = get_nonzero_columns(A)
     nz1 == nz2 || return false
-    
+
     x = zeros(2*ndofs)
     x[nz1] = lufact(A[nz1,nz2]) \ full(b[nz1])
 
@@ -294,7 +294,7 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
         end
         gc()
     end
- 
+
     #=
     if !haskey(solver, "fint")
         solver.fields["fint"] = field(solver.time => f)
@@ -542,6 +542,7 @@ end
 ### Nonlinear quasistatic solver
 
 type Nonlinear <: AbstractSolver
+    time :: Float64
     iteration :: Int        # iteration counter
     min_iterations :: Int64 # minimum number of iterations
     max_iterations :: Int64 # maximum number of iterations
@@ -550,7 +551,7 @@ type Nonlinear <: AbstractSolver
 end
 
 function Nonlinear()
-    solver = Nonlinear(0, 1, 10, 5.0e-5, true)
+    solver = Nonlinear(0.0, 0, 1, 10, 5.0e-5, true)
     return solver
 end
 
@@ -580,8 +581,9 @@ function has_converged(solver::Solver{Nonlinear})
 end
 
 """ Default solver for quasistatic nonlinear problems. """
-function solve!(solver::Solver{Nonlinear}, time::Float64)
+function FEMBase.run!(solver::Solver{Nonlinear})
 
+    time = solver.properties.time
     problems = get_problems(solver)
     properties = solver.properties
 
@@ -638,9 +640,15 @@ Main differences in this solver, compared to nonlinear solver are:
 
 """
 type Linear <: AbstractSolver
+    time :: Float64
 end
 
-function solve!(solver::Solver{Linear}, time::Float64)
+function Linear()
+    return Linear(0.0)
+end
+
+function FEMBase.run!(solver::Analysis{Linear})
+    time = solver.properties.time
     problems = get_problems(solver)
     N = 0
     @timeit "assemble problems" for problem in problems
@@ -675,6 +683,15 @@ function NonlinearSolver(problems::Problem...)
 end
 
 # will be deprecated
+
 function (solver::Solver)(time::Float64=0.0)
-    solve!(solver, time)
+    warn("analysis(time) is deprecated. Instead, use run!(analysis)")
+    solver.properties.time = time
+    run!(solver)
+end
+
+function solve!(solver::Solver, time::Float64)
+    warn("solve!(analysis, time) is deprecated. Instead, use run!(analysis)")
+    solver.properties.time = time
+    run!(solver)
 end
