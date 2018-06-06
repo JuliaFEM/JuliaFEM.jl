@@ -679,13 +679,13 @@ end
 # will be deprecated
 
 function (solver::Solver)(time::Float64=0.0)
-    warning("analysis(time) is deprecated. Instead, use run!(analysis)")
+    warn("analysis(time) is deprecated. Instead, use run!(analysis)")
     solver.properties.time = time
     run!(solver)
 end
 
 function solve!(solver::Solver{Nonlinear}, time::Float64)
-    warning("solve!(analysis, time) is deprecated. Instead, use run!(analysis)")
+    warn("solve!(analysis, time) is deprecated. Instead, use run!(analysis)")
     solver.properties.time = time
     run!(solver)
 end
