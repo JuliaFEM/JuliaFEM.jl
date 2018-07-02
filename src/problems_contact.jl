@@ -10,7 +10,7 @@ distval
     5 means that distance of slave element midpoint and point to project
     is 5 times larger than length of element
 """
-type Contact <: BoundaryProblem
+mutable struct Contact <: BoundaryProblem
     dimension :: Int
     rotate_normals :: Bool
     finite_sliding :: Bool

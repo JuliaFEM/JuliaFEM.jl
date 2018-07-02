@@ -12,7 +12,7 @@ function Solver{S<:AbstractSolver}(::Type{S}, name="solver", properties...)
 end
 =#
 
-function Solver{S<:AbstractSolver}(::Type{S}, problems::Problem...)
+function Solver(::Type{S}, problems::Problem...) where S<:AbstractSolver
     solver = Solver(S, "$(S)Solver")
     push!(solver.problems, problems...)
     return solver
@@ -471,7 +471,7 @@ function (solver::Solver)(field_name::String, time::Float64)
 end
 
 """ Default update for solver. """
-function update!{S}(solver::Solver{S}, u, la, time)
+function update!(solver::Solver{S}, u, la, time) where S
     #u = solver.u
     #la = solver.la
 
@@ -536,7 +536,7 @@ end
 
 ### Nonlinear quasistatic solver
 
-type Nonlinear <: AbstractSolver
+mutable struct Nonlinear <: AbstractSolver
     time :: Float64
     iteration :: Int        # iteration counter
     min_iterations :: Int64 # minimum number of iterations
@@ -630,7 +630,7 @@ Main differences in this solver, compared to nonlinear solver are:
 2. reassembly of problem is done only if it's manually requested using empty!(problem.assembly)
 
 """
-type Linear <: AbstractSolver
+mutable struct Linear <: AbstractSolver
     time :: Float64
 end
 

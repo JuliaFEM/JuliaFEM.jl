@@ -33,7 +33,7 @@ https://en.wikipedia.org/wiki/Plane_stress
 https://en.wikipedia.org/wiki/Hooke's_law
 
 """
-type Elasticity <: FieldProblem
+mutable struct Elasticity <: FieldProblem
     # these are found from problem.properties for type Problem{Elasticity}
     formulation :: Symbol
     finite_strain :: Bool
@@ -99,10 +99,10 @@ function initialize_internal_params!(params, ip, type_) #::Type{Val{:type_2d}})
 end
 
 """ Assemble 3d continuum elements in general solid mechanics problem. """
-function assemble!{El<:Elasticity3DVolumeElements}(assembly::Assembly,
-                                                   problem::Problem{Elasticity},
-                                                   elements::Vector{Element{El}},
-                                                   time, ::Type{Val{:continuum}})
+function assemble!(assembly::Assembly,
+                   problem::Problem{Elasticity},
+                   elements::Vector{Element{El}},
+                   time, ::Type{Val{:continuum}}) where El<:Elasticity3DVolumeElements
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
 
@@ -342,10 +342,10 @@ function assemble!{El<:Elasticity3DVolumeElements}(assembly::Assembly,
 end
 
 """ Elasticity equations, surface traction for continuum formulation. """
-function assemble!{El<:Elasticity3DSurfaceElements}(assembly::Assembly,
-                                                    problem::Problem{Elasticity},
-                                                    elements::Vector{Element{El}},
-                                                    time, ::Type{Val{:continuum}})
+function assemble!(assembly::Assembly,
+                   problem::Problem{Elasticity},
+                   elements::Vector{Element{El}},
+                   time, ::Type{Val{:continuum}}) where El<:Elasticity3DSurfaceElements
 
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
