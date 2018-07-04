@@ -112,7 +112,6 @@ function get_polygon_clip{T}(xs::Vector{T}, xm::Vector{T}, n::T)
     # 1. test is master point inside slave, if yes, add to clip
     for i=1:nm
         if vertex_inside_polygon(xm[i], xs)
-            # debug("1. $(xm[i]) inside S -> push")
             push!(P, xm[i])
         end
     end
@@ -121,7 +120,6 @@ function get_polygon_clip{T}(xs::Vector{T}, xm::Vector{T}, n::T)
     for i=1:ns
         if vertex_inside_polygon(xs[i], xm)
             approx_in(xs[i], P) && continue
-            # debug("2. $(xs[i]) inside M -> push")
             push!(P, xs[i])
         end
     end
@@ -144,7 +142,6 @@ function get_polygon_clip{T}(xs::Vector{T}, xm::Vector{T}, n::T)
             #info("t=$t, q=$q, q ∈ xm ? $(vertex_inside_polygon(q, xm))")
             if vertex_inside_polygon(q, xm)
                 approx_in(q, P) && continue
-                # debug("3. $q inside M -> push")
                 push!(P, q)
             end
         end
@@ -269,7 +266,6 @@ function check_orientation!(P, n)
     np = length(P)
     s = [dot(n, cross(P[i]-C, P[mod(i+1,np)+1]-C)) for i=1:np]
     all(s .< 0) && return
-    # debug("polygon not in ccw order, fixing")
     # project points to new orthogonal basis Q and sort there
     t1 = (P[1]-C)/norm(P[1]-C)
     t2 = cross(n, t1)
@@ -378,7 +374,6 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
 
     # project slave nodes to auxiliary plane (x0, Q)
     xi = get_mean_xi(slave_element)
-    first_slave_element && debug("midpoint xi = $xi")
     N = vec(get_basis(slave_element, xi, time))
     x0 = interpolate(N, X1)
     n0 = interpolate(N, n1)
@@ -387,8 +382,6 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
     master_elements = slave_element("master elements", time)
 
     if props.dual_basis
-
-        debug("Creating dual basis for element $(slave_element.id)")
 
         De = zeros(nsl, nsl)
         Me = zeros(nsl, nsl)
@@ -460,15 +453,6 @@ function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_elemen
         check_orientation!(P, n0)
         N_P = length(P)
         P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
-
-        if first_slave_element
-            debug("Polygon clip info for first slave element:")
-            debug("S = $S")
-            debug("M = $M")
-            debug("P = $P")
-            debug("N_P = $N_P")
-            debug("P_area = $P_area")
-        end
 
         if isapprox(P_area, 0.0)
             info("Polygon P has zero area: $P_area")
@@ -600,7 +584,6 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
 
             # create auxiliary plane
             xi = get_mean_xi(sub_slave_element)
-            first_slave_element && debug("midpoint xi = $xi")
             N = vec(get_basis(sub_slave_element, xi, time))
             x0 = interpolate(N, X1)
             n0 = interpolate(N, n1)
@@ -683,7 +666,6 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
 
         # create auxiliary plane
         xi = get_mean_xi(sub_slave_element)
-        first_slave_element && debug("midpoint xi = $xi")
         N = vec(get_basis(sub_slave_element, xi, time))
         x0 = interpolate(N, X1)
         n0 = interpolate(N, n1)
@@ -718,15 +700,6 @@ function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Elem
                 check_orientation!(P, n0)
                 N_P = length(P)
                 P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
-
-                if first_slave_element
-                    debug("Polygon clip info for first slave element:")
-                    debug("S = $S")
-                    debug("M = $M")
-                    debug("P = $P")
-                    debug("N_P = $N_P")
-                    debug("P_area = $P_area")
-                end
 
                 if isapprox(P_area, 0.0)
                     warn("Polygon P has zero area: $P_area")
@@ -838,8 +811,6 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
 
     maxdim = maximum(size(C1))
     if problem.properties.alpha != 0.0
-        debug("mortar_3d: size C1 = ", size(C1), " max dim = $maxdim")
-        debug("alpha != 0.0, applying transformation D = Dh*T^-1")
         alp = problem.properties.alpha
         Te = [
                 1.0 0.0 0.0 0.0 0.0 0.0
@@ -884,14 +855,11 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
     end
 
     tol = problem.properties.drop_tolerance
-    debug("Dropping small values from C1 & C2, tolerace = $tol")
     SparseArrays.droptol!(C1, tol)
     SparseArrays.droptol!(C2, tol)
 
     problem.assembly.C1 = C1
     problem.assembly.C2 = C2
-
-    debug("area of interface: $area")
 
 end
 

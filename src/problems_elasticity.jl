@@ -442,7 +442,6 @@ function lsq_fit(problem, elements, field, time)
             volume += w
         end
     end
-    debug("Mass matrix for least-squares fit is assembled. Total volume to fit: $volume")
     A = sparse(A)
     b = sparse(b)
     A = 1/2*(A + A')

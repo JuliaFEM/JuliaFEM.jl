@@ -61,8 +61,6 @@ end
 function assemble!(problem::Problem{Contact}, time::Real)
     if problem.properties.dimension == -1
         problem.properties.dimension = dim = size(first(problem.elements), 1)
-        debug("assuming dimension of mesh tie surface is $dim")
-        debug("if this is wrong set is manually using problem.properties.dimension")
     end
     dimension = Val{problem.properties.dimension}
     finite_sliding = Val{problem.properties.finite_sliding}
