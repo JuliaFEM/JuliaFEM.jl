@@ -77,7 +77,6 @@ function get_temporal_collection(xdmf::Xdmf)
     domain = find_element(xdmf.xml, "Domain")
     grid = nothing
     if domain == nothing
-        debug("Xdmf: creating new temporal collection")
         domain = new_child(xdmf.xml, "Domain")
         grid = new_child(domain, "Grid")
         set_attribute(grid, "CollectionType", "Temporal")
@@ -299,13 +298,11 @@ function new_dataitem{T,N}(xdmf::Xdmf, data::Array{T,N})
         # Path can be whatever as XML format does not store to HDF at all
         return new_dataitem(xdmf, "/whatever", data)
     else
-        debug("Determining path for HDF file automatically.")
         path = "/DataItem_$(xdmf.hdf_counter)"
         while exists(xdmf.hdf, path)
             xdmf.hdf_counter += 1
             path = "/DataItem_$(xdmf.hdf_counter)"
         end
-        debug("HDF path automatically determined to be $path")
         return new_dataitem(xdmf, path, data)
     end
 end
@@ -348,8 +345,6 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
     if domain == nothing
         info("Xdmf: Domain not found, creating.")
         domain = new_child(xml, "Domain")
-    else
-        debug("Xdmf: Domain already defined, skipping.")
     end
 
     # 2. find for TemporalCollection
@@ -360,8 +355,6 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
         set_attribute(temporal_collection, "GridType", "Collection")
         set_attribute(temporal_collection, "Name", "Time")
         set_attribute(temporal_collection, "CollectionType", "Temporal")
-    else
-        debug("Xdmf: Temporal collection found, skipping.")
     end
 
     # 2.1 make sure that Grid element we found really is TemporalCollection

@@ -193,10 +193,6 @@ function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{1}})
     B == B2 || return false
     I = setdiff(A, B)
 
-    debug("# A = $(length(A))")
-    debug("# B = $(length(B))")
-    debug("# I = $(length(I))")
-
     if length(B) == 0
         warn("No rows in C2, forget to set Dirichlet boundary conditions to model?")
     else
@@ -307,7 +303,6 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
     if length(fint) > 1
         # kick in generalized alpha rule for time integration
         alpha = solver.alpha
-        debug("Using generalized-α time integration, α=$alpha")
         K = (1-alpha)*K
         C1 = (1-alpha)*C1
         f = (1-alpha)*f + alpha*fint.data[end-1].second
@@ -571,10 +566,6 @@ function has_converged(solver::Solver{Nonlinear})
             # trivial solution
             has_converged = true
         end
-        debug("Details for problem $(problem.name)")
-        debug("Norm: $(norm(problem.assembly.u))")
-        debug("Norm change: $(problem.assembly.u_norm_change)")
-        debug("Has converged? $(has_converged)")
         converged &= has_converged
     end
     return converged

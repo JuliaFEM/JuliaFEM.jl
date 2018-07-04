@@ -15,11 +15,8 @@ import FEMBase: get_unknown_field_name, get_unknown_field_dimension,
                 assemble!, update!, initialize!
 using FEMBase: get_problems
 
-# from other packages TimerOutputs.jl and Logging.jl
 using TimerOutputs
 export @timeit, print_timer
-using Logging
-export info, debug
 
 import Base: getindex, setindex!, convert, length, size, isapprox,
              similar, start, first, next, done, last, endof, vec,

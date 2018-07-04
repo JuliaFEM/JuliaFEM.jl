@@ -46,7 +46,6 @@ using JuliaFEM.Testing
         a = geom[i]
         b = strain[i]
         c = stress[i]
-        debug("$a -> $b -> $c")
         @test isapprox(b, [-1/3, -1/3, 1.0, 0.0, 0.0, 0.0])
         @test isapprox(c, [0.0, 0.0, 288.0, 0.0, 0.0, 0.0])
     end
