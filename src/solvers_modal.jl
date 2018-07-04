@@ -205,7 +205,7 @@ function FEMBase.run!(solver::Solver{Modal})
     end
 
     if !passed
-        sigma = problem.properties.sigma = 1.0e-9
+        sigma = props.sigma = 1.0e-9
         info("Calculation of eigenvalues failed. Stiffness matrix is not ",
              "positive definite and Cholesky factorization is failing. Trying ",
              "again by adjusting problem.properties.sigma to $sigma.")
