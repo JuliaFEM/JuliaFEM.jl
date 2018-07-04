@@ -164,7 +164,6 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
 
         Ae = De*inv(Me)
     
-        debug("Dual basis coeffients = $Ae")
     end
 
     # loop all polygons
@@ -344,7 +343,6 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
 
         Ae = De*inv(Me)
     
-        debug("Dual basis coeffients = $Ae")
     end
 
     # split slave element to linear sub-elements and loop
@@ -520,8 +518,6 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
 
     maxdim = maximum(size(C1))
     if problem.properties.alpha != 0.0
-        debug("mortar_3d: size C1 = ", size(C1), " max dim = $maxdim")
-        debug("alpha != 0.0, applying transformation D = Dh*T^-1")
         alp = problem.properties.alpha
         Te = [
                 1.0 0.0 0.0 0.0 0.0 0.0
@@ -566,7 +562,6 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
     end
 
     tol = problem.properties.drop_tolerance
-    debug("Dropping small values from C1 & C2, tolerace = $tol")
     SparseArrays.droptol!(C1, tol)
     SparseArrays.droptol!(C2, tol)
 
@@ -650,7 +645,6 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
     for j in S
         dofs = [3*(j-1)+1, 3*(j-1)+2, 3*(j-1)+3]
         if is_inactive[j] == 1
-            debug("$j is inactive, removing dofs $dofs")
             C1[dofs,:] = 0.0
             C2[dofs,:] = 0.0
             D[dofs,:] = 0.0
@@ -663,7 +657,6 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
         dofs = [3*(j-1)+1, 3*(j-1)+2, 3*(j-1)+3]
         tdofs = dofs[[2,3]]
         if (is_active[j] == 1) && (is_slip[j] == 1)
-            debug("$j is in active/slip, removing tangential constraints $tdofs")
             C2[tdofs,:] = 0.0
             g[tdofs] = 0.0
             normal = normals[j]

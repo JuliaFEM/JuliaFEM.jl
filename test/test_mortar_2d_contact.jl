@@ -5,9 +5,6 @@ using JuliaFEM
 using JuliaFEM.Preprocess
 using JuliaFEM.Testing
 
-using Logging
-Logging.configure(level=DEBUG)
-
 mesh = Mesh()
 add_node!(mesh, 1, [0.0, 0.0])
 add_node!(mesh, 2, [1.0, 0.0])

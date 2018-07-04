@@ -4,7 +4,6 @@ ForwardDiff
 LightXML 0.4
 HDF5 0.7
 Formatting
-Logging
 TimerOutputs
 AbaqusReader
 AsterReader
