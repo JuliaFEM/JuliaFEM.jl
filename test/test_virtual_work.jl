@@ -10,11 +10,11 @@ function PlaneStressElasticityProblem(dim::Int=2, elements=[])
     return Problem{PlaneStressElasticityProblem}(dim, elements)
 end
 
-function get_unknown_field_name{P<:PlaneStressElasticityProblem}(::Type{P})
+function get_unknown_field_name(::Type{P}) where P<:PlaneStressElasticityProblem
     return "displacement"
 end
 
-function get_unknown_field_type{P<:PlaneStressElasticityProblem}(::Type{P})
+function get_unknown_field_type(::Type{P}) where P<:PlaneStressElasticityProblem
     return Vector{Float64}
 end
 

@@ -32,7 +32,7 @@ split_quadratic_master_elements
 store_fields
     not used
 """
-type Mortar <: BoundaryProblem
+mutable struct Mortar <: BoundaryProblem
     dimension :: Int
     rotate_normals :: Bool
     adjust :: Bool

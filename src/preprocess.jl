@@ -16,7 +16,7 @@ import Base: copy
 
 using JuliaFEM
 
-type Mesh
+mutable struct Mesh
     nodes :: Dict{Int, Vector{Float64}}
     node_sets :: Dict{Symbol, Set{Int}}
     elements :: Dict{Int, Vector{Int}}
@@ -292,13 +292,13 @@ function reorder_element_connectivity!(mesh::Mesh, mapping::Dict{Symbol, Vector{
     end
 end
 
-function JuliaFEM.Problem{P<:FieldProblem}(mesh::Mesh, ::Type{P}, name::AbstractString, dimension::Int)
+function JuliaFEM.Problem(mesh::Mesh, ::Type{P}, name::AbstractString, dimension::Int) where P<:FieldProblem
     problem = Problem(P, name, dimension)
     problem.elements = create_elements(mesh, name)
     return problem
 end
 
-function JuliaFEM.Problem{P<:BoundaryProblem}(mesh::Mesh, ::Type{P}, name, dimension, parent_field_name)
+function JuliaFEM.Problem(mesh::Mesh, ::Type{P}, name, dimension, parent_field_name) where P<:BoundaryProblem
     problem = Problem(P, name, dimension, parent_field_name)
     problem.elements = create_elements(mesh, name)
     return problem

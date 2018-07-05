@@ -4,17 +4,19 @@
 using JuliaFEM
 using JuliaFEM.Testing
 
-abstract HeatProblem <: AbstractProblem
+abstract type HeatProblem <: AbstractProblem 
+
+end
 
 function HeatProblem(dim::Int=1, elements=[])
     return Problem{HeatProblem}(dim, elements)
 end
 
-function get_unknown_field_name{P<:HeatProblem}(::Type{P})
+function get_unknown_field_name(::Type{P}) where P<:HeatProblem
     return "temperature"
 end
 
-function get_unknown_field_type{P<:HeatProblem}(::Type{P})
+function get_unknown_field_type(::Type{P}) where P<:HeatProblem
     return Float64
 end
 
