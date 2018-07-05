@@ -4,7 +4,7 @@
 """
 Problem u(X) = u₀ in Γ(d)
 """
-type Dirichlet <: BoundaryProblem
+mutable struct Dirichlet <: BoundaryProblem
     formulation :: Symbol
     variational :: Bool
     dual_basis :: Bool

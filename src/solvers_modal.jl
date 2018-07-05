@@ -11,7 +11,7 @@ julia> solver = Solver(Modal)
 julia> push!(solver, problems...)
 julia> solver()
 """
-type Modal <: AbstractSolver
+mutable struct Modal <: AbstractSolver
     time :: Float64
     geometric_stiffness :: Bool
     eigvals :: Vector

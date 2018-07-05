@@ -4,9 +4,9 @@
 const Elasticity2DSurfaceElements = Union{Poi1,Seg2,Seg3}
 const Elasticity2DVolumeElements = Union{Tri3,Tri6,Quad4,Quad8,Quad9}
 
-function assemble!{T}(assembly::Assembly, problem::Problem{Elasticity},
-                      elements::Union{Vector{Element}, Vector{Element{T}}},
-                      time, ::Type{Val{:plane_stress}})
+function assemble!(assembly::Assembly, problem::Problem{Elasticity},
+                   elements::Union{Vector{Element}, Vector{Element{T}}},
+                   time, ::Type{Val{:plane_stress}}) where T
     for element in elements
         gdofs = get_gdofs(problem, element)
         Km, Kg, f = assemble(problem, element, time, Val{:plane})
@@ -16,9 +16,9 @@ function assemble!{T}(assembly::Assembly, problem::Problem{Elasticity},
     end
 end
 
-function assemble!{T}(assembly::Assembly, problem::Problem{Elasticity},
-                      elements::Union{Vector{Element}, Vector{Element{T}}},
-                      time, ::Type{Val{:plane_strain}})
+function assemble!(assembly::Assembly, problem::Problem{Elasticity},
+                   elements::Union{Vector{Element}, Vector{Element{T}}},
+                   time, ::Type{Val{:plane_strain}}) where T
     for element in elements
         gdofs = get_gdofs(problem, element)
         Km, Kg, f = assemble(problem, element, time, Val{:plane})
@@ -29,9 +29,9 @@ function assemble!{T}(assembly::Assembly, problem::Problem{Elasticity},
 end
 
 """ Plane elasticity equations (plane stress, plane strain). """
-function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity},
-                                                  element::Element{El}, time,
-                                                  ::Type{Val{:plane}})
+function assemble(problem::Problem{Elasticity},
+                  element::Element{El}, time,
+                  ::Type{Val{:plane}}) where El<:Elasticity2DVolumeElements
 
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
@@ -184,9 +184,9 @@ function assemble{El<:Elasticity2DVolumeElements}(problem::Problem{Elasticity},
     return Km, Kg, f
 end
 
-function assemble{El<:Elasticity2DSurfaceElements}(problem::Problem{Elasticity},
-                                                   element::Element{El},
-                                                   time, ::Type{Val{:plane}})
+function assemble(problem::Problem{Elasticity},
+                  element::Element{El},
+                  time, ::Type{Val{:plane}}) where El<:Elasticity2DSurfaceElements
 
     props = problem.properties
     dim = get_unknown_field_dimension(problem)

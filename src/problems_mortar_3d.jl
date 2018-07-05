@@ -94,7 +94,7 @@ julia> approx_in(q, P)
 true
 
 """
-function approx_in{T}(q::T, P::Vector{T}; rtol=1.0e-4, atol=0.0)
+function approx_in(q::T, P::Vector{T}; rtol=1.0e-4, atol=0.0) where T
     for p in P
         if isapprox(q, p; rtol=rtol, atol=atol)
             return true
@@ -103,7 +103,7 @@ function approx_in{T}(q::T, P::Vector{T}; rtol=1.0e-4, atol=0.0)
     return false
 end
 
-function get_polygon_clip{T}(xs::Vector{T}, xm::Vector{T}, n::T)
+function get_polygon_clip(xs::Vector{T}, xm::Vector{T}, n::T) where T
     # objective: search does line xm1 - xm2 clip xs
     nm = length(xm)
     ns = length(xs)
@@ -151,9 +151,9 @@ function get_polygon_clip{T}(xs::Vector{T}, xm::Vector{T}, n::T)
 end
 
 """ Project some vertex p to surface of element E using Newton's iterations. """
-function project_vertex_to_surface{E}(p, x0, n0,
-                                      element::Element{E}, x, time;
-                                      max_iterations=10, iter_tol=1.0e-6)
+function project_vertex_to_surface(p, x0, n0,
+                                   element::Element{E}, x, time;
+                                   max_iterations=10, iter_tol=1.0e-6) where E
     basis(xi) = get_basis(element, xi, time)
     function dbasis(xi)
         return get_dbasis(element, xi, time)
@@ -279,7 +279,7 @@ function check_orientation!(P, n)
     end)
 end
 
-function convert_to_linear_element{E}(element::Element{E})
+function convert_to_linear_element(element::Element{E}) where E
     return element
 end
 
@@ -290,7 +290,7 @@ function convert_to_linear_element(element::Element{Tri6})
     return new_element
 end
 
-function split_quadratic_element{E}(element::Element{E}, time::Float64)
+function split_quadratic_element(element::Element{E}, time::Float64) where E
     return [element]
 end
 
@@ -360,7 +360,7 @@ References
 
 [Popp2013] Popp, Alexander, et al. "Improved robustness and consistency of 3D contact algorithms based on a dual mortar approach." Computer Methods in Applied Mechanics and Engineering 264 (2013): 67-80.
 """
-function assemble!{E<:Union{Tri3, Quad4}}(problem::Problem{Mortar}, slave_element::Element{E}, time::Real; first_slave_element=false)
+function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Real; first_slave_element=false) where E<:Union{Tri3, Quad4}
     
     props = problem.properties
     field_dim = get_unknown_field_dimension(problem)
@@ -533,7 +533,7 @@ References
 [Popp1012] Popp, Alexander, et al. "Dual quadratic mortar finite element methods for 3D finite deformation contact." SIAM Journal on Scientific Computing 34.4 (2012): B421-B446.
 
 """
-function assemble!{E<:Union{Tri6}}(problem::Problem{Mortar}, slave_element::Element{E}, time::Real; first_slave_element=false)
+function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Real; first_slave_element=false) where E<:Union{Tri6}
     
     props = problem.properties
     field_dim = get_unknown_field_dimension(problem)
