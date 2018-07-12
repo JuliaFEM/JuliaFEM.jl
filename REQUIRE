@@ -14,3 +14,4 @@ HeatTransfer
 MortarContact2D
 MortarContact2DAD
 FEMBeam
+FEMCoupling

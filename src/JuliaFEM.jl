@@ -203,3 +203,6 @@ export get_nonzero_rows, get_local_coordinates, inside, IP, get_element_type,
        get_element_id, get_nonzero_columns, resize_sparse, resize_sparsevec
 
 end
+
+# Coupling elements
+@reexport using FEMCoupling
