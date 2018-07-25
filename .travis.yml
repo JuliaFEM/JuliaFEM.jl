@@ -3,10 +3,16 @@ os:
   - linux
 julia:
   - 0.6
+  - 0.7
+  - nightly
 addons:
     apt:
         packages:
             - hdf5-tools
+matrix:
+    allow_failures:
+        - julia: 0.7
+        - julia: nightly
 notifications:
   email: false
   webhooks:
