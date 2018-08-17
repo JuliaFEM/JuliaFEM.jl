@@ -1,9 +1,11 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-# # Linear Static Example
+# # JuliaFEM Linear Static Example
+
 
 # ![](linear_static/freecad.png)
+
 
 # ## Preprocessing
 using JuliaFEM
@@ -69,7 +71,7 @@ end
 
 # The fixed boundary conditions are defined next.
 
-fixed = Problem(Dirichlet, "fixed", 3, "displacement");
+fixed = Problem(Dirichlet, "fixed", 3, "displacement")
 fixed_elements = create_nodal_elements(mesh, "mid_fixed")
 add_elements!(fixed, fixed_elements)
 update!(fixed_elements, "displacement 1", 0.0)
@@ -84,9 +86,11 @@ update!(model_elements, "displacement load 1", 1.0)
 analysis = Analysis(Linear, model, fixed)
 
 # Let's request xdmf resuls
+
 add_results_writer!(analysis, Xdmf("model_results"; overwrite=true))
 
 # Now we have all we need to run the analysis.
+
 run!(analysis)
 
 # ## Postprocessing
@@ -95,14 +99,37 @@ push!(model.postprocess_fields,"stress")
 
 # Finally let's write the results to the xdmf (this is bug, the solver should
 # do this automatically)
+
 time = 0.0
 JuliaFEM.postprocess!(analysis,time)
 JuliaFEM.write_results!(analysis,time)
 
 # In order to look the results, we will need to close the xdmf that it is actually
 # written to the file from buffer.
+
 close(analysis.results_writers[1].hdf)
 
 # Finally when we open the model in ParaView and set some settings we have this
 # end result.
+
+
 # ![](linear_static/paraview.png)
+
+
+
+# ## Testing
+# First let's test that we have the output files writen to the disk
+
+using Base.Test
+@test isfile("model_results.xmf")
+@test isfile("model_results.h5")
+
+# Secondly let's test that we have the same maximum displacement each time. 
+# This is also an usefull example how to access the displacements values.
+
+time = 0.0
+u = analysis("displacement", time)
+u_norms = Dict(i => norm(j) for (i, j) in u)
+@test isapprox(maximum(values(u_norms)),2.4052929896922337)
+
+
