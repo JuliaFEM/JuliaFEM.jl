@@ -41,7 +41,7 @@ model.elements = collect(filter(x -> !isa(x, Union{Element{Seg3},
 # define a function, which finds nodes on the given plane yz, xz or xy from the
 # given height.
 
-function find_nodes_at_certain_plane!(mesh,name,vector_id,distance,radius=6.0)
+function add_nodes_at_certain_plane_to_node_set!(mesh,name,vector_id,distance,radius=6.0)
     for (node, coords) in mesh.nodes
         if isapprox(coords[vector_id], distance, atol=radius)
             add_node_to_node_set!(mesh,name,node)
@@ -52,8 +52,8 @@ end
 # We will find nodes from the xz-plane going through point (0,50,0) or actually
 # we previously defined the radius to be 6.0, which means (0,[44,56],0). In other
 # words we will select each node, which second coordinate value is between 44
-# and 56.
-find_nodes_at_certain_plane!(mesh,:mid_fixed,2,50.0)
+# and 56. This function will edit mesh object and add node set called `:mid_fixed` to it. 
+add_nodes_at_certain_plane_to_node_set!(mesh,:mid_fixed,2,50.0)
 
 # We need to somehow handle the i's dot. I looked the rough coordinates of the
 # dot in FreeCAD and now we can search three closest nodes to these coordinates.
@@ -68,7 +68,7 @@ end
 
 fixed = Problem(Dirichlet, "fixed", 3, "displacement");
 fixed_elements = create_nodal_elements(mesh, "mid_fixed")
-JuliaFEM.add_elements!(fixed, fixed_elements)
+add_elements!(fixed, fixed_elements)
 update!(fixed_elements, "displacement 1", 0.0)
 update!(fixed_elements, "displacement 2", 0.0)
 update!(fixed_elements, "displacement 3", 0.0)
@@ -78,7 +78,7 @@ update!(fixed_elements, "displacement 3", 0.0)
 update!(model_elements, "displacement load 1", 1.0)
 
 # Finally the ´Analysis` couples everything togeter.
-analysis = Analysis(Linear,model, fixed);
+analysis = Analysis(Linear, model, fixed)
 
 # Let's request xdmf resuls
 add_results_writer!(analysis, Xdmf("model_results"; overwrite=true))
@@ -92,8 +92,9 @@ push!(model.postprocess_fields,"stress")
 
 # Finally let's write the results to the xdmf (this is bug, the solver should
 # do this automatically)
-JuliaFEM.postprocess!(analysis,0.0)
-JuliaFEM.write_results!(analysis,0.0)
+time = 0.0
+JuliaFEM.postprocess!(analysis,time)
+JuliaFEM.write_results!(analysis,time)
 
 # In order to look the results, we will need to close the xdmf that it is actually
 # written to the file from buffer.
