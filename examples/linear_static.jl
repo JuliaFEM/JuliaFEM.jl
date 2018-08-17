@@ -33,13 +33,16 @@ update!(model_elements, "density", 7.80E-9)
 JuliaFEM.add_elements!(model, model_elements)
 
 # Let's ingore Seg3 and Tri6 elements using `filter`
+
 model.elements = collect(filter(x -> !isa(x, Union{Element{Seg3},
-                                            Element{Tri6}}), model.elements));
+                                            Element{Tri6}}), model.elements))
+
 
 # The whole idea of the JuliaFEM input is to be a normal Julia script, where the
 # user can freely define any functions needed to perform the task. Here we
 # define a function, which finds nodes on the given plane yz, xz or xy from the
 # given height.
+
 
 function add_nodes_at_certain_plane_to_node_set!(mesh,name,vector_id,distance,radius=6.0)
     for (node, coords) in mesh.nodes
