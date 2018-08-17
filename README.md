@@ -90,6 +90,24 @@ Readability counts.
 Errors should never pass silently.
 ```
 
+## Citing
+
+If you like using our package, please consider citing our [article](https://rakenteidenmekaniikka.journal.fi/article/view/64224/26397)
+```
+@article{frondelius2017juliafem,
+  title={JuliaFEM - open source solver for both industrial and academia usage},
+  volume={50}, 
+  url={https://rakenteidenmekaniikka.journal.fi/article/view/64224},
+  DOI={10.23998/rm.64224},
+  number={3},
+  journal={Rakenteiden Mekaniikka},
+  author={Frondelius, Tero and Aho, Jukka},
+  year={2017},
+  pages={229-233}
+}
+```
+
+
 ## Contributing
 
 Developing JuliaFEM encourages good practices, starting from unit testing both
