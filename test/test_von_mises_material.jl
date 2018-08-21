@@ -3,9 +3,9 @@
 
 #using PyPlot
 #using JuliaFEM
-#using JuliaFEM.Testing
 #using JuliaFEM.MaterialModels: stiffnessTensor, calculate_stress, State
 #using JuliaFEM.MaterialModels: stiffnessTensorPlaneStress
+using Test
 
 #=
 function test_von_mises_3D_basic()
@@ -59,7 +59,7 @@ function test_von_mises_3D_basic()
         a[3, 2] = b[4]
     end
 
-    info("Starting calculation")
+    @info("Starting calculation")
     tic()
     params = Dict("yield_stress" => stress_y)
     stress_new = zeros(Float64, 6)
@@ -117,7 +117,7 @@ function test_von_mises_3D_basic()
     end
 
 
-    info("Calculation finished")
+    @info("Calculation finished")
     # plot3D(ee, ss)
 
 
@@ -224,7 +224,7 @@ function test_von_mises_planestress_basic()
     eig_stress = zeros(Float64, (3, 3))
     eig_vals = zeros(Float64, (steps, 3))
 
-    info("Starting calculation")
+    @info("Starting calculation")
     tic()
 
     stress_new = zeros(Float64, 3)

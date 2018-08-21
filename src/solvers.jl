@@ -76,8 +76,8 @@ function get_field_assembly(solver::Solver)
     M = sparse(M, N, N)
     K = sparse(K, N, N)
     if nnz(K) == 0
-        warn("Field assembly seems to be empty. Check that elements are ",
-             "pushed to problem and formulation is correct.")
+        @warn("Field assembly seems to be empty. Check that elements are ",
+              "pushed to problem and formulation is correct.")
     end
     Kg = sparse(Kg, N, N)
     f = sparse(f, N, 1)
@@ -98,26 +98,26 @@ function check_for_overconstrained_dofs(solver::Solver)
         overconstrained_dofs = intersect(constrained_dofs, new_constraints)
         all_overconstrained_dofs = union(all_overconstrained_dofs, overconstrained_dofs)
         if length(overconstrained_dofs) != 0
-            warn("problem is overconstrained, finding overconstrained dofs... ")
+            @warn("problem is overconstrained, finding overconstrained dofs... ")
             overdetermined = true
             for dof in overconstrained_dofs
                 for problem_ in boundary_problems
                     new_constraints_ = Set(problem_.assembly.C2.I)
                     new_constraints_ = setdiff(new_constraints_, problem_.assembly.removed_dofs)
                     if dof in new_constraints_
-                        warn("overconstrained dof $dof defined in problem $(problem_.name)")
+                        @warn("overconstrained dof $dof defined in problem $(problem_.name)")
                     end
                 end
-                warn("To solve overconstrained situation, remove dofs from problems so that it exists only in one.")
-                warn("To do this, use push! to add dofs to remove to problem.assembly.removed_dofs, e.g.")
-                warn("`push!(bc.assembly.removed_dofs, $dof`)")
+                @warn("To solve overconstrained situation, remove dofs from problems so that it exists only in one.")
+                @warn("To do this, use push! to add dofs to remove to problem.assembly.removed_dofs, e.g.")
+                @warn("`push!(bc.assembly.removed_dofs, $dof`)")
             end
         end
         constrained_dofs = union(constrained_dofs, new_constraints)
     end
     if overdetermined
-        warn("List of all overconstrained dofs:")
-        warn(sort(collect(all_overconstrained_dofs)))
+        @warn("List of all overconstrained dofs:")
+        @warn(sort(collect(all_overconstrained_dofs)))
         error("problem is overconstrained, not continuing to solution.")
     end
     return true
@@ -149,9 +149,9 @@ function get_boundary_assembly(solver::Solver, N)
         f_ = sparse(assembly.f, N, 1)
         g_ = sparse(assembly.g, N, 1)
         for dof in assembly.removed_dofs
-            info("$(problem.name): removing dof $dof from assembly")
-            C1_[dof,:] = 0.0
-            C2_[dof,:] = 0.0
+            @info("$(problem.name): removing dof $dof from assembly")
+            C1_[dof,:] .= 0.0
+            C2_[dof,:] .= 0.0
         end
         SparseArrays.dropzeros!(C1_)
         SparseArrays.dropzeros!(C2_)
@@ -160,9 +160,9 @@ function get_boundary_assembly(solver::Solver, N)
         new_constraints = get_nonzero_rows(C2_)
         overconstrained_dofs = intersect(already_constrained, new_constraints)
         if length(overconstrained_dofs) != 0
-            warn("overconstrained dofs $overconstrained_dofs")
-            warn("already constrained = $already_constrained")
-            warn("new constraints = $new_constraints")
+            @warn("overconstrained dofs $overconstrained_dofs")
+            @warn("already constrained = $already_constrained")
+            @warn("new constraints = $new_constraints")
             overconstrained_dofs = sort(overconstrained_dofs)
             error("overconstrained dofs, not solving problem.")
         end
@@ -194,17 +194,17 @@ function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{1}})
     I = setdiff(A, B)
 
     if length(B) == 0
-        warn("No rows in C2, forget to set Dirichlet boundary conditions to model?")
+        @warn("No rows in C2, forget to set Dirichlet boundary conditions to model?")
     else
-        u[B] = lufact(C2[B,B2]) \ full(g[B])
+        u[B] = lu(C2[B,B2]) \ Vector(g[B])
     end
 
     # solve interior domain using LDLt factorization
-    F = ldltfact(K[I,I])
-    u[I] = F \ (f[I] - K[I,B]*u[B])
+    F = ldlt(K[I,I])
+    u[I] = F \ Vector(f[I] - K[I,B]*u[B])
 
     # solve lagrange multipliers
-    la[B] = lufact(C1[B2,B]) \ full(f[B] - K[B,I]*u[I] - K[B,B]*u[B])
+    la[B] = lu(C1[B2,B]) \ Vector(f[B] - K[B,I]*u[I] - K[B,B]*u[B])
 
     return true
 end
@@ -249,14 +249,16 @@ function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{3}})
     b = [f; g]
 
     ndofs = size(K, 2)
-    nz = ones(2*ndofs)
-    nz[get_nonzero_rows(A)] = 0.0
-    A += spdiagm(nz)
+    nonzero_rows = zeros(2*ndofs)
+    for j in rowvals(A)
+        nonzero_rows[j] = 1.0
+    end
+    A += sparse(Diagonal(1.0 .- nonzero_rows))
 
-    x = lufact(A) \ full(b)
+    x = lu(A) \ Vector(b[:])
 
-    u[:] = x[1:ndofs]
-    la[:] = x[ndofs+1:end]
+    u[:] .= x[1:ndofs]
+    la[:] .= x[ndofs+1:end]
 
     return true
 end
@@ -264,7 +266,7 @@ end
 """ Default linear system solver for solver. """
 function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric=true)
 
-    info("Solving problems ...")
+    @info("Solving problems ...")
     t0 = Base.time()
 
     # assemble field & boundary problems
@@ -288,7 +290,6 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
         for problem in get_field_problems(solver)
             empty!(problem.assembly)
         end
-        gc()
     end
 
     #=
@@ -313,25 +314,25 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
     u = zeros(ndofs)
     la = zeros(ndofs)
     is_solved = false
-    i = 0
+    local i
     for i in [1, 2, 3]
         is_solved = solve!(solver, K, C1, C2, D, f, g, u, la, Val{i})
         if is_solved
+            t1 = round(Base.time()-t0; digits=2)
+            @info("Solved problems in $t1 seconds using solver $i.")
             break
         end
     end
     if !is_solved
         error("Failed to solve linear system!")
     end
-    t1 = round(Base.time()-t0, 2)
     norms = (norm(u), norm(la))
     #push!(solver.norms, norms)
 
     #solver.u = u
     #solver.la = la
 
-    info("Solved problems in $t1 seconds using solver $i.")
-    info("Solution norms = $norms.")
+    @info("Solution norms = $norms.")
 
     return u, la
 end
@@ -347,7 +348,7 @@ populated with global stiffness matrix, force vector, and, optionally,
 mass matrix.
 """
 function assemble!(solver::Solver, time::Float64; with_mass_matrix=false)
-    info("Assembling problems ...")
+    @info("Assembling problems ...")
 
     for problem in get_problems(solver)
         timeit("assemble $(problem.name)") do
@@ -373,7 +374,7 @@ function assemble!(solver::Solver, time::Float64; with_mass_matrix=false)
     end
     solver.ndofs = ndofs
     =#
-    info("Assembly done!")
+    @info("Assembly done!")
 end
 
 function get_unknown_fields(solver::Solver)
@@ -399,18 +400,18 @@ end
 """ Default initializer for solver. """
 function initialize!(solver::Solver)
     if solver.initialized
-        warn("initialize!(): solver already initialized")
+        @warn("initialize!(): solver already initialized")
         return
     end
-    info("Initializing solver ...")
+    @info("Initializing solver ...")
     problems = get_problems(solver)
     length(problems) != 0 || error("Empty solver, add problems to solver using push!")
     t0 = Base.time()
     field_problems = get_field_problems(solver)
-    length(field_problems) != 0 || warn("No field problem found from solver, add some..?")
+    length(field_problems) != 0 || @warn("No field problem found from solver, add some..?")
     field_name = get_unknown_field_name(solver)
     field_dim = get_unknown_field_dimension(solver)
-    info("initialize!(): looks we are solving $field_name, $field_dim dofs/node")
+    @info("initialize!(): looks we are solving $field_name, $field_dim dofs/node")
     nodes = Set{Int64}()
     for problem in problems
         initialize!(problem, solver.time)
@@ -420,9 +421,9 @@ function initialize!(solver::Solver)
         end
     end
     nnodes = length(nodes)
-    info("Total number of nodes in problems: $nnodes")
+    @info("Total number of nodes in problems: $nnodes")
     maxdof = maximum(nodes)*field_dim
-    info("# of max dof (=size of solution vector) is $maxdof")
+    @info("# of max dof (=size of solution vector) is $maxdof")
     solver.u = zeros(maxdof)
     solver.la = zeros(maxdof)
     # TODO: this could be used to initialize elements too...
@@ -432,8 +433,8 @@ function initialize!(solver::Solver)
         problem.assembly.la = zeros(maxdof)
         # initialize(problem, ....)
     end
-    t1 = round(Base.time()-t0, 2)
-    info("Initialized solver in $t1 seconds.")
+    t1 = round(Base.time()-t0; digits=2)
+    @info("Initialized solver in $t1 seconds.")
     solver.initialized = true
 end
 
@@ -459,7 +460,7 @@ function (solver::Solver)(field_name::String, time::Float64)
             continue
         end
         if length(field) == 0
-            warn("no field $field_name found for problem $(problem.name)")
+            @warn("no field $field_name found for problem $(problem.name)")
             continue
         end
         push!(fields, field)
@@ -475,7 +476,7 @@ function update!(solver::Solver{S}, u, la, time) where S
     #u = solver.u
     #la = solver.la
 
-    info("Updating problems ...")
+    @info("Updating problems ...")
     t0 = Base.time()
 
     for problem in get_problems(solver)
@@ -487,8 +488,8 @@ function update!(solver::Solver{S}, u, la, time) where S
         update!(problem, assembly, elements, time)
     end
 
-    t1 = round(Base.time()-t0, 2)
-    info("Updated problems in $t1 seconds.")
+    t1 = round(Base.time()-t0; digits=2)
+    @info("Updated problems in $t1 seconds.")
 end
 
 """ Default postprocess for solver. Loop all problems and run postprocess
@@ -496,11 +497,11 @@ functions to calculate secondary fields, i.e. contact pressure, stress,
 heat flux, reaction force etc. quantities.
 """
 function postprocess!(solver::Solver, time)
-    info("Running postprocess scripts for solver...")
+    @info("Running postprocess scripts for solver...")
     for problem in get_problems(solver)
         for field_name in problem.postprocess_fields
             field = Val{Symbol(field_name)}
-            info("Running postprocess for problem $(problem.name), field $field_name")
+            @info("Running postprocess for problem $(problem.name), field $field_name")
             postprocess!(problem, time, field)
         end
     end
@@ -517,9 +518,9 @@ to Xdmf file. By default write the main unknown field (displacement, temperature
 function write_results!(solver, time)
     results_writers = get_results_writers(solver)
     if length(results_writers) == 0
-        info("Xdmf is not attached to solver, not writing output to a file.")
-        info("To write results to Xdmf file, attach Xdmf to Solver, i.e.")
-        info("add_results_writer!(solver, Xdmf(\"results\"))")
+        @info("Xdmf is not attached to solver, not writing output to a file.")
+        @info("To write results to Xdmf file, attach Xdmf to Solver, i.e.")
+        @info("add_results_writer!(solver, Xdmf(\"results\"))")
         return
     end
     # FIXME: result writer can be anything, not only Xdmf
@@ -585,10 +586,10 @@ function FEMBase.run!(solver::Solver{Nonlinear})
 
     # 2. start non-linear iterations
     for properties.iteration=1:properties.max_iterations
-        info(repeat("-", 80))
-        info("Starting nonlinear iteration #$(properties.iteration)")
-        info("Increment time t=$(round(time, 3))")
-        info(repeat("-", 80))
+        @info(repeat("-", 80))
+        @info("Starting nonlinear iteration #$(properties.iteration)")
+        @info("Increment time t=$(round(time; digits=3))")
+        @info(repeat("-", 80))
 
         # 2.1 update assemblies
         for problem in problems
@@ -604,7 +605,7 @@ function FEMBase.run!(solver::Solver{Nonlinear})
 
         # 2.4 check convergence
         if properties.iteration >= properties.min_iterations && has_converged(solver)
-            info("Converged in $(properties.iteration) iterations.")
+            @info("Converged in $(properties.iteration) iterations.")
             # 2.4.1 run any postprocessing of problems
             postprocess!(solver, time)
             # 2.4.2 update Xdmf output
@@ -676,13 +677,13 @@ end
 # will be deprecated
 
 function (solver::Solver)(time::Float64=0.0)
-    warn("analysis(time) is deprecated. Instead, use run!(analysis)")
+    @warn("analysis(time) is deprecated. Instead, use run!(analysis)")
     solver.properties.time = time
     run!(solver)
 end
 
 function solve!(solver::Solver, time::Float64)
-    warn("solve!(analysis, time) is deprecated. Instead, use run!(analysis)")
+    @warn("solve!(analysis, time) is deprecated. Instead, use run!(analysis)")
     solver.properties.time = time
     run!(solver)
 end

@@ -54,12 +54,12 @@ end
 
 function assemble!(problem::Problem{Mortar}, time::Float64)
     if length(problem.elements) == 0
-        warn("No elements defined in interface $(problem.name), this will result empty assembly!")
+        @warn("No elements defined in interface $(problem.name), this will result empty assembly!")
         return
     end
     if problem.properties.dimension == -1
         problem.properties.dimension = dim = size(first(problem.elements), 1)
-        info("Assuming dimension of mesh tie surface is $dim. If this is wrong set is manually using problem.properties.dimension")
+        @info("Assuming dimension of mesh tie surface is $dim. If this is wrong set is manually using problem.properties.dimension")
     end
     dimension = Val{problem.properties.dimension}
     use_forwarddiff = Val{problem.properties.use_forwarddiff}
@@ -99,7 +99,7 @@ end
 
 """ Function to print useful debug information from interface to find bugs. """
 function diagnose_interface(problem::Problem{Mortar}, time::Float64)
-    info("Diagnosing Mortar interface...")
+    @info("Diagnosing Mortar interface...")
     props = problem.properties
     field_dim = get_unknown_field_dimension(problem)
     field_name = get_parent_field_name(problem)
@@ -108,13 +108,13 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
     I_area = 0.0
 
     if props.split_quadratic_slave_elements
-        info("props.split_quadratic_slave_elements = true")
+        @info("props.split_quadratic_slave_elements = true")
         if !props.linear_surface_elements
-            warn("Mortar3D: split_quadratic_surfaces = true and linear_surface_elements = false maybe have unexpected behavior")
+            @warn("Mortar3D: split_quadratic_surfaces = true and linear_surface_elements = false maybe have unexpected behavior")
         end
         slave_elements = split_quadratic_elements(slave_elements, time)
     end
-    info("Number of slave elements in interface: $(length(slave_elements))")
+    @info("Number of slave elements in interface: $(length(slave_elements))")
 
     # 1. calculate nodal normals and tangents for slave element nodes j ∈ S
     normals = calculate_normals(slave_elements, time, Val{2};
@@ -127,25 +127,25 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
 
     for slave_element in slave_elements
 
-        info(repeat("-", 80))
-        info("Processing slave element $(slave_element.id), type = $(get_element_type(slave_element))")
-        info(repeat("-", 80))
+        @info(repeat("-", 80))
+        @info("Processing slave element $(slave_element.id), type = $(get_element_type(slave_element))")
+        @info(repeat("-", 80))
 
         S_area = 0.0
         S_area_in_contact = 0.0
         for ip in get_integration_points(slave_element)
             S_area += ip.weight*slave_element(ip, time, Val{:detJ})
         end
-        info("Total area of slave element = $S_area")
+        @info("Total area of slave element = $S_area")
 
 
         if props.linear_surface_elements
-            info("Converting slave element to linear surface element")
+            @info("Converting slave element to linear surface element")
             slave_element = convert_to_linear_element(slave_element)
         end
 
         slave_element_nodes = get_connectivity(slave_element)
-        info("Slave element connectivity = $slave_element_nodes")
+        @info("Slave element connectivity = $slave_element_nodes")
         nsl = length(slave_element)
         X1 = slave_element("geometry", time)
         n1 = tuple(collect(normals[j] for j in slave_element_nodes)...)
@@ -155,10 +155,10 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
         N = vec(get_basis(slave_element, xi, time))
         x0 = interpolate(N,X1)
         n0 = interpolate(N,n1)
-        info("Auxiliary plane x0 = $x0, n0 = $n0")
+        @info("Auxiliary plane x0 = $x0, n0 = $n0")
         S = Vector[project_vertex_to_auxiliary_plane(X1[i], x0, n0) for i=1:nsl]
         check_orientation!(S, n0)
-        info("Slave element $(slave_element.id) vertices in auxiliary plane: $S")
+        @info("Slave element $(slave_element.id) vertices in auxiliary plane: $S")
 
         # 3. loop all master elements
         master_elements = slave_element("master elements", time)
@@ -190,17 +190,17 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
                     continue
                 end
                 if length(P) == 1
-                    info("length(P) == 1, shared vertex")
+                    @info("length(P) == 1, shared vertex")
                 end
                 if length(P) == 2
-                    info("length(P) == 2, shared edge")
+                    @info("length(P) == 2, shared edge")
                 end
                 continue
             end
-            info("Master element $(master_element.id) vertices in auxiliary plane = $M")
+            @info("Master element $(master_element.id) vertices in auxiliary plane = $M")
             check_orientation!(P, n0)
             P_area_ = calculate_polygon_area(P)
-            info("Polygon clip found, P=$P, N_P = $(length(P)), area of polygon = $P_area_")
+            @info("Polygon clip found, P=$P, N_P = $(length(P)), area of polygon = $P_area_")
             if isapprox(P_area_, 0.0)
                 error("Polygon P has zero area: $P_area_")
             end
@@ -208,11 +208,11 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
             P_area = 0.0
 
             C0 = calculate_centroid(P)
-            info("Centroid of polygon = $C0")
+            @info("Centroid of polygon = $C0")
 
             # 4. loop integration cells
             all_cells = get_cells(P, C0)
-            info("Polygon is splitted to $(length(all_cells)) integration cells.")
+            @info("Polygon is splitted to $(length(all_cells)) integration cells.")
             for (cell_id, cell) in enumerate(all_cells)
                 C_area = 0.0
                 virtual_element = Element(Tri3, Int[])
@@ -229,7 +229,7 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
                     xi_m, alpha = project_vertex_to_surface(x_gauss, x0, n0, master_element, X2, time)
                     C_area += w
                 end # integration points done
-                info("Cell $cell_id has area of $C_area")
+                @info("Cell $cell_id has area of $C_area")
                 P_area += C_area
                 push!(C_areas, C_area)
             end # integration cells done
@@ -245,15 +245,15 @@ function diagnose_interface(problem::Problem{Mortar}, time::Float64)
 
         S_perc = S_area_in_contact / S_area * 100.0
         push!(S_areas, S_area_in_contact)
-        info("Area of slave element in contact: $S_area_in_contact, it's $S_perc % of total element area")
+        @info("Area of slave element in contact: $S_area_in_contact, it's $S_perc % of total element area")
 
         I_area += S_area_in_contact
 
     end # slave elements done, contact virtual work ready
 
-    info("Area of interface: $I_area")
-    info("Smallest cell area: $(minimum(C_areas))")
-    info("Smallest polygon area: $(minimum(P_areas))")
-    info("Smallest slave element area in contact: $(minimum(S_areas))")
+    @info("Area of interface: $I_area")
+    @info("Smallest cell area: $(minimum(C_areas))")
+    @info("Smallest polygon area: $(minimum(P_areas))")
+    @info("Smallest slave element area in contact: $(minimum(S_areas))")
 
 end

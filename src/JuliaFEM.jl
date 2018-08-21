@@ -1,14 +1,13 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-# __precompile__()
-
 """
-This is JuliaFEM -- Finite Element Package
+    JuliaFEM -- Finite Element Package
 """
 module JuliaFEM
 
-using Reexport
+using SparseArrays, LinearAlgebra, Statistics
+using Reexport, ForwardDiff, LightXML, HDF5
 
 @reexport using FEMBase
 import FEMBase: get_unknown_field_name, get_unknown_field_dimension,
@@ -21,12 +20,7 @@ export @timeit, print_timer
 import Base: getindex, setindex!, convert, length, size, isapprox,
              similar, start, first, next, done, last, endof, vec,
              ==, +, -, *, /, haskey, copy, push!, isempty, empty!,
-             append!, sparse, full, read
-
-module Testing
-using Base.Test
-export @test, @testset, @test_throws
-end
+             append!, read, copy
 
 using AbaqusReader
 using AsterReader
@@ -70,31 +64,29 @@ include("problems_contact_3d.jl")
 #include("problems_contact_3d_autodiff.jl")
 export Contact
 
-# Preprocess module
-
 module Preprocess
-using FEMBase
+end
+
+using FEMBase, SparseArrays, LinearAlgebra
 include("preprocess.jl")
-export create_elements, Mesh, add_node!, add_nodes!, add_element!,
-       add_elements!, add_element_to_element_set!, add_node_to_node_set!,
+export create_elements, Mesh, add_node!, add_nodes!,
+       add_element_to_element_set!, add_node_to_node_set!,
        find_nearest_nodes, find_nearest_node, reorder_element_connectivity!,
        create_node_set_from_element_set!, filter_by_element_set
 include("preprocess_abaqus_reader.jl")
 export abaqus_read_mesh, create_surface_elements, create_nodal_elements
 include("preprocess_aster_reader.jl")
 export aster_read_mesh
-end
 
 # Postprocess module
 
 module Postprocess
-using FEMBase
-using FEMBase: get_elements
+end
+
 include("postprocess_utils.jl")
 export calc_nodal_values!, get_nodal_vector, get_nodal_dict, copy_field!,
-       calculate_area, calculate_center_of_mass,
-       calculate_second_moment_of_mass, extract
-end
+       calculate_area, calculate_center_of_mass, calculate_second_moment_of_mass,
+       extract
 
 include("deprecations.jl")
 

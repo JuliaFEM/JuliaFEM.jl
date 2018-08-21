@@ -1,11 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM
-using JuliaFEM.Preprocess
-using JuliaFEM.Postprocess
-using JuliaFEM.Testing
-
+using JuliaFEM, Test
 using AsterReader: RMEDFile, aster_read_nodes, aster_read_data
 
 #=
@@ -15,48 +11,49 @@ Put constant temperature 1.0 for inner surface of inner ring and 2.0 for outer
 surface of outer ring. We should expect constant temperature in contact surface.
 This is conforming mesh so result should match to the conforming situation.
 =#
-@testset "test that curved interface transfers constant field without error, two rings problem" begin
-    meshfile = @__DIR__() * "/testdata/primitives.med"
-    mesh = aster_read_mesh(meshfile, "RINGS")
 
-    ring1 = Problem(Heat, "RING1", 1)
-    ring1.elements = create_elements(mesh, "RING1")
-    update!(ring1.elements, "thermal conductivity", 1.0)
+## test that curved interface transfers constant field without error, two rings problem
 
-    ring2 = Problem(Heat, "RING2", 1)
-    ring2.elements = create_elements(mesh, "RING2")
-    update!(ring2.elements, "thermal conductivity", 1.0)
+meshfile = @__DIR__() * "/testdata/primitives.med"
+mesh = aster_read_mesh(meshfile, "RINGS")
 
-    bc_inner = Problem(Dirichlet, "INNER SURFACE", 1, "temperature")
-    bc_inner.elements = create_elements(mesh, "RING1_INNER")
-    update!(bc_inner, "temperature 1", 1.0)
+ring1 = Problem(Heat, "RING1", 1)
+ring1_elements = create_elements(mesh, "RING1")
+update!(ring1_elements, "thermal conductivity", 1.0)
+add_elements!(ring1, ring1_elements)
 
-    bc_outer = Problem(Dirichlet, "OUTER SURFACE", 1, "temperature")
-    bc_outer.elements = create_elements(mesh, "RING2_OUTER")
-    update!(bc_outer, "temperature 1", 2.0)
+ring2 = Problem(Heat, "RING2", 1)
+ring2_elements = create_elements(mesh, "RING2")
+update!(ring2_elements, "thermal conductivity", 1.0)
+add_elements!(ring2, ring2_elements)
 
-    interface = Problem(Mortar, "interface between rings", 1, "temperature")
-    interface_slave = create_elements(mesh, "RING1_OUTER")
-    interface_master = create_elements(mesh, "RING2_INNER")
-    interface.elements = [interface_slave; interface_master]
-    update!(interface_slave, "master elements", interface_master)
+bc_inner = Problem(Dirichlet, "INNER SURFACE", 1, "temperature")
+bc_inner_elements = create_elements(mesh, "RING1_INNER")
+update!(bc_inner_elements, "temperature 1", 1.0)
+add_elements!(bc_inner, bc_inner_elements)
 
-    solver = LinearSolver(ring1, ring2, bc_inner, bc_outer, interface)
-    solver()
+bc_outer = Problem(Dirichlet, "OUTER SURFACE", 1, "temperature")
+bc_outer_elements = create_elements(mesh, "RING2_OUTER")
+update!(bc_outer_elements, "temperature 1", 2.0)
+add_elements!(bc_outer, bc_outer_elements)
 
-    fn = @__DIR__() * "/testdata/rings.rmed"
-    results = RMEDFile(fn)
-    nodes = aster_read_nodes(results)
-    temp_ca = aster_read_data(results, "TEMP")
+interface = Problem(Mortar, "interface between rings", 1, "temperature")
+interface_slave = create_elements(mesh, "RING1_OUTER")
+interface_master = create_elements(mesh, "RING2_INNER")
+update!(interface_slave, "master elements", interface_master)
+add_elements!(interface, interface_slave, interface_master)
 
-    passed = true
-    for j in sort(collect(keys(nodes)))
-        X = nodes[j]
-        T1 = solver("temperature", X, 0.0)
-        T2 = temp_ca[j]
-        rtol = norm(T1-T2) / max(T1,T2)
-        @printf "% 5i : %8.5f %8.5f %8.5f | %8.5f %8.5f | %8.5f\n" j X... T1 T2 rtol
-        passed = passed && (rtol < 1.0e-12)
-    end
-    @test passed
-end
+analysis = Analysis(Linear)
+add_problems!(analysis, ring1, ring2, bc_inner, bc_outer, interface)
+run!(analysis)
+
+fn = @__DIR__() * "/testdata/rings.rmed"
+results = RMEDFile(fn)
+nodes = aster_read_nodes(results)
+temp_ca = aster_read_data(results, "TEMP")
+
+sorted_node_ids = sort(collect(keys(nodes)))
+node_coords = [nodes[j] for j in sorted_node_ids]
+node_temps_jf = [analysis("temperature", node_coords[j], 0.0) for j in sorted_node_ids]
+node_temps_ca = [temp_ca[j] for j in sorted_node_ids]
+@test isapprox(node_temps_jf, node_temps_ca; rtol=1.0e-12)

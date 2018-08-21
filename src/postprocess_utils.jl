@@ -1,12 +1,6 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM
-#using DataFrames
-using HDF5
-using LightXML
-using Formatting
-
 """
 Calculate field values to nodal points from Gauss points using least-squares fitting.
 """
@@ -27,7 +21,7 @@ function calc_nodal_values!(elements::Vector, field_name, field_dim, time;
         A = sparse(A)
         nz = get_nonzero_rows(A)
         A = 1/2*(A + A')
-        F = ldltfact(A[nz,nz])
+        F = ldlt(A[nz,nz])
     end
 
     if b == nothing
@@ -36,7 +30,7 @@ function calc_nodal_values!(elements::Vector, field_name, field_dim, time;
             gdofs = get_connectivity(element)
             for ip in get_integration_points(element)
                 if !haskey(ip, field_name)
-                    info("warning: integration point does not have field $field_name")
+                    @warn("integration point does not have field $field_name")
                     continue
                 end
                 detJ = element(ip, time, Val{:detJ})
@@ -134,7 +128,7 @@ https://en.wikipedia.org/wiki/Center_of_mass
 """
 function calculate_center_of_mass(problem::Problem, X=[0.0, 0.0, 0.0], time=0.0)
     M = 0.0
-    Xc = zeros(X)
+    Xc = zero(X)
     for element in get_elements(problem)
         for ip in get_integration_points(element)
             w = ip.weight*element(ip, time, Val{:detJ})

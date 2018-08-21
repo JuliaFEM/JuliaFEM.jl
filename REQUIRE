@@ -1,15 +1,15 @@
-julia 0.6
-FEMBase 0.1 0.2-
+julia 0.7
+FEMBase
+FEMBasis
+FEMQuad
 ForwardDiff
 LightXML 0.4
 HDF5 0.7
-Formatting
 TimerOutputs
+Reexport
+Arpack
 AbaqusReader
 AsterReader
-FEMBasis
-FEMQuad
-Reexport
 HeatTransfer
 MortarContact2D
 MortarContact2DAD

@@ -1,52 +1,51 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using Base.Test
-using JuliaFEM
+using JuliaFEM, Test
 
-@testset "2d linear elasticity + volume load + surface load" begin
+# Example of 2d linear elasticity + volume load + surface load
 
-    X = Dict(1 => [0.0, 0.0],
-             2 => [1.0, 0.0],
-             3 => [1.0, 1.0],
-             4 => [0.0, 1.0])
+# Dictionary containing node coordinates
+X = Dict(1 => [0.0, 0.0], 2 => [1.0, 0.0], 3 => [1.0, 1.0], 4 => [0.0, 1.0])
 
-    props = ("formulation" => "plane_stress",
-             "finite_strain" => "false",
-             "geometric_stiffness" => "false")
+# Create new problem of type `Elasticity`
+block = Problem(Elasticity, "block", 2)
+block.properties.formulation = :plane_stress
+block.properties.finite_strain = false
+block.properties.geometric_stiffness = false
 
-    # field problem
-    block = Problem(Elasticity, "BLOCK", 2)
-    block.elements = [Element(Quad4, [1, 2, 3, 4])]
-    update!(block.properties, props...)
-    update!(block.elements, "geometry", X)
-    update!(block.elements, "youngs modulus", 288.0)
-    update!(block.elements, "poissons ratio", 1/3)
-    update!(block.elements, "displacement load 2", 576.0)
+# Add volume element
+element = Element(Quad4, (1, 2, 3, 4))
+update!(element, "geometry", X)
+update!(element, "youngs modulus", 288.0)
+update!(element, "poissons ratio", 1/3)
+update!(element, "displacement load 2", 576.0)
+add_element!(block, element)
 
-    # traction
-    traction = Problem(Elasticity, "TRACTION", 2)
-    traction.elements = [Element(Seg2, [3, 4])]
-    update!(traction.properties, props...)
-    update!(traction.elements, "geometry", X)
-    update!(traction.elements, "displacement traction force 2", 288.0)
+# Add boundary element for tractoin force
+traction_element = Element(Seg2, (3, 4))
+update!(traction_element, "geometry", X)
+update!(traction_element, "displacement traction force 2", 288.0)
+add_element!(block, traction_element)
 
-    # boundary conditions
-    bc = Problem(Dirichlet, "symmetry boundary conditions", 2, "displacement")
-    bc.elements = [Element(Seg2, [1, 2]), Element(Seg2, [4, 1])]
-    update!(bc.elements, "geometry", X)
-    update!(bc.elements[1], "displacement 2", 0.0)
-    update!(bc.elements[2], "displacement 1", 0.0)
+# Define boundary conditions
+bc = Problem(Dirichlet, "symmetry boundary conditions", 2, "displacement")
+bc_elements = [Element(Seg2, (1, 2)), Element(Seg2, (4, 1))]
+update!(bc_elements, "geometry", X)
+update!(bc_elements[1], "displacement 2", 0.0)
+update!(bc_elements[2], "displacement 1", 0.0)
+add_elements!(bc, bc_elements)
 
-    solver = Solver(Linear, "solve 2d linear elasticity problem")
-    add_problems!(solver, [block, traction, bc])
-    solve!(solver, 0.0)
+# Create analysis, add problems to it and run analysis
+analysis = Analysis(Linear)
+add_problems!(analysis, block, bc)
+run!(analysis)
 
-    f = 288.0
-    g = 576.0
-    E = 288.0
-    nu = 1/3
-    u3 = block("displacement", 0.0)[3]
-    u3_expected = f/E*[-nu, 1] + g/(2*E)*[-nu, 1]
-    @test isapprox(u3, u3_expected)
-end
+# Analytical solution is known:
+f = 288.0
+g = 576.0
+E = 288.0
+nu = 1/3
+u3 = block("displacement", 0.0)[3]
+u3_expected = f/E*[-nu, 1] + g/(2*E)*[-nu, 1]
+@test isapprox(u3, u3_expected)

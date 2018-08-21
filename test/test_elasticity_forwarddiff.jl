@@ -1,10 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM
-using JuliaFEM.Preprocess
-using JuliaFEM.Postprocess
-using JuliaFEM.Testing
+using JuliaFEM, Test
 
 #= TODO: Fix test.
 @testset "test forwarddiff version + volume load." begin
@@ -43,7 +40,7 @@ using JuliaFEM.Testing
     push!(solver, body, bc)
     solver()
     disp = element("displacement", [1.0, 1.0], 0.0)
-    info("displacement at tip: $disp")
+    @info("displacement at tip: $disp")
     # verified using Code Aster, verification/2015-10-22-plane-stress/cplan_grot_gdep_volume_force.resu
     @test isapprox(disp[2], -8.77303119819776)
 end
@@ -85,4 +82,3 @@ end
     @test isapprox(f1, f2)
 end
 =#
-

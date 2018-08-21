@@ -4,8 +4,8 @@
 const ContactElements3D = Union{Tri3,Tri6,Quad4,Quad8,Quad9}
 
 function create_orthogonal_basis(n)
-    I = eye(3)
-    k = indmax([norm(cross(n,I[:,k])) for k in 1:3])
+    I = [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0]
+    k = argmax([norm(cross(n,I[:,k])) for k in 1:3])
     t1 = cross(n, I[:,k])/norm(cross(n, I[:,k]))
     t2 = cross(n, t1)
     return t1, t2
@@ -106,7 +106,6 @@ function create_contact_segmentation(slave_element, master_elements, x0, n0, tim
     return result
 end
 
-"Assemble linear surface element to contact problem. """
 function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time::Float64)
 
     props = problem.properties
@@ -134,7 +133,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
         return
     end
 
-    Ae = eye(nsl)
+    Ae = Matrix{Float64}(I, nsl, nsl)
 
     if problem.properties.dual_basis # construct dual basis
 
@@ -154,7 +153,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
                     x_gauss = virtual_element("geometry", ip, time)
                     xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
                     N1 = slave_element(xi_s, time)
-                    De += w*diagm(vec(N1))
+                    De += w*Matrix(Diagonal(vec(N1)))
                     Me += w*N1'*N1
                 end # integration points done
 
@@ -163,7 +162,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
         end # master elements done
 
         Ae = De*inv(Me)
-    
+
     end
 
     # loop all polygons
@@ -193,18 +192,18 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
 
                 detJ = virtual_element(ip, time, Val{:detJ})
                 w = ip.weight*detJ
-            
+
                 # add contributions
                 N1 = vec(get_basis(slave_element, xi_s, time))
                 N2 = vec(get_basis(master_element, xi_m, time))
                 Phi = Ae*N1
                 De += w*Phi*N1'
                 Me += w*Phi*N2'
-                
+
                 x_s = interpolate(N1, map(+,X1,u1))
                 x_m = interpolate(N2, map(+,X2,u2))
                 ge += w*vec((x_m-x_s)*Phi')
-            
+
             end # integration points done
 
         end # integration cells done
@@ -220,7 +219,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
             D3[i:field_dim:end, i:field_dim:end] += De
             M3[i:field_dim:end, i:field_dim:end] += Me
         end
-        
+
         add!(problem.assembly.C1, sdofs, sdofs, D3)
         add!(problem.assembly.C1, sdofs, mdofs, -M3)
         add!(problem.assembly.C2, sdofs, sdofs, Q3'*D3)
@@ -250,16 +249,16 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
                 alp 0.0 alp 0.0 0.0 1.0-2*alp
             ]
     else
-        T = eye(6)
+        T = Matrix(1.0*I, 6, 6)
     end
-    
+
     nsl = length(slave_element)
     Xs = slave_element("geometry", time)
     n1 = slave_element("normal", time)
 
     Q3 = create_rotation_matrix(slave_element, time)
 
-    Ae = eye(nsl)
+    Ae = Matrix(1.0*I, nsl, nsl)
 
     if problem.properties.dual_basis # construct dual basis
 
@@ -329,7 +328,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
                             x_gauss = virtual_element("geometry", ip, time)
                             xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, Xs, time)
                             N1 = vec(slave_element(xi_s, time)*T)
-                            De += w*diagm(N1)
+                            De += w*Matrix(Diagonal(N1))
                             Me += w*N1*N1'
                         end # integration points done
 
@@ -342,7 +341,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
         end # sub slave elements done
 
         Ae = De*inv(Me)
-    
+
     end
 
     # split slave element to linear sub-elements and loop
@@ -352,13 +351,13 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
         nsl = length(sub_slave_element)
         X1 = sub_slave_element("geometry", time)
         n1 = sub_slave_element("normal", time)
-            
+
         # create auxiliary plane
         xi = get_mean_xi(sub_slave_element)
         N = vec(get_basis(sub_slave_element, xi, time))
         x0 = interpolate(N, X1)
         n0 = interpolate(N, n1)
-            
+
         # project slave nodes to auxiliary plane
         S = Vector[project_vertex_to_auxiliary_plane(p, x0, n0) for p in X1]
 
@@ -416,7 +415,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
 
                         detJ = virtual_element(ip, time, Val{:detJ})
                         w = ip.weight*detJ
-            
+
                         # add contributions
                         N1 = vec(get_basis(slave_element, xi_s, time)*T)
                         N2 = vec(get_basis(master_element, xi_m, time))
@@ -424,13 +423,13 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
 
                         De += w*Phi*N1'
                         Me += w*Phi*N2'
-               
+
                         us = slave_element("displacement", time)
                         um = master_element("displacement", time)
                         xs = interpolate(N1, map(+,Xs,us))
                         xm = interpolate(N2, map(+,Xs,um))
                         ge += w*vec((xm-xs)*Phi')
-            
+
                     end # integration points done
 
                 end # integration cells done
@@ -446,7 +445,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
                     D3[i:field_dim:end, i:field_dim:end] += De
                     M3[i:field_dim:end, i:field_dim:end] += Me
                 end
-                
+
                 add!(problem.assembly.C1, sdofs, sdofs, D3)
                 add!(problem.assembly.C1, sdofs, mdofs, -M3)
                 add!(problem.assembly.C2, sdofs, sdofs, Q3'*D3)
@@ -513,8 +512,8 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
     C1 = sparse(problem.assembly.C1, ndofs, ndofs)
     C2 = sparse(problem.assembly.C2, ndofs, ndofs)
     D = sparse(problem.assembly.D, ndofs, ndofs)
-    g = full(problem.assembly.g, ndofs, 1)
-    c = full(problem.assembly.c, ndofs, 1)
+    g = Vector(problem.assembly.g, ndofs)
+    c = Vector(problem.assembly.c, ndofs)
 
     maxdim = maximum(size(C1))
     if problem.properties.alpha != 0.0
@@ -550,13 +549,13 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
         invT = sparse(invT, maxdim, maxdim, (a, b) -> b)
         # fill diagonal
         d = ones(size(T, 1))
-        d[get_nonzero_rows(T)] = 0.0
-        T += spdiagm(d)
-        invT += spdiagm(d)
+        d[get_nonzero_rows(T)] .= 0.0
+        T += sparse(Diagonal(d))
+        invT += sparse(Diagonal(d))
         #invT2 = sparse(inv(full(T)))
-        #info("invT == invT2? ", invT == invT2)
+        #@info("invT == invT2? ", invT == invT2)
         #maxabsdiff = maximum(abs(invT - invT2))
-        #info("max diff = $maxabsdiff")
+        #@info("max diff = $maxabsdiff")
         C1 = C1*invT
         C2 = C2*invT
     end
@@ -572,7 +571,7 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
 
     state = problem.properties.contact_state_in_first_iteration
     if problem.properties.iteration == 1
-        info("First contact iteration, initial contact state = $state")
+        @info("First contact iteration, initial contact state = $state")
 
         if state == :AUTO
             avg_gap = mean([weighted_gap[j][1] for j in S])
@@ -582,7 +581,7 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
             else
                 state = :UNKNOWN
             end
-            info("Average weighted gap = $avg_gap, std gap = $std_gap, automatically determined contact state = $state")
+            @info("Average weighted gap = $avg_gap, std gap = $std_gap, automatically determined contact state = $state")
         end
 
     end
@@ -602,7 +601,7 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
             contact_pressure[j] = [0.0, 0.0, 0.0]
         end
         complementarity_condition[j] = contact_pressure[j] - weighted_gap[j]
-        
+
         if complementarity_condition[j][1] > 0.0
             is_inactive[j] = 0
             is_active[j] = 1
@@ -624,7 +623,7 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
             is_stick[j] = 0
         end
     end
-    
+
     if (problem.properties.iteration == 1) && (state == :INACTIVE)
         for j in S
             is_inactive[j] = 1
@@ -634,35 +633,31 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
         end
     end
 
-    info("# | active | stick | slip | gap | pres | comp")
+    @info("# | active | stick | slip | gap | pres | comp")
     for j in S
         str1 = "$j | $(is_active[j]) | $(is_stick[j]) | $(is_slip[j]) | "
-        str2 = "$(round(weighted_gap[j][1], 3)) | $(round(contact_pressure[j][1], 3)) | $(round(complementarity_condition[j][1], 3))"
-        info(str1 * str2)
+        str2 = "$(round(weighted_gap[j][1]; digits=3)) | $(round(contact_pressure[j][1]; digits=3)) | $(round(complementarity_condition[j][1]; digits=3))"
+        @info(str1 * str2)
     end
-    
-    # remove inactive nodes from assembly
+
+
     for j in S
         dofs = [3*(j-1)+1, 3*(j-1)+2, 3*(j-1)+3]
+        tdofs = [3*(j-1)+2, 3*(j-1)+3]
         if is_inactive[j] == 1
-            C1[dofs,:] = 0.0
-            C2[dofs,:] = 0.0
-            D[dofs,:] = 0.0
-            g[dofs,:] = 0.0
-        end
-    end
-    
-    # constitutive modelling in tangent direction, frictionless contact
-    for j in S
-        dofs = [3*(j-1)+1, 3*(j-1)+2, 3*(j-1)+3]
-        tdofs = dofs[[2,3]]
-        if (is_active[j] == 1) && (is_slip[j] == 1)
-            C2[tdofs,:] = 0.0
-            g[tdofs] = 0.0
+            # remove inactive nodes from assembly
+            C1[dofs,:] .= 0.0
+            C2[dofs,:] .= 0.0
+            D[dofs,:] .= 0.0
+            g[dofs,:] .= 0.0
+        elseif (is_active[j] == 1) && (is_slip[j] == 1)
+            # constitutive modelling in tangent direction, frictionless contact
+            C2[tdofs,:] .= 0.0
+            g[tdofs] .= 0.0
             normal = normals[j]
             tangent1, tangent2 = create_orthogonal_basis(normal)
-            D[tdofs[1], dofs] = tangent1
-            D[tdofs[2], dofs] = tangent2
+            D[tdofs[1], dofs] .= tangent1
+            D[tdofs[2], dofs] .= tangent2
         end
     end
 

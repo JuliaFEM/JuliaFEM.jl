@@ -2,7 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM.Testing
+using Test
 
 function get_test_2d_model()
     X = Dict{Int64, Vector{Float64}}(
@@ -107,6 +107,6 @@ end
 
     u = e2("displacement", [1.0, 1.0], 0.0)
     u_expected = [-1/3, 1.0]
-    info("displacement at tip: $u")
+    @info("displacement at tip: $u")
     @test isapprox(u, u_expected)
 end

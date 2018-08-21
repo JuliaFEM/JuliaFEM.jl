@@ -36,7 +36,7 @@ function Xdmf(name::String; version="3.0", overwrite=false)
 
     if isfile(h5file)
         if overwrite
-            info("Result file $h5file exists, removing old file.")
+            @debug("Result file $h5file exists, removing old file.")
             rm(h5file)
         else
             error("Result file $h5file exists, use Xdmf($name; overwrite=true) to rewrite results")
@@ -45,7 +45,7 @@ function Xdmf(name::String; version="3.0", overwrite=false)
 
     if isfile(xmlfile)
         if overwrite
-            info("Result file $xmlfile exists, removing old file.")
+            @debug("Result file $xmlfile exists, removing old file.")
             rm(xmlfile)
         else
             error("Result file $xmlfile exists, use Xdmf($name; overwrite=true) to rewrite results")
@@ -209,9 +209,9 @@ function traverse(xdmf::Xdmf, x::XMLElement, attr_name::String)
         items = split(attr_name, '/')
         new_item = xdmf_filter(childs, first(items))
         if new_item == nothing
-            info("traverse: childs:")
+            @debug("traverse: childs:")
             for child in childs
-                info(LightXML.name(child))
+                @debug(LightXML.name(child))
             end
             error("traverse: failed, items = $items, xdmf_filter not find child")
         end
@@ -263,7 +263,7 @@ end
 
 function new_dataitem(xdmf::Xdmf, path::String, data::Array{T,N}) where {T,N}
     dataitem = new_element("DataItem")
-    datatype = replace("$T", "64", "")
+    datatype = replace("$T", "64" => "")
     dimensions = join(reverse(size(data)), " ")
     set_attribute(dataitem, "DataType", datatype)
     set_attribute(dataitem, "Dimensions", dimensions)
@@ -271,7 +271,7 @@ function new_dataitem(xdmf::Xdmf, path::String, data::Array{T,N}) where {T,N}
     if xdmf.format == "HDF"
         hdf = basename(h5file(xdmf))
         if exists(xdmf.hdf, path)
-            info("Xdmf: $path already existing in h5 file, not overwriting.")
+            @debug("Xdmf: $path already existing in h5 file, not overwriting.")
         else
             write(xdmf.hdf, path, data)
         end
@@ -337,20 +337,20 @@ julia> update_xdmf!(p1, 0.0, ["displacement", "temperature"])
 """
 function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vector)
 
-    info("Xdmf: storing fields $fields of problem $(problem.name) at time $time")
+    @debug("Xdmf: storing fields $fields of problem $(problem.name) at time $time")
 
     # 1. find domain
     xml = xdmf.xml
     domain = find_element(xml, "Domain")
     if domain == nothing
-        info("Xdmf: Domain not found, creating.")
+        @debug("Xdmf: Domain not found, creating.")
         domain = new_child(xml, "Domain")
     end
 
     # 2. find for TemporalCollection
     temporal_collection = find_element(domain, "Grid")
     if temporal_collection == nothing
-        info("Xdmf: Temporal collection not found, creating.")
+        @debug("Xdmf: Temporal collection not found, creating.")
         temporal_collection = new_child(domain, "Grid")
         set_attribute(temporal_collection, "GridType", "Collection")
         set_attribute(temporal_collection, "Name", "Time")
@@ -366,16 +366,16 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
     spatial_collection_exists = false
     for spatial_collection in get_elements_by_tagname(temporal_collection, "Grid")
         time_element = find_element(spatial_collection, "Time")
-        time_value = parse(attribute(time_element, "Value"; required=true))
+        time_value = Meta.parse(attribute(time_element, "Value"; required=true))
         if isapprox(time_value, time)
-            info("Xdmf: SpatialCollection for time $time already exists.")
+            @debug("Xdmf: SpatialCollection for time $time already exists.")
             spatial_collection_exists = true
             break
         end
     end
 
     if !spatial_collection_exists
-        info("Xdmf: SpatialCollection for time $time not found, creating.")
+        @debug("Xdmf: SpatialCollection for time $time not found, creating.")
         spatial_collection = new_child(temporal_collection, "Grid")
         set_attribute(spatial_collection, "GridType", "Collection")
         set_attribute(spatial_collection, "Name", "Problems")
@@ -391,13 +391,13 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
     for frame in get_elements_by_tagname(spatial_collection, "Grid")
         frame_name = attribute(frame, "Name")
         if frame_name == problem.name
-            warn("Xdmf: Already found Grid with name $frame_name for time $time, skipping.")
+            @warn("Xdmf: Already found Grid with name $frame_name for time $time, skipping.")
             return
         end
     end
 
     frame_name = problem.name
-    info("Xdmf: Creating Grid for problem $frame_name")
+    @debug("Xdmf: Creating Grid for problem $frame_name")
     frame = new_child(spatial_collection, "Grid")
     set_attribute(frame, "Name", frame_name)
 
@@ -408,7 +408,7 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
     X_array = hcat([X_dict[nid] for nid in node_ids]...)
     ndim, nnodes = size(X_array)
     geom_type = (ndim == 2 ? "XY" : "XYZ")
-    info("Xdmf: Creating geometry, type = $geom_type, number of nodes = $nnodes")
+    @debug("Xdmf: Creating geometry, type = $geom_type, number of nodes = $nnodes")
     X_dataitem = new_dataitem(xdmf, X_array)
     geometry = new_child(frame, "Geometry")
     set_attribute(geometry, "Type", geom_type)
@@ -419,12 +419,12 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
     nelements = length(all_elements)
     element_types = unique(map(get_element_type, all_elements))
     nelement_types = length(element_types)
-    info("Xdmf: Saving topology of $nelements elements total, $nelement_types different element types.")
+    @debug("Xdmf: Saving topology of $nelements elements total, $nelement_types different element types.")
 
     for element_type in element_types
         elements = collect(filter_by_element_type(element_type, all_elements))
         nelements = length(elements)
-        info("Xdmf: $nelements elements of type $element_type")
+        @debug("Xdmf: $nelements elements of type $element_type")
         sort!(elements, by=get_element_id)
         element_ids = map(get_element_id, elements)
         element_conn = map(element -> [node_mapping[j]-1 for j in get_connectivity(element)], elements)
@@ -446,24 +446,24 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
         @assert node_ids == field_node_ids
         field_dim = length(field_dict[first(field_node_ids)])
         if field_dim == 2
-            info("Xdmf: Field dimension = 2, extending to 3")
+            @debug("Xdmf: Field dimension = 2, extending to 3")
             for nid in field_node_ids
                 field_dict[nid] = [field_dict[nid]; 0.0]
             end
             field_dim = 3
         end
         field_type = Dict(1 => "Scalar", 3 => "Vector", 6 => "Tensor6")[field_dim]
-        info("Xdmf: Saving field $field_name, type = $field_type, dimension = $field_dim, center = $field_center")
+        @debug("Xdmf: Saving field $field_name, type = $field_type, dimension = $field_dim, center = $field_center")
 
         field_array = hcat([field_dict[nid] for nid in field_node_ids]...)
         field_dataitem = new_dataitem(xdmf, field_array)
         attribute = new_child(frame, "Attribute")
-        set_attribute(attribute, "Name", ucfirst(field_name))
+        set_attribute(attribute, "Name", uppercasefirst(field_name))
         set_attribute(attribute, "Center", field_center)
         set_attribute(attribute, "AttributeType", field_type)
         add_child(attribute, field_dataitem)
     end
 
     save!(xdmf)
-    info("Xdmf: all done.")
+    @debug("Xdmf: all done.")
 end

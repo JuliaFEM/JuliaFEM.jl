@@ -56,7 +56,7 @@ function assemble(problem::Problem{Elasticity},
 
         if props.finite_strain
             strain = 1/2*(gradu + gradu' + gradu'*gradu)
-            F = eye(dim) + gradu
+            F = I + gradu
             for i=1:size(dN, 2)
                 BL[1, 2*(i-1)+1] += F[1,1]*dN[1,i]
                 BL[1, 2*(i-1)+2] += F[2,1]*dN[1,i]
@@ -67,7 +67,7 @@ function assemble(problem::Problem{Elasticity},
             end
         else # linearized strain
             strain = 1/2*(gradu + gradu')
-            F = eye(dim)
+            F = I
             for i=1:size(dN, 2)
                 BL[1, 2*(i-1)+1] = dN[1,i]
                 BL[2, 2*(i-1)+2] = dN[2,i]

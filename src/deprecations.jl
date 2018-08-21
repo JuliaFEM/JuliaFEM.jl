@@ -10,5 +10,5 @@ function assemble!(problem::Problem, element::Element, time=0.0)
 end
 
 module Abaqus
-using JuliaFEM.Preprocess: create_surface_elements
+using JuliaFEM: create_surface_elements
 end
