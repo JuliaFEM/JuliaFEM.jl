@@ -48,11 +48,12 @@ const med_element_names = Dict{Symbol, Symbol}(
     :P13 => :Pyr13)
 
 """
-    aster_read_mesh(filename::String, mesh_name=nothing; reorder_element_connectivity=true)
+    aster_read_mesh(filename, mesh_name=nothing; reorder_element_connectivity=true)
 
-Read code aster mesh from file and return Mesh instance. If mesh file contains
-several meshes, a name of mesh must be given. By default elements are reordered
-so that they match to the conventions used in JuliaFEM.
+Read code aster mesh from file and return `Mesh` structure.
+
+If mesh file contains several meshes, a name of mesh must be given. By default,
+elements are reordered so that they match to the conventions used in JuliaFEM.
 """
 function aster_read_mesh(filename::String, mesh_name=nothing; reorder_element_connectivity=true)
     m = AsterReader.aster_read_mesh(filename, mesh_name)
@@ -62,6 +63,20 @@ function aster_read_mesh(filename::String, mesh_name=nothing; reorder_element_co
     end
     if reorder_element_connectivity
         reorder_element_connectivity!(mesh, med_connectivity)
+    end
+    nnodes = length(mesh.nodes)
+    nelements = length(mesh.elements)
+    @info("Mesh parsed from Code Aster file $filename.")
+    @info("Mesh contains $nnodes nodes and $nelements elements.")
+    for (elset_name, elset_elids) in mesh.element_sets
+        content = Dict{Symbol, Int}()
+        for elid in elset_elids
+            eltype = mesh.element_types[elid]
+            content[eltype] = get(content, eltype, 0) + 1
+        end
+        s = join(("$v x $k" for (k, v) in content), ", ")
+        nels = length(elset_elids)
+        @info("Element set $elset_name contains $nels elements ($s).")
     end
     return mesh
 end
