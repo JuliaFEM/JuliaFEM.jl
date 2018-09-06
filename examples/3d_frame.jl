@@ -11,12 +11,7 @@
 
 # ![](3d_frame/model.png)
 
-using JuliaFEM
-using JuliaFEM.Preprocess
-using FEMBase.Test
-using Logging
-Logging.configure(level=INFO)
-add_elements! = JuliaFEM.add_elements!
+using JuliaFEM, LinearAlgebra
 
 # Reading mesh
 
@@ -32,7 +27,7 @@ println("Number of nodes in a model: ", length(mesh.nodes))
 # system and polar moment of inertia.
 
 beam_elements = create_elements(mesh, "FRAME")
-info("Number of elements: ", length(beam_elements))
+@info("Number of elements: ", length(beam_elements))
 update!(beam_elements, "youngs modulus", 210.0e6)
 update!(beam_elements, "shear modulus", 84.0e6)
 update!(beam_elements, "density", 7850.0e-3)
@@ -50,7 +45,7 @@ update!(beam_elements, "polar moment of inertia", 30.0e-5)
 for element in beam_elements
     X1, X2 = element("geometry", 0.0)
     t = (X2-X1)/norm(X2-X1)
-    I = eye(3)
+    I = [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0]
     k = indmax([norm(cross(t, I[:,k])) for k in 1:3])
     n = cross(t, I[:,k])/norm(cross(t, I[:,k]))
     update!(element, "normal", n)
@@ -77,12 +72,12 @@ add_elements!(frame, bc_elements)
 
 # Perform modal analysis
 
-step = Analysis(Modal)
+analysis = Analysis(Modal)
 xdmf = Xdmf(joinpath(datadir, "3d_frame_results"); overwrite=true)
-add_results_writer!(step, xdmf)
-add_problems!(step, [frame])
-run!(step)
-close(xdmf.hdf)
+add_results_writer!(analysis, xdmf)
+add_problems!(analysis, frame)
+run!(analysis)
+close(xdmf)
 
 # Each `Analysis` can have properties, e.g. time, maximum number of iterations,
 # convergence tolerance and so on. Eigenvalues of calculation are stored as a
