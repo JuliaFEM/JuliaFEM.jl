@@ -37,10 +37,10 @@ function vertex_inside_polygon(q, P; atol=1.0e-3)
         #try
         angle += acos(cosa)
         #catch
-        #    info("Unable to calculate acos($(ForwardDiff.get_value(cosa))) when determining is a vertex inside polygon.")
-        #    info("Polygon is: $(ForwardDiff.get_value(P)) and vertex under consideration is $(ForwardDiff.get_value(q))")
-        #    info("Polygon corner point in loop: A=$(ForwardDiff.get_value(A)), B=$(ForwardDiff.get_value(B))")
-        #    info("c = ||A||*||B|| = $(ForwardDiff.get_value(c))")
+        #    @info("Unable to calculate acos($(ForwardDiff.get_value(cosa))) when determining is a vertex inside polygon.")
+        #    @info("Polygon is: $(ForwardDiff.get_value(P)) and vertex under consideration is $(ForwardDiff.get_value(q))")
+        #    @info("Polygon corner point in loop: A=$(ForwardDiff.get_value(A)), B=$(ForwardDiff.get_value(B))")
+        #    @info("c = ||A||*||B|| = $(ForwardDiff.get_value(c))")
         #    rethrow()
         #end
     end
@@ -128,18 +128,18 @@ function get_polygon_clip(xs::Vector{T}, xm::Vector{T}, n::T) where T
         # 2. find possible intersection
         xm1 = xm[i]
         xm2 = xm[mod(i,nm)+1]
-        #info("intersecting line $xm1 -> $xm2")
+        # @info("intersecting line $xm1 -> $xm2")
         for j=1:ns
             xs1 = xs[j]
             xs2 = xs[mod(j,ns)+1]
-            #info("clipping polygon edge $xs1 -> $xs2")
+            # @info("clipping polygon edge $xs1 -> $xs2")
             tnom = dot(cross(xm1-xs1, xm2-xm1), n)
             tdenom = dot(cross(xs2-xs1, xm2-xm1), n)
             isapprox(tdenom, 0) && continue
             t = tnom/tdenom
             (0 <= t <= 1) || continue
             q = xs1 + t*(xs2 - xs1)
-            #info("t=$t, q=$q, q ∈ xm ? $(vertex_inside_polygon(q, xm))")
+            # @info("t=$t, q=$q, q ∈ xm ? $(vertex_inside_polygon(q, xm))")
             if vertex_inside_polygon(q, xm)
                 approx_in(q, P) && continue
                 push!(P, q)
@@ -180,27 +180,27 @@ function project_vertex_to_surface(p, x0, n0,
         end
     end
     #=
-    info("failed to project vertex from auxiliary plane back to surface")
-    info("element type: $E")
-    info("element connectivity: $(get_connectivity(element))")
-    info("auxiliary plane: x0 = $x0, n0 = $n0")
-    info("element geometry: $(x.data)")
-    info("vertex to project: $p")
-    info("parameter vector before giving up: $theta")
-    info("increment in parameter vector before giving up: $dtheta")
-    info("norm(dtheta) before giving up: $(norm(dtheta))")
-    info("f([0.0, 0.0, 0.0]) = $(f([0.0, 0.0, 0.0]))")
-    info("L([0.0, 0.0, 0.0]) = $(L([0.0, 0.0, 0.0]))")
+    @info("failed to project vertex from auxiliary plane back to surface")
+    @info("element type: $E")
+    @info("element connectivity: $(get_connectivity(element))")
+    @info("auxiliary plane: x0 = $x0, n0 = $n0")
+    @info("element geometry: $(x.data)")
+    @info("vertex to project: $p")
+    @info("parameter vector before giving up: $theta")
+    @info("increment in parameter vector before giving up: $dtheta")
+    @info("norm(dtheta) before giving up: $(norm(dtheta))")
+    @info("f([0.0, 0.0, 0.0]) = $(f([0.0, 0.0, 0.0]))")
+    @info("L([0.0, 0.0, 0.0]) = $(L([0.0, 0.0, 0.0]))")
 
-    info("iterations:")
+    @info("iterations:")
     theta = zeros(3)
     dtheta = zeros(3)
     for i=1:max_iterations
-        info("iter $i, theta = $theta")
-        info("f = $(f(theta))")
-        info("L = $(L(theta))")
+        @info("iter $i, theta = $theta")
+        @info("f = $(f(theta))")
+        @info("L = $(L(theta))")
         dtheta = L(theta) * f(theta)
-        info("dtheta = $(dtheta)")
+        @info("dtheta = $(dtheta)")
         theta -= dtheta
     end
     =#
@@ -273,8 +273,8 @@ function check_orientation!(P, n)
     sort!(P, lt=(A, B) -> begin
         A_proj = Q'*(A-C)
         B_proj = Q'*(B-C)
-        a = atan2(A_proj[3], A_proj[2])
-        b = atan2(B_proj[3], B_proj[2])
+        a = atan(A_proj[3], A_proj[2])
+        b = atan(B_proj[3], B_proj[2])
         return a > b
     end)
 end
@@ -330,7 +330,7 @@ function split_quadratic_elements(elements::Vector, time::Float64)
     n1 = length(elements)
     n2 = length(new_elements)
     if n1 != n2
-        info("Splitted $n1 elements to $n2 (linear) sub-elements")
+        @info("Splitted $n1 elements to $n2 (linear) sub-elements")
     end
     return new_elements
 end
@@ -361,7 +361,7 @@ References
 [Popp2013] Popp, Alexander, et al. "Improved robustness and consistency of 3D contact algorithms based on a dual mortar approach." Computer Methods in Applied Mechanics and Engineering 264 (2013): 67-80.
 """
 function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Real; first_slave_element=false) where E<:Union{Tri3, Quad4}
-    
+
     props = problem.properties
     field_dim = get_unknown_field_dimension(problem)
     field_name = get_parent_field_name(problem)
@@ -385,7 +385,7 @@ function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Re
 
         De = zeros(nsl, nsl)
         Me = zeros(nsl, nsl)
- 
+
         for master_element in master_elements
 
             master_element_nodes = get_connectivity(master_element)
@@ -405,7 +405,7 @@ function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Re
             P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
 
             if isapprox(P_area, 0.0)
-                info("Polygon P has zero area: $P_area")
+                @info("Polygon P has zero area: $P_area")
                 continue
             end
 
@@ -421,19 +421,19 @@ function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Re
                     x_gauss = virtual_element("geometry", ip, time)
                     xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
                     N1 = slave_element(xi_s, time)
-                    De += w*diagm(vec(N1))
+                    De += w*Matrix(Diagonal(vec(N1)))
                     Me += w*N1'*N1
                 end
             end # integration cells done
 
         end # master elements done
-                    
+
         Ae = De*inv(Me)
 
-        info("Dual basis coefficient matrix: $Ae")
+        @info("Dual basis coefficient matrix: $Ae")
 
     else
-        Ae = eye(nsl)
+        Ae = Matrix(1.0I, nsl, nsl)
     end
 
     for master_element in master_elements
@@ -455,7 +455,7 @@ function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Re
         P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
 
         if isapprox(P_area, 0.0)
-            info("Polygon P has zero area: $P_area")
+            @info("Polygon P has zero area: $P_area")
             continue
         end
 
@@ -504,7 +504,7 @@ function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Re
         # 6. add contribution to contact virtual work
         sdofs = get_gdofs(problem, slave_element)
         mdofs = get_gdofs(problem, master_element)
-        
+
         for i=1:field_dim
             lsdofs = sdofs[i:field_dim:end]
             lmdofs = mdofs[i:field_dim:end]
@@ -534,12 +534,12 @@ References
 
 """
 function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Real; first_slave_element=false) where E<:Union{Tri6}
-    
+
     props = problem.properties
     field_dim = get_unknown_field_dimension(problem)
     field_name = get_parent_field_name(problem)
     area = 0.0
-        
+
     Xs = slave_element("geometry", time)
 
     alp = props.alpha
@@ -554,7 +554,7 @@ function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Re
                 alp 0.0 alp 0.0 0.0 1.0-2*alp
             ]
     else
-        T = eye(6)
+        T = Matrix(1.0I, 6, 6)
     end
 
     #=
@@ -569,11 +569,11 @@ function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Re
     =#
 
     if props.dual_basis
-        # info("Creating dual basis for element $(slave_element.id)")            
+        # @info("Creating dual basis for element $(slave_element.id)")
         nsl = length(slave_element)
         De = zeros(nsl, nsl)
         Me = zeros(nsl, nsl)
-    
+
         # split slave element to linear sub-elements and loop
         for sub_slave_element in split_quadratic_element(slave_element, time)
 
@@ -587,7 +587,7 @@ function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Re
             N = vec(get_basis(sub_slave_element, xi, time))
             x0 = interpolate(N, X1)
             n0 = interpolate(N, n1)
-        
+
             # project slave nodes to auxiliary plane
             S = Vector[project_vertex_to_auxiliary_plane(X1[i], x0, n0) for i=1:nsl]
 
@@ -597,7 +597,7 @@ function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Re
             for master_element in master_elements
 
                 Xm = master_element("geometry", time)
-                
+
                 if norm(mean(Xs) - mean(Xm)) > problem.properties.distval
                     continue
                 end
@@ -632,28 +632,28 @@ function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Re
                             detJ = virtual_element(ip, time, Val{:detJ})
                             w = ip.weight*detJ
                             N1 = vec(slave_element(xi_s, time)*T)
-                            De += w*diagm(N1)
+                            De += w*Matrix(Diagonal(N1))
                             Me += w*N1*N1'
                         end
 
                     end # integration cells done
- 
-                end # sub aster elements done
+
+                end # sub master elements done
 
             end # master elements done
-     
+
         end # sub slave elements done
-        
+
         Ae = De*inv(Me)
-        # info("Dual basis construction finished.")
-        # info("Slave element geometry = $Xs")
-        # info("De = $De")
-        # info("Me = $Me")
-        # info("Dual basis coefficient matrix: $Ae")
+        # @info("Dual basis construction finished.")
+        # @info("Slave element geometry = $Xs")
+        # @info("De = $De")
+        # @info("Me = $Me")
+        # @info("Dual basis coefficient matrix: $Ae")
 
     else
         nsl = length(slave_element)
-        Ae = eye(nsl)
+        Ae = Matrix(1.0I, nsl, nsl)
     end
 
     # split slave element to linear sub-elements and loop
@@ -669,7 +669,7 @@ function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Re
         N = vec(get_basis(sub_slave_element, xi, time))
         x0 = interpolate(N, X1)
         n0 = interpolate(N, n1)
-    
+
         # project slave nodes to auxiliary plane
         S = Vector[project_vertex_to_auxiliary_plane(X1[i], x0, n0) for i=1:nsl]
 
@@ -679,7 +679,7 @@ function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Re
         for master_element in master_elements
 
             Xm = master_element("geometry", time)
- 
+
             if norm(mean(Xs) - mean(Xm)) > problem.properties.distval
                 continue
             end
@@ -702,7 +702,7 @@ function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Re
                 P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
 
                 if isapprox(P_area, 0.0)
-                    warn("Polygon P has zero area: $P_area")
+                    @warn("Polygon P has zero area: $P_area")
                     continue
                 end
 
@@ -752,7 +752,7 @@ function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Re
                 # 6. add contribution to contact virtual work
                 sdofs = get_gdofs(problem, slave_element)
                 mdofs = get_gdofs(problem, master_element)
-                
+
                 for i=1:field_dim
                     lsdofs = sdofs[i:field_dim:end]
                     lmdofs = mdofs[i:field_dim:end]
@@ -762,11 +762,11 @@ function assemble!(problem::Problem{Mortar}, slave_element::Element{E}, time::Re
                     add!(problem.assembly.C2, lsdofs, lmdofs, -Me)
                 end
                 add!(problem.assembly.g, sdofs, ge)
-   
+
             end # sub aster elements done
 
         end # master elements done
- 
+
     end # sub slave elements done
 
     return area
@@ -784,7 +784,7 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
     #=
     if props.split_quadratic_slave_elements
         if !props.linear_surface_elements
-            warn("Mortar3D: split_quadratic_surfaces = true and linear_surface_elements = false maybe have unexpected behavior")
+            @warn("Mortar3D: split_quadratic_surfaces = true and linear_surface_elements = false maybe have unexpected behavior")
         end
         slave_elements = split_quadratic_elements(slave_elements, time)
     end
@@ -805,7 +805,7 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
         first_slave_element = false
 
     end # slave elements done, contact virtual work ready
- 
+
     C1 = sparse(problem.assembly.C1)
     C2 = sparse(problem.assembly.C2)
 
@@ -843,13 +843,13 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
         invT = sparse(invT, maxdim, maxdim, (a, b) -> b)
         # fill diagonal
         d = ones(size(T, 1))
-        d[get_nonzero_rows(T)] = 0.0
-        T += spdiagm(d)
-        invT += spdiagm(d)
+        d[get_nonzero_rows(T)] .= 0.0
+        T += sparse(Diagonal(d))
+        invT += sparse(Diagonal(d))
         #invT2 = sparse(inv(full(T)))
-        #info("invT == invT2? ", invT == invT2)
+        #@info("invT == invT2? ", invT == invT2)
         #maxabsdiff = maximum(abs(invT - invT2))
-        #info("max diff = $maxabsdiff")
+        #@info("max diff = $maxabsdiff")
         C1 = C1*invT
         C2 = C2*invT
     end
@@ -862,4 +862,3 @@ function assemble!(problem::Problem{Mortar}, time::Real, ::Type{Val{2}}, ::Type{
     problem.assembly.C2 = C2
 
 end
-

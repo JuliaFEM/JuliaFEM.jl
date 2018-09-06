@@ -1,12 +1,6 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM
-#using DataFrames
-using HDF5
-using LightXML
-using Formatting
-
 """
 Calculate field values to nodal points from Gauss points using least-squares fitting.
 """
@@ -27,7 +21,7 @@ function calc_nodal_values!(elements::Vector, field_name, field_dim, time;
         A = sparse(A)
         nz = get_nonzero_rows(A)
         A = 1/2*(A + A')
-        F = ldltfact(A[nz,nz])
+        F = ldlt(A[nz,nz])
     end
 
     if b == nothing
@@ -36,7 +30,7 @@ function calc_nodal_values!(elements::Vector, field_name, field_dim, time;
             gdofs = get_connectivity(element)
             for ip in get_integration_points(element)
                 if !haskey(ip, field_name)
-                    info("warning: integration point does not have field $field_name")
+                    @warn("integration point does not have field $field_name")
                     continue
                 end
                 detJ = element(ip, time, Val{:detJ})
@@ -81,8 +75,30 @@ function get_nodal_vector(elements::Vector, field_name::AbstractString, time::Fl
     return node_ids, field
 end
 
-""" Interpolate field from a set of elements. """
-function (problem::Problem)(field_name::AbstractString, X::Vector, time::Float64=0.0; fillna=NaN)
+"""
+    problem(field_name, X, time)
+
+Interpolate field from a set of elements defined in problem. Here, `X` is the
+location inside domain described by elements.
+
+Internally, function loops through all the elements, finding the one containing
+the point `X`. After that, using inverse isoparametric mapping, first find
+dimensionless coordinates (ξ,η,ζ) of that element corresponding to the location
+of point `X` and after that interpolate the values of field under investigation.
+Algorithm can be expected to be somewhat slow for big models, but for tests
+models the performance is good.
+
+# Examples
+
+Having a problem called `body`, one can query the field `displacement` at
+position `X = (1.0, 2.0, 3.0)` and time `t = 1.0`, with the command
+```julia
+X = (1.0, 2.0, 3.0)
+time = 1.0
+u = body("displacement", X, time)
+```
+"""
+function (problem::Problem)(field_name, X, time; fillna=NaN)
     for element in get_elements(problem)
         if inside(element, X, time)
             xi = get_local_coordinates(element, X, time)
@@ -92,8 +108,7 @@ function (problem::Problem)(field_name::AbstractString, X::Vector, time::Float64
     return fillna
 end
 
-""" Interpolate field from a set of elements. """
-function (problem::Problem)(field_name::AbstractString, X::Vector, time::Float64, ::Type{Val{:Grad}}; fillna=NaN)
+function (problem::Problem)(field_name, X, time, ::Type{Val{:Grad}}; fillna=NaN)
     for element in get_elements(problem)
         if inside(element, X, time)
             xi = get_local_coordinates(element, X, time)
@@ -134,7 +149,7 @@ https://en.wikipedia.org/wiki/Center_of_mass
 """
 function calculate_center_of_mass(problem::Problem, X=[0.0, 0.0, 0.0], time=0.0)
     M = 0.0
-    Xc = zeros(X)
+    Xc = zero(X)
     for element in get_elements(problem)
         for ip in get_integration_points(element)
             w = ip.weight*element(ip, time, Val{:detJ})

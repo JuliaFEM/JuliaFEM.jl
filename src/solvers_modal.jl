@@ -1,16 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-""" Modal solver to solve generalized eigenvalue problems Ku = Muλ
+using SparseArrays, Arpack
 
-Examples
---------
-
-julia> problems = get_problems()
-julia> solver = Solver(Modal)
-julia> push!(solver, problems...)
-julia> solver()
-"""
 mutable struct Modal <: AbstractSolver
     time :: Float64
     geometric_stiffness :: Bool
@@ -28,7 +20,7 @@ mutable struct Modal <: AbstractSolver
 end
 
 function Modal(nev=10, which=:SM)
-    solver = Modal(0.0, false, [], Matrix{Float64}(0,0), nev, which,
+    solver = Modal(0.0, false, [], Matrix{Float64}(undef,0,0), nev, which,
                    false, [], true, true, false, false, 0.0)
 end
 
@@ -53,8 +45,8 @@ function calc_projection(problem::T) where
     M = -C2[s,m]
 
     if !isdiag(D)
-        warn("Mortar matrix D is not diagonal. This might take a long time.")
-        P = ldltfact(1/2*(D + D')) \ M
+        @warn("Mortar matrix D is not diagonal. This might take a long time.")
+        P = ldlt(1/2*(D + D')) \ M
     else
         P = D \ M
     end
@@ -68,10 +60,12 @@ function FEMBase.eliminate_boundary_conditions!(problem::P, K, M, f) where {P}
     C2 = sparse(problem.assembly.C2)
     C1 == C2 || error("Cannot eliminate boundary condition $P: C1 != C2.")
     isdiag(C1) || error("Cannot eliminate boundary condition $P: C is not diagonal")
-    info("Eliminating boundary condition $(problem.name) from global system.")
+    @info("Eliminating boundary condition $(problem.name) from global system.")
     fixed_dofs = get_nonzero_rows(C1)
-    K[fixed_dofs,:] = K[:,fixed_dofs] = 0.0
-    M[fixed_dofs,:] = M[:,fixed_dofs] = 0.0
+    K[fixed_dofs,:] .= 0.0
+    K[:,fixed_dofs] .= 0.0
+    M[fixed_dofs,:] .= 0.0
+    M[:,fixed_dofs] .= 0.0
     dropzeros!(K)
     dropzeros!(M)
     return nothing
@@ -84,15 +78,15 @@ Eliminate Mortar boundary condition from matrices K, M and force vector f.
 """
 function FEMBase.eliminate_boundary_conditions!(problem::T, K, M, f) where
                             {T <: Union{Problem{Mortar}, Problem{Mortar2D}}}
-    info("Eliminating mesh tie constraint $(problem.name) using static condensation")
+    @info("Eliminating mesh tie constraint $(problem.name) using static condensation")
     s, m, P = calc_projection(problem)
     ndim = size(K, 1)
     Id = ones(ndim)
-    Id[s] = 0.0
-    Q = spdiagm(Id)
+    Id[s] .= 0.0
+    Q = sparse(Diagonal(Id))
     Q[s,m] += P
-    K[:,:] = Q'*K*Q
-    M[:,:] = Q'*M*Q
+    K[:,:] .= Q'*K*Q
+    M[:,:] .= Q'*M*Q
     return nothing
 end
 
@@ -100,10 +94,8 @@ function FEMBase.run!(solver::Solver{Modal})
     time = solver.properties.time
     problems = get_problems(solver)
     properties = solver.properties
-    info(repeat("-", 80))
-    info("Starting natural frequency solver")
-    info("Increment time t=$(round(time, 3))")
-    info(repeat("-", 80))
+
+    @info("Starting natural frequency solver at time $time")
 
     @timeit "assemble matrices" begin
         assemble!(solver, time; with_mass_matrix=true)
@@ -116,17 +108,14 @@ function FEMBase.run!(solver::Solver{Modal})
     dim = size(K, 1)
     ndofs = size(K, 1)
 
-    K_red = K
-    M_red = M
-
     for P in properties.P
-        info("Using P to make transformation K_red = P'*K*P and M_red = P'*M*P")
-        K_red[:,:] = P'*K_red*P
-        M_red[:,:] = P'*M_red*P
+        @info("Using P to make transformation K_red = P'*K*P and M_red = P'*M*P")
+        K[:,:] .= P'*K*P
+        M[:,:] .= P'*M*P
     end
 
     for problem in get_problems(solver)
-        eliminate_boundary_conditions!(problem, K_red, M_red, f)
+        eliminate_boundary_conditions!(problem, K, M, f)
     end
 
     # free up some memory before solution
@@ -134,42 +123,39 @@ function FEMBase.run!(solver::Solver{Modal})
         for problem in get_field_problems(solver)
             empty!(problem.assembly)
         end
-        gc()
     end
 
-    SparseArrays.droptol!(K_red, 1.0e-9)
-    SparseArrays.droptol!(M_red, 1.0e-9)
-    nz = get_nonzero_rows(K_red)
-    K_red = K_red[nz,nz]
-    M_red = M_red[nz,nz]
+    SparseArrays.droptol!(K, 1.0e-9)
+    SparseArrays.droptol!(M, 1.0e-9)
+    nz = get_nonzero_rows(K)
+    K = K[nz,nz]
+    M = M[nz,nz]
 
     sigma = 0.0
     if properties.sigma != 0.0
-        info("Adding diagonal term $(properties.sigma) to stiffness matrix")
+        @info("Adding diagonal term $(properties.sigma) to stiffness matrix")
         sigma = properties.sigma
     end
 
     props = solver.properties
 
-    info("Calculate $(props.nev) eigenvalues...")
-
-    tic()
+    @debug("Calculating $(props.nev) eigenvalues...")
 
     if properties.symmetric
-        K_red = 1/2*(K_red + transpose(K_red))
-        M_red = 1/2*(M_red + transpose(M_red))
+        K = Symmetric(K)
+        M = Symmetric(M)
     end
 
     if properties.info_matrices
-        info("is K symmetric? ", issymmetric(K_red))
-        info("is M symmetric? ", issymmetric(M_red))
-        info("is K positive definite? ", isposdef(K_red))
-        info("is M positive definite? ", isposdef(M_red))
+        @info("is K symmetric? ", issymmetric(K))
+        @info("is M symmetric? ", issymmetric(M))
+        @info("is K positive definite? ", isposdef(K))
+        @info("is M positive definite? ", isposdef(M))
     end
 
     if properties.dense
-        K_red = full(K_red)
-        M_red = full(M_red)
+        K = Matrix(K)
+        M = Matrix(M)
     end
 
     om2 = nothing
@@ -178,49 +164,39 @@ function FEMBase.run!(solver::Solver{Modal})
 
     try
         @timeit "solve eigenvalue problem using `eigs`" begin
-            om2, X = eigs(K_red + sigma*I, M_red; nev=props.nev, which=props.which)
+            om2, X = eigs(K + sigma*I, M; nev=props.nev, which=props.which)
         end
         passed = true
     catch
-        info("Failed to calculate eigenvalues for problem.")
-        b1 = issymmetric(K_red)
-        b2 = issymmetric(M_red)
-        b3 = isposdef(K_red)
-        b4 = isposdef(M_red)
-        info("Is K symmetric? $b1")
-        info("Is M symmetric? $b2")
-        info("Is K positive definite? $b3")
-        info("Is M positive definite? $b4")
-        if properties.sigma != 0.0
-            if !b3
-                info("Stiffness matrix is not positive definite and Cholesky ",
-                     "factorization is failing. Model is not supported enough ",
-                     "with boundary conditions. To work around this problem, ",
-                     "use `problem.properties.sigma = <some small value>` ",
-                     "To add artificial stiffness to model. (Or add boundary ",
-                     "conditions.)")
-            end
+        @info("Failed to calculate eigenvalues for problem.",
+              issymmetric(K), issymmetric(M), isposdef(K), isposdef(M))
+        if !isapprox(properties.sigma, 0.0)
+            @info("Stiffness matrix is not positive definite and Cholesky " *
+                  "factorization is failing. Model is not supported enough " *
+                  "with boundary conditions. To work around this problem, " *
+                  "use `problem.properties.sigma = <some small value>` " *
+                  "To add artificial stiffness to model. (Or add boundary " *
+                  "conditions.)")
             rethrow()
         end
     end
 
     if !passed
         sigma = props.sigma = 1.0e-9
-        info("Calculation of eigenvalues failed. Stiffness matrix is not ",
-             "positive definite and Cholesky factorization is failing. Trying ",
-             "again by adjusting problem.properties.sigma to $sigma.")
+        @info("Calculation of eigenvalues failed. Stiffness matrix is not " *
+              "positive definite and Cholesky factorization is failing. Trying " *
+              "again by adjusting problem.properties.sigma to $sigma.")
         try
-            om2, X = eigs(K_red + sigma*I, M_red; nev=props.nev, which=props.which)
+            om2, X = eigs(K + sigma*I, M; nev=props.nev, which=props.which)
             passed = true
         catch
-            info("Failed to calculate eigenvalues with sigma value $sigma. ",
-                 "Manually set sigma to something larger and try again.")
+            @info("Failed to calculate eigenvalues with sigma value $sigma. " *
+                  "Manually set sigma to something larger and try again.")
             rethrow()
         end
     end
 
-    t1 = round(toq(), 2)
-    info("Eigenvalues computed in $t1 seconds. Squared eigenvalues: $om2")
+    @info("Squared eigenvalues: $om2.")
 
     props.eigvals = om2
     neigvals = length(om2)
@@ -239,7 +215,7 @@ function FEMBase.run!(solver::Solver{Modal})
 
     @timeit "save results to Xdmf" update_xdmf!(solver)
 
-    return true
+    return nothing
 
 end
 
@@ -247,13 +223,13 @@ function update_xdmf!(solver::Solver{Modal})
 
     results_writers = get_results_writers(solver)
     if length(results_writers) == 0
-        info("Xdmf is not attached to solver, not writing output to a file.")
-        info("To write results to Xdmf file, attach Xdmf to Solver, i.e.")
-        info("add_results_writer!(solver, Xdmf(\"results\"))")
+        @info("Xdmf is not attached to solver, not writing output to a file.")
+        @info("To write results to Xdmf file, attach Xdmf to Solver, i.e.")
+        @info("add_results_writer!(solver, Xdmf(\"results\"))")
         return
     end
     if maximum(abs.(imag(solver.properties.eigvals))) > 1.0e-9
-        info("Writing imaginary eigenvalues for Xdmf not supported.")
+        @info("Writing imaginary eigenvalues for Xdmf not supported.")
         return
     end
 
@@ -265,9 +241,9 @@ function update_xdmf!(solver::Solver{Modal})
     nnodes = length(X_)
     ndofs = round(Int, size(solver.properties.eigvecs, 1)/nnodes)
     ndim = length(X_[first(node_ids)])
-    info("Number of nodes: $nnodes. ",
-         "Number of dofs/node: $ndofs. ",
-         "Dimension of geometry: $ndim.")
+    @info("Number of nodes: $nnodes. ",
+          "Number of dofs/node: $ndofs. ",
+          "Dimension of geometry: $ndim.")
     @timeit "create ncoords array" begin
         X = zeros(ndim, nnodes)
         for j in node_ids
@@ -318,12 +294,12 @@ function update_xdmf!(solver::Solver{Modal})
 
     @timeit "save modes" for (j, eigval) in enumerate(real(solver.properties.eigvals))
         if eigval < 0.0
-            warn("negative real eigenvalue found, om2=$eigval, setting to zero.")
+            @warn("negative real eigenvalue found, om2=$eigval, setting to zero.")
             eigval = 0.0
         end
         freq = sqrt(eigval)/(2.0*pi)
         path = "/Results/Natural Frequency Analysis/$unknown_field_name/Mode $j"
-        info("Creating frequency frame f=$(round(freq, 3)), path=$path")
+        @info("Creating frequency frame f=$(round(freq; digits=3)), path=$path")
 
         frame = new_element("Grid")
         time = new_child(frame, "Time")
@@ -393,7 +369,7 @@ function update_xdmf!(solver::Solver{Modal})
 end
 
 function solve!(solver::Solver{Modal}, time::Float64)
-    info("solve!(analysis, time) is deprecated. Use run!(analysis) instead.")
+    @info("solve!(analysis, time) is deprecated. Use run!(analysis) instead.")
     solver.properties.time = time
     run!(solver)
 end

@@ -27,7 +27,7 @@ function equivalent_stress(stress, ::Type{Val{:type_3d}})
     stress_ten = [stress[1] stress[6] stress[5];
                   stress[6] stress[2] stress[4];
                   stress[5] stress[4] stress[3]]
-    stress_dev = stress_ten - 1/3 * trace(stress_ten) * eye(3)
+    stress_dev = stress_ten - 1/3 * tr(stress_ten) * eye(3)
     s = vec(stress_dev)
     return sqrt(3/2 * dot(s, s))
 end
