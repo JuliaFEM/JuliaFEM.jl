@@ -261,9 +261,9 @@ function assemble!(assembly::Assembly,
             :plastic_strain in props.store_fields && update!(ip, "plastic_strain", time => plastic_strain)
 
             #Km += w*BL'*Dtan*BL
-            At_mul_B!(Bt_mul_D, BL, Dtan)
-            A_mul_B!(Bt_mul_D_mul_B, Bt_mul_D, BL)
-            scale!(Bt_mul_D_mul_B, w)
+            mul!(Bt_mul_D, transpose(BL), Dtan)
+            mul!(Bt_mul_D_mul_B, Bt_mul_D, BL)
+            rmul!(Bt_mul_D_mul_B, w)
             for i=1:ndofs^2
                 @inbounds Km[i] += Bt_mul_D_mul_B[i]
             end
@@ -301,8 +301,8 @@ function assemble!(assembly::Assembly,
             end
 
             # internal load
-            At_mul_B!(Bt_mul_S, BL, stress_vec)
-            scale!(Bt_mul_S, w)
+            mul!(Bt_mul_S, transpose(BL), stress_vec)
+            rmul!(Bt_mul_S, w)
             for i=1:ndofs
                 @inbounds f_int[i] += Bt_mul_S[i]
             end
@@ -407,7 +407,7 @@ function get_stress_tensor(problem, element, ip, time)
     nu = element("poissons ratio", ip, time)
     mu = E/(2.0*(1.0+nu))
     la = E*nu/((1.0+nu)*(1.0-2.0*nu))
-    S = la*trace(eps)*I + 2.0*mu*eps
+    S = la*tr(eps)*I + 2.0*mu*eps
     return S
 end
 
@@ -445,13 +445,13 @@ function lsq_fit(problem, elements, field, time)
     A = sparse(A)
     b = sparse(b)
     A = 1/2*(A + A')
-    
+
     nz = get_nonzero_rows(A)
-    F = ldltfact(A[nz,nz])
+    F = ldlt(A[nz,nz])
 
     x = F \ b[nz, :]
 
-    nodal_values = Dict(node_id => vec(full(x[idx,:])) for (idx, node_id) in enumerate(nz))
+    nodal_values = Dict(node_id => Vector(x[idx, :]) for (idx, node_id) in enumerate(nz))
     return nodal_values
 end
 

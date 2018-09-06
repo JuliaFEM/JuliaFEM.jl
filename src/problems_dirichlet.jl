@@ -24,7 +24,7 @@ function get_dualbasis(element::Element, time::Float64, order=1)
         detJ = element(ip, time, Val{:detJ})
         w = ip.weight*detJ
         N = element(ip, time)
-        De += w*diagm(vec(N))
+        De += w*Matrix(Diagonal(vec(N)))
         Me += w*N'*N
     end
     return De, Me, De*inv(Me)
@@ -38,23 +38,23 @@ function assemble!(problem::Problem{Dirichlet}, time::Float64=0.0;
                    auto_initialize=true)
     # FIXME: boilerplate
     if !isempty(problem.assembly)
-        warn("Assemble problem $(problem.name): problem.assembly is not empty and assembling, are you sure you know what are you doing?")
+        @warn("Assemble problem $(problem.name): problem.assembly is not empty and assembling, are you sure you know what are you doing?")
     end
     if isempty(problem.elements)
-        warn("Assemble problem $(problem.name): problem.elements is empty, no elements in problem?")
+        @warn("Assemble problem $(problem.name): problem.elements is empty, no elements in problem?")
     else
         first_element = first(problem.elements)
         unknown_field_name = get_unknown_field_name(problem)
         if !haskey(first_element, unknown_field_name)
-            warn("Assemble problem $(problem.name): seems that problem is uninitialized.")
+            @warn("Assemble problem $(problem.name): seems that problem is uninitialized.")
             if auto_initialize
-                info("Initializing problem $(problem.name) at time $time automatically.")
+                @info("Initializing problem $(problem.name) at time $time automatically.")
                 initialize!(problem, time)
             end
         end
     end
 
-    if method_exists(assemble_prehook!, Tuple{typeof(problem), Float64})
+    if hasmethod(assemble_prehook!, Tuple{typeof(problem), Float64})
         assemble_prehook!(problem, time)
     end
 
@@ -88,13 +88,13 @@ function assemble!(problem::Problem{Dirichlet}, time::Float64=0.0;
             end
         end
         for (k, v) in field_vals
-            push!(problem.assembly.C1, k, k, 1.0)
-            push!(problem.assembly.C2, k, k, 1.0)
-            push!(problem.assembly.g, k, 1, v)
+            add!(problem.assembly.C1, k, k, 1.0)
+            add!(problem.assembly.C2, k, k, 1.0)
+            add!(problem.assembly.g, k, 1, v)
         end
     end
 
-    if method_exists(assemble_posthook!, Tuple{typeof(problem), Float64})
+    if hasmethod(assemble_posthook!, Tuple{typeof(problem), Float64})
         assemble_posthook!(problem, time)
     end
 end
@@ -112,7 +112,7 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet},
     if problem.properties.dual_basis
         De, Me, Ae = get_dualbasis(element, time)
     else
-        Ae = eye(nnodes)
+        Ae = I
         De = zeros(nnodes, nnodes)
         for ip in get_integration_points(element, props.order)
             N = element(ip, time)

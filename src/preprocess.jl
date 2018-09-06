@@ -12,10 +12,6 @@
 - etc only topology related stuff
 =#
 
-import Base: copy
-
-using JuliaFEM
-
 mutable struct Mesh
     nodes :: Dict{Int, Vector{Float64}}
     node_sets :: Dict{Symbol, Set{Int}}
@@ -42,8 +38,9 @@ function Mesh(m::Dict)
     mesh.nodes = m["nodes"]
     mesh.elements = m["elements"]
     mesh.element_types = m["element_types"]
-    mesh.surface_sets = m["surface_sets"]
-    mesh.surface_types = m["surface_types"]
+    for (k, v) in m["surface_types"]
+        mesh.surface_types[Symbol(k)] = v
+    end
     for (nset_name, node_ids) in m["node_sets"]
         mesh.node_sets[Symbol(nset_name)] = Set(node_ids)
     end
@@ -100,7 +97,7 @@ the set names to be inserted in the function.
 function create_node_set_from_element_set!(mesh::Mesh, set_names::String...)
     for set_name in set_names
         set_name = Symbol(set_name)
-        info("Creating node set $set_name from element set")
+        @info("Creating node set $set_name from element set")
         node_ids = Set{Int}()
         for elid in mesh.element_sets[set_name]
             push!(node_ids, mesh.elements[elid]...)
@@ -125,9 +122,10 @@ end
 Add an element into the mesh. ´elid´ is the element id, ´eltype´ is the type of
 the element and ´connectivity´ is the connectivity of the element.
 """
-function add_element!(mesh::Mesh, elid::Int, eltype::Symbol, connectivity::Vector{Int})
+function FEMBase.add_element!(mesh::Mesh, elid, eltype, connectivity)
     mesh.elements[elid] = connectivity
     mesh.element_types[elid] = eltype
+    return nothing
 end
 
 """
@@ -135,10 +133,11 @@ end
 
 Add elements into the mesh.
 """
-function add_elements!(mesh::Mesh, elements::Dict{Int, Tuple{Symbol, Vector{Int}}})
+function FEMBase.add_elements!(mesh::Mesh, elements::Dict{Int, Tuple{Symbol, Vector{Int}}})
     for (elid, (eltype, elcon)) in elements
         add_element!(mesh, elid, eltype, elcon)
     end
+    return nothing
 end
 
 """
@@ -157,9 +156,9 @@ end
 """
     copy(mesh)
 
-Copy the mesh.
+Return a copy of the mesh.
 """
-function copy(mesh::Mesh)
+function Base.copy(mesh::Mesh)
     mesh2 = Mesh()
     mesh2.nodes = copy(mesh.nodes)
     mesh2.node_sets = copy(mesh.node_sets)
@@ -208,11 +207,6 @@ function create_element(mesh::Mesh, id::Int)
     return element
 end
 
-"""
-    create_elements(mesh, element_type=nothing)
-
-Create elements from the mesh filtered by their type.
-"""
 function create_elements(mesh::Mesh; element_type=nothing)
     element_ids = collect(keys(mesh.elements))
     if element_type != nothing
@@ -237,12 +231,34 @@ function create_elements(mesh::Mesh, element_sets::Symbol...; element_type=nothi
     end
 
     elements = [create_element(mesh, id) for id in element_ids]
+
+    nelements = length(elements)
+    content = Dict{Symbol, Int}()
+    for elid in element_ids
+        eltype = mesh.element_types[elid]
+        content[eltype] = get(content, eltype, 0) + 1
+    end
+    s = join(("$v x $k" for (k, v) in content), ", ")
+    v = join(element_sets, ", ")
+    @info("Created $nelements elements ($s) from element set: $v.")
+
     return elements
 end
 
-function create_elements(mesh::Mesh, element_sets::AbstractString...; element_type=nothing)
-    element_sets = map(parse, element_sets)
-    return create_elements(mesh, element_sets...; element_type=element_type)
+"""
+    create_elements(mesh::Mesh, element_set::String)
+
+# Examples
+
+Suppose that there is a `mesh` with element set `Body_1`. Creating elements
+based on that element set is done then
+
+```julia
+create_elements(mesh, "Body_1")
+```
+"""
+function create_elements(mesh::Mesh, element_sets::String...)
+    return create_elements(mesh, map(Symbol, element_sets)...)
 end
 
 
