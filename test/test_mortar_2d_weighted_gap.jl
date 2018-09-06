@@ -1,7 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM.Testing
+using Test
 
 #= TODO: Fix test.
 @testset "calculate mortar matrices and weighted gap vector for 2d model" begin
@@ -23,7 +23,7 @@ using JuliaFEM.Testing
     M = C1[:, [5, 6, 7, 8]]*24
     X = calculate_nodal_vector("geometry", 2, [sel, mel], 0.0)
     @debug begin
-        info("nodal vector")
+        @info("nodal vector")
         dump(round(full(X), 3))
     end
     g = -C1*X

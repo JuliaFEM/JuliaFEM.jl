@@ -1,9 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM
-using JuliaFEM.Preprocess
-using JuliaFEM.Testing
+using JuliaFEM, Test
 
 #=
 @testset "2d nonlinear elasticity: test nonhomogeneous boundary conditions and stress calculation" begin
@@ -55,7 +53,7 @@ using JuliaFEM.Testing
     u3_expected =  [-2.36237356855269E-01, 5.00000000000000E-01]
 
     u3 = reshape(block.assembly.u, 2, 4)[:, 3]
-    info("u3 = $u3")
+    @info("u3 = $u3")
     @test isapprox(u3, u3_expected, atol=1.0e-5)
 end
 

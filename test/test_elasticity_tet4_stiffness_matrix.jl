@@ -1,45 +1,33 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM
-using JuliaFEM: add_elements!
-using Base.Test
+using JuliaFEM, Test
 
-@testset "test tet4 stiffness matrix" begin
-    el = Element(Tet4, [1, 2, 3, 4])
-    el["youngs modulus"] = 96.0
-    el["poissons ratio"] = 1/3
-    x1 = [2.0, 3.0, 4.0]
-    x2 = [6.0, 3.0, 2.0]
-    x3 = [2.0, 5.0, 1.0]
-    x4 = [4.0, 3.0, 6.0]
-    u1 = u2 = u3 = u4 = zeros(3)
-    el["geometry"] = Vector{Float64}[x1, x2, x3, x4]
-    u = Vector{Float64}[u1, u2, u3, u4]
-    pr = Problem(Elasticity, "tet4", 3)
-    add_elements!(pr, [el])
-    assemble!(pr)
-    as = pr.assembly
-    Kt = full(as.K)
-    Kt_expected = [
-         149.0   108.0   24.0   -1.0    6.0   12.0  -54.0   -48.0    0.0  -94.0   -66.0  -36.0
-         108.0   344.0   54.0  -24.0  104.0   42.0  -24.0  -216.0  -12.0  -60.0  -232.0  -84.0
-          24.0    54.0  113.0    0.0   30.0   35.0    0.0   -24.0  -54.0  -24.0   -60.0  -94.0
-          -1.0   -24.0    0.0   29.0  -18.0  -12.0  -18.0    24.0    0.0  -10.0    18.0   12.0
-           6.0   104.0   30.0  -18.0   44.0   18.0   12.0   -72.0  -12.0    0.0   -76.0  -36.0
-          12.0    42.0   35.0  -12.0   18.0   29.0    0.0   -24.0  -18.0    0.0   -36.0  -46.0
-         -54.0   -24.0    0.0  -18.0   12.0    0.0   36.0     0.0    0.0   36.0    12.0    0.0
-         -48.0  -216.0  -24.0   24.0  -72.0  -24.0    0.0   144.0    0.0   24.0   144.0   48.0
-           0.0   -12.0  -54.0    0.0  -12.0  -18.0    0.0     0.0   36.0    0.0    24.0   36.0
-         -94.0   -60.0  -24.0  -10.0    0.0    0.0   36.0    24.0    0.0   68.0    36.0   24.0
-         -66.0  -232.0  -60.0   18.0  -76.0  -36.0   12.0   144.0   24.0   36.0   164.0   72.0
-         -36.0   -84.0  -94.0   12.0  -36.0  -46.0    0.0    48.0   36.0   24.0    72.0  104.0]
-    if !isapprox(Kt, Kt_expected)
-        info("Test failed")
-        info("Kt_expected")
-        dump(Kt_expected)
-        info("Kt")
-        dump(Kt)
-    end
-    @test isapprox(Kt, Kt_expected)
-end
+# test tet4 stiffness matrix
+
+X = Dict(1 => [2.0, 3.0, 4.0],
+         2 => [6.0, 3.0, 2.0],
+         3 => [2.0, 5.0, 1.0],
+         4 => [4.0, 3.0, 6.0])
+element = Element(Tet4, (1, 2, 3, 4))
+update!(element, "youngs modulus", 96.0)
+update!(element, "poissons ratio", 1/3)
+update!(element, "geometry", X)
+problem = Problem(Elasticity, "tet4", 3)
+add_element!(problem, element)
+time = 0.0
+assemble!(problem, time)
+K_expected = [
+     149   108   24   -1    6   12  -54   -48    0  -94   -66  -36
+     108   344   54  -24  104   42  -24  -216  -12  -60  -232  -84
+      24    54  113    0   30   35    0   -24  -54  -24   -60  -94
+      -1   -24    0   29  -18  -12  -18    24    0  -10    18   12
+       6   104   30  -18   44   18   12   -72  -12    0   -76  -36
+      12    42   35  -12   18   29    0   -24  -18    0   -36  -46
+     -54   -24    0  -18   12    0   36     0    0   36    12    0
+     -48  -216  -24   24  -72  -24    0   144    0   24   144   48
+       0   -12  -54    0  -12  -18    0     0   36    0    24   36
+     -94   -60  -24  -10    0    0   36    24    0   68    36   24
+     -66  -232  -60   18  -76  -36   12   144   24   36   164   72
+     -36   -84  -94   12  -36  -46    0    48   36   24    72  104]
+@test isapprox(problem.assembly.K, K_expected)

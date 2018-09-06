@@ -1,9 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM
-using JuliaFEM: assemble_mass_matrix!, add_elements!
-using Base.Test
+using JuliaFEM, Test
 
 X = Dict(
     1 => [2.0, 3.0, 4.0],
@@ -17,16 +15,16 @@ X[8] = 1/2*(X[1] + X[4])
 X[9] = 1/2*(X[2] + X[4])
 X[10] = 1/2*(X[3] + X[4])
 
-element = Element(Tet10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+element = Element(Tet10, (1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
 update!(element, "youngs modulus", 480.0)
 update!(element, "poissons ratio", 1/3)
 update!(element, "geometry", X)
 update!(element, "density", 105.0)
 
-body = Problem(Heat, "TET", 1)
-add_elements!(body, [element])
-assemble_mass_matrix!(body, 0.0)
-M = full(body.assembly.M)
+problem = Problem(Heat, "tet10", 1)
+add_element!(problem, element)
+time = 0.0
+assemble_mass_matrix!(problem, time)
 
 M_expected = [
     6   1   1   1  -4  -6  -4  -4  -6  -6
@@ -40,4 +38,4 @@ M_expected = [
    -6  -4  -6  -4  16  16   8  16  32  16
    -6  -6  -4  -4   8  16  16  16  16  32]
 
-@test isapprox(M, M_expected)
+@test isapprox(problem.assembly.M, M_expected)

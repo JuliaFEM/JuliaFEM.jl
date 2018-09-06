@@ -1,81 +1,61 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM
-using Base.Test
+using JuliaFEM, Test
 
-@testset "two increments, linear solver" begin
-    X = Dict{Int, Vector{Float64}}(
-        1 => [0.0,0.0],
-        2 => [1.0,0.0],
-        3 => [1.0,1.0],
-        4 => [0.0,1.0])
-    element = Element(Quad4, [1, 2, 3, 4])
-    update!(element, "geometry", X)
-    update!(element, "thermal conductivity", 6.0)
-    update!(element, "heat source", 0.0 => 12.0)
-    update!(element, "heat source", 1.0 => 24.0)
-    problem = Problem(PlaneHeat, "one element heat problem", 1)
-    push!(problem, element)
-    boundary_element = Element(Seg2, [1, 2])
-    update!(boundary_element, "geometry", X)
-    update!(boundary_element, "temperature 1", 0.0)
-    bc = Problem(Dirichlet, "fixed", 1, "temperature")
-    push!(bc, boundary_element)
-    solver = Solver(Linear, problem, bc)
+X = Dict(1 => [0.0,0.0], 2 => [1.0,0.0], 3 => [1.0,1.0], 4 => [0.0,1.0])
+element = Element(Quad4, (1, 2, 3, 4))
+update!(element, "geometry", X)
+update!(element, "thermal conductivity", 6.0)
+update!(element, "heat source", 0.0 => 12.0)
+update!(element, "heat source", 1.0 => 24.0)
+problem = Problem(PlaneHeat, "one element heat problem", 1)
+add_element!(problem, element)
+boundary_element = Element(Seg2, [1, 2])
+update!(boundary_element, "geometry", X)
+update!(boundary_element, "temperature 1", 0.0)
+bc = Problem(Dirichlet, "fixed", 1, "temperature")
+add_element!(bc, boundary_element)
+analysis = Analysis(Linear)
+add_problems!(analysis, problem, bc)
 
-    empty!(problem.assembly)
-    solve!(solver, 0.0)
-    @test isapprox(solver("temperature", 0.0)[3], 1.0)
+# two increments, linear solver
 
-    empty!(problem.assembly)
-    solver()
-    @test isapprox(solver("temperature", 0.0)[3], 1.0)
+run!(analysis)
+@test isapprox(analysis("temperature", 0.0)[3], 1.0)
 
-    empty!(problem.assembly)
-    solve!(solver, 1.0)
-    @test isapprox(solver("temperature", 1.0)[3], 2.0)
+empty!(problem.assembly)
+run!(analysis)
+@test isapprox(analysis("temperature", 0.0)[3], 1.0)
 
-    empty!(problem.assembly)
-    solver()
-    @test isapprox(solver("temperature", 1.0)[3], 2.0)
+empty!(problem.assembly)
+analysis.properties.time = 1.0
+run!(analysis)
+@test isapprox(analysis("temperature", 1.0)[3], 2.0)
 
-end
+empty!(problem.assembly)
+run!(analysis)
+@test isapprox(analysis("temperature", 1.0)[3], 2.0)
 
-@testset "two increments, nonlinear solver" begin
-    X = Dict{Int, Vector{Float64}}(
-        1 => [0.0,0.0],
-        2 => [1.0,0.0],
-        3 => [1.0,1.0],
-        4 => [0.0,1.0])
-    element = Element(Quad4, [1, 2, 3, 4])
-    update!(element, "geometry", X)
-    update!(element, "thermal conductivity", 6.0)
-    update!(element, "heat source", 0.0 => 12.0)
-    update!(element, "heat source", 1.0 => 24.0)
-    problem = Problem(PlaneHeat, "one element heat problem", 1)
-    push!(problem, element)
-    boundary_element = Element(Seg2, [1, 2])
-    update!(boundary_element, "geometry", X)
-    update!(boundary_element, "temperature 1", 0.0)
-    bc = Problem(Dirichlet, "fixed", 1, "temperature")
-    push!(bc, boundary_element)
-    solver = Solver(Nonlinear, problem, bc)
+# two increments, nonlinear solver
 
-    empty!(problem.assembly)
-    solve!(solver, 0.0)
-    @test isapprox(solver("temperature", 0.0)[3], 1.0)
+delete!(element.fields, "temperature")
+analysis = Analysis(Nonlinear)
+add_problems!(analysis, problem, bc)
 
-    empty!(problem.assembly)
-    solver()
-    @test isapprox(solver("temperature", 0.0)[3], 1.0)
+empty!(problem.assembly)
+run!(analysis)
+@test isapprox(analysis("temperature", 0.0)[3], 1.0)
 
-    empty!(problem.assembly)
-    solve!(solver, 1.0)
-    @test isapprox(solver("temperature", 1.0)[3], 2.0)
+empty!(problem.assembly)
+run!(analysis)
+@test isapprox(analysis("temperature", 0.0)[3], 1.0)
 
-    empty!(problem.assembly)
-    solve!(solver, 1.0)
-    @test isapprox(solver("temperature", 1.0)[3], 2.0)
+empty!(problem.assembly)
+analysis.properties.time = 1.0
+run!(analysis)
+@test isapprox(analysis("temperature", 1.0)[3], 2.0)
 
-end
+empty!(problem.assembly)
+run!(analysis)
+@test isapprox(analysis("temperature", 1.0)[3], 2.0)
