@@ -2,7 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM.Testing
+using Test
 
 abstract type HeatProblem <: AbstractProblem 
 
@@ -63,7 +63,7 @@ function test_potential_energy_method()
     solve!(problem, [1, 2], 0.0)
     temp = element("temperature", [0.0, -1.0], 0.0)
     err = temp - 2/3
-    info("error: $err")
+    @info("error: $err")
     @test isapprox(err, 0.0)
 end
 
@@ -93,7 +93,7 @@ function test_potential_energy_method_2()
 
     temp = element1("temperature", [0.0, -1.0], 0.0)
     err = temp - 0.5
-    info("error: $err")
+    @info("error: $err")
     @test isapprox(err, 0.0, atol=1.0e-6)
     
     # @test isapprox(temp, 2.93509690572300E+00)  # tested using Code Aster

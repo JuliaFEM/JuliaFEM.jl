@@ -2,7 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM.Testing
+using SparseArrays, Test
 
 function test_auxiliary_plane_transforms()
     nodes = Vector{Float64}[
@@ -18,19 +18,19 @@ function test_auxiliary_plane_transforms()
     e1["normal-tangential coordinates"] = Matrix{Float64}[R, R, R]
     time::Real = 0.0
     x0, Q = create_auxiliary_plane(e1, time)
-    info("x0 = $x0")
-    info("Q = $Q")
+    @info("x0 = $x0")
+    @info("Q = $Q")
     @test isapprox(x0, [1.0/3.0, 1.0/3.0, 0.0])
     @test isapprox(Q, R)
     p1 = Float64[1.0/3.0+0.1, 1.0/3.0+0.1, 1.0]
     p2 = project_point_to_auxiliary_plane(p1, x0, Q)
-    info("point in auxiliary plane p2 = $p2")
+    @info("point in auxiliary plane p2 = $p2")
     @test isapprox(p2, [0.1, 0.1])
     theta = project_point_from_plane_to_surface(p2, x0, Q, e1, time)
-    info("theta = $theta")
+    @info("theta = $theta")
     @test isapprox(theta[1], 0.0)
     X = e1("geometry", theta[2:3], time)
-    info("projected point = $X")
+    @info("projected point = $X")
     @test isapprox(X, Float64[1.0/3.0+0.1, 1.0/3.0+0.1, 0.0])
 end
 
@@ -126,7 +126,7 @@ function test_calculate_polygon_centerpoint()
         0.0  1.0  2.0  2.0  1.25  0.0
         0.5  0.0  0.0  1.0  1.75  1.33333]
     C = calculate_polygon_centerpoint(P)
-    info("Polygon centerpoint: $C")
+    @info("Polygon centerpoint: $C")
     @test isapprox(C, [1.0397440690338993, 0.8047003412233396])
 end
 
@@ -154,10 +154,10 @@ function test_assemble_3d_problem_tri3()
 
     push!(prob, sel)
     stiffness_matrix = full(assemble(prob, 0.0).stiffness_matrix)
-    info("stiffness matrix for this problem:\n$stiffness_matrix")
+    @info("stiffness matrix for this problem:\n$stiffness_matrix")
     M = D = 1/24*[2 1 1; 1 2 1; 1 1 2]
     B = [D -M]  # slave dofs are first in this.
-    info("expected matrix for this problem:\n$B")
+    @info("expected matrix for this problem:\n$B")
     @test isapprox(stiffness_matrix, B)
 
     # rotate and translate surface and check that we are still having same results
@@ -183,15 +183,15 @@ function test_assemble_3d_problem_tri3()
     end
     calculate_normal_tangential_coordinates!(sel, 0.0)
     stiffness_matrix = full(assemble(prob, 0.0).stiffness_matrix)
-    info("sel midpnt: ", sel("geometry", [1/3, 1/3], 0.0))
-    info("nt basis: ", sel("normal-tangential coordinates", [1/3, 1/3], 0.0))
+    @info("sel midpnt: ", sel("geometry", [1/3, 1/3], 0.0))
+    @info("nt basis: ", sel("normal-tangential coordinates", [1/3, 1/3], 0.0))
     @test isapprox(stiffness_matrix, B)
 
 end
 
 
 function test_assemble_3d_problem_quad4()
-    info("assemble 3d problem in quad4-quad4")
+    @info("assemble 3d problem in quad4-quad4")
     nodes = Vector{Float64}[
         [0.0, 0.0, 0.0],
         [1.0, 0.0, 0.0],
@@ -215,10 +215,10 @@ function test_assemble_3d_problem_quad4()
     D = [16 8 4 8; 8  16 8 4;  4 8 16 8;  8 4 8 16]
     M = [25 5 1 5; 20 10 2 4; 16 8  4 8; 20 4 2 10]
     B = [D -M]  # slave dofs are first in this.
-    info("expected matrix for this problem:")
+    @info("expected matrix for this problem:")
     dump(round(B, 3))
 
-    info("stiffness matrix for this problem:")
+    @info("stiffness matrix for this problem:")
     dump(round(stiffness_matrix, 3))
     @test isapprox(stiffness_matrix, B)
 
@@ -226,7 +226,7 @@ end
 
 
 function test_assemble_3d_problem_quad4_2()
-    info("assemble 3d problem in quad4-quad4")
+    @info("assemble 3d problem in quad4-quad4")
     nodes = Vector{Float64}[
         [0.0, 0.0, 0.0],
         [1/4, 0.0, 0.0],
@@ -261,10 +261,10 @@ function test_assemble_3d_problem_quad4_2()
         3456 1152 1152 3456
         ]
     B = [D -M]  # slave dofs are first in this.
-    info("expected matrix for this problem:")
+    @info("expected matrix for this problem:")
     dump(round(B, 3))
 
-    info("stiffness matrix for this problem:")
+    @info("stiffness matrix for this problem:")
     dump(round(stiffness_matrix, 3))
     @test isapprox(stiffness_matrix, B)
 
@@ -272,7 +272,7 @@ end
 
 
 function test_assemble_3d_problem_quad4_3()
-    info("assemble 3d problem in quad4-quad4")
+    @info("assemble 3d problem in quad4-quad4")
     a = 1/4
     b = 1/3
     nodes = Vector{Float64}[
@@ -310,10 +310,10 @@ function test_assemble_3d_problem_quad4_3()
         ]
 
     B = [D -M]  # slave dofs are first in this.
-    info("expected matrix for this problem:")
+    @info("expected matrix for this problem:")
     dump(round(B, 3))
 
-    info("stiffness matrix for this problem:")
+    @info("stiffness matrix for this problem:")
     dump(round(stiffness_matrix, 3))
     @test isapprox(stiffness_matrix, B)
 
@@ -375,7 +375,7 @@ function test_3d_problem()
     solver()
     X = el2("geometry", [1.0, 1.0, 1.0], 0.0)
     u = el2("displacement", [1.0, 1.0, 1.0], 0.0)
-    info("displacement at $X = $u")
+    @info("displacement at $X = $u")
     @test isapprox(u, 1/36*[1, 1, -4])
 end
 
@@ -422,7 +422,7 @@ end
     sel1["master elements"] = [mel1, mel2, mel4, mel5]
     sel2["master elements"] = [mel2, mel3, mel5, mel6]
     stiffness_matrix = full(assemble(prob, 0.0).stiffness_matrix)*2592*6
-    info("interface matrix:")
+    @info("interface matrix:")
     dump(round(stiffness_matrix, 3))
     B = [
         864  432   0 432  216   0 -420 -375  -15    0 -504 -450  -18    0  -84  -75   -3    0
@@ -432,7 +432,7 @@ end
         216  864 216 432 1728 432  -24 -138 -138  -24 -144 -828 -828 -144 -120 -690 -690 -120
           0  216 432   0  432 864    0   -3  -75  -84    0  -18 -450 -504    0  -15 -375 -420
         ]
-    info("expected interface matrix:")
+    @info("expected interface matrix:")
     dump(round(B, 3))
     @test isapprox(stiffness_matrix, B)
 end
@@ -504,9 +504,9 @@ end
     B = full(B)
     D = B[1:9,1:9]
     M = B[1:9,10:end]
-    info("interface matrix D:")
+    @info("interface matrix D:")
     dump(round(D, 3))
-    info("interface matrix M:")
+    @info("interface matrix M:")
     dump(round(M, 3))
     D_expected = [
         1296  648    0  648  324    0    0    0    0
@@ -531,9 +531,9 @@ end
            0     0     0    0     0    -1   -25   -28     0   -25  -625  -700    0   -28  -700 -784]
 
 
-    info("D - D_expected")
+    @info("D - D_expected")
     dump(D - D_expected)
-    info("M - M_expected")
+    @info("M - M_expected")
     dump(M - M_expected)
     
     @test isapprox(D, D_expected)
@@ -547,7 +547,7 @@ end
         216  864 216 432 1728 432  -24 -138 -138  -24 -144 -828 -828 -144 -120 -690 -690 -120
           0  216 432   0  432 864    0   -3  -75  -84    0  -18 -450 -504    0  -15 -375 -420
         ]
-    info("expected interface matrix:")
+    @info("expected interface matrix:")
     dump(round(B, 3))
     @test isapprox(stiffness_matrix, B)
 =#

@@ -1,49 +1,38 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-# http://ahojukka5.github.io/posts/finite-element-solution-for-one-element-problem/
+using JuliaFEM, Test
 
-using JuliaFEM
-using JuliaFEM: add_elements!
-using Base.Test
+# Local stiffness matrix of plane stress element
 
-@testset "test 2d linear elasticity local matrices" begin
-    element = Element(Quad4, [1, 2, 3, 4])
-    X = Dict{Int64, Vector{Float64}}(
-        1 => [0.0, 0.0],
-        2 => [1.0, 0.0],
-        3 => [1.0, 1.0],
-        4 => [0.0, 1.0])
-    u = Dict{Int64, Vector{Float64}}(
-        1 => [0.0, 0.0],
-        2 => [0.0, 0.0],
-        3 => [0.0, 0.0],
-        4 => [0.0, 0.0])
-    update!(element, "geometry", X)
-    update!(element, "displacement", u)
-    update!(element, "youngs modulus", 288.0)
-    update!(element, "poissons ratio", 1/3)
-    update!(element, "displacement load", [4.0, 8.0])
+element = Element(Quad4, (1, 2, 3, 4))
+X = Dict(1 => [0.0, 0.0], 2 => [1.0, 0.0], 3 => [1.0, 1.0], 4 => [0.0, 1.0])
+u = Dict(1 => [0.0, 0.0], 2 => [0.0, 0.0], 3 => [0.0, 0.0], 4 => [0.0, 0.0])
+update!(element, "geometry", X)
+update!(element, "displacement", u)
+update!(element, "youngs modulus", 288.0)
+update!(element, "poissons ratio", 1/3)
+update!(element, "displacement load", [4.0, 8.0])
 
-    problem = Problem(Elasticity, "[0x1] x [0x1] block", 2)
-    update!(problem.properties, "formulation" => "plane_stress")
-    add_elements!(problem, [element])
-    assemble!(problem)
-    K = full(problem.assembly.K)
-    f = vec(full(problem.assembly.f))
+problem = Problem(Elasticity, "[0x1] x [0x1] block", 2)
+problem.properties.formulation  = :plane_stress
+add_element!(problem, element)
+assemble!(problem, 0.0)
 
-    K_expected = [
-        144  54 -90   0 -72 -54  18   0
-         54 144   0  18 -54 -72   0 -90
-        -90   0 144 -54  18   0 -72  54
-          0  18 -54 144   0 -90  54 -72
-        -72 -54  18   0 144  54 -90   0
-        -54 -72   0 -90  54 144   0  18
-         18   0 -72  54 -90   0 144 -54
-          0 -90  54 -72   0  18 -54 144]
+K = Matrix(problem.assembly.K)
+f = Vector(problem.assembly.f)
 
-    f_expected = [1, 2, 1, 2, 1, 2, 1, 2]
+K_expected = [
+    144  54 -90   0 -72 -54  18   0
+     54 144   0  18 -54 -72   0 -90
+    -90   0 144 -54  18   0 -72  54
+      0  18 -54 144   0 -90  54 -72
+    -72 -54  18   0 144  54 -90   0
+    -54 -72   0 -90  54 144   0  18
+     18   0 -72  54 -90   0 144 -54
+      0 -90  54 -72   0  18 -54 144]
 
-    @test isapprox(K, K_expected)
-    @test isapprox(f, f_expected)
-end
+f_expected = [1, 2, 1, 2, 1, 2, 1, 2]
+
+@test isapprox(K, K_expected)
+@test isapprox(f, f_expected)
