@@ -6,10 +6,8 @@
 # ![](linear_static/freecad.png)
 
 # ## Preprocessing
+
 using JuliaFEM
-using JuliaFEM.Preprocess
-using JuliaFEM.Postprocess
-add_elements! = JuliaFEM.add_elements!
 
 # First we will read in the mesh. Geometry and mesh are greated with FreeCAD,
 # where med format is selected for exporting. Mesh file consist also edge and
@@ -46,7 +44,8 @@ filter!(is_not_Seg3_or_Tri6, model.elements)
 # define a function, which finds nodes on the given plane yz, xz or xy from the
 # given height.
 
-function add_nodes_at_certain_plane_to_node_set!(mesh, name, vector_id, distance, radius=6.0)
+function add_nodes_at_certain_plane_to_node_set!(mesh, name, vector_id, distance,
+                                                 radius=6.0)
     for (node, coords) in mesh.nodes
         if isapprox(coords[vector_id], distance, atol=radius)
             add_node_to_node_set!(mesh, name, node)
@@ -58,8 +57,10 @@ end
 # We will find nodes from the xz-plane going through point (0,50,0) or actually
 # we previously defined the radius to be 6.0, which means (0,[44,56],0). In other
 # words we will select each node, which second coordinate value is between 44
-# and 56. This function will edit mesh object and add node set called `:mid_fixed` to it. 
-add_nodes_at_certain_plane_to_node_set!(mesh,:mid_fixed,2,50.0)
+# and 56. This function will edit mesh object and add node set called `:mid_fixed`
+# to it. 
+
+add_nodes_at_certain_plane_to_node_set!(mesh, :mid_fixed, 2, 50.0)
 
 # We need to somehow handle the i's dot. I looked the rough coordinates of the
 # dot in FreeCAD and now we can search three closest nodes to these coordinates.
@@ -91,26 +92,19 @@ analysis = Analysis(Linear, model, fixed)
 xdmf = Xdmf("model_results"; overwrite=true)
 add_results_writer!(analysis, xdmf)
 
+# This is how the stresses are requested
+push!(model.postprocess_fields, "stress")
+
 # Now we have all we need to run the analysis.
 
 run!(analysis)
 
 # ## Postprocessing
 
-# This is how the stresses are requested
-push!(model.postprocess_fields, "stress")
-
-# Finally let's write the results to the xdmf (this is bug, the solver should
-# do this automatically, see issue #203)
-
-time = 0.0
-JuliaFEM.postprocess!(analysis, time)
-JuliaFEM.write_results!(analysis, time)
-
 # In order to look the results, we will need to close the xdmf that it is actually
 # written to the file from buffer.
 
-close(xdmf.hdf)
+close(xdmf)
 
 # Finally when we open the model in ParaView and set some settings we have this
 # end result.

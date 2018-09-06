@@ -24,11 +24,6 @@
 # ``a = 6.21 \;\mathrm{mm}``.
 
 using JuliaFEM
-using JuliaFEM.Preprocess
-using JuliaFEM.Postprocess
-using Logging
-Logging.configure(level=INFO)
-add_elements! = JuliaFEM.add_elements!
 
 # Simulation starts by reading the mesh. Model is constructed and meshed using
 # SALOME, thus mesh format is .med. Mesh type is quite simple structure,
@@ -135,18 +130,15 @@ add_slave_elements!(contact, contact_slave_elements)
 # results using ParaView, thus we write our results to Xdmf format, which uses
 # well defined standards XML and HDF to store model data.
 
-step = Analysis(Nonlinear)
-add_problems!(step, [upper, lower, bc_fixed, bc_sym_23, load, contact])
+analysis = Analysis(Nonlinear)
+add_problems!(analysis, upper, lower, bc_fixed, bc_sym_23, load, contact)
 xdmf = Xdmf("2d_hertz_results"; overwrite=true)
-## todo for 2d
-## for body in (upper, lower)
-##     push!(body.postprocess_fields, "stress")
-## end
-add_results_writer!(step, xdmf)
+add_results_writer!(analysis, xdmf)
 
 # In last part, we run the analysis.
 
-step()
+run!(analysis)
+close(xdmf)
 
 # # Results
 
@@ -172,7 +164,7 @@ end
 
 println("2d hertz contact resultant forces: Rn = $Rn, Rt = $Rt")
 
-using Base.Test
+using Test
 @test isapprox(Rn, 35.0e3)
 @test isapprox(Rt, 0.0)
 
@@ -217,5 +209,3 @@ end
 println("Contact radius: $a_rad")
 
 # This example briefly described some of the core features of JuliaFEM.
-
-close(xdmf.hdf) # src
