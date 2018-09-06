@@ -16,4 +16,4 @@ problem = Problem(Elasticity, "test problem", 2)
 problem.properties.formulation = :plane_stress
 add_elements!(problem, [element])
 assemble!(problem, 0.0)
-K = round.(full(problem.assembly.K), 5)
+K = round.(Matrix(problem.assembly.K), 5)
