@@ -1,9 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM
-using JuliaFEM.Preprocess
-using JuliaFEM.Testing
+using JuliaFEM, Test
 
 #=
 
@@ -58,7 +56,7 @@ using JuliaFEM.Testing
     solver()
 
     disp = element("displacement", [1.0, 1.0, 1.0], 1.0)
-    info("displacement at tip: $disp")
+    @info("displacement at tip: $disp")
     u_expected = 2.0 * [-1/3, -1/3, 1.0]
      @test isapprox(disp, u_expected)
 end
@@ -69,7 +67,7 @@ end
 #     fn = @__DIR__() * "/testdata/rod_short.med"
 #     mesh = aster_read_mesh(fn, eltype)
 #     element_sets = join(keys(mesh.element_sets), ", ")
-#     info("element sets: $element_sets")
+#     @info("element sets: $element_sets")
 #     p1 = Problem(Elasticity, "rod", 3)
 #     p2 = Problem(Elasticity, "trac", 3)
 #     p3 = Problem(Dirichlet, "fixed", 3, "displacement")
@@ -89,7 +87,7 @@ end
 #     solver = LinearSolver(p1, p2, p3, p4, p5)
 #     solver()
 #     u_max = maximum(p1.assembly.u)
-#     info("$eltype, u_max = $u_max")
+#     @info("$eltype, u_max = $u_max")
 #     return u_max
 # end
 # @testset "compare 3d rod to CA solution" begin

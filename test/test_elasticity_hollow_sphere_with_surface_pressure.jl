@@ -1,9 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM
-using JuliaFEM.Preprocess
-using JuliaFEM.Testing
+using JuliaFEM, Test, SparseArrays, LinearAlgebra, Statistics
 
 function get_stress_tensor(element, ip, time)
     haskey(element, "displacement") || return nothing
@@ -13,7 +11,7 @@ function get_stress_tensor(element, ip, time)
     nu = element("poissons ratio", ip, time)
     mu = E/(2.0*(1.0+nu))
     la = E*nu/((1.0+nu)*(1.0-2.0*nu))
-    S = la*trace(eps)*I + 2.0*mu*eps
+    S = la*tr(eps)*I + 2.0*mu*eps
     return S
 end
 
@@ -49,15 +47,15 @@ function lsq_fit(elements, field, time)
             volume += w
         end
     end
-    info("Mass matrix for least-squares fit is assembled. Total volume to fit: $volume")
+    @info("Mass matrix for least-squares fit is assembled. Total volume to fit: $volume")
     A = sparse(A)
     b = sparse(b)
     A = 1/2*(A + A')
-    
+
     SparseArrays.droptol!(A, 1.0e-6)
     SparseArrays.dropzeros!(A)
     nz = get_nonzero_rows(A)
-    F = ldltfact(A[nz,nz])
+    F = ldlt(A[nz,nz])
 
     x = zeros(size(b)...)
     x[nz, :] = F \ b[nz, :]
@@ -90,10 +88,13 @@ http://mms2.ensmp.fr/emms_paris/plasticite3D/exercices/eSpherePress.pdf
 function test_wedge_sphere(model, u_CA, S_CA)
     mesh_file = @__DIR__() * "/testdata/primitives.med"
     mesh = aster_read_mesh(mesh_file, model)
+
     body = Problem(Elasticity, "hollow sphere 1/8 model", 3)
-    body.elements = create_elements(mesh, "HOLLOWSPHERE8")
-    update!(body, "youngs modulus", 24580.0)
-    update!(body, "poissons ratio", 1/3)
+    body_elements = create_elements(mesh, "HOLLOWSPHERE8")
+    update!(body_elements, "youngs modulus", 24580.0)
+    update!(body_elements, "poissons ratio", 1/3)
+    add_elements!(body, body_elements)
+
     bc = Problem(Dirichlet, "symmetry bc", 3, "displacement")
     el1 = create_elements(mesh, "FACE1")
     update!(el1, "displacement 3", 0.0)
@@ -101,40 +102,47 @@ function test_wedge_sphere(model, u_CA, S_CA)
     update!(el2, "displacement 2", 0.0)
     el3 = create_elements(mesh, "FACE3")
     update!(el3, "displacement 1", 0.0)
-    bc.elements = [el1; el2; el3]
-    lo = Problem(Elasticity, "pressure load", 3)
-    lo.elements = create_elements(mesh, "OUTER")
-    update!(lo, "surface pressure", 7317.0)
-    solver = LinearSolver(body, bc, lo)
-    solver()
+    add_elements!(bc, el1, el2, el3)
 
-    X = lo("geometry", 0.0)
-    u = lo("displacement", 0.0)
+    load = Problem(Elasticity, "pressure load", 3)
+    load_elements = create_elements(mesh, "OUTER")
+    update!(load_elements, "surface pressure", 7317.0)
+    add_elements!(load, load_elements)
+
+    analysis = Analysis(Linear)
+    add_problems!(analysis, body, load, bc)
+    run!(analysis)
+
+    X = load("geometry", 0.0)
+    u = load("displacement", 0.0)
     nids = sort(collect(keys(X)))
     umag = Float64[norm(u[id]) for id in nids]
     um = mean(umag)
     us = std(umag)
     rtol = norm(um - 0.9) / max(norm(um), 0.9) * 100.0
-    info("mean umag = $um, std umag = $us, rtol = $rtol")
+    @debug("Displacement field statistics", mean=um, std=us, rtol=rtol)
     @test rtol < 1.5 # percents
 
-    info("Verifying displacement against Code Aster solution.. ")
+    @debug("Verifying displacement against Code Aster solution.. ")
+    pass = true
     for nid in keys(u_CA)
         rtol = norm(u[nid] - u_CA[nid]) / max(norm(u[nid]), norm(u_CA[nid])) * 100.0
-        info("Node id $nid, rel diff to CA = $rtol %")
-        @test isapprox(u[nid], u_CA[nid])
+        @debug("Node id $nid, rel diff to CA = $rtol %")
+        pass &= isapprox(u[nid], u_CA[nid])
     end
+    @test pass
 
     S = lsq_fit(body.elements, get_stress, 0.0)
-    
-    info("Verifying stress against Code Aster solution.. ")
+
+    @debug("Verifying stress against Code Aster solution.. ")
     for nid in keys(S_CA)
         rtol = norm(S[nid] - S_CA[nid]) / max(norm(S[nid]), norm(S_CA[nid])) * 100.0
-        info("Node id $nid, S=$(S[nid]), S_CA=$(S_CA[nid]), rel diff to CA = $rtol %")
-        #@test isapprox(S[nid], S_CA[nid])
+        @debug("Node id $nid, S=$(S[nid]), S_CA=$(S_CA[nid]), rel diff to CA = $rtol %")
+        # @test isapprox(S[nid], S_CA[nid])
         # http://code-aster.org/doc/default/en/man_r/r3/r3.06.03.pdf
-        @test rtol < 10.0 # percents
+        pass &= (rtol < 10.0) # percents
     end
+    @test pass
 
     # Calculate principal stresses in nodes
     Sp = Dict()
@@ -146,12 +154,12 @@ function test_wedge_sphere(model, u_CA, S_CA)
             s[6] s[5] s[3]]
         Sp[nid] = sort(eigvals(stress_tensor))
     end
-    
+
     node_ids = sort(collect(keys(Sp)))
     for (i, nid) in enumerate(node_ids)
-        println("$nid -> $(Sp[nid])")
+        @debug("$nid -> $(Sp[nid])")
         if i > 9
-            println("...")
+            @debug("...")
             break
         end
     end
@@ -170,20 +178,19 @@ function test_wedge_sphere(model, u_CA, S_CA)
         for (i, ip) in enumerate(get_integration_points(element))
             S = get_stress(element, ip, time)
             rtol = norm(S - S_CA_gp[i]) / max(norm(S), norm(S_CA_gp[i]))
-            info("$i $S, rtol=$rtol")
-            @test isapprox(S, S_CA_gp[i])
+            @debug("$i $S, rtol=$rtol")
+            pass &= isapprox(S, S_CA_gp[i])
         end
     end
+    @test pass
 end
 
-@testset """1/8 hollow sphere with surface load""" begin
-    u_CA = Dict()
-    u_CA[38] = [-8.85861895037377E-01, -3.46944695195361E-18, -3.46944695195361E-18]
-    u_CA[49] = [-4.50934684240566E-01, -4.46908405333021E-01, -5.92329377847994E-01]
-    S_CA = Dict()
-    S_CA[38] = [-1.94504819940510E+03, -3.47014655438479E+04, -3.40876135857114E+04, 1.70379805227866E+03, 2.16707698388864E+03, 4.32009983342141E-12]
-    S_CA[49] = [-2.36067010168718E+04, -2.33820775692753E+04, -1.80606705820104E+04, 8.85783922092890E+03, 1.12122431934777E+04, 1.14035796957343E+04]
-    test_wedge_sphere("HOLLOWSPHERE8_WEDGE6", u_CA, S_CA)
-    #test_wedge_sphere("HOLLOWSPHERE8_WEDGE15")
-end
-
+# 1/8 hollow sphere with surface load
+u_CA = Dict()
+u_CA[38] = [-8.85861895037377E-01, -3.46944695195361E-18, -3.46944695195361E-18]
+u_CA[49] = [-4.50934684240566E-01, -4.46908405333021E-01, -5.92329377847994E-01]
+S_CA = Dict()
+S_CA[38] = [-1.94504819940510E+03, -3.47014655438479E+04, -3.40876135857114E+04, 1.70379805227866E+03, 2.16707698388864E+03, 4.32009983342141E-12]
+S_CA[49] = [-2.36067010168718E+04, -2.33820775692753E+04, -1.80606705820104E+04, 8.85783922092890E+03, 1.12122431934777E+04, 1.14035796957343E+04]
+test_wedge_sphere("HOLLOWSPHERE8_WEDGE6", u_CA, S_CA)
+#test_wedge_sphere("HOLLOWSPHERE8_WEDGE15")

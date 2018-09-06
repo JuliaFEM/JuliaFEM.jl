@@ -2,7 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 using JuliaFEM
-using JuliaFEM.Testing
+using Test
 
 function get_test_model()
 
@@ -88,7 +88,7 @@ end
     solver()
     X = e3("geometry", [1.0, 1.0], 0.0)
     u = e3("displacement", [1.0, 1.0], 0.0)
-    info("displacement at $X: $u")
+    @info("displacement at $X: $u")
     u_expected = [-1/3, 1.0]
     @test isapprox(u, u_expected)
 end

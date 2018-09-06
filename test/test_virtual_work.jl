@@ -1,8 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using JuliaFEM
-using JuliaFEM.Testing
+using JuliaFEM, Test
 
 abstract type PlaneStressElasticityProblem <: AbstractProblem end
 
@@ -61,9 +60,8 @@ function test_residual_form()
     free_dofs = [3, 4, 5, 6]
     solve!(problem, free_dofs, 0.0)  # launch a newton solver for single element
     disp = element("displacement", [1.0, 1.0], 0.0)
-    info("displacement at tip: $disp")
+    @info("displacement at tip: $disp")
 
     # verified using Code Aster.
     @test isapprox(disp[2], -8.77303119819776E+00)
 end
-
