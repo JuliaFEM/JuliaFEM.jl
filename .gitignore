@@ -16,3 +16,5 @@ docs/src/packages
 *.jld
 *.mem
 *.cov
+test/*.h5
+test/*.xmf
