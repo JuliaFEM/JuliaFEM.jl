@@ -98,6 +98,55 @@ function initialize_internal_params!(params, ip, type_) #::Type{Val{:type_2d}})
     end
 end
 
+Parameters.@with_kw struct Elasticity3DLocalBuffers{B, T}
+    ndofs          :: Int
+    dim            :: Int
+    bi             :: BasisInfo{B, T}
+    BL             :: Matrix{T} = zeros(6, ndofs)
+    BNL            :: Matrix{T} = zeros(9, ndofs)
+    Km             :: Matrix{T} = zeros(ndofs, ndofs)
+    Kg             :: Matrix{T} = zeros(ndofs, ndofs)
+    f_int          :: Vector{T} = zeros(ndofs)
+    f_ext          :: Vector{T} = zeros(ndofs)
+    gradu          :: Matrix{T} = zeros(dim, dim)
+    strain         :: Matrix{T} = zeros(dim, dim)
+    strain_vec     :: Vector{T} = zeros(6)
+    stress_vec     :: Vector{T} = zeros(6)
+    F              :: Matrix{T} = zeros(dim, dim)
+    D              :: Matrix{T} = zeros(6, 6)
+    Dtan           :: Matrix{T} = zeros(6, 6)
+    Bt_mul_D       :: Matrix{T} = zeros(ndofs, 6)
+    Bt_mul_D_mul_B :: Matrix{T} = zeros(ndofs, ndofs)
+    Bt_mul_S       :: Vector{T} = zeros(ndofs)
+end
+
+function reset_element!(buf::Elasticity3DLocalBuffers)
+    fill!(buf.Km, 0.0)
+    fill!(buf.Kg, 0.0)
+    fill!(buf.f_int, 0.0)
+    fill!(buf.f_ext, 0.0)
+    return
+end
+
+function reset_integration_point!(buf::Elasticity3DLocalBuffers)
+    fill!(buf.F, 0.0)
+    fill!(buf.strain, 0.0)
+    fill!(buf.D, 0.0)
+    fill!(buf.BL, 0.0)
+    fill!(buf.BNL, 0.0)
+    return
+end
+
+function to_voigt!(strain_vec, strain)
+    strain_vec[1] = strain[1,1]
+    strain_vec[2] = strain[2,2]
+    strain_vec[3] = strain[3,3]
+    strain_vec[4] = 2.0*strain[1,2]
+    strain_vec[5] = 2.0*strain[2,3]
+    strain_vec[6] = 2.0*strain[1,3]
+    return
+end
+
 """ Assemble 3d continuum elements in general solid mechanics problem. """
 function assemble!(assembly::Assembly,
                    problem::Problem{Elasticity},
@@ -108,34 +157,17 @@ function assemble!(assembly::Assembly,
 
     nnodes = length(El)
     ndofs = dim*nnodes
-    BL = zeros(6, ndofs)
-    BNL = zeros(9, ndofs)
-    Km = zeros(ndofs, ndofs)
-    Kg = zeros(ndofs, ndofs)
-    f_int = zeros(ndofs)
-    f_ext = zeros(ndofs)
-    bi = BasisInfo(El)
-    gradu = zeros(dim, dim)
-    strain = zeros(dim, dim)
-    strain_vec = zeros(6)
-    stress_vec = zeros(6)
-    F = zeros(dim, dim)
-    D = zeros(6, 6)
-    Dtan = zeros(6, 6)
 
-    Bt_mul_D = zeros(ndofs, 6)
-    Bt_mul_D_mul_B = zeros(ndofs, ndofs)
-    Bt_mul_S = zeros(ndofs)
+    buffer = Elasticity3DLocalBuffers(ndofs=ndofs, dim=dim, bi = BasisInfo(El))
 
     for element in elements
-
+        Parameters.@unpack bi, BL, BNL, Km, Kg, f_int, f_ext, gradu, strain,
+                strain_vec, stress_vec, F, D, Dtan, Bt_mul_D, Bt_mul_D_mul_B, Bt_mul_S = buffer
         u = element("displacement", time)
-        fill!(Km, 0.0)
-        fill!(Kg, 0.0)
-        fill!(f_int, 0.0)
-        fill!(f_ext, 0.0)
+        reset_element!(buffer)
 
         for ip in get_integration_points(element)
+            reset_integration_point!(buffer)
             X = element("geometry", time)
             eval_basis!(bi, X, ip)
             w = ip.weight*bi.detJ
@@ -144,8 +176,6 @@ function assemble!(assembly::Assembly,
             grad!(bi, gradu, u)  # displacement gradient ∇u
 
             # calculate strain tensor and deformation gradient
-            fill!(strain, 0.0)
-            fill!(F, 0.0)
             F[:,:] += I
             if props.finite_strain
                 strain[:,:] = 1/2 * (gradu + gradu' + gradu'*gradu)
@@ -154,16 +184,10 @@ function assemble!(assembly::Assembly,
                 strain[:,:] = 1/2 * (gradu + gradu')
             end
 
-            strain_vec[1] = strain[1,1]
-            strain_vec[2] = strain[2,2]
-            strain_vec[3] = strain[3,3]
-            strain_vec[4] = 2.0*strain[1,2]
-            strain_vec[5] = 2.0*strain[2,3]
-            strain_vec[6] = 2.0*strain[1,3]
+            to_voigt!(strain_vec, strain)
 
             # material stiffness start
 
-            fill!(BL, 0.0)
             if props.finite_strain
                 for i=1:nnodes
                     BL[1, 3*(i-1)+1] = F[1,1]*dN[1,i]
@@ -201,7 +225,6 @@ function assemble!(assembly::Assembly,
 
             # calculate stress
 
-            fill!(D, 0.0)
             E = element("youngs modulus", ip, time)
             nu = element("poissons ratio", ip, time)
             la = E*nu/((1.0+nu)*(1.0-2.0*nu))
@@ -230,7 +253,6 @@ function assemble!(assembly::Assembly,
                 calculate_stress! = plastic_def["type"]
                 yield_surface_ = plastic_def["yield_surface"]
                 params = plastic_def["params"]
-
                 initialize_internal_params!(params, ip, Val{:type_3d})
 
                 if time == 0.0
@@ -272,8 +294,6 @@ function assemble!(assembly::Assembly,
 
             if props.geometric_stiffness
                 # take geometric stiffness into account
-
-                fill!(BNL, 0.0)
 
                 for i=1:size(dN, 2)
                     BNL[1, 3*(i-1)+1] = dN[1,i]
