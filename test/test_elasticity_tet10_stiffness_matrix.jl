@@ -25,8 +25,8 @@ update!(element, "geometry", X)
 update!(element, "displacement", u)
 problem = Problem(Elasticity, "tet10", 3)
 add_element!(problem, element)
-time = 0.0
-assemble!(problem, time)
+ttime = 0.0
+assemble!(problem, ttime)
 eigs = real(eigvals(Matrix(problem.assembly.K)))
 eigs_expected = [8809.45, 4936.01, 2880.56, 2491.66, 2004.85,
                  1632.49, 1264.32, 1212.42, 817.905,

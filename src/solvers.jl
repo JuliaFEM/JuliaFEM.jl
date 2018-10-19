@@ -57,15 +57,16 @@ problems must have unique node ids.
 function get_field_assembly(solver::Solver)
     problems = get_field_problems(solver)
 
+    problem = problems[1]
     M = SparseMatrixCOO()
-    K = SparseMatrixCOO()
+    K = spzeros(size(problems[1].assembly.K)...)
     Kg = SparseMatrixCOO()
     f = SparseMatrixCOO()
     fg = SparseMatrixCOO()
 
     for problem in problems
         append!(M, problem.assembly.M)
-        append!(K, problem.assembly.K)
+        K += problem.assembly.K
         append!(Kg, problem.assembly.Kg)
         append!(f, problem.assembly.f)
         append!(fg, problem.assembly.fg)
@@ -74,7 +75,6 @@ function get_field_assembly(solver::Solver)
     N = size(K, 1)
 
     M = sparse(M, N, N)
-    K = sparse(K, N, N)
     if nnz(K) == 0
         @warn("Field assembly seems to be empty. Check that elements are ",
               "pushed to problem and formulation is correct.")
@@ -142,7 +142,7 @@ function get_boundary_assembly(solver::Solver, N)
     g = spzeros(N, 1)
     for problem in get_boundary_problems(solver)
         assembly = problem.assembly
-        K_ = sparse(assembly.K, N, N)
+        # K_ = assembly.K
         C1_ = sparse(assembly.C1, N, N)
         C2_ = sparse(assembly.C2, N, N)
         D_ = sparse(assembly.D, N, N)
@@ -167,7 +167,7 @@ function get_boundary_assembly(solver::Solver, N)
             error("overconstrained dofs, not solving problem.")
         end
 
-        K += K_
+        #K += K_
         C1 += C1_
         C2 += C2_
         D += D_
