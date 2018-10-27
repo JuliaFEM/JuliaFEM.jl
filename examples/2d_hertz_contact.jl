@@ -23,7 +23,7 @@
 # Substituting values, one gets accurate solution to be ``p_0 = 3585 \;\mathrm{MPa}`` and
 # ``a = 6.21 \;\mathrm{mm}``.
 
-using JuliaFEM
+using JuliaFEM, LinearAlgebra
 
 # Simulation starts by reading the mesh. Model is constructed and meshed using
 # SALOME, thus mesh format is .med. Mesh type is quite simple structure,
@@ -33,7 +33,7 @@ using JuliaFEM
 # need to use `Mesh` in simulation anyway if we figure some other way to define
 # the geometry for elements.
 
-datadir = Pkg.dir("JuliaFEM", "examples", "2d_hertz_contact")
+datadir = abspath(joinpath(pathof(JuliaFEM), "..", "..", "examples", "2d_hertz_contact"))
 meshfile = joinpath(datadir, "hertz_2d_full.med")
 mesh = aster_read_mesh(meshfile)
 for (elset_name, element_ids) in mesh.element_sets
@@ -153,6 +153,7 @@ Rt = 0.0
 time = 0.0
 for sel in contact_slave_elements
     for ip in get_integration_points(sel)
+        global Rn, Rt
         w = ip.weight*sel(ip, time, Val{:detJ})
         n = sel("normal", ip, time)
         t = sel("tangent", ip, time)
@@ -181,10 +182,11 @@ p0_acc = 3585.0
 for (nid, n) in normal
     lan = dot(n, lambda[nid])
     println("$nid => $lan")
+    global p0
     p0 = max(p0, lan)
 end
-p0 = round(p0, 2)
-rtol = round(norm(p0-p0_acc)/max(p0,p0_acc)*100, 2)
+p0 = round(p0, digits=2)
+rtol = round(norm(p0-p0_acc)/max(p0,p0_acc)*100, digits=2)
 println("Maximum contact pressure p0 = $p0, p0_acc = $p0_acc, rtol = $rtol %")
 
 # To get rough approximation where does the contact open, we can find the element
@@ -202,6 +204,7 @@ for element in contact_slave_elements
         println("Contact opening element lambda: la1 = $la1, la2 = $la2")
         x11, y11 = X1
         x12, y12 = X2
+        global a_rad
         a_rad = 1/2*abs(x11+x12)
         break
     end
