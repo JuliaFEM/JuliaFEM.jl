@@ -73,7 +73,7 @@ end
 function assemble!(assembly::Assembly, problem::Problem{Elasticity},
                    elements::Vector{<:Element}, time, formulation)
     local_buffer = allocate_buffer(problem, elements)
-    assembler = FEMBase.start_assemble(assembly.K)
+    assembler = FEMSparse.start_assemble(assembly.K, assembly.f)
     for element in elements
         assemble_element!(assembly, assembler, problem, element, local_buffer, time, formulation)
     end
@@ -168,7 +168,7 @@ end
 
 """ Assemble 3d continuum elements in general solid mechanics problem. """
 function assemble_element!(assembly::Assembly,
-                   assembler::FEMBase.AssemblerSparsityPattern,
+                   assembler::FEMSparse.AssemblerSparsityPattern,
                    problem::Problem{Elasticity},
                    element::Element{El},
                    local_buffer::Elasticity3DLocalBuffers,
@@ -341,12 +341,9 @@ function assemble_element!(assembly::Assembly,
         # internal load
         mul!(Bt_mul_S, transpose(BL), stress_vec)
         rmul!(Bt_mul_S, w)
-        for i=1:ndofs
-            @inbounds f_int[i] += Bt_mul_S[i]
-        end
+        f_int .+= Bt_mul_S
 
         # external load start
-
         if haskey(element, "displacement load")
             T = element("displacement load", ip, time)
             f_ext += w*vec(T*N)
@@ -358,21 +355,20 @@ function assemble_element!(assembly::Assembly,
                 f_ext[i:dim:end] += w*vec(b*N)
             end
         end
-
         # external load end
-
     end
 
     gdofs = get_gdofs(problem, element)
 
+    # Update f_ext in place to be f_ext - f_int
+    f_ext .-= f_int
+
     # add contributions to K, Kg, f
-    FEMBase.assemble_local_matrix!(assembler, gdofs, Km)
+    FEMSparse.assemble_local!(assembler, gdofs, Km, f_ext)
 
     if props.geometric_stiffness
-        add!(assembly.Kg, gdofs, gdofs, Kg)
+        FEMSparse.assemble_local_matrix!(assembler, gdofs, Kg)
     end
-
-    add!(assembly.f, gdofs, f_ext - f_int)
 
     return nothing
 end
@@ -424,8 +420,7 @@ function assemble!(assembly::Assembly,
         end
 
         gdofs = get_gdofs(problem, element)
-        add!(assembly.f, gdofs, f)
-
+        FEMSparse.assemble_local_vector!(assembly.f, gdofs, f)
     end
 end
 
