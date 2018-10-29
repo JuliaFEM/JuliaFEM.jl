@@ -108,6 +108,8 @@ module JuliaFEM
 using SparseArrays, LinearAlgebra, Statistics
 using Reexport, ForwardDiff, LightXML, HDF5, Parameters
 
+import FEMSparse
+
 @reexport using FEMBase
 import FEMBase: get_unknown_field_name, get_unknown_field_dimension,
                 assemble!, update!, initialize!

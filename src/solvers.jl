@@ -58,17 +58,17 @@ function get_field_assembly(solver::Solver)
     problems = get_field_problems(solver)
 
     problem = problems[1]
-    M = SparseMatrixCOO()
-    K = spzeros(size(problems[1].assembly.K)...)
-    Kg = SparseMatrixCOO()
-    f = SparseMatrixCOO()
-    fg = SparseMatrixCOO()
+    M = problem.assembly.M
+    K = problem.assembly.K
+    f = problem.assembly.f
+    Kg = problem.assembly.Kg
+    fg = problem.assembly.fg
 
-    for problem in problems
+    for problem in problems[2:end]
         append!(M, problem.assembly.M)
         K += problem.assembly.K
         append!(Kg, problem.assembly.Kg)
-        append!(f, problem.assembly.f)
+        f += problem.assembly.f
         append!(fg, problem.assembly.fg)
     end
 
@@ -80,7 +80,6 @@ function get_field_assembly(solver::Solver)
               "pushed to problem and formulation is correct.")
     end
     Kg = sparse(Kg, N, N)
-    f = sparse(f, N, 1)
     fg = sparse(fg, N, 1)
 
     return M, K, Kg, f, fg
@@ -146,7 +145,7 @@ function get_boundary_assembly(solver::Solver, N)
         C1_ = sparse(assembly.C1, N, N)
         C2_ = sparse(assembly.C2, N, N)
         D_ = sparse(assembly.D, N, N)
-        f_ = sparse(assembly.f, N, 1)
+        # f_ = assembly.f
         g_ = sparse(assembly.g, N, 1)
         for dof in assembly.removed_dofs
             @info("$(problem.name): removing dof $dof from assembly")
@@ -171,7 +170,7 @@ function get_boundary_assembly(solver::Solver, N)
         C1 += C1_
         C2 += C2_
         D += D_
-        f += f_
+        #f += f_
         g += g_
     end
     return K, C1, C2, D, f, g
