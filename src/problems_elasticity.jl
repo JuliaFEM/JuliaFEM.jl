@@ -130,13 +130,14 @@ function assemble!(assembly::Assembly,
     for element in elements
 
         u = element("displacement", time)
+        X = element("geometry", time)
+
         fill!(Km, 0.0)
         fill!(Kg, 0.0)
         fill!(f_int, 0.0)
         fill!(f_ext, 0.0)
 
         for ip in get_integration_points(element)
-            X = element("geometry", time)
             eval_basis!(bi, X, ip)
             w = ip.weight*bi.detJ
             N = bi.N
