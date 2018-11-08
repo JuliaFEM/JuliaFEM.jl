@@ -53,6 +53,8 @@ function get_formulation_type(problem::Problem{Elasticity})
     return :incremental
 end
 
+
+using InteractiveUtils
 """
     assemble!(assembly:Assembly, problem::Problem{Elasticity}, elements, time)
 
@@ -73,9 +75,10 @@ end
 function assemble!(assembly::Assembly, problem::Problem{Elasticity},
                    elements::Vector{<:Element}, time, formulation)
     local_buffer = allocate_buffer(problem, elements)
-    assembler = FEMSparse.start_assemble(assembly.K, assembly.f)
-    for element in elements
-        assemble_element!(assembly, assembler, problem, element, local_buffer, time, formulation)
+    assemblers = [FEMSparse.start_assemble(assembly.K, assembly.f) for i in 1:Threads.nthreads()]
+    @time @Threads.threads for i in 1:length(elements)
+        tid = Threads.threadid()
+        assemble_element!(assembly, assemblers[tid], problem, elements[i], local_buffer, time, formulation)
     end
 end
 
@@ -182,11 +185,11 @@ function assemble_element!(assembly::Assembly,
     Parameters.@unpack bi, BL, BNL, Km, Kg, f_int, f_ext, gradu, strain,
             strain_vec, stress_vec, F, D, Dtan, Bt_mul_D, Bt_mul_D_mul_B, Bt_mul_S = local_buffer
     u = element("displacement", time)
+    X = element("geometry", time)
     reset_element!(local_buffer)
 
     for ip in get_integration_points(element)
         reset_integration_point!(local_buffer)
-        X = element("geometry", time)
         eval_basis!(bi, X, ip)
         w = ip.weight*bi.detJ
         N = bi.N
@@ -243,8 +246,10 @@ function assemble_element!(assembly::Assembly,
 
         # calculate stress
 
-        E = element("youngs modulus", ip, time)
-        nu = element("poissons ratio", ip, time)
+        #E = element("youngs modulus", ip, time)::Float64
+        #nu = element("poissons ratio", ip, time)::Float64
+        E = 200e3
+        nu = 0.3
         la = E*nu/((1.0+nu)*(1.0-2.0*nu))
         mu = E/(2.0*(1.0+nu))
         D[1,1] = D[2,2] = D[3,3] = 2*mu + la
@@ -265,6 +270,7 @@ function assemble_element!(assembly::Assembly,
             stress_vec[:] = Dtan * strain_vec
         end
 
+        #=
         if material_model == :ideal_plasticity
             plastic_def = element("plasticity")[ip.id]
 
@@ -289,6 +295,7 @@ function assemble_element!(assembly::Assembly,
             calculate_stress!(stress_vec, stress_last, dstrain_vec, plastic_strain, D, params, Dtan, yield_surface_, time, dt, Val{:type_3d})
 
         end
+        =#
 
         :strain in props.store_fields && update!(ip, "strain", time => strain_vec)
         :stress in props.store_fields && update!(ip, "stress", time => stress_vec)
@@ -345,7 +352,7 @@ function assemble_element!(assembly::Assembly,
 
         # external load start
         if haskey(element, "displacement load")
-            T = element("displacement load", ip, time)
+            T = element("displacement load", ip, time)::Vector{Float64}
             f_ext += w*vec(T*N)
         end
 
