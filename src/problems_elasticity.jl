@@ -75,10 +75,9 @@ end
 function assemble!(assembly::Assembly, problem::Problem{Elasticity},
                    elements::Vector{<:Element}, time, formulation)
     local_buffer = allocate_buffer(problem, elements)
-    assemblers = [FEMSparse.start_assemble(assembly.K, assembly.f) for i in 1:Threads.nthreads()]
-    @time @Threads.threads for i in 1:length(elements)
-        tid = Threads.threadid()
-        assemble_element!(assembly, assemblers[tid], problem, elements[i], local_buffer, time, formulation)
+    assembler = FEMSparse.start_assemble(assembly.K, assembly.f)
+    for i in 1:length(elements)
+        assemble_element!(assembly, assembler, problem, elements[i], local_buffer, time, formulation)
     end
 end
 
@@ -246,10 +245,8 @@ function assemble_element!(assembly::Assembly,
 
         # calculate stress
 
-        #E = element("youngs modulus", ip, time)::Float64
-        #nu = element("poissons ratio", ip, time)::Float64
-        E = 200e3
-        nu = 0.3
+        E = element("youngs modulus", ip, time)::Float64
+        nu = element("poissons ratio", ip, time)::Float64
         la = E*nu/((1.0+nu)*(1.0-2.0*nu))
         mu = E/(2.0*(1.0+nu))
         D[1,1] = D[2,2] = D[3,3] = 2*mu + la
