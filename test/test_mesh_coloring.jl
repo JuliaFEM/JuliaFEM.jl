@@ -6,8 +6,8 @@ datadir = first(splitext(basename(@__FILE__)))
     fn = joinpath(datadir, "cube_tet4.inp")
     mesh = JuliaFEM.Mesh(open(parse_abaqus, fn))
 
-    JuliaFEM.create_coloring!(mesh)
-    for colors in mesh.coloring
+    coloring = JuliaFEM.create_coloring(mesh)
+    for colors in coloring
         for ele_i in colors
             for ele_j in colors
                 if ele_i == ele_j

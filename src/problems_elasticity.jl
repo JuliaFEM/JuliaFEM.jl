@@ -73,11 +73,30 @@ function assemble!(assembly::Assembly, problem::Problem{Elasticity},
 end
 
 function assemble!(assembly::Assembly, problem::Problem{Elasticity},
-                   elements::Vector{<:Element}, time, formulation)
-    local_buffer = allocate_buffer(problem, elements)
-    assembler = FEMSparse.start_assemble(assembly.K, assembly.f)
-    for i in 1:length(elements)
-        assemble_element!(assembly, assembler, problem, elements[i], local_buffer, time, formulation)
+                   elements::Vector{T}, time, formulation) where {T <: Element}
+
+    if problem.assemble_parallel
+        # Threaded assembly
+
+        assemblers = [FEMSparse.start_assemble(assembly.K, assembly.f) for i in 1:Threads.nthreads()]
+        local_buffers = [allocate_buffer(problem, elements) for i in 1:Threads.nthreads()]
+        #TODO: We have to be a bit careful here, the index of the element is no longer
+        #
+        # should only loop over elements that exist in `elements` here
+        for (color, elements) in FEMBase.get_color_ranges(elements)
+            Threads.@threads for i in 1:length(elements)
+                element = elements[i]
+                tid = Threads.threadid()
+                assemble_element!(assembly, assemblers[tid], problem, element, local_buffers[tid], time, formulation)
+            end
+        end
+    else
+        # Normal assembly
+        local_buffer = allocate_buffer(problem, elements)
+        assembler = FEMSparse.start_assemble(assembly.K, assembly.f)
+        for i in 1:length(elements)
+            assemble_element!(assembly, assembler, problem, elements[i], local_buffer, time, formulation)
+        end
     end
 end
 
@@ -247,6 +266,8 @@ function assemble_element!(assembly::Assembly,
 
         E = element("youngs modulus", ip, time)::Float64
         nu = element("poissons ratio", ip, time)::Float64
+        #E = 200e3
+        #nu = 0.3
         la = E*nu/((1.0+nu)*(1.0-2.0*nu))
         mu = E/(2.0*(1.0+nu))
         D[1,1] = D[2,2] = D[3,3] = 2*mu + la
