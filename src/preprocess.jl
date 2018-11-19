@@ -21,11 +21,10 @@ mutable struct Mesh
     element_sets :: Dict{Symbol, Set{Int}}
     surface_sets :: Dict{Symbol, Vector{Tuple{Int, Symbol}}}
     surface_types :: Dict{Symbol, Symbol}
-    coloring::Union{Nothing, Vector{Vector{Int}}} # Each vector contains a list of elements that do not share nodes
 end
 
 function Mesh()
-    return Mesh(Dict(), Dict(), Dict(), Dict(), Dict(), Dict(), Dict(), Dict(), nothing)
+    return Mesh(Dict(), Dict(), Dict(), Dict(), Dict(), Dict(), Dict(), Dict())
 end
 
 """
@@ -322,15 +321,14 @@ function JuliaFEM.Problem(mesh::Mesh, ::Type{P}, name, dimension, parent_field_n
 end
 
 """
-    create_coloring!(mesh::Mesh)
+    create_coloring!(mesh::Mesh) -> Dict{Int, Int}
 
 Greedy algorithm for coloring a grid such that no two cells with the same node
 have the same color.
-This function sets the `coloring` field in `mesh` to a `Vector{Vector{Int}}` where
-each vector contains vectors of elements that do not share any nodes.
-It is therefore safe to assemble in parallel each element vector by vector.
+The returned value is a mapping between an element id and its color.
+It is safe to assemble elements with the same color in parallel
 """
-function create_coloring!(mesh::Mesh)
+function create_coloring(mesh::Mesh)
     # Contains the elements that each node contain
     cell_containing_node = Dict{Int, Set{Int}}()
     for (cellid, nodes) in mesh.elements
@@ -359,7 +357,7 @@ function create_coloring!(mesh::Mesh)
     # cell -> color of cell
     cell_colors = Dict{Int, Int}()
     # color -> list of cells
-    final_colors = Vector{Int}[]
+    final_colors = Set{Int}[]
     occupied_colors = Set{Int}()
     # Zero represents no color set yet
     for (cellid, _) in mesh.elements
@@ -389,13 +387,12 @@ function create_coloring!(mesh::Mesh)
         if free_color == 0 # no free color found, need to bump max colors
             total_colors += 1
             free_color = total_colors
-            push!(final_colors, Int[])
+            push!(final_colors, Set{Int}())
         end
 
         cell_colors[cellid] = free_color
         push!(final_colors[free_color], cellid)
     end
 
-    mesh.coloring = final_colors
-    return mesh
+    return cell_colors
 end
