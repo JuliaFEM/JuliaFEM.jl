@@ -61,28 +61,35 @@ function get_field_assembly(solver::Solver)
     M = problem.assembly.M
     K = problem.assembly.K
     f = problem.assembly.f
+    K_csc = problem.assembly.K_csc
+    f_csc = problem.assembly.f_csc
     Kg = problem.assembly.Kg
     fg = problem.assembly.fg
 
     for problem in problems[2:end]
         append!(M, problem.assembly.M)
-        K += problem.assembly.K
+        append!(K, problem.assembly.K)
         append!(Kg, problem.assembly.Kg)
-        f += problem.assembly.f
+        append!(f, problem.assembly.f)
+        # Use in place addition with .+= ?
+        K_csc += problem.assembly.K_csc
+        f_csc += problem.assembly.f_csc
         append!(fg, problem.assembly.fg)
     end
 
     N = size(K, 1)
 
     M = sparse(M, N, N)
+    K = sparse(K, N, N)
     if nnz(K) == 0
         @warn("Field assembly seems to be empty. Check that elements are ",
               "pushed to problem and formulation is correct.")
     end
+    f = sparse(f, N, 1)
     Kg = sparse(Kg, N, N)
     fg = sparse(fg, N, 1)
 
-    return M, K, Kg, f, fg
+    return M, problem.assemble_csc ? K_csc : K, Kg, problem.assemble_csc ? f_csc : f, fg
 end
 
 """ Loop through boundary assemblies and check for possible overconstrain situations. """
@@ -141,11 +148,11 @@ function get_boundary_assembly(solver::Solver, N)
     g = spzeros(N, 1)
     for problem in get_boundary_problems(solver)
         assembly = problem.assembly
-        # K_ = assembly.K
+        K_ = sparse(assembly.K, N, N)
         C1_ = sparse(assembly.C1, N, N)
         C2_ = sparse(assembly.C2, N, N)
         D_ = sparse(assembly.D, N, N)
-        # f_ = assembly.f
+        f_ = sparse(assembly.f, N, 1)
         g_ = sparse(assembly.g, N, 1)
         for dof in assembly.removed_dofs
             @info("$(problem.name): removing dof $dof from assembly")
@@ -166,12 +173,12 @@ function get_boundary_assembly(solver::Solver, N)
             error("overconstrained dofs, not solving problem.")
         end
 
-        #K += K_
-        C1 += C1_
-        C2 += C2_
-        D += D_
-        #f += f_
-        g += g_
+        K .+= K_
+        C1 .+= C1_
+        C2 .+= C2_
+        D .+= D_
+        f .+= f_
+        g .+= g_
     end
     return K, C1, C2, D, f, g
 end

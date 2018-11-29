@@ -39,7 +39,7 @@ run!(analysis)
 
 # two increments, nonlinear solver
 
-delete!(element, "temperature")
+delete!(element.fields, "temperature")
 analysis = Analysis(Nonlinear)
 add_problems!(analysis, problem, bc)
 

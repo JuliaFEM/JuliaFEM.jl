@@ -53,8 +53,6 @@ function get_formulation_type(problem::Problem{Elasticity})
     return :incremental
 end
 
-
-using InteractiveUtils
 """
     assemble!(assembly:Assembly, problem::Problem{Elasticity}, elements, time)
 
@@ -76,26 +74,23 @@ function assemble!(assembly::Assembly, problem::Problem{Elasticity},
                    elements::Vector{T}, time, formulation) where {T <: Element}
 
     if problem.assemble_parallel
+        @assert problem.assemble_csc
         # Threaded assembly
-
-        assemblers = [FEMSparse.start_assemble(assembly.K, assembly.f) for i in 1:Threads.nthreads()]
+        assemblers = [FEMSparse.start_assemble(assembly.K_csc, assembly.f_csc) for i in 1:Threads.nthreads()]
         local_buffers = [allocate_buffer(problem, elements) for i in 1:Threads.nthreads()]
-        #TODO: We have to be a bit careful here, the index of the element is no longer
-        #
-        # should only loop over elements that exist in `elements` here
         for (color, elements) in FEMBase.get_color_ranges(elements)
-            Threads.@threads for i in 1:length(elements)
+            for i in 1:length(elements)
                 element = elements[i]
                 tid = Threads.threadid()
-                assemble_element!(assembly, assemblers[tid], problem, element, local_buffers[tid], time, formulation)
+                assemble_element!(assembly, assemblers[tid], problem, element, local_buffers[tid], time, formulation, true)
             end
         end
     else
         # Normal assembly
         local_buffer = allocate_buffer(problem, elements)
-        assembler = FEMSparse.start_assemble(assembly.K, assembly.f)
+        assembler = FEMSparse.start_assemble(assembly.K_csc, assembly.f_csc)
         for i in 1:length(elements)
-            assemble_element!(assembly, assembler, problem, elements[i], local_buffer, time, formulation)
+            assemble_element!(assembly, assembler, problem, elements[i], local_buffer, time, formulation, problem.assemble_csc)
         end
     end
 end
@@ -193,7 +188,8 @@ function assemble_element!(assembly::Assembly,
                    problem::Problem{Elasticity},
                    element::Element{El},
                    local_buffer::Elasticity3DLocalBuffers,
-                   time, ::Type{Val{:continuum}}) where El<:Elasticity3DVolumeElements
+                   time, ::Type{Val{:continuum}},
+                   use_csc = false) where El<:Elasticity3DVolumeElements
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
 
@@ -288,7 +284,6 @@ function assemble_element!(assembly::Assembly,
             stress_vec[:] = Dtan * strain_vec
         end
 
-        #=
         if material_model == :ideal_plasticity
             plastic_def = element("plasticity")[ip.id]
 
@@ -313,7 +308,6 @@ function assemble_element!(assembly::Assembly,
             calculate_stress!(stress_vec, stress_last, dstrain_vec, plastic_strain, D, params, Dtan, yield_surface_, time, dt, Val{:type_3d})
 
         end
-        =#
 
         :strain in props.store_fields && update!(ip, "strain", time => strain_vec)
         :stress in props.store_fields && update!(ip, "stress", time => stress_vec)
@@ -388,11 +382,19 @@ function assemble_element!(assembly::Assembly,
     # Update f_ext in place to be f_ext - f_int
     f_ext .-= f_int
 
-    # add contributions to K, Kg, f
-    FEMSparse.assemble_local!(assembler, gdofs, Km, f_ext)
+    if use_csc
+        # add contributions to K, Kg, f
+        FEMSparse.assemble_local!(assembler, gdofs, Km, f_ext)
 
-    if props.geometric_stiffness
-        FEMSparse.assemble_local_matrix!(assembler, gdofs, Kg)
+        if props.geometric_stiffness
+            FEMSparse.assemble_local_matrix!(assembler, gdofs, Kg)
+        end
+    else
+        add!(assembly.f, gdofs, f_ext)
+        add!(assembly.K, gdofs, gdofs, Km)
+        if props.geometric_stiffness
+            add!(assembly.Kg, gdofs, gdofs, Kg)
+        end
     end
 
     return nothing
@@ -445,7 +447,7 @@ function assemble!(assembly::Assembly,
         end
 
         gdofs = get_gdofs(problem, element)
-        FEMSparse.assemble_local_vector!(assembly.f, gdofs, f)
+        add!(assembly.f, gdofs, f)
     end
 end
 
