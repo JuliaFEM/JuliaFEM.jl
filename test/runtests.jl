@@ -3,7 +3,7 @@
 
 using JuliaFEM, Test
 
-include("../docs/make.jl")
+# include("../docs/make.jl")
 
 @testset "JuliaFEM.jl" begin
     @testset "test_dirichlet.jl" begin
