@@ -79,7 +79,7 @@ function assemble!(assembly::Assembly, problem::Problem{Elasticity},
         assemblers = [FEMSparse.start_assemble(assembly.K_csc, assembly.f_csc) for i in 1:Threads.nthreads()]
         local_buffers = [allocate_buffer(problem, elements) for i in 1:Threads.nthreads()]
         for (color, elements) in FEMBase.get_color_ranges(elements)
-            for i in 1:length(elements)
+            Threads.@threads for i in 1:length(elements)
                 element = elements[i]
                 tid = Threads.threadid()
                 assemble_element!(assembly, assemblers[tid], problem, element, local_buffers[tid], time, formulation, true)
@@ -133,6 +133,9 @@ Parameters.@with_kw struct Elasticity3DLocalBuffers{B, T}
     Kg             :: Matrix{T} = zeros(ndofs, ndofs)
     f_int          :: Vector{T} = zeros(ndofs)
     f_ext          :: Vector{T} = zeros(ndofs)
+    f_buffer       :: Vector{T} = zeros(ndofs)
+    f_buffer_dim   :: Vector{T} = zeros(div(ndofs, dim))
+    gdofs          :: Vector{Int} = zeros(Int, ndofs)
     gradu          :: Matrix{T} = zeros(dim, dim)
     strain         :: Matrix{T} = zeros(dim, dim)
     strain_vec     :: Vector{T} = zeros(6)
@@ -182,6 +185,9 @@ function to_voigt!(strain_vec, strain)
     return
 end
 
+const u = ([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0])
+const X = ([-93.7197, -93.7197, 150.883], [-91.657, -85.8251, 157.885], [-100.523, -88.8309, 157.883], [-91.6593, -88.8309, 157.883], [-92.6883, -89.7724, 154.384], [-96.0902, -87.328, 157.883], [-97.1216, -91.2753, 154.383], [-92.6895, -91.2753, 154.383], [-91.6581, -87.328, 157.883], [-96.0914, -88.8309, 157.883])
+const displacement_load_string = [string("displacement load ", i) for i in 1:3]
 """ Assemble 3d continuum elements in general solid mechanics problem. """
 function assemble_element!(assembly::Assembly,
                    assembler::FEMSparse.AssemblerSparsityPattern,
@@ -190,16 +196,19 @@ function assemble_element!(assembly::Assembly,
                    local_buffer::Elasticity3DLocalBuffers,
                    time, ::Type{Val{:continuum}},
                    use_csc = false) where El<:Elasticity3DVolumeElements
+    cheating = false
     props = problem.properties
     dim = get_unknown_field_dimension(problem)
 
     nnodes = length(El)
     ndofs = dim*nnodes
 
-    Parameters.@unpack bi, BL, BNL, Km, Kg, f_int, f_ext, gradu, strain,
+    Parameters.@unpack bi, BL, BNL, Km, Kg, f_int, f_ext, f_buffer, f_buffer_dim, gdofs, gradu, strain,
             strain_vec, stress_vec, F, D, Dtan, Bt_mul_D, Bt_mul_D_mul_B, Bt_mul_S = local_buffer
-    u = element("displacement", time)
-    X = element("geometry", time)
+    if !cheating
+        u = element("displacement", time)
+        X = element("geometry", time)
+    end
     reset_element!(local_buffer)
 
     for ip in get_integration_points(element)
@@ -211,12 +220,15 @@ function assemble_element!(assembly::Assembly,
         grad!(bi, gradu, u)  # displacement gradient ∇u
 
         # calculate strain tensor and deformation gradient
-        F[:,:] += I
+        #F[:,:] += I
+        for i in 1:dim
+            F[i, i] += 1.0
+        end
         if props.finite_strain
             strain[:,:] = 1/2 * (gradu + gradu' + gradu'*gradu)
             F[:,:] += gradu
         else
-            strain[:,:] = 1/2 * (gradu + gradu')
+            strain[:,:] .= 1/2 .* (gradu .+ gradu')
         end
 
         to_voigt!(strain_vec, strain)
@@ -260,10 +272,13 @@ function assemble_element!(assembly::Assembly,
 
         # calculate stress
 
-        E = element("youngs modulus", ip, time)::Float64
-        nu = element("poissons ratio", ip, time)::Float64
-        #E = 200e3
-        #nu = 0.3
+        if cheating
+            E = 200e3
+            nu = 0.3
+        else
+            E = element("youngs modulus", ip, time)::Float64
+            nu = element("poissons ratio", ip, time)::Float64
+        end
         la = E*nu/((1.0+nu)*(1.0-2.0*nu))
         mu = E/(2.0*(1.0+nu))
         D[1,1] = D[2,2] = D[3,3] = 2*mu + la
@@ -271,6 +286,7 @@ function assemble_element!(assembly::Assembly,
         D[1,2] = D[2,1] = D[2,3] = D[3,2] = D[1,3] = D[3,1] = la
 
         # determine material model
+
 
         material_model = :linear_elasticity
         if haskey(element, "plasticity")
@@ -280,8 +296,8 @@ function assemble_element!(assembly::Assembly,
         # calculate stress vector based on material model
 
         if material_model == :linear_elasticity
-            Dtan[:,:] = D[:,:]
-            stress_vec[:] = Dtan * strain_vec
+            copyto!(Dtan, D)
+            mul!(stress_vec, Dtan, strain_vec)
         end
 
         if material_model == :ideal_plasticity
@@ -328,7 +344,6 @@ function assemble_element!(assembly::Assembly,
         end
 
         # material stiffness end
-
         if props.geometric_stiffness
             # take geometric stiffness into account
 
@@ -365,29 +380,33 @@ function assemble_element!(assembly::Assembly,
         # external load start
         if haskey(element, "displacement load")
             T = element("displacement load", ip, time)::Vector{Float64}
-            f_ext += w*vec(T*N)
+            mul!(f_buffer, w, vec(T*N))
+            f_ext .+= f_buffer
         end
 
         for i=1:dim
-            if haskey(element, "displacement load $i")
-                b = element("displacement load $i", ip, time)
-                f_ext[i:dim:end] += w*vec(b*N)
+            if haskey(element, displacement_load_string[i])
+                b = element(displacement_load_string[i], ip, time)::Float64
+                mul!(f_buffer_dim, w, N)
+                for (i, j) in enumerate(1:dim:length(f_ext))
+                    f_ext[j] = b * f_buffer_dim[i]
+                end
             end
         end
         # external load end
     end
 
-    gdofs = get_gdofs(problem, element)
+    FEMBase.get_gdofs!(gdofs, problem, element)
 
     # Update f_ext in place to be f_ext - f_int
     f_ext .-= f_int
 
     if use_csc
         # add contributions to K, Kg, f
-        FEMSparse.assemble_local!(assembler, gdofs, Km, f_ext)
+        @inbounds FEMSparse.assemble_local!(assembler, gdofs, Km, f_ext)
 
         if props.geometric_stiffness
-            FEMSparse.assemble_local_matrix!(assembler, gdofs, Kg)
+            @inbounds FEMSparse.assemble_local_matrix!(assembler, gdofs, Kg)
         end
     else
         add!(assembly.f, gdofs, f_ext)
