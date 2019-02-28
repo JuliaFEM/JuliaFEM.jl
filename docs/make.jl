@@ -254,7 +254,7 @@ PAGES = [
 @info("Pages in documentation", PAGES)
 
 makedocs(modules=[JuliaFEM],
-         format = :html,
+         format = Documenter.HTML(),
          checkdocs = :all,
          sitename = "JuliaFEM",
          analytics = "UA-83590644-1",
