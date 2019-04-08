@@ -202,8 +202,8 @@ function assemble!(assembly::Assembly,
             # calculate stress
 
             fill!(D, 0.0)
-            E = element("youngs modulus", ip, time)
-            nu = element("poissons ratio", ip, time)
+            E = element("youngs modulus", ip, time)::Float64
+            nu = element("poissons ratio", ip, time)::Float64
             la = E*nu/((1.0+nu)*(1.0-2.0*nu))
             mu = E/(2.0*(1.0+nu))
             D[1,1] = D[2,2] = D[3,3] = 2*mu + la
