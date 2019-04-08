@@ -5,7 +5,6 @@ using Documenter
 
 deploydocs(
     repo = "github.com/JuliaFEM/JuliaFEM.jl.git",
-    julia = "1.0",
     target = "build",
     deps = nothing,
     make = nothing)
