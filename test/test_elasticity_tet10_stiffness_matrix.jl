@@ -34,4 +34,4 @@ eigs_expected = [8809.45, 4936.01, 2880.56, 2491.66, 2004.85,
                  195.832, 104.008, 72.7562, 64.4376, 53.8515,
                  23.8417, 16.6354, 9.54682, 6.93361, 2.22099,
                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-@test isapprox(eigs, eigs_expected; atol=1.0e-2)
+@test isapprox(sort(eigs), sort(eigs_expected); atol=1.0e-2)
