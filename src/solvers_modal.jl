@@ -289,7 +289,7 @@ function update_xdmf!(solver::Solver{Modal})
     # save modes
 
     temporal_collection = get_temporal_collection(xdmf)
-    unknown_field_name = ucfirst(get_unknown_field_name(solver))
+    unknown_field_name = uppercasefirst(get_unknown_field_name(solver))
     frames = []
 
     @timeit "save modes" for (j, eigval) in enumerate(real(solver.properties.eigvals))
