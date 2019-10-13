@@ -117,7 +117,7 @@ using TimerOutputs
 export @timeit, print_timer
 
 import Base: getindex, setindex!, convert, length, size, isapprox,
-             similar, start, first, next, done, last, endof, vec,
+             similar, first, last, vec,
              ==, +, -, *, /, haskey, copy, push!, isempty, empty!,
              append!, read, copy
 
