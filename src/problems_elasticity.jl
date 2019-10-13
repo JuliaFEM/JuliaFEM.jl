@@ -394,6 +394,22 @@ function assemble!(assembly::Assembly,
     end
 end
 
+"""
+    assemble!(assembly, problem, elements, time, ::Type{Val{:continuum}})
+
+Assemble all other elements for continuum elasticity problems. Basically, throw
+an exception telling to filter invalid elements out from the element set.
+"""
+function assemble!(assembly::Assembly,
+                   problem::Problem{Elasticity},
+                   elements::Vector{Element{El}},
+                   time, ::Type{Val{:continuum}}) where El
+    @info("It looks that you are trying to assemble elements of type $El to 3d continuum "*
+          "problem. However, they are not supported yet. To filter out elements from a "*
+          "element set, try `filter(element->!isa(element, Element{$El}), elements)`")
+    error("Tried to assemble unsupported elements of type $El to 3d continuum problem.")
+end
+
 """ Return strain tensor. """
 function get_strain_tensor(problem, element, ip, time)
     gradu = element("displacement", ip, time, Val{:Grad})
