@@ -1,6 +1,7 @@
 name = "JuliaFEM"
 uuid = "f80590ac-b429-510a-8a99-e7c46989f22d"
-version = "0.5.0"
+author = ["Jukka Aho <ahojukka5@gmail.com>", "Tero Frondelius <tero.frondelius@gmail.com>", "Olli Väinölä"]
+version = "0.5.1"
 
 [deps]
 AbaqusReader = "bc6b9049-e460-56d6-94b4-a597b2c0390d"
@@ -19,6 +20,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MortarContact2D = "048d6160-1a0b-53cd-a5b3-316946cc8d80"
 MortarContact2DAD = "c1673bdb-6aff-560b-99da-c78ea6da9af3"
 Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
+REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
@@ -29,5 +31,16 @@ Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
+[compat]
+HDF5 = "≥ 0.7.0"
+LightXML = "≥ 0.4.0"
+julia = "≥ 1.0"
+
+[extras]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
 [targets]
-test = ["Test", "Pkg", "Documenter"]
+test = ["Test"]
