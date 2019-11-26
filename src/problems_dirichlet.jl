@@ -88,9 +88,9 @@ function assemble!(problem::Problem{Dirichlet}, time::Float64=0.0;
             end
         end
         for (k, v) in field_vals
-            add!(problem.assembly.C1, k, k, 1.0)
-            add!(problem.assembly.C2, k, k, 1.0)
-            add!(problem.assembly.g, k, 1, v)
+            FEMBase.add!(problem.assembly.C1, k, k, 1.0)
+            FEMBase.add!(problem.assembly.C2, k, k, 1.0)
+            FEMBase.add!(problem.assembly.g, k, 1, v)
         end
     end
 
