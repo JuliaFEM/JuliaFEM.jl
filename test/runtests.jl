@@ -3,8 +3,11 @@
 
 using JuliaFEM, Test
 
+<<<<<<< HEAD
 # include("../docs/make.jl")
 
+=======
+>>>>>>> master
 @testset "JuliaFEM.jl" begin
     @testset "test_dirichlet.jl" begin
         include("test_dirichlet.jl")
@@ -163,5 +166,3 @@ using JuliaFEM, Test
         include("test_von_mises_material.jl")
     end
 end
-
-include("../docs/deploy.jl")

@@ -95,7 +95,7 @@ Errors should never pass silently.
 If you like using our package, please consider citing our [article](https://rakenteidenmekaniikka.journal.fi/article/view/64224/26397)
 ```
 @article{frondelius2017juliafem,
-  title={JuliaFEM - open source solver for both industrial and academia usage},
+  title={Julia{FEM} - open source solver for both industrial and academia usage},
   volume={50}, 
   url={https://rakenteidenmekaniikka.journal.fi/article/view/64224},
   DOI={10.23998/rm.64224},

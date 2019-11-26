@@ -154,9 +154,39 @@ function allocate_buffer(problem::Problem{Elasticity}, ::Vector{Element{El}}) wh
     nnodes = length(El)
     ndofs = dim*nnodes
 
+<<<<<<< HEAD
     return Elasticity3DLocalBuffers(ndofs=ndofs, dim=dim, bi = BasisInfo(El))
 end
 
+=======
+    for element in elements
+
+        u = element("displacement", time)
+        X = element("geometry", time)
+
+        fill!(Km, 0.0)
+        fill!(Kg, 0.0)
+        fill!(f_int, 0.0)
+        fill!(f_ext, 0.0)
+
+        for ip in get_integration_points(element)
+            eval_basis!(bi, X, ip)
+            w = ip.weight*bi.detJ
+            N = bi.N
+            dN = bi.grad  # deriatives of basis functions w.r.t. X, i.e. ∂N/∂X
+            grad!(bi, gradu, u)  # displacement gradient ∇u
+
+            # calculate strain tensor and deformation gradient
+            fill!(strain, 0.0)
+            fill!(F, 0.0)
+            F[:,:] += I
+            if props.finite_strain
+                strain[:,:] = 1/2 * (gradu + gradu' + gradu'*gradu)
+                F[:,:] += gradu
+            else
+                strain[:,:] = 1/2 * (gradu + gradu')
+            end
+>>>>>>> master
 
 function reset_element!(buf::Elasticity3DLocalBuffers)
     fill!(buf.Km, 0.0)
@@ -175,6 +205,7 @@ function reset_integration_point!(buf::Elasticity3DLocalBuffers)
     return
 end
 
+<<<<<<< HEAD
 function to_voigt!(strain_vec, strain)
     strain_vec[1] = strain[1,1]
     strain_vec[2] = strain[2,2]
@@ -184,6 +215,16 @@ function to_voigt!(strain_vec, strain)
     strain_vec[6] = 2.0*strain[1,3]
     return
 end
+=======
+            fill!(D, 0.0)
+            E = element("youngs modulus", ip, time)::Float64
+            nu = element("poissons ratio", ip, time)::Float64
+            la = E*nu/((1.0+nu)*(1.0-2.0*nu))
+            mu = E/(2.0*(1.0+nu))
+            D[1,1] = D[2,2] = D[3,3] = 2*mu + la
+            D[4,4] = D[5,5] = D[6,6] = mu
+            D[1,2] = D[2,1] = D[2,3] = D[3,2] = D[1,3] = D[3,1] = la
+>>>>>>> master
 
 const u = ([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0])
 const X = ([-93.7197, -93.7197, 150.883], [-91.657, -85.8251, 157.885], [-100.523, -88.8309, 157.883], [-91.6593, -88.8309, 157.883], [-92.6883, -89.7724, 154.384], [-96.0902, -87.328, 157.883], [-97.1216, -91.2753, 154.383], [-92.6895, -91.2753, 154.383], [-91.6581, -87.328, 157.883], [-96.0914, -88.8309, 157.883])

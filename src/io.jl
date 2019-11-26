@@ -328,6 +328,29 @@ global const xdmf_element_mapping = Dict(
         "Wedge15" => "Wedge_15",
         "Hex20" => "Hex_20")
 
+get_xdmf_element_code(::Element{Poi1}) = 1
+get_xdmf_element_code(::Element{Seg2}) = 2
+# get_xdmf_element_code(::Element{Polygon}) =  3
+get_xdmf_element_code(::Element{Tri3}) = 4
+get_xdmf_element_code(::Element{Quad4}) = 5
+get_xdmf_element_code(::Element{Tet4}) = 6
+get_xdmf_element_code(::Element{Pyr5}) = 7
+get_xdmf_element_code(::Element{Wedge6}) = 8
+get_xdmf_element_code(::Element{Hex8}) = 9
+# get_xdmf_element_code(::Element{Polyhedron}) = 16
+
+get_xdmf_element_code(::Element{Seg3}) = 34
+get_xdmf_element_code(::Element{Quad9}) = 35
+get_xdmf_element_code(::Element{Tri6}) = 36
+get_xdmf_element_code(::Element{Quad8}) = 37
+get_xdmf_element_code(::Element{Tet10}) = 38
+# get_xdmf_element_code(::Element{Pyr13}) = 39
+get_xdmf_element_code(::Element{Wedge15}) = 40
+# get_xdmf_element_code(::Element{Wedge18}) = 41
+get_xdmf_element_code(::Element{Hex20}) = 48
+# get_xdmf_element_code(::Element{Hex24}) = 49
+get_xdmf_element_code(::Element{Hex27}) = 50
+
 """
     get_spatial_collection()
 
@@ -416,27 +439,48 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
     add_child(geometry, X_dataitem)
 
     # 5. save topology
-    all_elements = get_elements(problem)
-    nelements = length(all_elements)
-    element_types = unique(map(get_element_type, all_elements))
-    nelement_types = length(element_types)
-    @debug("Xdmf: Saving topology of $nelements elements total, $nelement_types different element types.")
-
-    for element_type in element_types
-        elements = collect(filter_by_element_type(element_type, all_elements))
-        nelements = length(elements)
-        @debug("Xdmf: $nelements elements of type $element_type")
-        sort!(elements, by=get_element_id)
-        element_ids = map(get_element_id, elements)
-        element_conn = map(element -> [node_mapping[j]-1 for j in get_connectivity(element)], elements)
-        element_conn = hcat(element_conn...)
-        element_code = split(string(element_type), ".")[end]
+    mesh_type = "unstructured"
+    if mesh_type == "unstructured"
+        element_conn = Int64[]
+        for element in get_elements(problem)
+            xdmf_element_code = get_xdmf_element_code(element)
+            xdmf_element_code > 0 || continue
+            push!(element_conn, xdmf_element_code)
+            if xdmf_element_code == 2
+                push!(element_conn, length(element))
+            end
+            for j in get_connectivity(element)
+                push!(element_conn, node_mapping[j]-1)
+            end
+        end
         topology_dataitem = new_dataitem(xdmf, element_conn)
-
         topology = new_child(frame, "Topology")
-        set_attribute(topology, "TopologyType", xdmf_element_mapping[element_code])
-        set_attribute(topology, "NumberOfElements", length(elements))
+        set_attribute(topology, "TopologyType", "Mixed")
         add_child(topology, topology_dataitem)
+    else
+        all_elements = get_elements(problem)
+        nelements = length(all_elements)
+        element_types = unique(map(get_element_type, all_elements))
+        nelement_types = length(element_types)
+        @debug("Xdmf: Saving topology of $nelements elements total, $nelement_types different element types.")
+        if nelement_types != 1
+            error("Xdmf: only single type of element supported by structured grid type!")
+        end
+        for element_type in element_types
+            elements = collect(filter_by_element_type(element_type, all_elements))
+            nelements = length(elements)
+            @debug("Xdmf: $nelements elements of type $element_type")
+            sort!(elements, by=get_element_id)
+            element_ids = map(get_element_id, elements)
+            element_conn = map(element -> [node_mapping[j]-1 for j in get_connectivity(element)], elements)
+            element_conn = hcat(element_conn...)
+            element_code = split(string(element_type), ".")[end]
+            topology_dataitem = new_dataitem(xdmf, element_conn)
+            topology = new_child(frame, "Topology")
+            set_attribute(topology, "TopologyType", xdmf_element_mapping[element_code])
+            set_attribute(topology, "NumberOfElements", length(elements))
+            add_child(topology, topology_dataitem)
+        end
     end
 
     # 6. save requested fields
@@ -444,7 +488,11 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
         field_dict = problem(field_name, time)
         field_center = "Node"
         field_node_ids = sort(collect(keys(field_dict)))
-        @assert node_ids == field_node_ids
+        if node_ids != field_node_ids
+            @error("geom node ids = $node_ids")
+            @error("field node ids = $field_node_ids")
+            error("!=, geometry does not match with field.")
+        end
         field_dim = length(field_dict[first(field_node_ids)])
         if field_dim == 2
             @debug("Xdmf: Field dimension = 2, extending to 3")
