@@ -1,7 +1,7 @@
 name = "JuliaFEM"
 uuid = "f80590ac-b429-510a-8a99-e7c46989f22d"
 author = ["Jukka Aho <ahojukka5@gmail.com>", "Tero Frondelius <tero.frondelius@gmail.com>", "Olli Väinölä"]
-version = "0.5.1"
+version = "0.5.2"
 
 [deps]
 AbaqusReader = "bc6b9049-e460-56d6-94b4-a597b2c0390d"
