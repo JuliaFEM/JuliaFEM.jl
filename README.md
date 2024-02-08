@@ -10,6 +10,29 @@
 [![Stable documentation](https://img.shields.io/badge/docs-stable-blue.svg)](https://juliafem.github.io/JuliaFEM.jl/stable)
 [![Latest documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://juliafem.github.io/JuliaFEM.jl/latest)
 [![Issues](https://img.shields.io/github/issues/JuliaFEM/JuliaFEM.jl.svg)](https://github.com/JuliaFEM/JuliaFEM.jl/issues)
+<pre>
+
+
+
+
+
+
+
+</pre>
+
+Everything is outdated. See other FEM options from here: https://github.com/JuliaPDE/SurveyofPDEPackages?tab=readme-ov-file#fem
+
+<pre>
+
+
+
+
+
+
+
+
+</pre>
+
 
 JuliaFEM organization web-page: [http://www.juliafem.org](http://www.juliafem.org)
 
