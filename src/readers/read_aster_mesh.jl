@@ -2,7 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/AsterReader.jl/blob/master/LICENSE
 
 function aster_parse_nodes(section; strip_characters=true)
-    nodes = Dict{Any, Vector{Float64}}()
+    nodes = Dict{Any,Vector{Float64}}()
     has_started = false
     for line in split(section, '\n')
         m = collect((string(m.match) for m in eachmatch(r"[\w.-]+", line)))
@@ -33,7 +33,7 @@ end
 
 """ Code Aster binary file (.med). """
 mutable struct MEDFile
-    data :: Dict
+    data::Dict
 end
 
 function MEDFile(fn::String)
@@ -67,9 +67,9 @@ Notes
 One node set id can have multiple names.
 
 """
-function get_node_sets(med::MEDFile, mesh_name::String)::Dict{Int64, Vector{String}}
+function get_node_sets(med::MEDFile, mesh_name::String)::Dict{Int64,Vector{String}}
     mesh = get_mesh(med, mesh_name)
-    node_sets = Dict{Int64, Vector{String}}(0 => ["OTHER"])
+    node_sets = Dict{Int64,Vector{String}}(0 => ["OTHER"])
     if !haskey(mesh, "NOEUD")
         return node_sets
     end
@@ -92,9 +92,9 @@ human-readable name for element set.
 One element set id can have multiple names.
 
 """
-function get_element_sets(med::MEDFile, mesh_name::String)::Dict{Int64, Vector{String}}
+function get_element_sets(med::MEDFile, mesh_name::String)::Dict{Int64,Vector{String}}
     mesh = get_mesh(med, mesh_name)
-    element_sets = Dict{Int64, Vector{String}}()
+    element_sets = Dict{Int64,Vector{String}}()
     if !haskey(mesh, "ELEME")
         return element_sets
     end
@@ -115,7 +115,7 @@ function get_element_sets(med::MEDFile, mesh_name::String)::Dict{Int64, Vector{S
     return element_sets
 end
 
-function get_nodes(med::MEDFile, nsets::Dict{Int, Vector{String}}, mesh_name::String)
+function get_nodes(med::MEDFile, nsets::Dict{Int,Vector{String}}, mesh_name::String)
     increments = keys(med.data["ENS_MAA"][mesh_name])
     @assert length(increments) == 1
     increment = first(increments)
@@ -124,17 +124,17 @@ function get_nodes(med::MEDFile, nsets::Dict{Int, Vector{String}}, mesh_name::St
     nnodes = length(nset_ids)
     node_ids = get(nodes, "NUM", collect(1:nnodes))
     node_coords = nodes["COO"]
-    dim = round(Int, length(node_coords)/nnodes)
+    dim = round(Int, length(node_coords) / nnodes)
     node_coords = reshape(node_coords, nnodes, dim)'
-    d = Dict{Int64}{Tuple{Vector{String}, Vector{Float64}}}()
-    for i=1:nnodes
+    d = Dict{Int64}{Tuple{Vector{String},Vector{Float64}}}()
+    for i = 1:nnodes
         nset = nsets[nset_ids[i]]
         d[node_ids[i]] = (nset, node_coords[:, i])
     end
     return d
 end
 
-function get_connectivity(med::MEDFile, elsets::Dict{Int64, Vector{String}}, mesh_name::String)
+function get_connectivity(med::MEDFile, elsets::Dict{Int64,Vector{String}}, mesh_name::String)
     if !haskey(elsets, 0)
         elsets[0] = ["OTHER"]
     end
@@ -142,16 +142,16 @@ function get_connectivity(med::MEDFile, elsets::Dict{Int64, Vector{String}}, mes
     @assert length(increments) == 1
     increment = first(increments)
     all_elements = med.data["ENS_MAA"][mesh_name][increment]["MAI"]
-    d = Dict{Int64, Tuple{Symbol, Vector{String}, Vector{Int64}}}()
+    d = Dict{Int64,Tuple{Symbol,Vector{String},Vector{Int64}}}()
     for eltype in keys(all_elements)
         elements = all_elements[eltype]
         elset_ids = elements["FAM"]
         nelements = length(elset_ids)
         element_ids = get(elements, "NUM", collect(1:nelements))
         element_connectivity = elements["NOD"]
-        element_dim = round(Int, length(element_connectivity)/nelements)
+        element_dim = round(Int, length(element_connectivity) / nelements)
         element_connectivity = reshape(element_connectivity, nelements, element_dim)'
-        for i=1:nelements
+        for i = 1:nelements
             eltype = Symbol(eltype)
             elco = element_connectivity[:, i]
             elset = elsets[elset_ids[i]]
@@ -173,7 +173,7 @@ If mesh file contains several meshes, one must provide the mesh name as
 additional argument or expcetion will be thrown.
 
 """
-function aster_read_mesh(filename::String, mesh_name=nothing)
+function aster_read_mesh_raw(filename::String, mesh_name=nothing)
     isfile(filename) || error("Cannot read mesh file $filename: file not found.")
     aster_read_mesh_(MEDFile(filename), mesh_name)
 end
@@ -188,14 +188,14 @@ function aster_read_mesh_(med::MEDFile, mesh_name=nothing)
         mesh_name in mesh_names || error("Mesh $mesh_name not found from mesh file $fn. Available meshes: $all_meshes")
     end
 
-    mesh = Dict{String, Dict}()
-    mesh["nodes"] = Dict{Int, Vector{Float64}}()
-    mesh["node_sets"] = Dict{String, Vector{Int}}()
-    mesh["elements"] = Dict{Int, Vector{Int}}()
-    mesh["element_types"] = Dict{Int, Symbol}()
-    mesh["element_sets"] = Dict{String, Vector{Int}}()
-    mesh["surface_sets"] = Dict{String, Vector{Tuple{Int, Symbol}}}()
-    mesh["surface_types"] = Dict{String, Symbol}()
+    mesh = Dict{String,Dict}()
+    mesh["nodes"] = Dict{Int,Vector{Float64}}()
+    mesh["node_sets"] = Dict{String,Vector{Int}}()
+    mesh["elements"] = Dict{Int,Vector{Int}}()
+    mesh["element_types"] = Dict{Int,Symbol}()
+    mesh["element_sets"] = Dict{String,Vector{Int}}()
+    mesh["surface_sets"] = Dict{String,Vector{Tuple{Int,Symbol}}}()
+    mesh["surface_types"] = Dict{String,Symbol}()
 
     elsets = get_element_sets(med, mesh_name)
     nsets = get_node_sets(med, mesh_name)

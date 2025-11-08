@@ -10,6 +10,6 @@ include("readers/parse_model.jl")
 include("readers/create_surface_elements.jl")
 include("readers/abaqus_download.jl")
 
-# AsterReader - Code Aster .med file format  
-include("readers/read_aster_mesh.jl")
-include("readers/read_aster_results.jl")
+# AsterReader - Code Aster .med file format (requires HDF5)
+# include("readers/read_aster_mesh.jl")
+# include("readers/read_aster_results.jl")
