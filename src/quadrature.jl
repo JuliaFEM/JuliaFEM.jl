@@ -35,7 +35,7 @@ Integrate a 1D function using the specified quadrature rule.
 """
 function integrate_1d(f::Function, rule::Symbol)
     points = get_quadrature_points(Val{rule})
-    result = sum(w*f(ip) for (w, ip) in points)
+    result = sum(w * f(ip) for (w, ip) in points)
     return result
 end
 
@@ -46,7 +46,7 @@ Integrate a 2D function using the specified quadrature rule.
 """
 function integrate_2d(f::Function, rule::Symbol)
     points = get_quadrature_points(Val{rule})
-    result = sum(w*f(ip) for (w, ip) in points)
+    result = sum(w * f(ip) for (w, ip) in points)
     return result
 end
 
@@ -57,6 +57,6 @@ Integrate a 3D function using the specified quadrature rule.
 """
 function integrate_3d(f::Function, rule::Symbol)
     points = get_quadrature_points(Val{rule})
-    result = sum(w*f(ip) for (w, ip) in points)
+    result = sum(w * f(ip) for (w, ip) in points)
     return result
 end
