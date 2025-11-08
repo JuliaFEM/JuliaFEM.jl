@@ -1,7 +1,8 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-using SparseArrays, Arpack
+using SparseArrays
+import Arpack  # For eigenvalue problems (eigs)
 
 mutable struct Modal <: AbstractSolver
     time::Float64

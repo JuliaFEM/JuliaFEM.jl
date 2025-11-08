@@ -73,13 +73,13 @@ function assemble_elements!(problem::Problem{PlaneHeat}, assembly::Assembly,
 end
 
 function assemble_elements!(problem::Problem{Heat}, assembly::Assembly,
-                                    elements::Vector{Element{M,B}}, time::Float64) where
-                                    {M,B<:Union{Tri3,Quad4,Tri6,Quad8,Quad9}}
+    elements::Vector{Element{M,B}}, time::Float64) where
+{M,B<:Union{Tri3,Quad4,Tri6,Quad8,Quad9}}
     return assemble_boundary_elements!(problem, assembly, elements, time)
 end
 
 function assemble_boundary_elements!(problem::Problem, assembly::Assembly,
-                                     elements::Vector{Element{M,B}}, time::Float64) where {M,B}
+    elements::Vector{Element{M,B}}, time::Float64) where {M,B}
 
     bi = BasisInfo(B)
     ndofs = length(bi)

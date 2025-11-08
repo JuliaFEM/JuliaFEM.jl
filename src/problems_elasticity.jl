@@ -108,29 +108,56 @@ function initialize_internal_params!(params, ip, type_) #::Type{Val{:type_2d}})
     end
 end
 
-Parameters.@with_kw struct Elasticity3DLocalBuffers{B,T}
+# Buffer for elasticity assembly (keyword constructor without Parameters.jl)
+struct Elasticity3DLocalBuffers{B,T}
     ndofs::Int
     dim::Int
     bi::BasisInfo{B,T}
-    BL::Matrix{T} = zeros(6, ndofs)
-    BNL::Matrix{T} = zeros(9, ndofs)
-    Km::Matrix{T} = zeros(ndofs, ndofs)
-    Kg::Matrix{T} = zeros(ndofs, ndofs)
-    f_int::Vector{T} = zeros(ndofs)
-    f_ext::Vector{T} = zeros(ndofs)
-    f_buffer::Vector{T} = zeros(ndofs)
-    f_buffer_dim::Vector{T} = zeros(div(ndofs, dim))
-    gdofs::Vector{Int} = zeros(Int, ndofs)
-    gradu::Matrix{T} = zeros(dim, dim)
-    strain::Matrix{T} = zeros(dim, dim)
-    strain_vec::Vector{T} = zeros(6)
-    stress_vec::Vector{T} = zeros(6)
-    F::Matrix{T} = zeros(dim, dim)
-    D::Matrix{T} = zeros(6, 6)
-    Dtan::Matrix{T} = zeros(6, 6)
-    Bt_mul_D::Matrix{T} = zeros(ndofs, 6)
-    Bt_mul_D_mul_B::Matrix{T} = zeros(ndofs, ndofs)
-    Bt_mul_S::Vector{T} = zeros(ndofs)
+    BL::Matrix{T}
+    BNL::Matrix{T}
+    Km::Matrix{T}
+    Kg::Matrix{T}
+    f_int::Vector{T}
+    f_ext::Vector{T}
+    f_buffer::Vector{T}
+    f_buffer_dim::Vector{T}
+    gdofs::Vector{Int}
+    gradu::Matrix{T}
+    strain::Matrix{T}
+    strain_vec::Vector{T}
+    stress_vec::Vector{T}
+    F::Matrix{T}
+    D::Matrix{T}
+    Dtan::Matrix{T}
+    Bt_mul_D::Matrix{T}
+    Bt_mul_D_mul_B::Matrix{T}
+    Bt_mul_S::Vector{T}
+
+    # Keyword constructor
+    function Elasticity3DLocalBuffers(; ndofs::Int, dim::Int, bi::BasisInfo{B,T}) where {B,T}
+        new{B,T}(
+            ndofs, dim, bi,
+            zeros(T, 6, ndofs),          # BL
+            zeros(T, 9, ndofs),          # BNL
+            zeros(T, ndofs, ndofs),      # Km
+            zeros(T, ndofs, ndofs),      # Kg
+            zeros(T, ndofs),             # f_int
+            zeros(T, ndofs),             # f_ext
+            zeros(T, ndofs),             # f_buffer
+            zeros(T, div(ndofs, dim)),   # f_buffer_dim
+            zeros(Int, ndofs),           # gdofs
+            zeros(T, dim, dim),          # gradu
+            zeros(T, dim, dim),          # strain
+            zeros(T, 6),                 # strain_vec
+            zeros(T, 6),                 # stress_vec
+            zeros(T, dim, dim),          # F
+            zeros(T, 6, 6),              # D
+            zeros(T, 6, 6),              # Dtan
+            zeros(T, ndofs, 6),          # Bt_mul_D
+            zeros(T, ndofs, ndofs),      # Bt_mul_D_mul_B
+            zeros(T, ndofs)              # Bt_mul_S
+        )
+    end
 end
 
 function allocate_buffer(problem::Problem{Elasticity}, ::Vector{Element{El}}) where El<:Elasticity3DVolumeElements
@@ -187,8 +214,28 @@ function assemble_element!(assembly::Assembly,
     nnodes = length(El)
     ndofs = dim * nnodes
 
-    Parameters.@unpack bi, BL, BNL, Km, Kg, f_int, f_ext, f_buffer, f_buffer_dim, gdofs, gradu, strain,
-    strain_vec, stress_vec, F, D, Dtan, Bt_mul_D, Bt_mul_D_mul_B, Bt_mul_S = local_buffer
+    # Unpack buffer fields (replaced Parameters.@unpack)
+    bi = local_buffer.bi
+    BL = local_buffer.BL
+    BNL = local_buffer.BNL
+    Km = local_buffer.Km
+    Kg = local_buffer.Kg
+    f_int = local_buffer.f_int
+    f_ext = local_buffer.f_ext
+    f_buffer = local_buffer.f_buffer
+    f_buffer_dim = local_buffer.f_buffer_dim
+    gdofs = local_buffer.gdofs
+    gradu = local_buffer.gradu
+    strain = local_buffer.strain
+    strain_vec = local_buffer.strain_vec
+    stress_vec = local_buffer.stress_vec
+    F = local_buffer.F
+    D = local_buffer.D
+    Dtan = local_buffer.Dtan
+    Bt_mul_D = local_buffer.Bt_mul_D
+    Bt_mul_D_mul_B = local_buffer.Bt_mul_D_mul_B
+    Bt_mul_S = local_buffer.Bt_mul_S
+
     if !cheating
         u = element("displacement", time)
         X = element("geometry", time)
