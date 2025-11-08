@@ -28,9 +28,9 @@ function setindex!(element::AbstractElement, data::T, field_name) where T<:Abstr
 end
 
 function setindex!(element::AbstractElement, data::Function, field_name)
-    if hasmethod(data, Tuple{AbstractElement, Vector, Float64})
+    if hasmethod(data, Tuple{AbstractElement,Vector,Float64})
         # create enclosure to pass element as argument
-        element.fields[field_name] = field((ip,time) -> data(element,ip,time))
+        element.fields[field_name] = field((ip, time) -> data(element, ip, time))
     else
         element.fields[field_name] = field(data)
     end
@@ -40,7 +40,7 @@ function setindex!(element::AbstractElement, data, field_name)
     element.dfields[field_name] = field(data)
 end
 
-function setindex!(fieldset::Dict{Symbol, AbstractField}, field_data, field_name::String)
+function setindex!(fieldset::Dict{Symbol,AbstractField}, field_data, field_name::String)
     setindex!(fieldset, field_data, Symbol(field_name))
 end
 
@@ -78,7 +78,7 @@ end
 
 # will be deprecated
 function assemble!(assembly::Assembly, problem::Problem{P},
-                   elements::Vector{Element}, time) where P
+    elements::Vector{Element}, time) where P
     @warn("This is default assemble! function. Decreased performance can be " *
           "expected without preallocation of memory. One should implement " *
           "`assemble_elements!(problem, assembly, elements, time)` function.")
