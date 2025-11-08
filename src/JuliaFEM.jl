@@ -167,6 +167,9 @@ include("deprecated_fembase.jl")     # Deprecated/legacy methods from FEMBase (l
 # Mesh readers (consolidated from AbaqusReader.jl and AsterReader.jl)
 include("readers.jl")
 
+# Graph algorithms (RCM bandwidth minimization from GraphOrdering.jl)
+include("graph/graph_ordering.jl")
+
 using TimerOutputs
 export @timeit, print_timer
 
