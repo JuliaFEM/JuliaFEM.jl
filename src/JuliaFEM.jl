@@ -116,8 +116,8 @@ using Reexport, ForwardDiff, LightXML, HDF5, Parameters
 using Tensors  # For basis functions (Vec type)
 import Calculus  # For symbolic differentiation in basis generation
 
-import FEMSparse
-# import FEMQuad  # Consolidated into src/quadrature.jl
+# import FEMSparse  # Consolidated into src/sparse/
+# import FEMQuad   # Consolidated into src/quadrature.jl
 
 # Note: Consolidating FEMBase and FEMBasis into JuliaFEM
 # Previously: @reexport using FEMBase

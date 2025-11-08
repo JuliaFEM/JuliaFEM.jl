@@ -1,8 +1,15 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/FEMBase.jl/blob/master/LICENSE
+#
+# Sparse matrix utilities consolidated from FEMBase.jl and FEMSparse.jl
 
 using SparseArrays
 import SparseArrays: sparse, sparsevec
+
+# SparseMatrixCOO from FEMBase (this file)
+# AssemblerSparsityPattern from FEMSparse
+include("sparsematrixcsc.jl")
+# include("sparsevectordok.jl")  # Old Julia syntax, not used, skipping for now
 
 mutable struct SparseMatrixCOO{T<:Real}
     I :: Vector{Int}

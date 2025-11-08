@@ -174,7 +174,7 @@ const X = ([-93.7197, -93.7197, 150.883], [-91.657, -85.8251, 157.885], [-100.52
 const displacement_load_string = [string("displacement load ", i) for i in 1:3]
 """ Assemble 3d continuum elements in general solid mechanics problem. """
 function assemble_element!(assembly::Assembly,
-    assembler::FEMSparse.AssemblerSparsityPattern,
+    assembler::AssemblerSparsityPattern,
     problem::Problem{Elasticity},
     element::Element{El},
     local_buffer::Elasticity3DLocalBuffers,
@@ -387,10 +387,10 @@ function assemble_element!(assembly::Assembly,
 
     if use_csc
         # add contributions to K, Kg, f
-        @inbounds FEMSparse.assemble_local!(assembler, gdofs, Km, f_ext)
+        @inbounds assemble_local!(assembler, gdofs, Km, f_ext)
 
         if props.geometric_stiffness
-            @inbounds FEMSparse.assemble_local_matrix!(assembler, gdofs, Kg)
+            @inbounds assemble_local_matrix!(assembler, gdofs, Kg)
         end
     else
         add!(assembly.f, gdofs, f_ext)
