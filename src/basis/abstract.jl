@@ -6,7 +6,7 @@
 
 using Tensors
 using LinearAlgebra
-import Calculus
+# import Calculus  # Only needed for symbolic basis generation (create_basis.jl)
 
 # Re-export Vec for convenience (from Tensors.jl)
 export Vec

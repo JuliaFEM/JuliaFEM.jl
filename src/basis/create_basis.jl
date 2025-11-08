@@ -3,6 +3,95 @@
 
 __precompile__(false)
 
+# Minimal symbolic differentiation for polynomial basis functions
+# Adapted from SymDiff.jl by Jukka Aho - zero dependencies!
+
+differentiate(::Number, ::Symbol) = 0
+differentiate(f::Symbol, x::Symbol) = f == x ? 1 : 0
+
+function differentiate(f::Expr, x::Symbol)
+    @assert f.head == :call
+    op = first(f.args)
+
+    # Product rule: (fg)' = f'g + fg'
+    if op == :*
+        res_args = Any[:+]
+        for i in 2:length(f.args)
+            new_args = copy(f.args)
+            new_args[i] = differentiate(f.args[i], x)
+            push!(res_args, Expr(:call, new_args...))
+        end
+        return Expr(:call, res_args...)
+
+        # Power rule: d/dx f^a = a * f^(a-1) * f'
+    elseif op == :^
+        _, f_inner, a = f.args
+        df = differentiate(f_inner, x)
+        return :($a * $f_inner^($a - 1) * $df)
+
+        # Sum rule: (f + g)' = f' + g'
+    elseif op == :+
+        args = differentiate.(f.args[2:end], x)
+        return Expr(:call, :+, args...)
+
+        # Difference rule: (f - g)' = f' - g'
+    elseif op == :-
+        args = differentiate.(f.args[2:end], x)
+        return Expr(:call, :-, args...)
+
+        # Quotient rule: d/dx (f/g) = (f'g - fg')/g^2
+    elseif op == :/
+        _, g, h = f.args
+        dg = differentiate(g, x)
+        dh = differentiate(h, x)
+        return :(($dg * $h - $g * $dh) / $h^2)
+
+    else
+        error("Unsupported operation: $op")
+    end
+end
+
+simplify(f::Union{Number,Symbol}) = f
+
+function simplify(ex::Expr)
+    @assert ex.head == :call
+    op = first(ex.args)
+
+    # Multiplication: remove 1's, return 0 if any 0
+    if op == :*
+        args = simplify.(ex.args[2:end])
+        0 in args && return 0
+        filter!(k -> !(isa(k, Number) && k == 1), args)
+        length(args) == 0 && return 1
+        length(args) == 1 && return first(args)
+        return Expr(:call, :*, args...)
+
+        # Addition: remove 0's
+    elseif op == :+
+        args = simplify.(ex.args[2:end])
+        filter!(k -> !isa(k, Number) || k != 0, args)
+        length(args) == 0 && return 0
+        length(args) == 1 && return first(args)
+        return Expr(:call, :+, args...)
+
+        # Subtraction: remove 0's
+    elseif op == :-
+        args = simplify.(ex.args[2:end])
+        filter!(k -> !isa(k, Number) || k != 0, args)
+        length(args) == 0 && return 0
+        length(args) == 1 && return first(args)
+        return Expr(:call, :-, args...)
+
+        # Power, Division: keep as-is
+    elseif op in (:^, :/)
+        args = simplify.(ex.args[2:end])
+        return Expr(:call, op, args...)
+
+    else
+        return ex
+    end
+end
+
 function get_reference_element_coordinates end
 function eval_basis! end
 function eval_dbasis! end
@@ -22,7 +111,7 @@ function calculate_interpolation_polynomials(p, V)
         N = Expr(:call, :+)
         for (ai, bi) in zip(solution, args)
             isapprox(ai, 0.0) && continue
-            push!(N.args, Calculus.simplify(:($ai * $bi)))
+            push!(N.args, simplify(:($ai * $bi)))  # Use our own simplify
         end
         push!(basis, N)
     end
@@ -35,7 +124,7 @@ function calculate_interpolation_polynomial_derivatives(basis, D)
     for (i, N) in enumerate(basis)
         partial_derivatives = []
         for j in 1:D
-            dbasis[j, i] = Calculus.simplify(Calculus.differentiate(N, vars[j]))
+            dbasis[j, i] = simplify(differentiate(N, vars[j]))  # Use our own differentiate and simplify
         end
     end
     return dbasis
