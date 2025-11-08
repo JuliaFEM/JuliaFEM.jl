@@ -4,24 +4,24 @@
 using SparseArrays, Arpack
 
 mutable struct Modal <: AbstractSolver
-    time :: Float64
-    geometric_stiffness :: Bool
-    eigvals :: Vector
-    eigvecs :: Matrix
-    nev :: Int
-    which :: Symbol
-    bc_invertible :: Bool
-    P :: Vector{SparseMatrixCSC}
-    symmetric :: Bool
-    empty_assemblies_before_solution :: Bool
-    dense :: Bool
-    info_matrices :: Bool
-    sigma :: Float64
+    time::Float64
+    geometric_stiffness::Bool
+    eigvals::Vector
+    eigvecs::Matrix
+    nev::Int
+    which::Symbol
+    bc_invertible::Bool
+    P::Vector{SparseMatrixCSC}
+    symmetric::Bool
+    empty_assemblies_before_solution::Bool
+    dense::Bool
+    info_matrices::Bool
+    sigma::Float64
 end
 
 function Modal(nev=10, which=:SM)
-    solver = Modal(0.0, false, [], Matrix{Float64}(undef,0,0), nev, which,
-                   false, [], true, true, false, false, 0.0)
+    solver = Modal(0.0, false, [], Matrix{Float64}(undef, 0, 0), nev, which,
+        false, [], true, true, false, false, 0.0)
 end
 
 """
@@ -66,10 +66,10 @@ function eliminate_boundary_conditions!(problem::P, K, M, f) where {P}
     isdiag(C1) || error("Cannot eliminate boundary condition $P: C is not diagonal")
     @info("Eliminating boundary condition $(problem.name) from global system.")
     fixed_dofs = get_nonzero_rows(C1)
-    K[fixed_dofs,:] .= 0.0
-    K[:,fixed_dofs] .= 0.0
-    M[fixed_dofs,:] .= 0.0
-    M[:,fixed_dofs] .= 0.0
+    K[fixed_dofs, :] .= 0.0
+    K[:, fixed_dofs] .= 0.0
+    M[fixed_dofs, :] .= 0.0
+    M[:, fixed_dofs] .= 0.0
     dropzeros!(K)
     dropzeros!(M)
     return nothing
@@ -118,8 +118,8 @@ function run!(solver::Solver{Modal})
 
     for P in properties.P
         @info("Using P to make transformation K_red = P'*K*P and M_red = P'*M*P")
-        K[:,:] .= P'*K*P
-        M[:,:] .= P'*M*P
+        K[:, :] .= P' * K * P
+        M[:, :] .= P' * M * P
     end
 
     for problem in get_problems(solver)
@@ -136,8 +136,8 @@ function run!(solver::Solver{Modal})
     SparseArrays.droptol!(K, 1.0e-9)
     SparseArrays.droptol!(M, 1.0e-9)
     nz = get_nonzero_rows(K)
-    K = K[nz,nz]
-    M = M[nz,nz]
+    K = K[nz, nz]
+    M = M[nz, nz]
 
     sigma = 0.0
     if properties.sigma != 0.0
@@ -172,12 +172,12 @@ function run!(solver::Solver{Modal})
 
     try
         @timeit "solve eigenvalue problem using `eigs`" begin
-            om2, X = eigs(K + sigma*I, M; nev=props.nev, which=props.which)
+            om2, X = eigs(K + sigma * I, M; nev=props.nev, which=props.which)
         end
         passed = true
     catch
         @info("Failed to calculate eigenvalues for problem.",
-              issymmetric(K), issymmetric(M), isposdef(K), isposdef(M))
+            issymmetric(K), issymmetric(M), isposdef(K), isposdef(M))
         if !isapprox(properties.sigma, 0.0)
             @info("Stiffness matrix is not positive definite and Cholesky " *
                   "factorization is failing. Model is not supported enough " *
@@ -195,7 +195,7 @@ function run!(solver::Solver{Modal})
               "positive definite and Cholesky factorization is failing. Trying " *
               "again by adjusting problem.properties.sigma to $sigma.")
         try
-            om2, X = eigs(K + sigma*I, M; nev=props.nev, which=props.which)
+            om2, X = eigs(K + sigma * I, M; nev=props.nev, which=props.which)
             passed = true
         catch
             @info("Failed to calculate eigenvalues with sigma value $sigma. " *
@@ -209,15 +209,15 @@ function run!(solver::Solver{Modal})
     props.eigvals = om2
     neigvals = length(om2)
     props.eigvecs = zeros(ndofs, neigvals)
-    for i=1:neigvals
-        props.eigvecs[nz,i] = X[:,i]
+    for i = 1:neigvals
+        props.eigvecs[nz, i] = X[:, i]
         for problem in get_boundary_problems(solver)
             isa(problem, Problem{Mortar}) || continue
             s, m, P = calc_projection(problem)
             # FIXME: store projection to boundary problem, i.e.
             # update!(problem, "master-slave projection", time => P)
             # us = P*um
-            props.eigvecs[s,i] = P*props.eigvecs[m,i]
+            props.eigvecs[s, i] = P * props.eigvecs[m, i]
         end
     end
 
@@ -245,13 +245,13 @@ function update_xdmf!(solver::Solver{Modal})
 
     @timeit "fetch geometry" X_ = solver("geometry", solver.properties.time)
     node_ids = keys(X_)
-    @timeit "create node permutation" P = Dict(j=>i for (i, j) in enumerate(node_ids))
+    @timeit "create node permutation" P = Dict(j => i for (i, j) in enumerate(node_ids))
     nnodes = length(X_)
-    ndofs = round(Int, size(solver.properties.eigvecs, 1)/nnodes)
+    ndofs = round(Int, size(solver.properties.eigvecs, 1) / nnodes)
     ndim = length(X_[first(node_ids)])
     @info("Number of nodes: $nnodes. ",
-          "Number of dofs/node: $ndofs. ",
-          "Dimension of geometry: $ndim.")
+        "Number of dofs/node: $ndofs. ",
+        "Dimension of geometry: $ndim.")
     @timeit "create ncoords array" begin
         X = zeros(ndim, nnodes)
         for j in node_ids
@@ -263,7 +263,7 @@ function update_xdmf!(solver::Solver{Modal})
     element_types = unique(map(get_element_type, all_elements))
     nelements = length(all_elements)
 
-    elcon_arrays  = Dict()
+    elcon_arrays = Dict()
     @timeit "create topology arrays" for element_type in element_types
         elements = collect(filter_by_element_type(element_type, all_elements))
         nelements = length(elements)
@@ -271,7 +271,7 @@ function update_xdmf!(solver::Solver{Modal})
         element_conn = zeros(Int, eldim, nelements)
         for (i, element) in enumerate(elements)
             for (j, conn) in enumerate(get_connectivity(element))
-                element_conn[j,i] = P[conn]-1
+                element_conn[j, i] = P[conn] - 1
             end
         end
         elcon_arrays[element_type] = element_conn
@@ -305,7 +305,7 @@ function update_xdmf!(solver::Solver{Modal})
             @warn("negative real eigenvalue found, om2=$eigval, setting to zero.")
             eigval = 0.0
         end
-        freq = sqrt(eigval)/(2.0*pi)
+        freq = sqrt(eigval) / (2.0 * pi)
         path = "/Results/Natural Frequency Analysis/$unknown_field_name/Mode $j"
         @info("Creating frequency frame f=$(round(freq; digits=3)), path=$path")
 
@@ -340,11 +340,11 @@ function update_xdmf!(solver::Solver{Modal})
         end
 
         @timeit "store eigenmode" begin
-            mode_ = reshape(solver.properties.eigvecs[:,j], ndofs, nnodes)
+            mode_ = reshape(solver.properties.eigvecs[:, j], ndofs, nnodes)
             @timeit "create mode array" begin
                 mode = zeros(ndofs, nnodes)
                 for nid in node_ids
-                    mode[:,P[nid]] = mode_[:,nid]
+                    mode[:, P[nid]] = mode_[:, nid]
                 end
             end
             if ndofs == 1

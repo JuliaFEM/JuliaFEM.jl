@@ -13,14 +13,14 @@
 =#
 
 mutable struct Mesh
-    nodes :: Dict{Int, Vector{Float64}}
-    node_sets :: Dict{Symbol, Set{Int}}
-    elements :: Dict{Int, Vector{Int}}
-    element_types :: Dict{Int, Symbol}
-    element_codes :: Dict{Int, Symbol}
-    element_sets :: Dict{Symbol, Set{Int}}
-    surface_sets :: Dict{Symbol, Vector{Tuple{Int, Symbol}}}
-    surface_types :: Dict{Symbol, Symbol}
+    nodes::Dict{Int,Vector{Float64}}
+    node_sets::Dict{Symbol,Set{Int}}
+    elements::Dict{Int,Vector{Int}}
+    element_types::Dict{Int,Symbol}
+    element_codes::Dict{Int,Symbol}
+    element_sets::Dict{Symbol,Set{Int}}
+    surface_sets::Dict{Symbol,Vector{Tuple{Int,Symbol}}}
+    surface_types::Dict{Symbol,Symbol}
 end
 
 function Mesh()
@@ -68,7 +68,7 @@ end
 
 Add nodes into the mesh.
 """
-function add_nodes!(mesh::Mesh, nodes::Dict{Int, Vector{Float64}})
+function add_nodes!(mesh::Mesh, nodes::Dict{Int,Vector{Float64}})
     for (nid, ncoords) in nodes
         add_node!(mesh, nid, ncoords)
     end
@@ -133,7 +133,7 @@ end
 
 Add elements into the mesh.
 """
-function add_elements!(mesh::Mesh, elements::Dict{Int, Tuple{Symbol, Vector{Int}}})
+function add_elements!(mesh::Mesh, elements::Dict{Int,Tuple{Symbol,Vector{Int}}})
     for (elid, (eltype, elcon)) in elements
         add_element!(mesh, elid, eltype, elcon)
     end
@@ -233,7 +233,7 @@ function create_elements(mesh::Mesh, element_sets::Symbol...; element_type=nothi
     elements = [create_element(mesh, id) for id in element_ids]
 
     nelements = length(elements)
-    content = Dict{Symbol, Int}()
+    content = Dict{Symbol,Int}()
     for elid in element_ids
         eltype = mesh.element_types[elid]
         content[eltype] = get(content, eltype, 0) + 1
@@ -268,14 +268,14 @@ end
 find npts nearest nodes from the mesh and return their id numbers as a list.
 """
 function find_nearest_nodes(mesh::Mesh, coords::Vector{Float64}, npts::Int=1; node_set=nothing)
-    dist = Dict{Int, Float64}()
+    dist = Dict{Int,Float64}()
     for (nid, c) in mesh.nodes
         if node_set != nothing && !(nid in mesh.node_sets[Symbol(node_set)])
             continue
         end
-        dist[nid] = norm(coords-c)
+        dist[nid] = norm(coords - c)
     end
-    s = sort(collect(dist), by=x->x[2])
+    s = sort(collect(dist), by=x -> x[2])
     nd = s[1:npts] # [(id1, dist1), (id2, dist2), ..., (id_npts, dist_npts)]
     node_ids = [n[1] for n in nd]
     return node_ids
@@ -298,7 +298,7 @@ mapping :: Dict{Symbol, Vector{Int}}
     e.g. :Tet10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 """
-function reorder_element_connectivity!(mesh::Mesh, mapping::Dict{Symbol, Vector{Int}})
+function reorder_element_connectivity!(mesh::Mesh, mapping::Dict{Symbol,Vector{Int}})
     for (elid, eltype) in mesh.element_types
         haskey(mapping, eltype) || continue
         new_order = mapping[eltype]
@@ -330,7 +330,7 @@ It is safe to assemble elements with the same color in parallel
 """
 function create_coloring(mesh::Mesh)
     # Contains the elements that each node contain
-    cell_containing_node = Dict{Int, Set{Int}}()
+    cell_containing_node = Dict{Int,Set{Int}}()
     for (cellid, nodes) in mesh.elements
         for v in nodes
             if !haskey(cell_containing_node, v)
@@ -355,7 +355,7 @@ function create_coloring(mesh::Mesh)
 
     incidence_matrix = sparse(I, J, V)
     # cell -> color of cell
-    cell_colors = Dict{Int, Int}()
+    cell_colors = Dict{Int,Int}()
     # color -> list of cells
     final_colors = Set{Int}[]
     occupied_colors = Set{Int}()

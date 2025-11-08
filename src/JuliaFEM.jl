@@ -152,6 +152,7 @@ include("assembly/problems.jl")      # Problem types
 include("assembly/assembly.jl")      # Assembly framework
 include("solvers/solvers_base.jl")   # Base solver types
 include("analysis.jl")               # Analysis and AbstractResultsWriter
+include("deprecated_fembase.jl")     # Deprecated/legacy methods from FEMBase (length, size, etc.)
 
 using TimerOutputs
 export @timeit, print_timer
