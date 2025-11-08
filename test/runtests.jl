@@ -3,11 +3,6 @@
 
 using JuliaFEM, Test
 
-<<<<<<< HEAD
-# include("../docs/make.jl")
-
-=======
->>>>>>> master
 @testset "JuliaFEM.jl" begin
     @testset "test_dirichlet.jl" begin
         include("test_dirichlet.jl")
