@@ -107,6 +107,8 @@ module JuliaFEM
 
 using SparseArrays, LinearAlgebra, Statistics
 using Reexport, ForwardDiff, LightXML, HDF5, Parameters
+using Tensors  # For basis functions (Vec type)
+import Calculus  # For symbolic differentiation in basis generation
 
 import FEMSparse
 
@@ -114,6 +116,24 @@ import FEMSparse
 import FEMBase: get_unknown_field_name, get_unknown_field_dimension,
                 assemble!, update!, initialize!
 using FEMBase: get_problems
+
+# Consolidate FEMBasis.jl into src/basis/ (Phase 1)
+include("basis/abstract.jl")
+include("basis/subs.jl")
+include("basis/vandermonde.jl")
+include("basis/create_basis.jl")
+include("basis/lagrange_segments.jl")
+include("basis/lagrange_quadrangles.jl")
+include("basis/lagrange_triangles.jl")
+include("basis/lagrange_tetrahedrons.jl")
+include("basis/lagrange_hexahedrons.jl")
+include("basis/lagrange_wedges.jl")
+include("basis/lagrange_pyramids.jl")
+include("basis/nurbs.jl")
+include("basis/nurbs_segment.jl")
+include("basis/nurbs_surface.jl")
+include("basis/nurbs_solid.jl")
+include("basis/math.jl")
 
 using TimerOutputs
 export @timeit, print_timer

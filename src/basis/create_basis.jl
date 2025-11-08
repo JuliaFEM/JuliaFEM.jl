@@ -78,7 +78,7 @@ function create_basis(name, description, X::Vector{<:Vecish{D, T}}, basis, dbasi
     end
 
     code = quote
-        struct $name <: FEMBasis.AbstractBasis{$D}
+        struct $name <: AbstractBasis{$D}
         end
 
         Base.@pure function Base.size(::Type{$name})
@@ -94,18 +94,18 @@ function create_basis(name, description, X::Vector{<:Vecish{D, T}}, basis, dbasi
             return $N
         end
 
-        function FEMBasis.get_reference_element_coordinates(::Type{$name})
+        function get_reference_element_coordinates(::Type{$name})
             return $X
         end
 
-        @inline function FEMBasis.eval_basis!(::Type{$name}, N::Vector{<:Number}, xi::Vec)
+        @inline function eval_basis!(::Type{$name}, N::Vector{<:Number}, xi::Vec)
             @assert length(N) == $N
             $unpack
             @inbounds $Q
             return N
         end
 
-        @inline function FEMBasis.eval_dbasis!(::Type{$name}, dN::Vector{<:Vec{$D}}, xi::Vec)
+        @inline function eval_dbasis!(::Type{$name}, dN::Vector{<:Vec{$D}}, xi::Vec)
             @assert length(dN) == $N
             $unpack
             @inbounds $V

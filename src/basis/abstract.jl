@@ -12,7 +12,7 @@ import Calculus
 export Vec
 
 # Type alias for coordinate inputs (tuples or Vec)
-const Vecish{N, T} = Union{NTuple{N, T}, Vec{N, T}}
+const Vecish{N,T} = Union{NTuple{N,T},Vec{N,T}}
 
 """
     AbstractBasis{dim}

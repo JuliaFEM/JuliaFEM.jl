@@ -2,7 +2,7 @@
 
 julia_version = "1.12.1"
 manifest_format = "2.0"
-project_hash = "ae6eda330dd02b1ac87faf263dad7340321f4918"
+project_hash = "8374f7f8d16cbdc78c0afd48a08515a6e9079d37"
 
 [[deps.AbaqusReader]]
 deps = ["Logging", "Nullables"]
@@ -191,7 +191,7 @@ uuid = "692b3bcd-3c85-4b1f-b108-f13ce0eb3210"
 version = "1.7.1"
 
 [[deps.JuliaFEM]]
-deps = ["AbaqusReader", "Arpack", "AsterReader", "FEMBase", "FEMBasis", "FEMBeam", "FEMQuad", "FEMSparse", "ForwardDiff", "HDF5", "HeatTransfer", "LightXML", "LinearAlgebra", "MortarContact2D", "MortarContact2DAD", "Parameters", "REPL", "Reexport", "SparseArrays", "Statistics", "TimerOutputs"]
+deps = ["AbaqusReader", "Arpack", "AsterReader", "Calculus", "FEMBase", "FEMBasis", "FEMBeam", "FEMQuad", "FEMSparse", "ForwardDiff", "HDF5", "HeatTransfer", "InterfaceMechanics", "LightXML", "LinearAlgebra", "MortarContact2D", "MortarContact2DAD", "Parameters", "REPL", "Reexport", "SparseArrays", "Statistics", "Tensors", "TimerOutputs"]
 path = "."
 uuid = "f80590ac-b429-510a-8a99-e7c46989f22d"
 version = "0.5.2"
