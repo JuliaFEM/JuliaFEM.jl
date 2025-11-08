@@ -5,11 +5,11 @@
 # Consolidated from GraphOrdering.jl
 
 struct GraphOrderingResult
-    perm :: Vector{Int}
-    invperm :: Vector{Int}
-    degrees :: Vector{Int}
-    edge :: Vector{Int}
-    dist :: Vector{Int}
+    perm::Vector{Int}
+    invperm::Vector{Int}
+    degrees::Vector{Int}
+    edge::Vector{Int}
+    dist::Vector{Int}
 end
 
 """
@@ -22,10 +22,10 @@ function bandwidth(G)
     bw = -1
     for (v, adj) in G
         for w in adj
-            bw = max(bw, abs(v-w))
+            bw = max(bw, abs(v - w))
         end
     end
-    return 2*bw + 1
+    return 2 * bw + 1
 end
 
 """
@@ -50,7 +50,7 @@ function symrcm(G, v)
     wrk = zeros(Int, nwrk)
     idx = 2
 
-    for i=1:n
+    for i = 1:n
 
         v = permutation[i]
         adj = G[v]

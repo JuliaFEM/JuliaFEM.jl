@@ -14,78 +14,78 @@ abstract type AbstractBoundaryCondition end
 abstract type AbstractOutputRequest end
 
 mutable struct Mesh
-    nodes :: Dict{Int, Vector{Float64}}
-    node_sets :: Dict{String, Vector{Int}}
-    elements :: Dict{Int, Vector{Int}}
-    element_types :: Dict{Int, Symbol}
-    element_sets :: Dict{String, Vector{Int}}
-    surface_sets :: Dict{String, Vector{Tuple{Int, Symbol}}}
-    surface_types :: Dict{String, Symbol}
+    nodes::Dict{Int,Vector{Float64}}
+    node_sets::Dict{String,Vector{Int}}
+    elements::Dict{Int,Vector{Int}}
+    element_types::Dict{Int,Symbol}
+    element_sets::Dict{String,Vector{Int}}
+    surface_sets::Dict{String,Vector{Tuple{Int,Symbol}}}
+    surface_types::Dict{String,Symbol}
 end
 
-function Mesh(d::Dict{String, Dict})
+function Mesh(d::Dict{String,Dict})
     return Mesh(d["nodes"], d["node_sets"], d["elements"],
-                d["element_types"], d["element_sets"],
-                d["surface_sets"], d["surface_types"])
+        d["element_types"], d["element_sets"],
+        d["surface_sets"], d["surface_types"])
 end
 
 mutable struct Model
-    path :: String
-    name :: String
-    mesh :: Mesh
-    materials :: Dict{Symbol, AbstractMaterial}
-    properties :: Vector{AbstractProperty}
-    boundary_conditions :: Vector{AbstractBoundaryCondition}
-    steps :: Vector{AbstractStep}
+    path::String
+    name::String
+    mesh::Mesh
+    materials::Dict{Symbol,AbstractMaterial}
+    properties::Vector{AbstractProperty}
+    boundary_conditions::Vector{AbstractBoundaryCondition}
+    steps::Vector{AbstractStep}
 end
 
 mutable struct SolidSection <: AbstractProperty
-    element_set :: Symbol
-    material_name :: Symbol
+    element_set::Symbol
+    material_name::Symbol
 end
 
 mutable struct Material <: AbstractMaterial
-    name :: Symbol
-    properties :: Vector{AbstractMaterialProperty}
+    name::Symbol
+    properties::Vector{AbstractMaterialProperty}
 end
 
 mutable struct Elastic <: AbstractMaterialProperty
-    E :: Float64
-    nu :: Float64
+    E::Float64
+    nu::Float64
 end
 
 mutable struct Step <: AbstractStep
-    kind :: Union{Symbol, Nothing} # STATIC, ... (was Nullable{Symbol} in Julia 0.x)
-    boundary_conditions :: Vector{AbstractBoundaryCondition}
-    output_requests :: Vector{AbstractOutputRequest}
+    kind::Union{Symbol,Nothing} # STATIC, ... (was Nullable{Symbol} in Julia 0.x)
+    boundary_conditions::Vector{AbstractBoundaryCondition}
+    output_requests::Vector{AbstractOutputRequest}
 end
 
 mutable struct BoundaryCondition <: AbstractBoundaryCondition
-    kind :: Symbol # BOUNDARY, CLOAD, DLOAD, DSLOAD, ...
-    data :: Vector
-    options :: Dict
+    kind::Symbol # BOUNDARY, CLOAD, DLOAD, DSLOAD, ...
+    data::Vector
+    options::Dict
 end
 
 mutable struct OutputRequest <: AbstractOutputRequest
-    kind :: Symbol # NODE, EL, SECTION, ...
-    data :: Vector
-    options :: Dict
-    target :: Symbol # PRINT, FILE
+    kind::Symbol # NODE, EL, SECTION, ...
+    data::Vector
+    options::Dict
+    target::Symbol # PRINT, FILE
 end
 
 ### Utility functions to parse ABAQUS .inp file to data model
 
 mutable struct Keyword
-    name :: String
-    options :: Vector{Union{String, Pair}}
+    name::String
+    options::Vector{Union{String,Pair}}
 end
 
 mutable struct AbaqusReaderState
-    section :: Union{Keyword, Nothing}  # was Nullable{Keyword}
-    material :: Union{AbstractMaterial, Nothing}  # was Nullable
-    property :: Union{AbstractProperty, Nothing}  # was Nullable
-    step :: Union{AbstractStep, Nothing}  # was Nullable
-    data :: Vector{String}
+    section::Union{Keyword,Nothing}  # was Nullable{Keyword}
+    material::Union{AbstractMaterial,Nothing}  # was Nullable
+    property::Union{AbstractProperty,Nothing}  # was Nullable
+    step::Union{AbstractStep,Nothing}  # was Nullable
+    data::Vector{String}
 end
 
 function get_data(state::AbaqusReaderState)
@@ -161,7 +161,7 @@ function maybe_close_section!(model, state)
     isnull(state.section) && return
     section_name = state.section.name
     @debug("Close section: $section_name")
-    args = Tuple{Model, AbaqusReaderState, Type{Val{Symbol(section_name)}}}
+    args = Tuple{Model,AbaqusReaderState,Type{Val{Symbol(section_name)}}}
     if hasmethod(close_section!, args)
         close_section!(model, state, Val{Symbol(section_name)})
     else
@@ -175,7 +175,7 @@ function maybe_open_section!(model, state)
     section_name = state.section.name
     section_options = state.section.options
     @debug("New section: $section_name with options $section_options")
-    args = Tuple{Model, AbaqusReaderState, Type{Val{Symbol(section_name)}}}
+    args = Tuple{Model,AbaqusReaderState,Type{Val{Symbol(section_name)}}}
     if hasmethod(open_section!, args)
         open_section!(model, state, Val{Symbol(section_name)})
     else
@@ -259,12 +259,12 @@ BOUNDARY = register_abaqus_keyword("BOUNDARY")
 CLOAD = register_abaqus_keyword("CLOAD")
 DLOAD = register_abaqus_keyword("DLOAD")
 DSLOAD = register_abaqus_keyword("DSLOAD")
-const BOUNDARY_CONDITIONS = Union{BOUNDARY, CLOAD, DLOAD, DSLOAD}
+const BOUNDARY_CONDITIONS = Union{BOUNDARY,CLOAD,DLOAD,DSLOAD}
 
 NODE_PRINT = register_abaqus_keyword("NODE PRINT")
 EL_PRINT = register_abaqus_keyword("EL PRINT")
 SECTION_PRINT = register_abaqus_keyword("SECTION PRINT")
-const OUTPUT_REQUESTS = Union{NODE_PRINT, EL_PRINT, SECTION_PRINT}
+const OUTPUT_REQUESTS = Union{NODE_PRINT,EL_PRINT,SECTION_PRINT}
 
 ## Properties
 

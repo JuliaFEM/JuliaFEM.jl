@@ -177,7 +177,9 @@ export @timeit, print_timer
 # using AbaqusReader  # Consolidated into src/readers.jl
 # using AsterReader   # Consolidated into src/readers.jl
 
-# @reexport using HeatTransfer
+# Problem types
+include("problems_heat.jl")
+export Heat, PlaneHeat
 include("problems_elasticity.jl")
 export Elasticity
 include("materials_plasticity.jl")
