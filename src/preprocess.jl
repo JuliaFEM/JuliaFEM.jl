@@ -122,7 +122,7 @@ end
 Add an element into the mesh. ´elid´ is the element id, ´eltype´ is the type of
 the element and ´connectivity´ is the connectivity of the element.
 """
-function FEMBase.add_element!(mesh::Mesh, elid, eltype, connectivity)
+function add_element!(mesh::Mesh, elid, eltype, connectivity)
     mesh.elements[elid] = connectivity
     mesh.element_types[elid] = eltype
     return nothing
@@ -133,7 +133,7 @@ end
 
 Add elements into the mesh.
 """
-function FEMBase.add_elements!(mesh::Mesh, elements::Dict{Int, Tuple{Symbol, Vector{Int}}})
+function add_elements!(mesh::Mesh, elements::Dict{Int, Tuple{Symbol, Vector{Int}}})
     for (elid, (eltype, elcon)) in elements
         add_element!(mesh, elid, eltype, elcon)
     end

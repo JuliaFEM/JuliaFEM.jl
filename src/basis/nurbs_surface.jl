@@ -1,5 +1,5 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/FEMBasis.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/jl/blob/master/LICENSE
 
 mutable struct NSurf <: AbstractBasis{2}
     order_u :: Int

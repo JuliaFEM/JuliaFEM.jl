@@ -1,5 +1,5 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/FEMBasis.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/jl/blob/master/LICENSE
 
 code = create_basis_and_eval(
     :Tet4,

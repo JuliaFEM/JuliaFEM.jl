@@ -1,5 +1,5 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/FEMBasis.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/jl/blob/master/LICENSE
 
 """
     interpolate(B, T, xi)
@@ -148,7 +148,7 @@ BasisInfo(Tri3)
 
 # output
 
-FEMBasis.BasisInfo{FEMBasis.Tri3,Float64}([0.0 0.0 0.0], [0.0 0.0 0.0; 0.0 0.0 0.0], [0.0 0.0 0.0; 0.0 0.0 0.0], [0.0 0.0; 0.0 0.0], [0.0 0.0; 0.0 0.0], 0.0)
+BasisInfo{Tri3,Float64}([0.0 0.0 0.0], [0.0 0.0 0.0; 0.0 0.0 0.0], [0.0 0.0 0.0; 0.0 0.0 0.0], [0.0 0.0; 0.0 0.0], [0.0 0.0; 0.0 0.0], 0.0)
 
 ```
 

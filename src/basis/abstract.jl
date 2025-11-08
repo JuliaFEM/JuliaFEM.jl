@@ -2,7 +2,7 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE
 
 # AbstractBasis type and interface
-# Consolidated from FEMBasis.jl package
+# Consolidated from jl package
 
 using Tensors
 using LinearAlgebra

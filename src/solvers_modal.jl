@@ -29,6 +29,9 @@ end
 
 A helper function to calculate P = D^-1*M
 """
+# TEMPORARILY DISABLED: Vendor package Mortar2D expects old FEMBase.AbstractProblem
+# TODO: Re-enable after vendor packages are consolidated or updated
+#= 
 function calc_projection(problem::T) where
         {T<:Union{Problem{Mortar}, Problem{Mortar2D}}}
 
@@ -53,8 +56,9 @@ function calc_projection(problem::T) where
 
     return s, m, P
 end
+=#
 
-function FEMBase.eliminate_boundary_conditions!(problem::P, K, M, f) where {P}
+function eliminate_boundary_conditions!(problem::P, K, M, f) where {P}
     isempty(problem.assembly.C2) && return nothing
     C1 = sparse(problem.assembly.C1)
     C2 = sparse(problem.assembly.C2)
@@ -76,7 +80,10 @@ end
 
 Eliminate Mortar boundary condition from matrices K, M and force vector f.
 """
-function FEMBase.eliminate_boundary_conditions!(problem::T, K, M, f) where
+# TEMPORARILY DISABLED: Vendor package Mortar2D expects old FEMBase.AbstractProblem
+# TODO: Re-enable after vendor packages are consolidated or updated
+#=
+function eliminate_boundary_conditions!(problem::T, K, M, f) where
                             {T <: Union{Problem{Mortar}, Problem{Mortar2D}}}
     @info("Eliminating mesh tie constraint $(problem.name) using static condensation")
     s, m, P = calc_projection(problem)
@@ -89,8 +96,9 @@ function FEMBase.eliminate_boundary_conditions!(problem::T, K, M, f) where
     M[:,:] .= Q'*M*Q
     return nothing
 end
+=#
 
-function FEMBase.run!(solver::Solver{Modal})
+function run!(solver::Solver{Modal})
     time = solver.properties.time
     problems = get_problems(solver)
     properties = solver.properties

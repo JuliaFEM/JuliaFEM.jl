@@ -1,5 +1,5 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/FEMBasis.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/jl/blob/master/LICENSE
 
 __precompile__(false)
 
@@ -22,7 +22,7 @@ function calculate_interpolation_polynomials(p, V)
         N = Expr(:call, :+)
         for (ai, bi) in zip(solution, args)
             isapprox(ai, 0.0) && continue
-            push!(N.args, Calculus.simplify( :( $ai * $bi ) ))
+            push!(N.args, Calculus.simplify(:($ai * $bi)))
         end
         push!(basis, N)
     end
@@ -55,17 +55,17 @@ function create_basis(name, description, X::Vector{<:Vecish{D}}, basis::Vector) 
     return create_basis(name, description, Vec.(X), basis, dbasis)
 end
 
-function create_basis(name, description, X::Vector{<:Vecish{D, T}}, basis, dbasis) where {D, T}
+function create_basis(name, description, X::Vector{<:Vecish{D,T}}, basis, dbasis) where {D,T}
     N = length(X)
     @debug "create basis given basis functions and derivatives" name description X basis dbasis
 
     Q = Expr(:block)
-    for i=1:N
+    for i = 1:N
         push!(Q.args, :(N[$i] = $(basis[i])))
     end
 
     V = Expr(:block)
-    for i=1:N
+    for i = 1:N
         push!(V.args, :(dN[$i] = Vec(float.(tuple($(dbasis[:, i]...))))))
     end
 

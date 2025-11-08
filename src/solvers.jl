@@ -572,7 +572,7 @@ function has_converged(solver::Solver{Nonlinear})
 end
 
 """ Default solver for quasistatic nonlinear problems. """
-function FEMBase.run!(solver::Solver{Nonlinear})
+function run!(solver::Solver{Nonlinear})
 
     time = solver.properties.time
     problems = get_problems(solver)
@@ -638,7 +638,7 @@ function Linear()
     return Linear(0.0)
 end
 
-function FEMBase.run!(analysis::Analysis{Linear})
+function run!(analysis::Analysis{Linear})
     time = analysis.properties.time
     @info("Running linear quasistatic analysis `$(analysis.name)` at time $time.")
     problems = get_problems(analysis)
