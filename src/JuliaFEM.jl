@@ -113,6 +113,7 @@ import Base: getindex, setindex!, convert, length, size, isapprox,
 
 using SparseArrays, LinearAlgebra, Statistics
 using Reexport, ForwardDiff, LightXML, HDF5, Parameters
+using Logging  # For mesh readers
 using Tensors  # For basis functions (Vec type)
 import Calculus  # For symbolic differentiation in basis generation
 
@@ -163,12 +164,15 @@ include("solvers/solvers_base.jl")   # Base solver types
 include("analysis.jl")               # Analysis and AbstractResultsWriter
 include("deprecated_fembase.jl")     # Deprecated/legacy methods from FEMBase (length, size, etc.)
 
+# Mesh readers (consolidated from AbaqusReader.jl and AsterReader.jl)
+include("readers.jl")
+
 using TimerOutputs
 export @timeit, print_timer
 
 # TODO: Consolidate these vendor packages later
-# using AbaqusReader
-# using AsterReader
+# using AbaqusReader  # Consolidated into src/readers.jl
+# using AsterReader   # Consolidated into src/readers.jl
 
 # @reexport using HeatTransfer
 include("problems_elasticity.jl")

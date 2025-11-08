@@ -12,9 +12,9 @@ include("sparsematrixcsc.jl")
 # include("sparsevectordok.jl")  # Old Julia syntax, not used, skipping for now
 
 mutable struct SparseMatrixCOO{T<:Real}
-    I :: Vector{Int}
-    J :: Vector{Int}
-    V :: Vector{T}
+    I::Vector{Int}
+    J::Vector{Int}
+    V::Vector{T}
 end
 
 const SparseVectorCOO = SparseMatrixCOO
@@ -120,10 +120,10 @@ Matrix(A)
 """
 function add!(A::SparseMatrixCOO, dofs1::AbstractVector{Int}, dofs2::AbstractVector{Int}, data)
     n, m = length(dofs1), length(dofs2)
-    @assert length(data) == n*m
+    @assert length(data) == n * m
     k = 1
-    for j=1:m
-        for i=1:n
+    for j = 1:m
+        for i = 1:n
             add!(A, dofs1[i], dofs2[j], data[k])
             k += 1
         end
@@ -145,7 +145,7 @@ function add!(A::SparseMatrixCOO, dofs::Vector{Int}, data::Array{Float64}, dim::
         error("Simulation stopped.")
     end
     append!(A.I, dofs)
-    append!(A.J, dim*ones(Int, length(dofs)))
+    append!(A.J, dim * ones(Int, length(dofs)))
     append!(A.V, vec(data))
 end
 
