@@ -37,13 +37,13 @@ for (E, R) in integration_rule_mapping
         if isequal(i, 1)
             code = quote
                 function get_integration_points(element::$E)
-                    return FEMQuad.get_quadrature_points($P)
+                    return get_quadrature_points($P)
                 end
             end
         else
             code = quote
                 function get_integration_points(element::$E, ::Type{$order})
-                    return FEMQuad.get_quadrature_points($P)
+                    return get_quadrature_points($P)
                 end
             end
         end

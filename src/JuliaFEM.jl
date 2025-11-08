@@ -117,7 +117,7 @@ using Tensors  # For basis functions (Vec type)
 import Calculus  # For symbolic differentiation in basis generation
 
 import FEMSparse
-import FEMQuad  # Still using vendor FEMQuad for now
+# import FEMQuad  # Consolidated into src/quadrature.jl
 
 # Note: Consolidating FEMBase and FEMBasis into JuliaFEM
 # Previously: @reexport using FEMBase
@@ -140,6 +140,9 @@ include("basis/nurbs_segment.jl")
 include("basis/nurbs_surface.jl")
 include("basis/nurbs_solid.jl")
 include("basis/math.jl")
+
+# Quadrature rules (consolidated from FEMQuad.jl)
+include("quadrature.jl")
 
 # Consolidate FEMBase.jl into src/ (Phase 1 continued)
 # Order matters: fields → types → sparse → elements → integrate → problems → assembly
@@ -238,7 +241,7 @@ export DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment
 export FieldProblem, BoundaryProblem, Problem, Node, Element, Assembly
 export Poi1, Seg2, Seg3, Tri3, Tri6, Tri7, Quad4, Quad8, Quad9,
    Tet4, Tet10, Pyr5, Wedge6, Wedge15, Hex8, Hex20, Hex27
-export update!, add_elements!, get_unknown_field_name, add!,
+export update!, add_element!, add_elements!, get_unknown_field_name, add!,
    is_field_problem, is_boundary_problem, get_gdofs,
    initialize!, get_integration_points, group_by_element_type,
    get_unknown_field_dimension, get_connectivity
