@@ -111,11 +111,20 @@ import Base: getindex, setindex!, convert, length, size, isapprox,
    ==, +, -, *, /, haskey, copy, push!, isempty, empty!,
    append!, read
 
-using SparseArrays, LinearAlgebra, Statistics
-using Reexport, ForwardDiff, LightXML, HDF5, Parameters
+using SparseArrays, LinearAlgebra
 using Logging  # For mesh readers
 using Tensors  # For basis functions (Vec type)
-import Calculus  # For symbolic differentiation in basis generation
+
+# Removed for minimal dependency approach:
+# - Calculus: Symbolic basis generation (basis/create_basis.jl, basis/subs.jl commented out)
+# - ForwardDiff: Only used in tutorial notebooks for plasticity
+# - HDF5/LightXML: I/O functionality (io.jl, AsterReader already commented out)
+# - Arpack: Modal analysis (solvers_modal.jl commented out)
+
+# No-op timing macro (TimerOutputs removed for minimal deps)
+macro timeit(args...)
+   return esc(args[end])
+end
 
 # import FEMSparse  # Consolidated into src/sparse/
 # import FEMQuad   # Consolidated into src/quadrature.jl
@@ -124,11 +133,11 @@ import Calculus  # For symbolic differentiation in basis generation
 # Previously: @reexport using FEMBase
 # Now: Include files directly below
 
-# Consolidate jl into src/basis/ (Phase 1)
+# Consolidate FEMBasis.jl into src/basis/ (Phase 1)
 include("basis/abstract.jl")
-include("basis/subs.jl")
+include("basis/subs.jl")  # Symbolic substitution (includes minimal simplify from SymDiff.jl)
 include("basis/vandermonde.jl")
-include("basis/create_basis.jl")
+include("basis/create_basis.jl")  # Basis generation (includes minimal differentiate from SymDiff.jl)
 include("basis/lagrange_segments.jl")
 include("basis/lagrange_quadrangles.jl")
 include("basis/lagrange_triangles.jl")
@@ -170,9 +179,6 @@ include("readers.jl")
 # Graph algorithms (RCM bandwidth minimization from GraphOrdering.jl)
 include("graph/graph_ordering.jl")
 
-using TimerOutputs
-export @timeit, print_timer
-
 # TODO: Consolidate these vendor packages later
 # using AbaqusReader  # Consolidated into src/readers.jl
 # using AsterReader   # Consolidated into src/readers.jl
@@ -180,10 +186,12 @@ export @timeit, print_timer
 # Problem types
 include("problems_heat.jl")
 export Heat, PlaneHeat
+include("problems_truss.jl")
+export Truss
 include("problems_elasticity.jl")
 export Elasticity
-include("materials_plasticity.jl")
-export plastic_von_mises
+# include("materials_plasticity.jl")  # Requires ForwardDiff for automatic differentiation
+# export plastic_von_mises
 include("problems_dirichlet.jl")
 export Dirichlet
 
@@ -203,8 +211,8 @@ include("problems_mortar_3d.jl")
 export calculate_normals, calculate_normals!, project_from_slave_to_master,
    project_from_master_to_slave, Mortar, get_slave_elements,
    get_polygon_clip
-include("io.jl")
-export Xdmf, h5file, xmffile, xdmf_filter, new_dataitem, update_xdmf!, save!
+# include("io.jl")  # Requires HDF5 and LightXML - skip for minimal deps
+# export Xdmf, h5file, xmffile, xdmf_filter, new_dataitem, update_xdmf!, save!
 include("solvers.jl")
 export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
    get_unknown_field_name, get_formulation_type, get_problems,
@@ -212,8 +220,8 @@ export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
    get_field_assembly, get_boundary_assembly,
    initialize!, create_projection, eliminate_interior_dofs,
    is_field_problem, is_boundary_problem
-include("solvers_modal.jl")
-export Modal
+# include("solvers_modal.jl")  # Requires Arpack for eigenvalue problems
+# export Modal
 include("problems_contact.jl")
 include("problems_contact_3d.jl")
 #include("problems_contact_3d_autodiff.jl")
@@ -228,10 +236,12 @@ export create_elements, Mesh, add_node!, add_nodes!,
    add_element_to_element_set!, add_node_to_node_set!,
    find_nearest_nodes, find_nearest_node, reorder_element_connectivity!,
    create_node_set_from_element_set!, filter_by_element_set
-include("preprocess_abaqus_reader.jl")
+
+# IO submodule for mesh readers and result writers
+include("io/io.jl")
+using .IO
 export abaqus_read_mesh, create_surface_elements, create_nodal_elements
-include("preprocess_aster_reader.jl")
-export aster_read_mesh
+# export aster_read_mesh  # Requires HDF5 - add when optional deps are set up
 
 # Postprocess module
 
