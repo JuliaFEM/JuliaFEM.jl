@@ -1,7 +1,7 @@
 name = "JuliaFEM"
 uuid = "f80590ac-b429-510a-8a99-e7c46989f22d"
-author = ["Jukka Aho <ahojukka5@gmail.com>", "Tero Frondelius <tero.frondelius@gmail.com>", "Olli Väinölä"]
 version = "0.5.2"
+author = ["Jukka Aho <ahojukka5@gmail.com>", "Tero Frondelius <tero.frondelius@gmail.com>", "Olli Väinölä"]
 
 [deps]
 AbaqusReader = "bc6b9049-e460-56d6-94b4-a597b2c0390d"
@@ -11,10 +11,11 @@ FEMBase = "fbcbbc08-f1bf-5204-9233-b69f5d396135"
 FEMBasis = "353fb843-c566-51e6-ba49-78b3e3d5ebb5"
 FEMBeam = "962f5c4a-ca9e-56d3-a659-14f0d9baaf78"
 FEMQuad = "be8e8821-3f6f-54c2-987c-d2773c3a52cb"
-FEMSparse = "55713501-a877-5f50-80b5-148fff7ff4b3"
+FEMSparse = "dcdf9ed5-39e7-592a-90de-966c054b7718"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
 HeatTransfer = "4030f512-cedb-5907-ac7f-4ab05ad75ee7"
+InterfaceMechanics = "d2649932-d9e0-11e8-27ac-0193def238a7"
 LightXML = "9c8b4983-aa76-5018-a973-4c85ecc9e179"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MortarContact2D = "048d6160-1a0b-53cd-a5b3-316946cc8d80"
@@ -33,8 +34,8 @@ julia = "≥ 1.0"
 
 [extras]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
