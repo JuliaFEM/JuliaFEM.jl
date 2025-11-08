@@ -5,11 +5,11 @@ using HDF5
 using LightXML
 
 mutable struct Xdmf <: AbstractResultsWriter
-    name :: String
-    xml :: XMLElement
-    hdf :: HDF5File
-    hdf_counter :: Int
-    format :: String
+    name::String
+    xml::XMLElement
+    hdf::HDF5File
+    hdf_counter::Int
+    format::String
 end
 
 function Xdmf()
@@ -17,11 +17,11 @@ function Xdmf()
 end
 
 function h5file(xdmf::Xdmf)
-    return xdmf.name*".h5"
+    return xdmf.name * ".h5"
 end
 
 function xmffile(xdmf::Xdmf)
-    return xdmf.name*".xmf"
+    return xdmf.name * ".xmf"
 end
 
 """
@@ -311,45 +311,45 @@ function new_dataitem(xdmf::Xdmf, data::Array{T,N}) where {T,N}
     end
 end
 
-global const xdmf_element_mapping = Dict(
-        "Poi1" => "Polyvertex",
-        "Seg2" => "Polyline",
-        "Tri3" => "Triangle",
-        "Quad4" => "Quadrilateral",
-        "Tet4" => "Tetrahedron",
-        "Pyramid5" => "Pyramid",
-        "Wedge6" => "Wedge",
-        "Hex8" => "Hexahedron",
-        "Seg3" => "Edge_3",
-        "Tri6" => "Tri_6",
-        "Quad8" => "Quad_8",
-        "Tet10" => "Tet_10",
-        "Pyramid13" => "Pyramid_13",
-        "Wedge15" => "Wedge_15",
-        "Hex20" => "Hex_20")
+const global xdmf_element_mapping = Dict(
+    "Poi1" => "Polyvertex",
+    "Seg2" => "Polyline",
+    "Tri3" => "Triangle",
+    "Quad4" => "Quadrilateral",
+    "Tet4" => "Tetrahedron",
+    "Pyramid5" => "Pyramid",
+    "Wedge6" => "Wedge",
+    "Hex8" => "Hexahedron",
+    "Seg3" => "Edge_3",
+    "Tri6" => "Tri_6",
+    "Quad8" => "Quad_8",
+    "Tet10" => "Tet_10",
+    "Pyramid13" => "Pyramid_13",
+    "Wedge15" => "Wedge_15",
+    "Hex20" => "Hex_20")
 
-get_xdmf_element_code(::Element{Poi1}) = 1
-get_xdmf_element_code(::Element{Seg2}) = 2
+get_xdmf_element_code(::Element{M,Poi1}) where M = 1
+get_xdmf_element_code(::Element{M,Seg2}) where M = 2
 # get_xdmf_element_code(::Element{Polygon}) =  3
-get_xdmf_element_code(::Element{Tri3}) = 4
-get_xdmf_element_code(::Element{Quad4}) = 5
-get_xdmf_element_code(::Element{Tet4}) = 6
-get_xdmf_element_code(::Element{Pyr5}) = 7
-get_xdmf_element_code(::Element{Wedge6}) = 8
-get_xdmf_element_code(::Element{Hex8}) = 9
+get_xdmf_element_code(::Element{M,Tri3}) where M = 4
+get_xdmf_element_code(::Element{M,Quad4}) where M = 5
+get_xdmf_element_code(::Element{M,Tet4}) where M = 6
+get_xdmf_element_code(::Element{M,Pyr5}) where M = 7
+get_xdmf_element_code(::Element{M,Wedge6}) where M = 8
+get_xdmf_element_code(::Element{M,Hex8}) where M = 9
 # get_xdmf_element_code(::Element{Polyhedron}) = 16
 
-get_xdmf_element_code(::Element{Seg3}) = 34
-get_xdmf_element_code(::Element{Quad9}) = 35
-get_xdmf_element_code(::Element{Tri6}) = 36
-get_xdmf_element_code(::Element{Quad8}) = 37
-get_xdmf_element_code(::Element{Tet10}) = 38
+get_xdmf_element_code(::Element{M,Seg3}) where M = 34
+get_xdmf_element_code(::Element{M,Quad9}) where M = 35
+get_xdmf_element_code(::Element{M,Tri6}) where M = 36
+get_xdmf_element_code(::Element{M,Quad8}) where M = 37
+get_xdmf_element_code(::Element{M,Tet10}) where M = 38
 # get_xdmf_element_code(::Element{Pyr13}) = 39
-get_xdmf_element_code(::Element{Wedge15}) = 40
+get_xdmf_element_code(::Element{M,Wedge15}) where M = 40
 # get_xdmf_element_code(::Element{Wedge18}) = 41
-get_xdmf_element_code(::Element{Hex20}) = 48
+get_xdmf_element_code(::Element{M,Hex20}) where M = 48
 # get_xdmf_element_code(::Element{Hex24}) = 49
-get_xdmf_element_code(::Element{Hex27}) = 50
+get_xdmf_element_code(::Element{M,Hex27}) where M = 50
 
 """
     get_spatial_collection()
@@ -450,7 +450,7 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
                 push!(element_conn, length(element))
             end
             for j in get_connectivity(element)
-                push!(element_conn, node_mapping[j]-1)
+                push!(element_conn, node_mapping[j] - 1)
             end
         end
         topology_dataitem = new_dataitem(xdmf, element_conn)
@@ -472,7 +472,7 @@ function update_xdmf!(xdmf::Xdmf, problem::Problem, time::Float64, fields::Vecto
             @debug("Xdmf: $nelements elements of type $element_type")
             sort!(elements, by=get_element_id)
             element_ids = map(get_element_id, elements)
-            element_conn = map(element -> [node_mapping[j]-1 for j in get_connectivity(element)], elements)
+            element_conn = map(element -> [node_mapping[j] - 1 for j in get_connectivity(element)], elements)
             element_conn = hcat(element_conn...)
             element_code = split(string(element_type), ".")[end]
             topology_dataitem = new_dataitem(xdmf, element_conn)
