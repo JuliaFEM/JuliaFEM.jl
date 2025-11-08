@@ -162,10 +162,11 @@ import Base: getindex, setindex!, convert, length, size, isapprox,
    ==, +, -, *, /, haskey, copy, push!, isempty, empty!,
    append!, read, copy
 
-using AbaqusReader
-using AsterReader
+# TODO: Consolidate these vendor packages later
+# using AbaqusReader
+# using AsterReader
 
-@reexport using HeatTransfer
+# @reexport using HeatTransfer
 include("problems_elasticity.jl")
 export Elasticity
 include("materials_plasticity.jl")
@@ -175,13 +176,14 @@ export Dirichlet
 
 export assemble!, postprocess!
 
+# TODO: Consolidate vendor packages (FEMBeam, Mortar) later
 # Structural elements: beams
-@reexport using FEMBeam
+# @reexport using FEMBeam
 
 ### Mortar methods ###
 
-@reexport using MortarContact2D
-@reexport using MortarContact2DAD
+# @reexport using MortarContact2D
+# @reexport using MortarContact2DAD
 
 include("problems_mortar.jl")
 include("problems_mortar_3d.jl")
