@@ -5,14 +5,14 @@ const ContactElements3D = Union{Tri3,Tri6,Quad4,Quad8,Quad9}
 
 function create_orthogonal_basis(n)
     I = [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0]
-    k = argmax([norm(cross(n,I[:,k])) for k in 1:3])
-    t1 = cross(n, I[:,k])/norm(cross(n, I[:,k]))
+    k = argmax([norm(cross(n, I[:, k])) for k in 1:3])
+    t1 = cross(n, I[:, k]) / norm(cross(n, I[:, k]))
     t2 = cross(n, t1)
     return t1, t2
 end
 
 """ Create rotation matrix Q for element nodes rotating quantities to nt coordinaet system. """
-function create_rotation_matrix(element::Element{Tri3}, time::Float64)
+function create_rotation_matrix(element::Element{M,Tri3}, time::Float64) where M
     n = element("normal", time)
     t11, t21 = create_orthogonal_basis(n[1])
     t12, t22 = create_orthogonal_basis(n[2])
@@ -28,7 +28,7 @@ function create_rotation_matrix(element::Element{Tri3}, time::Float64)
     return Q
 end
 
-function create_rotation_matrix(element::Element{Quad4}, time::Float64)
+function create_rotation_matrix(element::Element{M,Quad4}, time::Float64) where M
     n = element("normal", time)
     t11, t21 = create_orthogonal_basis(n[1])
     t12, t22 = create_orthogonal_basis(n[2])
@@ -47,7 +47,7 @@ function create_rotation_matrix(element::Element{Quad4}, time::Float64)
     return Q
 end
 
-function create_rotation_matrix(element::Element{Tri6}, time::Float64)
+function create_rotation_matrix(element::Element{M,Tri6}, time::Float64) where M
     n = element("normal", time)
     t11, t21 = create_orthogonal_basis(n[1])
     t12, t22 = create_orthogonal_basis(n[2])
@@ -96,7 +96,7 @@ function create_contact_segmentation(slave_element, master_elements, x0, n0, tim
         length(P) < 3 && continue # no clipping or shared edge (no volume)
         check_orientation!(P, n0)
         N_P = length(P)
-        P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
+        P_area = sum([norm(1 / 2 * cross(P[i] - P[1], P[mod(i, N_P)+1] - P[1])) for i = 2:N_P])
         if isapprox(P_area, 0.0)
             error("Polygon P has zero area")
         end
@@ -106,7 +106,7 @@ function create_contact_segmentation(slave_element, master_elements, x0, n0, tim
     return result
 end
 
-function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time::Float64)
+function assemble!(problem::Problem{Contact}, slave_element::Element{FS,Tri3}, time::Float64) where FS
 
     props = problem.properties
     field_dim = get_unknown_field_dimension(problem)
@@ -149,19 +149,19 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
                 update!(virtual_element, "geometry", tuple(cell...))
                 for ip in get_integration_points(virtual_element, 3)
                     detJ = virtual_element(ip, time, Val{:detJ})
-                    w = ip.weight*detJ
+                    w = ip.weight * detJ
                     x_gauss = virtual_element("geometry", ip, time)
                     xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, X1, time)
                     N1 = slave_element(xi_s, time)
-                    De += w*Matrix(Diagonal(vec(N1)))
-                    Me += w*N1'*N1
+                    De += w * Matrix(Diagonal(vec(N1)))
+                    Me += w * N1' * N1
                 end # integration points done
 
             end # integration cells done
 
         end # master elements done
 
-        Ae = De*inv(Me)
+        Ae = De * inv(Me)
 
     end
 
@@ -175,8 +175,8 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
 
         De = zeros(nsl, nsl)
         Me = zeros(nsl, nm)
-        ce = zeros(field_dim*nsl)
-        ge = zeros(field_dim*nsl)
+        ce = zeros(field_dim * nsl)
+        ge = zeros(field_dim * nsl)
 
         # loop integration cells
         for cell in get_cells(P, C0)
@@ -191,18 +191,18 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
                 xi_m, alpha = project_vertex_to_surface(x_gauss, x0, n0, master_element, X2, time)
 
                 detJ = virtual_element(ip, time, Val{:detJ})
-                w = ip.weight*detJ
+                w = ip.weight * detJ
 
                 # add contributions
                 N1 = vec(get_basis(slave_element, xi_s, time))
                 N2 = vec(get_basis(master_element, xi_m, time))
-                Phi = Ae*N1
-                De += w*Phi*N1'
-                Me += w*Phi*N2'
+                Phi = Ae * N1
+                De += w * Phi * N1'
+                Me += w * Phi * N2'
 
-                x_s = interpolate(N1, map(+,X1,u1))
-                x_m = interpolate(N2, map(+,X2,u2))
-                ge += w*vec((x_m-x_s)*Phi')
+                x_s = interpolate(N1, map(+, X1, u1))
+                x_m = interpolate(N2, map(+, X2, u2))
+                ge += w * vec((x_m - x_s) * Phi')
 
             end # integration points done
 
@@ -215,16 +215,16 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri3}, time
         nmdofs = length(mdofs)
         D3 = zeros(nsldofs, nsldofs)
         M3 = zeros(nsldofs, nmdofs)
-        for i=1:field_dim
+        for i = 1:field_dim
             D3[i:field_dim:end, i:field_dim:end] += De
             M3[i:field_dim:end, i:field_dim:end] += Me
         end
 
         add!(problem.assembly.C1, sdofs, sdofs, D3)
         add!(problem.assembly.C1, sdofs, mdofs, -M3)
-        add!(problem.assembly.C2, sdofs, sdofs, Q3'*D3)
-        add!(problem.assembly.C2, sdofs, mdofs, -Q3'*M3)
-        add!(problem.assembly.g, sdofs, Q3'*ge)
+        add!(problem.assembly.C2, sdofs, sdofs, Q3' * D3)
+        add!(problem.assembly.C2, sdofs, mdofs, -Q3' * M3)
+        add!(problem.assembly.g, sdofs, Q3' * ge)
 
     end # master elements done
 
@@ -232,7 +232,7 @@ end
 
 
 """ Assemble quadratic surface element to contact problem. """
-function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time::Float64)
+function assemble!(problem::Problem{Contact}, slave_element::Element{FS,Tri6}, time::Float64) where FS
 
     props = problem.properties
     field_dim = get_unknown_field_dimension(problem)
@@ -241,15 +241,15 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
 
     if alp != 0.0
         T = [
-                1.0 0.0 0.0 0.0 0.0 0.0
-                0.0 1.0 0.0 0.0 0.0 0.0
-                0.0 0.0 1.0 0.0 0.0 0.0
-                alp alp 0.0 1.0-2*alp 0.0 0.0
-                0.0 alp alp 0.0 1.0-2*alp 0.0
-                alp 0.0 alp 0.0 0.0 1.0-2*alp
-            ]
+            1.0 0.0 0.0 0.0 0.0 0.0
+            0.0 1.0 0.0 0.0 0.0 0.0
+            0.0 0.0 1.0 0.0 0.0 0.0
+            alp alp 0.0 1.0-2*alp 0.0 0.0
+            0.0 alp alp 0.0 1.0-2*alp 0.0
+            alp 0.0 alp 0.0 0.0 1.0-2*alp
+        ]
     else
-        T = Matrix(1.0*I, 6, 6)
+        T = Matrix(1.0 * I, 6, 6)
     end
 
     nsl = length(slave_element)
@@ -258,7 +258,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
 
     Q3 = create_rotation_matrix(slave_element, time)
 
-    Ae = Matrix(1.0*I, nsl, nsl)
+    Ae = Matrix(1.0 * I, nsl, nsl)
 
     if problem.properties.dual_basis # construct dual basis
 
@@ -311,7 +311,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
                     check_orientation!(P, n0)
 
                     N_P = length(P)
-                    P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
+                    P_area = sum([norm(1 / 2 * cross(P[i] - P[1], P[mod(i, N_P)+1] - P[1])) for i = 2:N_P])
                     if isapprox(P_area, 0.0)
                         error("Polygon P has zero area")
                     end
@@ -324,12 +324,12 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
                         update!(virtual_element, "geometry", tuple(cell...))
                         for ip in get_integration_points(virtual_element, 3)
                             detJ = virtual_element(ip, time, Val{:detJ})
-                            w = ip.weight*detJ
+                            w = ip.weight * detJ
                             x_gauss = virtual_element("geometry", ip, time)
                             xi_s, alpha = project_vertex_to_surface(x_gauss, x0, n0, slave_element, Xs, time)
-                            N1 = vec(slave_element(xi_s, time)*T)
-                            De += w*Matrix(Diagonal(N1))
-                            Me += w*N1*N1'
+                            N1 = vec(slave_element(xi_s, time) * T)
+                            De += w * Matrix(Diagonal(N1))
+                            Me += w * N1 * N1'
                         end # integration points done
 
                     end # integration cells done
@@ -340,7 +340,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
 
         end # sub slave elements done
 
-        Ae = De*inv(Me)
+        Ae = De * inv(Me)
 
     end
 
@@ -386,7 +386,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
                 check_orientation!(P, n0)
 
                 N_P = length(P)
-                P_area = sum([norm(1/2*cross(P[i]-P[1], P[mod(i,N_P)+1]-P[1])) for i=2:N_P])
+                P_area = sum([norm(1 / 2 * cross(P[i] - P[1], P[mod(i, N_P)+1] - P[1])) for i = 2:N_P])
                 if isapprox(P_area, 0.0)
                     error("Polygon P has zero area")
                 end
@@ -398,7 +398,7 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
                 nm = length(master_element)
                 De = zeros(nsl, nsl)
                 Me = zeros(nsl, nm)
-                ge = zeros(field_dim*nsl)
+                ge = zeros(field_dim * nsl)
 
                 # 4. loop integration cells
                 for cell in get_cells(P, C0)
@@ -414,21 +414,21 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
                         xi_m, alpha = project_vertex_to_surface(x_gauss, x0, n0, master_element, Xm, time)
 
                         detJ = virtual_element(ip, time, Val{:detJ})
-                        w = ip.weight*detJ
+                        w = ip.weight * detJ
 
                         # add contributions
-                        N1 = vec(get_basis(slave_element, xi_s, time)*T)
+                        N1 = vec(get_basis(slave_element, xi_s, time) * T)
                         N2 = vec(get_basis(master_element, xi_m, time))
-                        Phi = Ae*N1
+                        Phi = Ae * N1
 
-                        De += w*Phi*N1'
-                        Me += w*Phi*N2'
+                        De += w * Phi * N1'
+                        Me += w * Phi * N2'
 
                         us = slave_element("displacement", time)
                         um = master_element("displacement", time)
-                        xs = interpolate(N1, map(+,Xs,us))
-                        xm = interpolate(N2, map(+,Xs,um))
-                        ge += w*vec((xm-xs)*Phi')
+                        xs = interpolate(N1, map(+, Xs, us))
+                        xm = interpolate(N2, map(+, Xs, um))
+                        ge += w * vec((xm - xs) * Phi')
 
                     end # integration points done
 
@@ -441,16 +441,16 @@ function assemble!(problem::Problem{Contact}, slave_element::Element{Tri6}, time
                 nmdofs = length(mdofs)
                 D3 = zeros(nsldofs, nsldofs)
                 M3 = zeros(nsldofs, nmdofs)
-                for i=1:field_dim
+                for i = 1:field_dim
                     D3[i:field_dim:end, i:field_dim:end] += De
                     M3[i:field_dim:end, i:field_dim:end] += Me
                 end
 
                 add!(problem.assembly.C1, sdofs, sdofs, D3)
                 add!(problem.assembly.C1, sdofs, mdofs, -M3)
-                add!(problem.assembly.C2, sdofs, sdofs, Q3'*D3)
-                add!(problem.assembly.C2, sdofs, mdofs, -Q3'*M3)
-                add!(problem.assembly.g, sdofs, Q3'*ge)
+                add!(problem.assembly.C2, sdofs, sdofs, Q3' * D3)
+                add!(problem.assembly.C2, sdofs, mdofs, -Q3' * M3)
+                add!(problem.assembly.g, sdofs, Q3' * ge)
 
             end # sub master elements done
 
@@ -480,7 +480,7 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
 
     # 1. calculate nodal normals and tangents for slave element nodes j ∈ S
     normals = calculate_normals(slave_elements, time, Val{2};
-                                rotate_normals=props.rotate_normals)
+        rotate_normals=props.rotate_normals)
     update!(slave_elements, "normal", time => normals)
 
     # 2. loop all slave elements
@@ -489,13 +489,13 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
     end # slave elements done, contact virtual work ready
 
     S = sort(collect(keys(normals))) # slave element nodes
-    weighted_gap = Dict{Int64, Vector{Float64}}()
-    contact_pressure = Dict{Int64, Vector{Float64}}()
-    complementarity_condition = Dict{Int64, Vector{Float64}}()
-    is_active = Dict{Int64, Int}()
-    is_inactive = Dict{Int64, Int}()
-    is_slip = Dict{Int64, Int}()
-    is_stick = Dict{Int64, Int}()
+    weighted_gap = Dict{Int64,Vector{Float64}}()
+    contact_pressure = Dict{Int64,Vector{Float64}}()
+    complementarity_condition = Dict{Int64,Vector{Float64}}()
+    is_active = Dict{Int64,Int}()
+    is_inactive = Dict{Int64,Int}()
+    is_slip = Dict{Int64,Int}()
+    is_stick = Dict{Int64,Int}()
 
     la = problem.assembly.la
 
@@ -519,13 +519,13 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
     if problem.properties.alpha != 0.0
         alp = problem.properties.alpha
         Te = [
-                1.0 0.0 0.0 0.0 0.0 0.0
-                0.0 1.0 0.0 0.0 0.0 0.0
-                0.0 0.0 1.0 0.0 0.0 0.0
-                alp alp 0.0 1.0-2*alp 0.0 0.0
-                0.0 alp alp 0.0 1.0-2*alp 0.0
-                alp 0.0 alp 0.0 0.0 1.0-2*alp
-            ]
+            1.0 0.0 0.0 0.0 0.0 0.0
+            0.0 1.0 0.0 0.0 0.0 0.0
+            0.0 0.0 1.0 0.0 0.0 0.0
+            alp alp 0.0 1.0-2*alp 0.0 0.0
+            0.0 alp alp 0.0 1.0-2*alp 0.0
+            alp 0.0 alp 0.0 0.0 1.0-2*alp
+        ]
         invTe = [
             1.0 0.0 0.0 0.0 0.0 0.0
             0.0 1.0 0.0 0.0 0.0 0.0
@@ -539,7 +539,7 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
         invT = SparseMatrixCOO()
         for element in slave_elements
             dofs = get_gdofs(problem, element)
-            for i=1:field_dim
+            for i = 1:field_dim
                 ldofs = dofs[i:field_dim:end]
                 add!(T, ldofs, ldofs, Te)
                 add!(invT, ldofs, ldofs, invTe)
@@ -556,8 +556,8 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
         #@info("invT == invT2? ", invT == invT2)
         #maxabsdiff = maximum(abs(invT - invT2))
         #@info("max diff = $maxabsdiff")
-        C1 = C1*invT
-        C2 = C2*invT
+        C1 = C1 * invT
+        C2 = C2 * invT
     end
 
     tol = problem.properties.drop_tolerance
@@ -565,7 +565,7 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
     SparseArrays.droptol!(C2, tol)
 
     for j in S
-        dofs = [3*(j-1)+1, 3*(j-1)+2, 3*(j-1)+3]
+        dofs = [3 * (j - 1) + 1, 3 * (j - 1) + 2, 3 * (j - 1) + 3]
         weighted_gap[j] = g[dofs]
     end
 
@@ -588,7 +588,7 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
 
     # active / inactive node detection
     for j in S
-        dofs = [3*(j-1)+1, 3*(j-1)+2, 3*(j-1)+3]
+        dofs = [3 * (j - 1) + 1, 3 * (j - 1) + 2, 3 * (j - 1) + 3]
         weighted_gap[j] = g[dofs]
         if length(la) != 0
             normal = normals[j]
@@ -642,17 +642,17 @@ function assemble!(problem::Problem{Contact}, time::Float64, ::Type{Val{2}}, ::T
 
 
     for j in S
-        dofs = [3*(j-1)+1, 3*(j-1)+2, 3*(j-1)+3]
-        tdofs = [3*(j-1)+2, 3*(j-1)+3]
+        dofs = [3 * (j - 1) + 1, 3 * (j - 1) + 2, 3 * (j - 1) + 3]
+        tdofs = [3 * (j - 1) + 2, 3 * (j - 1) + 3]
         if is_inactive[j] == 1
             # remove inactive nodes from assembly
-            C1[dofs,:] .= 0.0
-            C2[dofs,:] .= 0.0
-            D[dofs,:] .= 0.0
-            g[dofs,:] .= 0.0
+            C1[dofs, :] .= 0.0
+            C2[dofs, :] .= 0.0
+            D[dofs, :] .= 0.0
+            g[dofs, :] .= 0.0
         elseif (is_active[j] == 1) && (is_slip[j] == 1)
             # constitutive modelling in tangent direction, frictionless contact
-            C2[tdofs,:] .= 0.0
+            C2[tdofs, :] .= 0.0
             g[tdofs] .= 0.0
             normal = normals[j]
             tangent1, tangent2 = create_orthogonal_basis(normal)
