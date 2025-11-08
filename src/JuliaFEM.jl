@@ -105,6 +105,12 @@ about JuliaFEM, please visit our website at
 """
 module JuliaFEM
 
+# Import Base functions FIRST before defining any methods
+import Base: getindex, setindex!, convert, length, size, isapprox,
+   similar, first, last, vec,
+   ==, +, -, *, /, haskey, copy, push!, isempty, empty!,
+   append!, read
+
 using SparseArrays, LinearAlgebra, Statistics
 using Reexport, ForwardDiff, LightXML, HDF5, Parameters
 using Tensors  # For basis functions (Vec type)
@@ -156,11 +162,6 @@ include("deprecated_fembase.jl")     # Deprecated/legacy methods from FEMBase (l
 
 using TimerOutputs
 export @timeit, print_timer
-
-import Base: getindex, setindex!, convert, length, size, isapprox,
-   similar, first, last, vec,
-   ==, +, -, *, /, haskey, copy, push!, isempty, empty!,
-   append!, read, copy
 
 # TODO: Consolidate these vendor packages later
 # using AbaqusReader
