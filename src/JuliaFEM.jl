@@ -222,6 +222,9 @@ export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
    is_field_problem, is_boundary_problem
 # include("solvers_modal.jl")  # Requires Arpack for eigenvalue problems
 # export Modal
+
+# Re-export Analysis and related types from FEMBase (needed by tests)
+export Analysis, AbstractAnalysis, add_problems!, run!
 include("problems_contact.jl")
 include("problems_contact_3d.jl")
 #include("problems_contact_3d_autodiff.jl")
