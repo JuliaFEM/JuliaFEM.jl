@@ -1,7 +1,12 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/FEMBase.jl/blob/master/LICENSE
 
-struct Poi1 <: AbstractBasis{0} end
+# Poi1: 0D point element (single node, no parametric coordinates)
+struct Poi1 <: AbstractBasis end
+
+# nnodes for Poi1
+nnodes(::Type{Poi1}) = 1
+nnodes(::Poi1) = 1
 
 function get_basis(::E, ::Any, ::Any) where E<:AbstractElement{M,Poi1} where M
     return [1]
