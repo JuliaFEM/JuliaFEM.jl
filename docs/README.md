@@ -8,8 +8,6 @@ keywords: ["juliafem", "finite element", "documentation", "manual"]
 type: "index"
 ---
 
-# JuliaFEM Documentation
-
 Welcome! JuliaFEM documentation is organized into **three manuals** for three different audiences:
 
 ---
@@ -21,6 +19,7 @@ Welcome! JuliaFEM documentation is organized into **three manuals** for three di
 **Style:** Simple, practical, step-by-step.
 
 **Contents:**
+
 - Quick start and installation
 - Tutorials and examples
 - API reference
@@ -39,6 +38,7 @@ Welcome! JuliaFEM documentation is organized into **three manuals** for three di
 **Style:** Technical, detailed, design rationale.
 
 **Contents:**
+
 - Testing philosophy
 - Code style and architecture
 - Performance guidelines
@@ -58,6 +58,7 @@ Welcome! JuliaFEM documentation is organized into **three manuals** for three di
 **Style:** Comprehensive, educational, opinionated, personal.
 
 **Contents:**
+
 - Mathematical foundations (Lagrange basis, contact mechanics, etc.)
 - Design philosophy and technical vision
 - Strategic mistakes and lessons learned (2015-2019)
@@ -106,6 +107,7 @@ Mixing these audiences in one manual makes it too complex for users and too shal
 ### Cross-References
 
 Manuals link to each other when appropriate:
+
 - User manual links to theory when deeper understanding helps
 - Contributor manual links to book for design rationale
 - Book links to code examples and practical guides
