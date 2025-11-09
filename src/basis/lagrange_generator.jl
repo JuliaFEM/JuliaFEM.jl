@@ -1,7 +1,57 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE
 
-__precompile__(false)
+# ==============================================================================
+# LAGRANGE BASIS FUNCTION GENERATOR
+# ==============================================================================
+#
+# This file contains the symbolic engine for generating Lagrange basis functions.
+# It is NOT loaded at runtime - it's a TOOL used during development.
+#
+# PURPOSE:
+#   Generate pre-computed basis functions and derivatives for all standard
+#   Lagrange finite elements (Seg2, Tri3, Quad4, Tet10, Hex8, etc.)
+#
+# THEORY:
+#   Lagrange basis functions satisfy the Kronecker delta property:
+#   
+#   N_i(x_j) = δ_ij = { 1  if i = j
+#                     { 0  if i ≠ j
+#
+#   Given:
+#   - n nodes with coordinates {x₁, x₂, ..., xₙ} in reference element
+#   - Polynomial ansatz {p₁(x), p₂(x), ..., pₙ(x)} (complete to order k)
+#
+#   We construct: N_i(x) = Σⱼ αᵢⱼ pⱼ(x)
+#
+#   The Kronecker property gives: V α_i = e_i
+#   
+#   Where Vandermonde matrix: V_kj = pⱼ(x_k)
+#
+#   Solving these n systems gives all basis functions explicitly.
+#   Then symbolic differentiation provides derivatives.
+#
+# USAGE:
+#   This file is loaded by scripts/generate_lagrange_basis.jl which:
+#   1. Defines all standard element types (coords + polynomial ansatz)
+#   2. Calls generate_lagrange_basis() for each
+#   3. Writes clean Julia code to src/basis/lagrange_generated.jl
+#
+# WHY GENERATE ONCE?
+#   - Symbolic math is expensive (100+ ms per element type)
+#   - Generated code is constant (mathematics doesn't change!)
+#   - Pre-compilation is much faster
+#   - Generated code is readable and debuggable
+#   - Version control shows what changed
+#
+# SEE:
+#   - docs/theory/lagrange_basis_functions.md (mathematical explanation)
+#   - scripts/generate_lagrange_basis.jl (generation script)
+#   - src/basis/lagrange_generated.jl (output - do not edit manually!)
+#
+# ==============================================================================
+
+__precompile__(false)  # This is a tool, not runtime code
 
 # Minimal symbolic differentiation for polynomial basis functions
 # Adapted from SymDiff.jl by Jukka Aho - zero dependencies!
