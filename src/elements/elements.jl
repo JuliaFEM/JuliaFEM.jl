@@ -20,84 +20,182 @@ end
 const DefaultFieldSet = EmptyFieldSet
 
 """
-    AbstractElement{M<:AbstractFieldSet, B<:AbstractBasis}
+    AbstractElement{F, B}
 
 Abstract supertype for all elements.
-"""
-abstract type AbstractElement{M<:AbstractFieldSet,B<:AbstractBasis} end
 
-# Immutable element with compile-time known connectivity and integration points
-struct Element{N,NIP,M,B} <: AbstractElement{M,B}
+# Type Parameters
+- `F`: Field type (any type-stable container: NamedTuple, struct, etc.)
+- `B`: Basis function type (e.g., Lagrange{Triangle,1})
+"""
+abstract type AbstractElement{F,B} end
+
+"""
+    Element{N,NIP,F,B} <: AbstractElement{F,B}
+
+Immutable finite element with type-stable fields.
+
+# Type Parameters
+- `N`: Number of nodes (compile-time constant)
+- `NIP`: Number of integration points (compile-time constant)
+- `F`: Field container type (NamedTuple, struct, etc.) - **must be type-stable!**
+- `B`: Basis function type (e.g., Lagrange{Triangle,1})
+
+# Fields
+- `id`: Element identifier
+- `connectivity`: Node IDs as NTuple (zero-cost, immutable)
+- `integration_points`: Integration points as NTuple (zero-cost, immutable)
+- `fields`: Type-stable field container (can be empty tuple `()` if no fields)
+- `basis`: Basis function type instance
+
+# Design Philosophy
+- **Type-stable fields**: `F` parameter ensures compile-time type knowledge
+- **Immutable**: All fields immutable (GPU-compatible, thread-safe)
+- **Zero-allocation**: NTuple for connectivity and IPs
+- **GPU-ready**: Immutable fields can be transferred to GPU without copying
+
+# Examples
+```julia
+# With fields (NamedTuple):
+fields = (E = 210e3, ν = 0.3)
+el = Element(UInt(1), (1,2,3), (), fields, Lagrange{Triangle,1}())
+
+# Without fields (empty tuple):
+el = Element(UInt(1), (1,2,3), (), (), Lagrange{Triangle,1}())
+
+# Access fields (type-stable!):
+E = el.fields.E  # Float64, known at compile time
+```
+"""
+struct Element{N,NIP,F,B} <: AbstractElement{F,B}
     id::UInt
     connectivity::NTuple{N,UInt}  # Tuple for zero-cost, compile-time known size
     integration_points::NTuple{NIP,IP}  # Tuple for zero-cost
-    dfields::Dict{Symbol,AbstractField}
-    sfields::M
-    properties::B
+    fields::F  # Type-stable field container (NamedTuple, struct, or ())
+    basis::B
 end
 
 """
-    Element(topology, connectivity)
+    Element(basis_type, connectivity; fields=(), id=UInt(0))
 
-Construct a new element where `topology` is the topological type of the element
-and connectivity contains node numbers where element is connected.
+Construct element from basis type with optional fields.
 
-# Topological types
-
-## 1d elements
-- `Seg2`
-- `Seg3`
-
-## 2d elements
-- `Tri3`
-- `Tri6`
-- `Tri7`
-- `Quad4`
-- `Quad8`
-- `Quad9`
-
-## 3d elements
-- `Tet4`
-- `Tet10`
-- `Hex8`
-- `Hex20`
-- `Hex27`
-- `Pyr5`
-- `Wedge6`
-- `Wedge15`
+# Arguments
+- `basis_type`: Basis function type (e.g., Lagrange{Triangle,1})
+- `connectivity`: Node IDs as tuple or vector
+- `fields`: Optional field container (NamedTuple, struct, or empty tuple)
+- `id`: Element identifier (default: 0)
 
 # Examples
-
 ```julia
-element = Element(Tri3, (1, 2, 3))
+# Simple element without fields:
+element = Element(Lagrange{Triangle,1}, (1, 2, 3))
+
+# Element with material properties:
+element = Element(Lagrange{Triangle,1}, (1, 2, 3), 
+                  fields=(E=210e3, ν=0.3))
+
+# Element with complete specification:
+element = Element(Lagrange{Quadrilateral,1}, (1,2,3,4),
+                  fields=(E=210e3, ν=0.3, thickness=0.01),
+                  id=UInt(42))
 ```
 """
-function Element(::Type{T}, connectivity::NTuple{N,<:Integer}) where {N,T<:AbstractBasis}
-    return Element(T, DefaultFieldSet, connectivity)
-end
-
-function Element(::Type{T}, ::Type{M}, connectivity::NTuple{N,<:Integer}) where {N,M<:AbstractFieldSet,T<:AbstractBasis}
-    element_id = UInt(0)
-    topology = T()
-    integration_points = ntuple(i -> IP(UInt(0), 0.0, ()), 0)  # Empty tuple initially
-    dfields = Dict{Symbol,AbstractField}()
-    sfields = M{N}()
-    # Convert connectivity to UInt tuple
+function Element(::Type{B}, connectivity::NTuple{N,<:Integer};
+    fields::F=(), id::UInt=UInt(0)) where {N,B<:AbstractBasis,F}
     connectivity_uint = UInt.(connectivity)
-    element = Element{N,0,M{N},T}(element_id, connectivity_uint, integration_points,
-        dfields, sfields, topology)
-    return element
+    integration_points = ntuple(i -> IP(UInt(0), 0.0, ()), 0)  # Empty initially
+    basis = B()
+    return Element{N,0,F,B}(id, connectivity_uint, integration_points, fields, basis)
 end
 
-function Element(::Type{T}, connectivity::Vector{<:Integer}) where T<:AbstractBasis
-    return Element(T, (connectivity...,))
+function Element(::Type{B}, connectivity::Vector{<:Integer}; kwargs...) where B<:AbstractBasis
+    return Element(B, (connectivity...,); kwargs...)
 end
 
 # ============================================================================
-# Backwards compatibility shims: Accept topology types, map to basis types
+# Topology → Basis constructors: Accept topology types, create Lagrange basis
 # ============================================================================
-# TODO (Phase 1B): Update for new Lagrange{Topology, P} parametric architecture
-# These old shims mapped Tri3 → Tri3Basis, but we're now using Lagrange{Triangle,1}
+
+"""
+    Element(::Type{<:AbstractTopology}, connectivity; fields=(), id=UInt(0))
+
+Construct element from topology type. Creates linear Lagrange basis automatically.
+
+# Examples
+```julia
+element = Element(Triangle, (1, 2, 3))        # → Lagrange{Triangle,1}
+element = Element(Quadrilateral, (1,2,3,4),   # → Lagrange{Quadrilateral,1}
+                  fields=(E=210e3, ν=0.3))
+element = Element(Tet10, (1,2,3,4,5,6,7,8,9,10))  # → Lagrange{Tet10,2}
+```
+"""
+function Element(::Type{T}, connectivity::NTuple{N,<:Integer}; kwargs...) where {N,T<:AbstractTopology}
+    # Determine order from number of nodes
+    order = infer_lagrange_order(T, N)
+    BasisType = Lagrange{T,order}
+    return Element(BasisType, connectivity; kwargs...)
+end
+
+function Element(::Type{T}, connectivity::Vector{<:Integer}; kwargs...) where T<:AbstractTopology
+    return Element(T, (connectivity...,); kwargs...)
+end
+
+"""Infer Lagrange order from topology type and number of nodes"""
+function infer_lagrange_order(::Type{T}, n::Int) where T<:AbstractTopology
+    # Get the type name for pattern matching
+    tname = string(nameof(T))
+
+    # Check explicit higher-order topologies first (Tet10, Hex20, Tri6, etc.)
+    if tname == "Tet10" && n == 10
+        return 2
+    elseif tname == "Tri6" && n == 6
+        return 2
+    elseif tname == "Tri7" && n == 7
+        return 3
+    elseif tname == "Quad8" && n == 8
+        return 2  # Serendipity
+    elseif tname == "Quad9" && n == 9
+        return 2  # Full quadratic
+    elseif tname == "Hex20" && n == 20
+        return 2  # Serendipity
+    elseif tname == "Hex27" && n == 27
+        return 2  # Full quadratic
+    elseif tname == "Wedge15" && n == 15
+        return 2
+    elseif tname == "Seg3" && n == 3
+        return 2
+    end
+
+    # For base topologies (and their aliases), infer order from number of nodes
+    if T === Segment || T === Seg2
+        n == 2 && return 1
+        n == 3 && return 2
+    elseif T === Triangle || T === Tri3
+        n == 3 && return 1
+        n == 6 && return 2
+        n == 7 && return 3
+    elseif T === Quadrilateral || T === Quad4
+        n == 4 && return 1
+        n == 8 && return 2  # Serendipity
+        n == 9 && return 2  # Full
+    elseif T === Tetrahedron || T === Tet4
+        n == 4 && return 1
+        n == 10 && return 2
+    elseif T === Hexahedron || T === Hex8
+        n == 8 && return 1
+        n == 20 && return 2  # Serendipity
+        n == 27 && return 2  # Full
+    elseif T === Pyramid || T === Pyr5
+        n == 5 && return 1
+    elseif T === Wedge || T === Wedge6
+        n == 6 && return 1
+        n == 15 && return 2
+    end
+
+    # Default to order 1 (linear)
+    return 1
+end
 # Commenting out until new architecture is fully implemented.
 
 # # Helper: Map topology type to basis type
@@ -590,8 +688,9 @@ function (element::Element)(field_name::String, ip, time::Float64)
     return interpolate(element, field_name, ip, time)
 end
 
-function element_info!(bi::BasisInfo{T}, element::AbstractElement{M,T}, ip, time) where {M,T}
-    X = interpolate(element, "geometry", time)
-    eval_basis!(bi, X, ip)
-    return bi.J, bi.detJ, bi.N, bi.grad
-end
+# OLD: Uses BasisInfo which was defined in math.jl (commented out)
+# function element_info!(bi::BasisInfo{T}, element::AbstractElement{M,T}, ip, time) where {M,T}
+#     X = interpolate(element, "geometry", time)
+#     eval_basis!(bi, X, ip)
+#     return bi.J, bi.detJ, bi.N, bi.grad
+# end
