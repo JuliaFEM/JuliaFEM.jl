@@ -53,6 +53,15 @@
 
 __precompile__(false)  # This is a tool, not runtime code
 
+# Type alias for coordinate types (works both when included and run as script)
+if !@isdefined(Vecish)
+    if !@isdefined(Vec)
+        # Running as standalone script - need Tensors.Vec
+        using Tensors
+    end
+    const Vecish{N,T} = Union{NTuple{N,T},Vec{N,T}}
+end
+
 # Minimal symbolic differentiation for polynomial basis functions
 # Adapted from SymDiff.jl by Jukka Aho - zero dependencies!
 
@@ -140,6 +149,39 @@ function simplify(ex::Expr)
     else
         return ex
     end
+end
+
+# Vandermonde matrix construction for polynomial basis
+function vandermonde_matrix(p::Expr, X::Vector{<:Vecish{D}}) where D
+    vars = [:u, :v, :w]
+    @assert p.head == :call
+    @assert first(p.args) == :+
+    terms = p.args[2:end]
+    n = length(X)
+    m = length(terms)
+    V = zeros(n, m)
+    for (i, xi) in enumerate(X)
+        for (j, term) in enumerate(terms)
+            # Evaluate term at xi
+            if D == 1
+                u = xi[1]
+                V[i, j] = @eval let u = $u
+                    $term
+                end
+            elseif D == 2
+                u, v = xi[1], xi[2]
+                V[i, j] = @eval let u = $u, v = $v
+                    $term
+                end
+            else
+                u, v, w = xi[1], xi[2], xi[3]
+                V[i, j] = @eval let u = $u, v = $v, w = $w
+                    $term
+                end
+            end
+        end
+    end
+    return V
 end
 
 function get_reference_element_coordinates end
@@ -251,4 +293,553 @@ function create_basis(name, description, X::Vector{<:Vecish{D,T}}, basis, dbasis
 end
 
 create_basis_and_eval(args...) = eval(create_basis(args...))
+
+# ==============================================================================
+# GENERATION SCRIPT - Run as: julia --project=. src/basis/lagrange_generator.jl
+# ==============================================================================
+#
+# This script portion executes only when this file is run directly (not included).
+# It generates all 15 standard Lagrange basis types and writes them to
+# src/basis/lagrange_generated.jl
+#
+# ==============================================================================
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    using Pkg
+    Pkg.activate(joinpath(@__DIR__, "../.."))
+
+    using Dates
+
+    println("="^80)
+    println("LAGRANGE BASIS FUNCTION GENERATOR")
+    println("="^80)
+    println()
+    println("Loading symbolic generator...")
+    println("✓ Generator loaded")
+    println()
+
+    # =========================================================================
+    # ELEMENT CATALOG
+    # =========================================================================
+
+    """
+        ElementDescription
+
+    Defines a Lagrange finite element for basis function generation.
+
+    # Fields
+    - `name::String`: Element type name (e.g., "Seg2", "Tri3", "Quad4")
+    - `description::String`: Human-readable description
+    - `coordinates::Vector{Vector{Float64}}`: Node coordinates in reference element
+    - `ansatz::Vector{Any}`: Polynomial terms for Vandermonde system (expressions or literals)
+    """
+    struct ElementDescription
+        name::String
+        description::String
+        coordinates::Vector{Vector{Float64}}
+        ansatz::Vector{Any}
+
+        # Constructor accepting keyword arguments for readability
+        function ElementDescription(; name, description, coordinates, ansatz)
+            new(name, description, coordinates, ansatz)
+        end
+    end
+
+    elements = ElementDescription[]
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 1D ELEMENTS
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # Seg2: 2-node linear segment
+    push!(elements, ElementDescription(
+        name="Seg2",
+        description="2-node linear segment element",
+        coordinates=[
+            [-1.0],  # Node 1
+            [1.0]   # Node 2
+        ],
+        ansatz=[
+            :(1),    # 1
+            :(u)     # u
+        ]
+    ))
+
+    # Seg3: 3-node quadratic segment
+    push!(elements, ElementDescription(
+        name="Seg3",
+        description="3-node quadratic segment element",
+        coordinates=[
+            [-1.0],  # Node 1
+            [1.0],  # Node 2
+            [0.0]   # Node 3 (midpoint)
+        ],
+        ansatz=[
+            :(1),    # 1
+            :(u),    # u
+            :(u^2)   # u²
+        ]
+    ))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 2D TRIANGULAR ELEMENTS
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # Tri3: 3-node linear triangle
+    push!(elements, ElementDescription(
+        name="Tri3",
+        description="3-node linear triangular element",
+        coordinates=[
+            [0.0, 0.0],  # Node 1 (origin)
+            [1.0, 0.0],  # Node 2 (u-axis)
+            [0.0, 1.0]   # Node 3 (v-axis)
+        ],
+        ansatz=[
+            :(1),    # 1
+            :(u),    # u
+            :(v)     # v
+        ]
+    ))
+
+    # Tri6: 6-node quadratic triangle
+    push!(elements, ElementDescription(
+        name="Tri6",
+        description="6-node quadratic triangular element",
+        coordinates=[
+            [0.0, 0.0],  # Node 1 (vertex)
+            [1.0, 0.0],  # Node 2 (vertex)
+            [0.0, 1.0],  # Node 3 (vertex)
+            [0.5, 0.0],  # Node 4 (edge 1-2)
+            [0.5, 0.5],  # Node 5 (edge 2-3)
+            [0.0, 0.5]   # Node 6 (edge 3-1)
+        ],
+        ansatz=[
+            :(1),    # 1
+            :(u), :(v),         # linear
+            :(u^2), :(u * v), :(v^2)  # quadratic
+        ]
+    ))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 2D QUADRILATERAL ELEMENTS
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # Quad4: 4-node bilinear quadrilateral
+    push!(elements, ElementDescription(
+        name="Quad4",
+        description="4-node bilinear quadrilateral element",
+        coordinates=[
+            [-1.0, -1.0],  # Node 1
+            [1.0, -1.0],  # Node 2
+            [1.0, 1.0],   # Node 3
+            [-1.0, 1.0]    # Node 4
+        ],
+        ansatz=[
+            :(1),        # 1
+            :(u), :(v),  # linear
+            :(u * v)     # bilinear
+        ]
+    ))
+
+    # Quad8: 8-node serendipity quadrilateral
+    push!(elements, ElementDescription(
+        name="Quad8",
+        description="8-node serendipity quadrilateral element",
+        coordinates=[
+            [-1.0, -1.0],  # Node 1 (vertex)
+            [1.0, -1.0],  # Node 2 (vertex)
+            [1.0, 1.0],   # Node 3 (vertex)
+            [-1.0, 1.0],   # Node 4 (vertex)
+            [0.0, -1.0],  # Node 5 (edge 1-2)
+            [1.0, 0.0],   # Node 6 (edge 2-3)
+            [0.0, 1.0],   # Node 7 (edge 3-4)
+            [-1.0, 0.0]    # Node 8 (edge 4-1)
+        ],
+        ansatz=[
+            :(1),                          # 1
+            :(u), :(v),                    # linear
+            :(u^2), :(u * v), :(v^2),      # quadratic
+            :(u^2 * v), :(u * v^2)         # serendipity (no u²v²)
+        ]
+    ))
+
+    # Quad9: 9-node biquadratic quadrilateral
+    push!(elements, ElementDescription(
+        name="Quad9",
+        description="9-node biquadratic quadrilateral element",
+        coordinates=[
+            [-1.0, -1.0],  # Node 1 (vertex)
+            [1.0, -1.0],  # Node 2 (vertex)
+            [1.0, 1.0],   # Node 3 (vertex)
+            [-1.0, 1.0],   # Node 4 (vertex)
+            [0.0, -1.0],  # Node 5 (edge 1-2)
+            [1.0, 0.0],   # Node 6 (edge 2-3)
+            [0.0, 1.0],   # Node 7 (edge 3-4)
+            [-1.0, 0.0],   # Node 8 (edge 4-1)
+            [0.0, 0.0]    # Node 9 (center)
+        ],
+        ansatz=[
+            :(1),                                # 1
+            :(u), :(v),                          # linear
+            :(u^2), :(u * v), :(v^2),            # quadratic
+            :(u^2 * v), :(u * v^2), :(u^2 * v^2) # biquadratic
+        ]
+    ))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 3D TETRAHEDRAL ELEMENTS
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # Tet4: 4-node linear tetrahedron
+    push!(elements, ElementDescription(
+        name="Tet4",
+        description="4-node linear tetrahedral element",
+        coordinates=[
+            [0.0, 0.0, 0.0],  # Node 1 (origin)
+            [1.0, 0.0, 0.0],  # Node 2 (u-axis)
+            [0.0, 1.0, 0.0],  # Node 3 (v-axis)
+            [0.0, 0.0, 1.0]   # Node 4 (w-axis)
+        ],
+        ansatz=[
+            :(1),           # 1
+            :(u), :(v), :(w)  # linear
+        ]
+    ))
+
+    # Tet10: 10-node quadratic tetrahedron
+    push!(elements, ElementDescription(
+        name="Tet10",
+        description="10-node quadratic tetrahedral element",
+        coordinates=[
+            [0.0, 0.0, 0.0],  # Node 1 (vertex)
+            [1.0, 0.0, 0.0],  # Node 2 (vertex)
+            [0.0, 1.0, 0.0],  # Node 3 (vertex)
+            [0.0, 0.0, 1.0],  # Node 4 (vertex)
+            [0.5, 0.0, 0.0],  # Node 5 (edge 1-2)
+            [0.5, 0.5, 0.0],  # Node 6 (edge 2-3)
+            [0.0, 0.5, 0.0],  # Node 7 (edge 3-1)
+            [0.0, 0.0, 0.5],  # Node 8 (edge 1-4)
+            [0.5, 0.0, 0.5],  # Node 9 (edge 2-4)
+            [0.0, 0.5, 0.5]   # Node 10 (edge 3-4)
+        ],
+        ansatz=[
+            :(1),                                      # 1
+            :(u), :(v), :(w),                          # linear
+            :(u^2), :(v^2), :(w^2),                    # pure quadratic
+            :(u * v), :(u * w), :(v * w)               # bilinear
+        ]
+    ))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 3D HEXAHEDRAL ELEMENTS
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # Hex8: 8-node trilinear hexahedron
+    push!(elements, ElementDescription(
+        name="Hex8",
+        description="8-node trilinear hexahedral element",
+        coordinates=[
+            [-1.0, -1.0, -1.0],  # Node 1
+            [1.0, -1.0, -1.0],  # Node 2
+            [1.0, 1.0, -1.0],   # Node 3
+            [-1.0, 1.0, -1.0],   # Node 4
+            [-1.0, -1.0, 1.0],   # Node 5
+            [1.0, -1.0, 1.0],   # Node 6
+            [1.0, 1.0, 1.0],    # Node 7
+            [-1.0, 1.0, 1.0]     # Node 8
+        ],
+        ansatz=[
+            :(1),                        # 1
+            :(u), :(v), :(w),            # linear
+            :(u * v), :(u * w), :(v * w),  # bilinear
+            :(u * v * w)                 # trilinear
+        ]
+    ))
+
+    # Hex20: 20-node serendipity hexahedron
+    push!(elements, ElementDescription(
+        name="Hex20",
+        description="20-node serendipity hexahedral element",
+        coordinates=[
+            [-1.0, -1.0, -1.0],  # Vertex 1
+            [1.0, -1.0, -1.0],  # Vertex 2
+            [1.0, 1.0, -1.0],   # Vertex 3
+            [-1.0, 1.0, -1.0],   # Vertex 4
+            [-1.0, -1.0, 1.0],   # Vertex 5
+            [1.0, -1.0, 1.0],   # Vertex 6
+            [1.0, 1.0, 1.0],    # Vertex 7
+            [-1.0, 1.0, 1.0],    # Vertex 8
+            [0.0, -1.0, -1.0],  # Edge midpoint
+            [1.0, 0.0, -1.0],   # Edge midpoint
+            [0.0, 1.0, -1.0],   # Edge midpoint
+            [-1.0, 0.0, -1.0],   # Edge midpoint
+            [-1.0, -1.0, 0.0],   # Edge midpoint
+            [1.0, -1.0, 0.0],   # Edge midpoint
+            [1.0, 1.0, 0.0],    # Edge midpoint
+            [-1.0, 1.0, 0.0],    # Edge midpoint
+            [0.0, -1.0, 1.0],   # Edge midpoint
+            [1.0, 0.0, 1.0],    # Edge midpoint
+            [0.0, 1.0, 1.0],    # Edge midpoint
+            [-1.0, 0.0, 1.0]     # Edge midpoint
+        ],
+        ansatz=[
+            :(1),                                                  # 1
+            :(u), :(v), :(w),                                      # linear
+            :(u^2), :(v^2), :(w^2),                                # quadratic
+            :(u * v), :(u * w), :(v * w),                          # bilinear
+            :(u^2 * v), :(u^2 * w), :(v^2 * u), :(v^2 * w), :(w^2 * u), :(w^2 * v),  # serendipity
+            :(u * v * w), :(u^2 * v * w), :(u * v^2 * w), :(u * v * w^2)  # trilinear + serendipity
+        ]
+    ))
+
+    # Hex27: 27-node triquadratic hexahedron
+    push!(elements, ElementDescription(
+        name="Hex27",
+        description="27-node triquadratic hexahedral element",
+        coordinates=[
+            [-1.0, -1.0, -1.0],  # Vertex 1
+            [1.0, -1.0, -1.0],  # Vertex 2
+            [1.0, 1.0, -1.0],   # Vertex 3
+            [-1.0, 1.0, -1.0],   # Vertex 4
+            [-1.0, -1.0, 1.0],   # Vertex 5
+            [1.0, -1.0, 1.0],   # Vertex 6
+            [1.0, 1.0, 1.0],    # Vertex 7
+            [-1.0, 1.0, 1.0],    # Vertex 8
+            [0.0, -1.0, -1.0],  # Edge midpoint
+            [1.0, 0.0, -1.0],   # Edge midpoint
+            [0.0, 1.0, -1.0],   # Edge midpoint
+            [-1.0, 0.0, -1.0],   # Edge midpoint
+            [-1.0, -1.0, 0.0],   # Edge midpoint
+            [1.0, -1.0, 0.0],   # Edge midpoint
+            [1.0, 1.0, 0.0],    # Edge midpoint
+            [-1.0, 1.0, 0.0],    # Edge midpoint
+            [0.0, -1.0, 1.0],   # Edge midpoint
+            [1.0, 0.0, 1.0],    # Edge midpoint
+            [0.0, 1.0, 1.0],    # Edge midpoint
+            [-1.0, 0.0, 1.0],    # Edge midpoint
+            [0.0, 0.0, -1.0],   # Face center
+            [0.0, 0.0, 1.0],    # Face center
+            [0.0, -1.0, 0.0],   # Face center
+            [1.0, 0.0, 0.0],    # Face center
+            [0.0, 1.0, 0.0],    # Face center
+            [-1.0, 0.0, 0.0],    # Face center
+            [0.0, 0.0, 0.0]     # Volume center
+        ],
+        ansatz=[
+            :(1),                                    # 1
+            :(u), :(v), :(w),                        # linear (3)
+            :(u^2), :(v^2), :(w^2),                  # quadratic (3)
+            :(u * v), :(u * w), :(v * w),            # bilinear (3)
+            :(u^2 * v), :(u^2 * w), :(v^2 * u), :(v^2 * w), :(w^2 * u), :(w^2 * v),  # mixed (6)
+            :(u * v * w),                            # trilinear (1)
+            :(u^2 * v^2), :(u^2 * w^2), :(v^2 * w^2),  # biquadratic (3)
+            :(u^2 * v * w), :(u * v^2 * w), :(u * v * w^2),  # mixed (3)
+            :(u^2 * v^2 * w), :(u^2 * v * w^2), :(u * v^2 * w^2),  # mixed (3)
+            :(u^2 * v^2 * w^2)                       # triquadratic (1)
+        ]
+    ))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 3D PYRAMID ELEMENTS
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # Pyr5: 5-node linear pyramid
+    push!(elements, ElementDescription(
+        name="Pyr5",
+        description="5-node linear pyramid element",
+        coordinates=[
+            [-1.0, -1.0, 0.0],  # Base node 1
+            [1.0, -1.0, 0.0],  # Base node 2
+            [1.0, 1.0, 0.0],   # Base node 3
+            [-1.0, 1.0, 0.0],   # Base node 4
+            [0.0, 0.0, 1.0]    # Apex node 5
+        ],
+        ansatz=[
+            :(1),                        # 1
+            :(u), :(v), :(w),            # linear
+            :(u * v)                     # bilinear base
+        ]
+    ))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 3D WEDGE ELEMENTS (Triangular prisms)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # Wedge6: 6-node linear wedge
+    push!(elements, ElementDescription(
+        name="Wedge6",
+        description="6-node linear wedge element (triangular prism)",
+        coordinates=[
+            [0.0, 0.0, -1.0],  # Bottom triangle node 1
+            [1.0, 0.0, -1.0],  # Bottom triangle node 2
+            [0.0, 1.0, -1.0],  # Bottom triangle node 3
+            [0.0, 0.0, 1.0],   # Top triangle node 4
+            [1.0, 0.0, 1.0],   # Top triangle node 5
+            [0.0, 1.0, 1.0]    # Top triangle node 6
+        ],
+        ansatz=[
+            :(1),                        # 1
+            :(u), :(v), :(w),            # linear
+            :(u * w), :(v * w)           # prism bilinear
+        ]
+    ))
+
+    # Wedge15: 15-node quadratic wedge
+    push!(elements, ElementDescription(
+        name="Wedge15",
+        description="15-node quadratic wedge element",
+        coordinates=[
+            [0.0, 0.0, -1.0],  # Bottom vertex 1
+            [1.0, 0.0, -1.0],  # Bottom vertex 2
+            [0.0, 1.0, -1.0],  # Bottom vertex 3
+            [0.0, 0.0, 1.0],   # Top vertex 4
+            [1.0, 0.0, 1.0],   # Top vertex 5
+            [0.0, 1.0, 1.0],   # Top vertex 6
+            [0.5, 0.0, -1.0],  # Bottom edge 1-2
+            [0.5, 0.5, -1.0],  # Bottom edge 2-3
+            [0.0, 0.5, -1.0],  # Bottom edge 3-1
+            [0.0, 0.0, 0.0],   # Vertical edge 1-4
+            [1.0, 0.0, 0.0],   # Vertical edge 2-5
+            [0.0, 1.0, 0.0],   # Vertical edge 3-6
+            [0.5, 0.0, 1.0],   # Top edge 4-5
+            [0.5, 0.5, 1.0],   # Top edge 5-6
+            [0.0, 0.5, 1.0]    # Top edge 6-4
+        ],
+        ansatz=[
+            :(1),                                      # 1
+            :(u), :(v), :(w),                          # linear (3)
+            :(u^2), :(v^2), :(w^2),                    # quadratic (3)
+            :(u * v),                                  # triangle bilinear (1)
+            :(u * w), :(v * w),                        # prism bilinear (2)
+            :(u^2 * w), :(v^2 * w), :(u * v * w),      # mixed (3)
+            :(u * w^2), :(v * w^2)                     # mixed (2)
+        ]
+    ))
+
+    println("Element catalog loaded: $(length(elements)) element types")
+    println()
+
+    # =========================================================================
+    # GENERATION LOOP
+    # =========================================================================
+
+    println("Generating basis functions...")
+    println("─"^80)
+
+    output = IOBuffer()
+
+    # File header
+    println(output, "# This file is a part of JuliaFEM.")
+    println(output, "# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE")
+    println(output)
+    println(output, "# ============================================================================")
+    println(output, "# AUTO-GENERATED LAGRANGE BASIS FUNCTIONS")
+    println(output, "# ============================================================================")
+    println(output, "#")
+    println(output, "# WARNING: DO NOT EDIT THIS FILE MANUALLY!")
+    println(output, "#")
+    println(output, "# This file was automatically generated by:")
+    println(output, "#   julia --project=. src/basis/lagrange_generator.jl")
+    println(output, "#")
+    println(output, "# To regenerate (e.g., after adding new element types):")
+    println(output, "#   cd /path/to/JuliaFEM.jl")
+    println(output, "#   julia --project=. src/basis/lagrange_generator.jl")
+    println(output, "#")
+    println(output, "# Theory:")
+    println(output, "#   See docs/book/lagrange_basis_functions.md")
+    println(output, "#")
+    println(output, "# Generator:")
+    println(output, "#   src/basis/lagrange_generator.jl (symbolic engine)")
+    println(output, "#")
+    println(output, "# Generated: $(Dates.format(now(), "yyyy-mm-dd HH:MM:SS"))")
+    println(output, "# ============================================================================")
+    println(output)
+
+    # Export all basis types
+    basis_names = [Symbol(elem.name * "Basis") for elem in elements]
+    println(output, "# Export all basis types")
+    println(output, "export ", join(string.(basis_names), ", "))
+    println(output)
+
+    for (i, elem) in enumerate(elements)
+        println("[$i/$(length(elements))] Generating $(elem.name)...")
+
+        try
+            # Convert coordinates to proper format (tuples, not vectors)
+            coords = [tuple(coord...) for coord in elem.coordinates]
+
+            # Build polynomial ansatz as single expression: term1 + term2 + ...
+            if length(elem.ansatz) == 1
+                ansatz_expr = elem.ansatz[1]
+            else
+                ansatz_expr = Expr(:call, :+, elem.ansatz...)
+            end
+
+            # Generate basis code using symbolic engine
+            # APPEND "Basis" SUFFIX to resolve name conflicts with topology types
+            basis_type_name = Symbol(elem.name * "Basis")
+            basis_code_expr = create_basis(
+                basis_type_name,
+                elem.description,
+                coords,
+                ansatz_expr
+            )
+
+            # Convert Expr to readable Julia code string
+            basis_code_str = string(basis_code_expr)
+
+            # Pretty-print: The generated code is in a quote block, extract inner code
+            basis_code_str = replace(basis_code_str, r"^(quote|begin)\s+" => "")
+            basis_code_str = replace(basis_code_str, r"\s*end$" => "")
+
+            # Clean up generator artifacts (file paths, line numbers, etc.)
+            basis_code_str = replace(basis_code_str, r"#=.*?=#\n?" => "")
+            basis_code_str = replace(basis_code_str, r"\n{3,}" => "\n\n")
+
+            # Write to output with nice formatting
+            println(output, "# " * "─"^78)
+            println(output, "# $(elem.name): $(elem.description)")
+            println(output, "# " * "─"^78)
+            println(output)
+            println(output, basis_code_str)
+            println(output)
+
+        catch e
+            println("  ⚠ Error generating $(elem.name):")
+            println("     $e")
+            if isa(e, ErrorException)
+                for (exc, bt) in Base.catch_stack()
+                    showerror(stdout, exc, bt)
+                    println()
+                end
+            end
+            println("  Skipping...")
+        end
+    end
+
+    println("─"^80)
+    println()
+
+    # Write output file
+    output_path = joinpath(@__DIR__, "lagrange_generated.jl")
+    println("Writing to: $output_path")
+    write(output_path, String(take!(output)))
+    println("✓ Generation complete!")
+    println()
+
+    # Summary
+    println("Generated $(length(elements)) element types:")
+    for elem in elements
+        println("  - $(elem.name): $(elem.description)")
+    end
+    println()
+
+    println("Next steps:")
+    println("  1. Review: src/basis/lagrange_generated.jl")
+    println("  2. Test: julia --project=. -e 'using JuliaFEM'")
+    println("  3. Run tests: julia --project=. -e 'using Pkg; Pkg.test()'")
+    println("  4. Commit: git add src/basis/lagrange_generated.jl && git commit")
+    println()
+    println("="^80)
+end
 
