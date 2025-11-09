@@ -28,6 +28,16 @@ dim(::Segment) = 1
 const Seg2 = Segment
 
 """
+    nnodes(::Segment) -> Int
+
+Number of corner nodes for a segment element (2).
+
+**Note:** In the new architecture, actual node count depends on basis degree.
+This returns the number of corner nodes for backwards compatibility.
+"""
+nnodes(::Segment) = 2
+
+"""
     reference_coordinates(::Segment) -> NTuple{2, NTuple{1, Float64}}
 
 Reference coordinates for segment endpoints: (-1.0,) and (1.0,).

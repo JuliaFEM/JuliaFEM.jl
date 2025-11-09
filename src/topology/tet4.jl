@@ -39,6 +39,16 @@ dim(::Tetrahedron) = 3
 const Tet4 = Tetrahedron
 
 """
+    nnodes(::Tetrahedron) -> Int
+
+Number of corner nodes for a tetrahedron element (4).
+
+**Note:** In the new architecture, actual node count depends on basis degree.
+This returns the number of corner nodes for backwards compatibility.
+"""
+nnodes(::Tetrahedron) = 4
+
+"""
     reference_coordinates(::Tetrahedron) -> NTuple{4, NTuple{3, Float64}}
 
 Reference coordinates for tetrahedron vertices:

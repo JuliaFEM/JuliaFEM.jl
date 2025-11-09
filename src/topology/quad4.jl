@@ -109,4 +109,14 @@ element = Element(Quadrilateral(), Lagrange{Quadrilateral, 1}(), Gauss{2}(), (1,
 """
 const Quad4 = Quadrilateral
 
+"""
+    nnodes(::Quadrilateral) -> Int
+
+Number of corner nodes for a quadrilateral element (4).
+
+**Note:** In the new architecture, actual node count depends on basis degree.
+This returns the number of corner nodes for backwards compatibility.
+"""
+nnodes(::Quadrilateral) = 4
+
 # Note: Quad4 is deprecated. Use Quadrilateral with parametric Lagrange basis instead.

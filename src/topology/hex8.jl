@@ -34,6 +34,16 @@ dim(::Hexahedron) = 3
 const Hex8 = Hexahedron
 
 """
+    nnodes(::Hexahedron) -> Int
+
+Number of corner nodes for a hexahedron element (8).
+
+**Note:** In the new architecture, actual node count depends on basis degree.
+This returns the number of corner nodes for backwards compatibility.
+"""
+nnodes(::Hexahedron) = 8
+
+"""
     reference_coordinates(::Hexahedron) -> NTuple{8, NTuple{3, Float64}}
 
 Reference coordinates for hexahedron vertices in [-1,1]³.

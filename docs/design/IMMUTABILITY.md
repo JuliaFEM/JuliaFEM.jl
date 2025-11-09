@@ -11,6 +11,7 @@
 JuliaFEM 1.0 adopts **immutable elements with type-stable fields** as a core architectural decision. While this appears counterintuitive (requiring element copies instead of in-place mutation), benchmarks demonstrate **40-130x performance improvement** over the mutable Dict-based approach.
 
 **Key Results:**
+
 - Field access: **40x faster** (1ns vs 45ns per read)
 - Assembly loop: **130x faster** (9ns vs 1,124ns per element)
 - Large mesh: **120x faster** (0.01ms vs 1.2ms for 1000 elements)
@@ -124,6 +125,7 @@ Memory: 0 bytes
 ### 4. GPU/HPC Compatibility
 
 **Mutable elements with Dict:**
+
 ```julia
 struct MutableElement
     fields::Dict{Symbol,Any}  # POINTER → cannot transfer to GPU
@@ -131,6 +133,7 @@ end
 ```
 
 **Immutable elements with NamedTuple:**
+
 ```julia
 struct ImmutableElement{F}
     fields::F  # All bits types → can transfer to GPU!
@@ -138,6 +141,7 @@ end
 ```
 
 GPU kernels require:
+
 - No pointers (CPU memory → GPU memory not allowed)
 - No dynamic dispatch (GPU can't call CPU functions)
 - All data as bits types (can be copied to GPU)
@@ -177,10 +181,10 @@ Run: `julia --project=. benchmarks/element_immutability_benchmark.jl`
 
 ### Large Mesh (1000 elements)
 
-| Implementation | Time | Memory |
-|---------------|------|--------|
-| Mutable | 1.2ms | 1.1 MB |
-| Immutable | 0.01ms | 0 KB |
+| Implementation | Time   | Memory |
+|----------------|--------|--------|
+| Mutable        |  1.2ms | 1.1 MB |
+| Immutable      | 0.01ms |   0 KB |
 
 **Speedup:** **120x faster**, zero allocations
 

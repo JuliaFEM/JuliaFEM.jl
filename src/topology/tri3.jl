@@ -106,3 +106,13 @@ element = Element(Triangle(), Lagrange{Triangle, 1}(), Gauss{2}(), (1,2,3))
 const Tri3 = Triangle
 
 # Note: Tri3 is deprecated. Use Triangle with parametric Lagrange basis instead.
+
+"""
+    nnodes(::Triangle) -> Int
+
+Number of corner nodes for a triangle element (3).
+
+**Note:** In the new architecture, actual node count depends on basis degree.
+This returns the number of corner nodes for backwards compatibility.
+"""
+nnodes(::Triangle) = 3
