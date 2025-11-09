@@ -161,14 +161,27 @@ include("topology/pyr5.jl")
 include("topology/wedge6.jl")
 include("topology/wedge15.jl")
 
-export AbstractTopology, nnodes, dim, reference_coordinates, edges, faces
+# Export topology types (new names without hardcoded node counts)
+export AbstractTopology, dim, reference_coordinates, edges, faces
+export Point  # 0D
+export Segment  # 1D (was Seg2/Seg3, but those had node counts)
+export Triangle, Quadrilateral  # 2D (was Tri3/Tri6/Tri7, Quad4/Quad8/Quad9)
+export Tetrahedron, Hexahedron, Pyramid, Wedge  # 3D (was Tet4/Tet10, Hex8/Hex20/Hex27, Pyr5, Wedge6/Wedge15)
+
+# Export old names as deprecated aliases (for backwards compatibility)
 export Seg2, Seg3
-export Tri3, Tri6, Tri7
-export Quad4, Quad8, Quad9
-export Tet4, Tet10
-export Hex8, Hex20, Hex27
-export Pyr5
-export Wedge6, Wedge15
+export Tri3, Tri6, Tri7  # All map to Triangle
+export Quad4, Quad8, Quad9  # All map to Quadrilateral
+export Tet4, Tet10  # Both map to Tetrahedron
+export Hex8, Hex20, Hex27  # All map to Hexahedron
+export Pyr5  # Maps to Pyramid
+export Wedge6, Wedge15  # Both map to Wedge
+
+# Note: Node count is no longer in topology! It comes from basis:
+# - Triangle + Lagrange{Triangle, 1} → 3 nodes
+# - Triangle + Lagrange{Triangle, 2} → 6 nodes
+# - Quadrilateral + Lagrange{Quadrilateral, 1} → 4 nodes
+# - Quadrilateral + Lagrange{Quadrilateral, 2} → 9 nodes
 
 # ============================================================================
 # QUADRATURE: Low-level integration point data (consolidated from FEMQuad.jl)
