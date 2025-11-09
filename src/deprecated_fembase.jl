@@ -119,14 +119,15 @@ function interpolate(element::AbstractElement, field_name::String, ip, time)
     interpolate(element, Symbol(field_name), ip, time)
 end
 
-# fields is now dfields
-function Base.getproperty(element::Element, sym::Symbol)
-    if sym === :fields  # Use === instead of == (which is overridden by fields.jl)
-        return getfield(element, :dfields)
-    else
-        return getfield(element, sym)
-    end
-end
+# OLD: fields is now dfields - DEPRECATED with new Element{N,NIP,F,B} architecture
+# New Element struct has `fields::F` directly, no need for redirection
+# function Base.getproperty(element::Element, sym::Symbol)
+#     if sym === :fields  # Use === instead of == (which is overridden by fields.jl)
+#         return getfield(element, :dfields)
+#     else
+#         return getfield(element, sym)
+#     end
+# end
 
 # getindex, when someone asks key element.fields["f"] => element.fields[:f]
 function Base.getindex(fieldset::Dict{Symbol,AbstractField}, field_name::String)
