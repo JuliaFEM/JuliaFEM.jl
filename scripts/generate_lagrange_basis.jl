@@ -70,13 +70,13 @@ elements = []
 
 # Seg2: 2-node linear segment
 push!(elements, (
-    name = "Seg2",
-    description = "2-node linear segment element",
-    coordinates = [
+    name="Seg2",
+    description="2-node linear segment element",
+    coordinates=[
         [-1.0],  # Node 1
-        [ 1.0]   # Node 2
+        [1.0]   # Node 2
     ],
-    ansatz = [
+    ansatz=[
         :(1),    # 1
         :(u)     # u
     ]
@@ -84,14 +84,14 @@ push!(elements, (
 
 # Seg3: 3-node quadratic segment
 push!(elements, (
-    name = "Seg3",
-    description = "3-node quadratic segment element",
-    coordinates = [
+    name="Seg3",
+    description="3-node quadratic segment element",
+    coordinates=[
         [-1.0],  # Node 1
-        [ 1.0],  # Node 2
-        [ 0.0]   # Node 3 (midpoint)
+        [1.0],  # Node 2
+        [0.0]   # Node 3 (midpoint)
     ],
-    ansatz = [
+    ansatz=[
         :(1),    # 1
         :(u),    # u
         :(u^2)   # u²
@@ -104,14 +104,14 @@ push!(elements, (
 
 # Tri3: 3-node linear triangle
 push!(elements, (
-    name = "Tri3",
-    description = "3-node linear triangular element",
-    coordinates = [
+    name="Tri3",
+    description="3-node linear triangular element",
+    coordinates=[
         [0.0, 0.0],  # Node 1
         [1.0, 0.0],  # Node 2
         [0.0, 1.0]   # Node 3
     ],
-    ansatz = [
+    ansatz=[
         :(1),    # 1
         :(u),    # u
         :(v)     # v
@@ -120,9 +120,9 @@ push!(elements, (
 
 # Tri6: 6-node quadratic triangle
 push!(elements, (
-    name = "Tri6",
-    description = "6-node quadratic triangular element",
-    coordinates = [
+    name="Tri6",
+    description="6-node quadratic triangular element",
+    coordinates=[
         [0.0, 0.0],  # Node 1
         [1.0, 0.0],  # Node 2
         [0.0, 1.0],  # Node 3
@@ -130,12 +130,12 @@ push!(elements, (
         [0.5, 0.5],  # Node 5 (edge 2-3)
         [0.0, 0.5]   # Node 6 (edge 3-1)
     ],
-    ansatz = [
+    ansatz=[
         :(1),      # 1
         :(u),      # u
         :(v),      # v
         :(u^2),    # u²
-        :(u*v),    # uv
+        :(u * v),    # uv
         :(v^2)     # v²
     ]
 ))
@@ -154,8 +154,8 @@ push!(elements, (
     ],
     ansatz=[
         :(1),      # 1
-        :( u),      # ξ
-        :( v),      # η
+        :(u),      # ξ
+        :(v),      # η
         :(u^2),    # ξ²
         :(ξ * η),    # ξη
         :(v^2)     # η²
@@ -169,73 +169,19 @@ push!(elements, (
 # Quad4: 4-node bilinear quadrilateral
 # Quad4: 4-node bilinear quadrilateral
 push!(elements, (
-    name = "Quad4",
-    description = "4-node bilinear quadrilateral element",
-    coordinates = [
+    name="Quad4",
+    description="4-node bilinear quadrilateral element",
+    coordinates=[
         [-1.0, -1.0],  # Node 1
-        [ 1.0, -1.0],  # Node 2
-        [ 1.0,  1.0],  # Node 3
-        [-1.0,  1.0]   # Node 4
+        [1.0, -1.0],  # Node 2
+        [1.0, 1.0],  # Node 3
+        [-1.0, 1.0]   # Node 4
     ],
-    ansatz = [
+    ansatz=[
         :(1),      # 1
         :(u),      # u
         :(v),      # v
-        :(u*v)     # uv
-    ]
-))
-
-# Quad8: 8-node serendipity quadrilateral (quadratic edges, no center node)
-push!(elements, (
-    name = "Quad8",
-    description = "8-node serendipity quadrilateral element",
-    coordinates = [
-        [-1.0, -1.0],  # Node 1
-        [ 1.0, -1.0],  # Node 2
-        [ 1.0,  1.0],  # Node 3
-        [-1.0,  1.0],  # Node 4
-        [ 0.0, -1.0],  # Node 5 (edge 1-2)
-        [ 1.0,  0.0],  # Node 6 (edge 2-3)
-        [ 0.0,  1.0],  # Node 7 (edge 3-4)
-        [-1.0,  0.0]   # Node 8 (edge 4-1)
-    ],
-    ansatz = [
-        :(1),      # 1
-        :(u),      # u
-        :(v),      # v
-        :(u^2),    # u²
-        :(u*v),    # uv
-        :(v^2),    # v²
-        :(u^2*v),  # u²v
-        :(u*v^2)   # uv²
-    ]
-))
-
-# Quad9: 9-node biquadratic quadrilateral (complete quadratic)
-push!(elements, (
-    name = "Quad9",
-    description = "9-node biquadratic quadrilateral element",
-    coordinates = [
-        [-1.0, -1.0],  # Node 1
-        [ 1.0, -1.0],  # Node 2
-        [ 1.0,  1.0],  # Node 3
-        [-1.0,  1.0],  # Node 4
-        [ 0.0, -1.0],  # Node 5 (edge 1-2)
-        [ 1.0,  0.0],  # Node 6 (edge 2-3)
-        [ 0.0,  1.0],  # Node 7 (edge 3-4)
-        [-1.0,  0.0],  # Node 8 (edge 4-1)
-        [ 0.0,  0.0]   # Node 9 (center)
-    ],
-    ansatz = [
-        :(1),        # 1
-        :(u),        # u
-        :(v),        # v
-        :(u^2),      # u²
-        :(u*v),      # uv
-        :(v^2),      # v²
-        :(u^2*v),    # u²v
-        :(u*v^2),    # uv²
-        :(u^2*v^2)   # u²v²
+        :(u * v)     # uv
     ]
 ))
 
@@ -255,8 +201,62 @@ push!(elements, (
     ],
     ansatz=[
         :(1),      # 1
-        :( u),      # ξ
-        :( v),      # η
+        :(u),      # u
+        :(v),      # v
+        :(u^2),    # u²
+        :(u * v),    # uv
+        :(v^2),    # v²
+        :(u^2 * v),  # u²v
+        :(u * v^2)   # uv²
+    ]
+))
+
+# Quad9: 9-node biquadratic quadrilateral (complete quadratic)
+push!(elements, (
+    name="Quad9",
+    description="9-node biquadratic quadrilateral element",
+    coordinates=[
+        [-1.0, -1.0],  # Node 1
+        [1.0, -1.0],  # Node 2
+        [1.0, 1.0],  # Node 3
+        [-1.0, 1.0],  # Node 4
+        [0.0, -1.0],  # Node 5 (edge 1-2)
+        [1.0, 0.0],  # Node 6 (edge 2-3)
+        [0.0, 1.0],  # Node 7 (edge 3-4)
+        [-1.0, 0.0],  # Node 8 (edge 4-1)
+        [0.0, 0.0]   # Node 9 (center)
+    ],
+    ansatz=[
+        :(1),        # 1
+        :(u),        # u
+        :(v),        # v
+        :(u^2),      # u²
+        :(u * v),      # uv
+        :(v^2),      # v²
+        :(u^2 * v),    # u²v
+        :(u * v^2),    # uv²
+        :(u^2 * v^2)   # u²v²
+    ]
+))
+
+# Quad8: 8-node serendipity quadrilateral (quadratic edges, no center node)
+push!(elements, (
+    name="Quad8",
+    description="8-node serendipity quadrilateral element",
+    coordinates=[
+        [-1.0, -1.0],  # Node 1
+        [1.0, -1.0],  # Node 2
+        [1.0, 1.0],  # Node 3
+        [-1.0, 1.0],  # Node 4
+        [0.0, -1.0],  # Node 5 (edge 1-2)
+        [1.0, 0.0],  # Node 6 (edge 2-3)
+        [0.0, 1.0],  # Node 7 (edge 3-4)
+        [-1.0, 0.0]   # Node 8 (edge 4-1)
+    ],
+    ansatz=[
+        :(1),      # 1
+        :(u),      # ξ
+        :(v),      # η
         :(u^2),    # ξ²
         :(ξ * η),    # ξη
         :(v^2),    # η²
@@ -282,8 +282,8 @@ push!(elements, (
     ],
     ansatz=[
         :(1),        # 1
-        :( u),        # ξ
-        :( v),        # η
+        :(u),        # ξ
+        :(v),        # η
         :(u^2),      # ξ²
         :(ξ * η),      # ξη
         :(v^2),      # η²
@@ -300,15 +300,15 @@ push!(elements, (
 # Tet4: 4-node linear tetrahedron
 # Tet4: 4-node linear tetrahedron
 push!(elements, (
-    name = "Tet4",
-    description = "4-node linear tetrahedral element",
-    coordinates = [
+    name="Tet4",
+    description="4-node linear tetrahedral element",
+    coordinates=[
         [0.0, 0.0, 0.0],  # Node 1
         [1.0, 0.0, 0.0],  # Node 2
         [0.0, 1.0, 0.0],  # Node 3
         [0.0, 0.0, 1.0]   # Node 4
     ],
-    ansatz = [
+    ansatz=[
         :(1),    # 1
         :(u),    # u
         :(v),    # v
@@ -318,9 +318,9 @@ push!(elements, (
 
 # Tet10: 10-node quadratic tetrahedron
 push!(elements, (
-    name = "Tet10",
-    description = "10-node quadratic tetrahedral element",
-    coordinates = [
+    name="Tet10",
+    description="10-node quadratic tetrahedral element",
+    coordinates=[
         [0.0, 0.0, 0.0],  # Node 1
         [1.0, 0.0, 0.0],  # Node 2
         [0.0, 1.0, 0.0],  # Node 3
@@ -332,16 +332,16 @@ push!(elements, (
         [0.5, 0.0, 0.5],  # Node 9 (edge 2-4)
         [0.0, 0.5, 0.5]   # Node 10 (edge 3-4)
     ],
-    ansatz = [
+    ansatz=[
         :(1),      # 1
         :(u),      # u
         :(v),      # v
         :(w),      # w
         :(u^2),    # u²
-        :(u*v),    # uv
-        :(u*w),    # uw
+        :(u * v),    # uv
+        :(u * w),    # uw
         :(v^2),    # v²
-        :(v*w),    # vw
+        :(v * w),    # vw
         :(w^2)     # w²
     ]
 ))
@@ -364,9 +364,9 @@ push!(elements, (
     ],
     ansatz=[
         :(1),      # 1
-        :( u),      # ξ
-        :( v),      # η
-        :( w),      # ζ
+        :(u),      # ξ
+        :(v),      # η
+        :(w),      # ζ
         :(u^2),    # ξ²
         :(ξ * η),    # ξη
         :(ξ * ζ),    # ξζ
@@ -396,9 +396,9 @@ push!(elements, (
     ],
     ansatz=[
         :(1),        # 1
-        :( u),        # ξ
-        :( v),        # η
-        :( w),        # ζ
+        :(u),        # ξ
+        :(v),        # η
+        :(w),        # ζ
         :(ξ * η),      # ξη
         :(ξ * ζ),      # ξζ
         :(η * ζ),      # ηζ
@@ -438,7 +438,7 @@ push!(elements, (
     ],
     ansatz=[
         :(1),          # 1
-        :( u), :( v), :( w),  # linear
+        :(u), :(v), :(w),  # linear
         :(u^2), :(v^2), :(w^2),  # pure quadratic
         :(ξ * η), :(ξ * ζ), :(η * ζ),  # bilinear
         :(u^2 * η), :(u^2 * ζ), :(v^2 * ξ), :(v^2 * ζ), :(w^2 * ξ), :(w^2 * η),  # quadratic-linear
@@ -488,7 +488,7 @@ push!(elements, (
     ],
     ansatz=[
         :(1),          # 1
-        :( u), :( v), :( w),  # linear (3)
+        :(u), :(v), :(w),  # linear (3)
         :(u^2), :(v^2), :(w^2),  # pure quadratic (3)
         :(ξ * η), :(ξ * ζ), :(η * ζ),  # bilinear (3)
         :(u^2 * η), :(u^2 * ζ), :(v^2 * ξ), :(v^2 * ζ), :(w^2 * ξ), :(w^2 * η),  # quad-linear (6)
@@ -517,9 +517,9 @@ push!(elements, (
     ],
     ansatz=[
         :(1),      # 1
-        :( u),      # ξ
-        :( v),      # η
-        :( w),      # ζ
+        :(u),      # ξ
+        :(v),      # η
+        :(w),      # ζ
         :(ξ * η)     # ξη (needed for symmetry)
     ]
 ))
@@ -542,9 +542,9 @@ push!(elements, (
     ],
     ansatz=[
         :(1),      # 1
-        :( u),      # ξ
-        :( v),      # η
-        :( w),      # ζ
+        :(u),      # ξ
+        :(v),      # η
+        :(w),      # ζ
         :(ξ * ζ),    # ξζ
         :(η * ζ)     # ηζ
     ]
@@ -578,7 +578,7 @@ push!(elements, (
     ],
     ansatz=[
         :(1),        # 1
-        :( u), :( v), :( w),  # linear (3)
+        :(u), :(v), :(w),  # linear (3)
         :(u^2), :(v^2), :(w^2),  # pure quadratic (3)
         :(ξ * η),      # triangle bilinear (1)
         :(ξ * ζ), :(η * ζ),  # prism bilinear (2)
