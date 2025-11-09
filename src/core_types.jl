@@ -6,14 +6,14 @@ const Node = Vector{Float64}
 abstract type AbstractPoint end
 
 mutable struct Point{P<:AbstractPoint}
-    id :: UInt  # Changed from Int to match Gmsh (Issue #267)
-    weight :: Float64
-    coords :: Tuple{Vararg{Float64}}
-    fields :: Dict{String, AbstractField}
-    properties :: P
+    id::UInt  # Changed from Int to match Gmsh (Issue #267)
+    weight::Float64
+    coords::Tuple{Vararg{Float64}}
+    fields::Dict{String,AbstractField}
+    properties::P
 end
 
-function setindex!(point::Point, val::Pair{Float64, T}, field_name) where T
+function setindex!(point::Point, val::Pair{Float64,T}, field_name) where T
     point.fields[field_name] = field(val)
 end
 
@@ -41,7 +41,7 @@ function Base.iterate(point::Point, i::Int)
     return Base.iterate(point.coords, i)
 end
 
-function update!(point::Point, field_name, val::Pair{Float64, T}) where T
+function update!(point::Point, field_name, val::Pair{Float64,T}) where T
     if haskey(point, field_name)
         update!(point[field_name], val)
     else
