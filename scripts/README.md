@@ -35,7 +35,7 @@ julia --project=. scripts/generate_lagrange_basis.jl
 - `src/basis/lagrange_generated.jl` (commit this file!)
 
 **Theory:**
-See `docs/theory/lagrange_basis_functions.md` for mathematical foundation.
+See `src/lagrange_basis_functions.md` for mathematical foundation.
 
 **Architecture:**
 
@@ -130,6 +130,6 @@ Pre-compute stiffness matrices for simple elements.
 
 **See also:**
 
-- `docs/theory/lagrange_basis_functions.md` - Mathematical theory
+- `src/lagrange_basis_functions.md` - Mathematical theory
 - `src/basis/lagrange_generator.jl` - Symbolic generation engine
 - `llm/VISION_2.0.md` - Overall project architecture
