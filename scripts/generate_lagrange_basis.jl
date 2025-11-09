@@ -21,7 +21,7 @@
 #   - After modifying lagrange_generator.jl
 #
 # THEORY:
-#   See src/lagrange_basis_functions.md for full mathematical details
+#   See docs/book/lagrange_basis_functions.md for full mathematical details
 #
 # ==============================================================================
 
@@ -617,7 +617,7 @@ println(output, "#   cd /path/to/JuliaFEM.jl")
 println(output, "#   julia --project=. scripts/generate_lagrange_basis.jl")
 println(output, "#")
 println(output, "# Theory:")
-println(output, "#   See src/lagrange_basis_functions.md")
+println(output, "#   See docs/book/lagrange_basis_functions.md")
 println(output, "#")
 println(output, "# Generator:")
 println(output, "#   src/basis/lagrange_generator.jl (symbolic engine)")

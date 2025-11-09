@@ -45,7 +45,7 @@
 #   - Version control shows what changed
 #
 # SEE:
-#   - src/lagrange_basis_functions.md (mathematical explanation)
+#   - docs/book/lagrange_basis_functions.md (mathematical explanation)
 #   - scripts/generate_lagrange_basis.jl (generation script)
 #   - src/basis/lagrange_generated.jl (output - do not edit manually!)
 #
