@@ -38,6 +38,7 @@ This is the **JuliaFEM Bible** - a comprehensive manual mixing theory, philosoph
 **"Let me show you how I think about FEM."**
 
 This is:
+
 - **Educational:** Teach FEM through implementation
 - **Personal:** Written in Jukka's voice, reflecting 8+ years of experience
 - **Opinionated:** Strong views on what works and what doesn't
@@ -45,6 +46,7 @@ This is:
 - **Honest:** Documents failures as much as successes
 
 We assume you:
+
 - Love mathematics AND programming
 - Want to understand WHY, not just HOW
 - Have time to read deeply
@@ -54,30 +56,35 @@ We assume you:
 ## Structure
 
 ### Part I: Foundations
+
 - Finite Element Method (brief review)
 - Lagrange Basis Functions (deep dive)
 - Assembly and Solving
 - Contact Mechanics
 
 ### Part II: Software Design
+
 - Type Stability and Performance
 - Zero-Allocation Design
 - Immutability and Composition
 - Field System Architecture
 
 ### Part III: History and Vision
+
 - Strategic Mistakes (2015-2019)
 - Why JuliaFEM is Different
 - Contact Mechanics Focus
 - Laboratory Philosophy
 
 ### Part IV: Research
+
 - Nodal Assembly (experimental)
 - Matrix-Free Methods
 - Automatic Differentiation
 - GPU Acceleration
 
 ### Part V: The Journey
+
 - Personal Reflections
 - Lessons Learned
 - Future Directions

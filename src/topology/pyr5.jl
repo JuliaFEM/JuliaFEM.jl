@@ -45,10 +45,10 @@ Reference coordinates for 5-node pyramid (Code Aster convention):
 """
 reference_coordinates(::Pyr5) = (
     (-1.0, -1.0, -1.0), # N1
-    ( 1.0, -1.0, -1.0), # N2
-    ( 1.0,  1.0, -1.0), # N3
-    (-1.0,  1.0, -1.0), # N4
-    ( 0.0,  0.0,  1.0), # N5 (apex)
+    (1.0, -1.0, -1.0), # N2
+    (1.0, 1.0, -1.0), # N3
+    (-1.0, 1.0, -1.0), # N4
+    (0.0, 0.0, 1.0), # N5 (apex)
 )
 
 """

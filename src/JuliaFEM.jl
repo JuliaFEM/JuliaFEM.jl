@@ -133,28 +133,84 @@ end
 # Previously: @reexport using FEMBase
 # Now: Include files directly below
 
-# Consolidate FEMBasis.jl into src/basis/ (Phase 1)
+# ============================================================================
+# TOPOLOGY: Reference element geometries (NEW - separation of concerns)
+# ============================================================================
+include("topology/topology.jl")       # Abstract topology interface
+# 1D elements
+include("topology/seg2.jl")
+include("topology/seg3.jl")
+# 2D triangular elements
+include("topology/tri3.jl")
+include("topology/tri6.jl")
+include("topology/tri7.jl")
+# 2D quadrilateral elements
+include("topology/quad4.jl")
+include("topology/quad8.jl")
+include("topology/quad9.jl")
+# 3D tetrahedral elements
+include("topology/tet4.jl")
+include("topology/tet10.jl")
+# 3D hexahedral elements
+include("topology/hex8.jl")
+include("topology/hex20.jl")
+include("topology/hex27.jl")
+# 3D pyramid elements
+include("topology/pyr5.jl")
+# 3D wedge/prism elements
+include("topology/wedge6.jl")
+include("topology/wedge15.jl")
+
+export AbstractTopology, nnodes, dim, reference_coordinates, edges, faces
+export Seg2, Seg3
+export Tri3, Tri6, Tri7
+export Quad4, Quad8, Quad9
+export Tet4, Tet10
+export Hex8, Hex20, Hex27
+export Pyr5
+export Wedge6, Wedge15
+
+# ============================================================================
+# QUADRATURE: Low-level integration point data (consolidated from FEMQuad.jl)
+# ============================================================================
+include("quadrature.jl")
+
+# ============================================================================
+# INTEGRATION: High-level integration schemes (NEW - separation of concerns)
+# ============================================================================
+include("integration/integration.jl")  # Abstract integration interface, IntegrationPoint
+include("integration/gauss.jl")        # Gauss-Legendre quadrature
+
+export AbstractIntegration, IntegrationPoint, integration_points, npoints
+export Gauss
+
+# ============================================================================
+# BASIS: Interpolation schemes (consolidated from FEMBasis.jl)
+# ============================================================================
 include("basis/abstract.jl")
 include("basis/subs.jl")  # Symbolic substitution (includes minimal simplify from SymDiff.jl)
 include("basis/vandermonde.jl")
-# TODO: Replace dynamic basis generation with pre-generated file
-# For now, still need this for existing lagrange_*.jl files
-include("basis/lagrange_generator.jl")
-include("basis/lagrange_segments.jl")
-include("basis/lagrange_quadrangles.jl")
-include("basis/lagrange_triangles.jl")
-include("basis/lagrange_tetrahedrons.jl")
-include("basis/lagrange_hexahedrons.jl")
-include("basis/lagrange_wedges.jl")
-include("basis/lagrange_pyramids.jl")
+
+# NOTE: Lagrange basis files create types like "Tri3 <: AbstractBasis"
+# These conflict with new "Tri3 <: AbstractTopology" types!
+# TODO (Phase 2): Rename basis types to avoid conflicts (Tri3Basis, Quad4Basis, etc.)
+# For now, we comment out to allow topology/integration to load properly.
+# Old code that uses these basis types will need updating.
+#
+# include("basis/lagrange_generator.jl")
+# include("basis/lagrange_segments.jl")
+# include("basis/lagrange_quadrangles.jl")
+# include("basis/lagrange_triangles.jl")
+# include("basis/lagrange_tetrahedrons.jl")
+# include("basis/lagrange_hexahedrons.jl")
+# include("basis/lagrange_wedges.jl")
+# include("basis/lagrange_pyramids.jl")
+
 include("basis/nurbs.jl")
 include("basis/nurbs_segment.jl")
 include("basis/nurbs_surface.jl")
 include("basis/nurbs_solid.jl")
 include("basis/math.jl")
-
-# Quadrature rules (consolidated from FEMQuad.jl)
-include("quadrature.jl")
 
 # Consolidate FEMBase.jl into src/ (Phase 1 continued)
 # Order matters: fields → types → sparse → elements → integrate → problems → assembly

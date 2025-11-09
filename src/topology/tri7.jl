@@ -44,7 +44,7 @@ reference_coordinates(::Tri7) = (
     (0.5, 0.0),    # N4
     (0.5, 0.5),    # N5
     (0.0, 0.5),    # N6
-    (1/3, 1/3),    # N7 (center)
+    (1 / 3, 1 / 3),    # N7 (center)
 )
 
 """
