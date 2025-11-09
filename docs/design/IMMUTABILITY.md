@@ -1,9 +1,12 @@
-# Element Immutability: Design Decision and Rationale
-
-**Status:** IMPLEMENTED (Phase 1B, November 2025)  
-**Author:** Jukka Aho  
-**Benchmark:** `benchmarks/element_immutability_benchmark.jl`
-
+---
+title: "Element Immutability: Design Decision and Rationale"
+author: "Jukka Aho"
+date: "2025-11-09"
+status: "IMPLEMENTED"
+phase: "Phase 1B"
+categories: ["Design", "Architecture"]
+tags: ["immutability", "performance", "design-decision"]
+benchmark: "benchmarks/element_immutability_benchmark.jl"
 ---
 
 ## Executive Summary
