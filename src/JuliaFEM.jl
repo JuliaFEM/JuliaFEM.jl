@@ -222,6 +222,30 @@ include("basis/nurbs.jl")
 # TODO: Rewrite for new AbstractBasis (non-parametric)
 # include("basis/math.jl")  # Uses AbstractBasis{dim} throughout (jacobian, grad, interpolate, etc.)
 # TODO: Rewrite math functions for new AbstractBasis
+# TEMPORARY: Define minimal jacobian function for testing
+function jacobian(B::AbstractBasis, X::Vector{<:Vec}, xi::Vec)
+    dB = eval_dbasis!(B, xi)
+    @assert length(X) == length(dB)
+    # Compute J = dX/dξ: rows are physical dims, columns are parametric dims
+    # J[i,j] = ∂X_i/∂ξ_j = sum_k X_k[i] * dN_k/dξ_j
+    dim_physical = length(first(X))
+    dim_parametric = length(xi)
+    
+    # Build Jacobian matrix manually for embedding case (e.g., 1D element in 3D space)
+    # Result is a dim_physical × dim_parametric matrix
+    J_data = zeros(dim_physical, dim_parametric)
+    @inbounds for k in 1:length(X)
+        for i in 1:dim_physical
+            for j in 1:dim_parametric
+                J_data[i,j] += X[k][i] * dB[k][j]
+            end
+        end
+    end
+    
+    # Convert to Tensor (note: Tensor{2,N} is N×N, but we need dim_physical×dim_parametric)
+    # For now, return as Matrix
+    return J_data
+end
 
 # Consolidate FEMBase.jl into src/ (Phase 1 continued)
 # Order matters: fields → types → sparse → elements → integrate → problems → assembly

@@ -641,9 +641,13 @@ function (element::Element)(ip, time, ::Type{Val{:Jacobian}})
     X_dict = element("geometry", time)
     # Convert to Vector{Vec} for Tensors.jl compatibility
     X = [Vec(x...) for x in X_dict]
-    # Convert ip.coords (Tuple) to Vec
-    xi = Vec(ip.coords)
-    J = jacobian(element.properties, X, xi)
+    # Convert ip to Vec - handle both Tuple and IntegrationPoint
+    if isa(ip, Tuple)
+        xi = Vec(ip)
+    else
+        xi = Vec(ip.coords)
+    end
+    J = jacobian(element.basis, X, xi)
     return J
 end
 
@@ -653,10 +657,13 @@ function (element::Element)(ip, time::Float64, ::Type{Val{:detJ}})
     if n == m  # volume element
         return det(J)
     end
+    # For embedded elements (1D in 2D/3D, 2D in 3D):
+    # detJ = || ∂X/∂ξ || for 1D elements
+    # detJ = || ∂X/∂ξ₁ × ∂X/∂ξ₂ || for 2D elements
     JT = transpose(J)
-    if size(JT, 2) == 1  # boundary of 2d problem, || ∂X/∂ξ ||
+    if m == 1  # 1D element (boundary of 2D or 3D), J is n×1, JT is 1×n
         return norm(JT)
-    else # manifold on 3d problem, || ∂X/∂ξ₁ × ∂X/∂ξ₂ ||
+    else  # 2D element (manifold on 3D problem), J is 3×2, JT is 2×3
         return norm(cross(JT[:, 1], JT[:, 2]))
     end
 end
