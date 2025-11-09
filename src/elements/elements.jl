@@ -513,7 +513,7 @@ this returns a new instance with updated integration points.
 """
 function with_integration_points(element::Element{N,NIP,M,B}, ips::NTuple{NNEW,IP}) where {N,NIP,M,B,NNEW}
     return Element{N,NNEW,M,B}(element.id, element.connectivity, ips,
-                                element.dfields, element.sfields, element.properties)
+        element.dfields, element.sfields, element.properties)
 end
 
 """ Find inverse isoparametric mapping of element. """

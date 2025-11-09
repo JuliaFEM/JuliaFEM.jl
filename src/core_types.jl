@@ -5,11 +5,12 @@ const Node = Vector{Float64}
 
 abstract type AbstractPoint end
 
-mutable struct Point{P<:AbstractPoint}
-    id::UInt  # Changed from Int to match Gmsh (Issue #267)
+# Immutable Point - Dict is a reference type so this is safe
+struct Point{P<:AbstractPoint}
+    id::UInt
     weight::Float64
     coords::Tuple{Vararg{Float64}}
-    fields::Dict{String,AbstractField}
+    fields::Dict{String,AbstractField}  # Reference type, can still be modified
     properties::P
 end
 
