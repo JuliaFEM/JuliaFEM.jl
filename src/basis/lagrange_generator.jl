@@ -222,23 +222,23 @@ function calculate_interpolation_polynomial_derivatives(basis, D)
     return dbasis
 end
 
-function create_basis(name, description, X::Vector{<:Vecish{D}}, p::Expr) where D
-    @debug "create basis given antsatz polynomial" name description X p
+function create_basis(topology_type::Symbol, polynomial_degree::Int, description, X::Vector{<:Vecish{D}}, p::Expr) where D
+    @debug "create basis given ansatz polynomial" topology_type polynomial_degree description X p
     V = vandermonde_matrix(p, X)
     basis = calculate_interpolation_polynomials(p, V)
-    return create_basis(name, description, X, basis)
+    return create_basis(topology_type, polynomial_degree, description, X, basis)
 end
 
-function create_basis(name, description, X::Vector{<:Vecish{D}}, basis::Vector) where D
+function create_basis(topology_type::Symbol, polynomial_degree::Int, description, X::Vector{<:Vecish{D}}, basis::Vector) where D
     @assert length(X) == length(basis)
-    @debug "create basis given basis functions" name description X basis
+    @debug "create basis given basis functions" topology_type polynomial_degree description X basis
     dbasis = calculate_interpolation_polynomial_derivatives(basis, D)
-    return create_basis(name, description, Vec.(X), basis, dbasis)
+    return create_basis(topology_type, polynomial_degree, description, Vec.(X), basis, dbasis)
 end
 
-function create_basis(name, description, X::Vector{<:Vecish{D,T}}, basis, dbasis) where {D,T}
+function create_basis(topology_type::Symbol, polynomial_degree::Int, description, X::Vector{<:Vecish{D,T}}, basis, dbasis) where {D,T}
     N = length(X)
-    @debug "create basis given basis functions and derivatives" name description X basis dbasis
+    @debug "create basis given basis functions and derivatives" topology_type polynomial_degree description X basis dbasis
 
     # Build tuple expression for eval_basis! return: (N1, N2, N3, ...)
     basis_tuple_args = [basis[i] for i = 1:N]
@@ -247,6 +247,10 @@ function create_basis(name, description, X::Vector{<:Vecish{D,T}}, basis, dbasis
     # Build tuple expression for eval_dbasis! return: (dN1, dN2, dN3, ...)
     dbasis_tuple_args = [:(Vec(float.(tuple($(dbasis[:, i]...))))) for i = 1:N]
     dbasis_tuple = Expr(:tuple, dbasis_tuple_args...)
+    
+    # Build tuple expression for reference coordinates: (Vec(...), Vec(...), ...)
+    coord_tuple_args = [:(Vec{$D,$T}(tuple($(X[i]...)))) for i = 1:N]
+    coord_tuple = Expr(:tuple, coord_tuple_args...)
 
     if D == 1
         unpack = :((u,) = xi)
@@ -256,35 +260,35 @@ function create_basis(name, description, X::Vector{<:Vecish{D,T}}, basis, dbasis
         unpack = :((u, v, w) = xi)
     end
 
+    # Generate code for Lagrange{Topology, P} instead of TopologyBasis
     code = quote
-        struct $name <: AbstractBasis{$D}
+        # $description
+        function get_reference_element_coordinates(::Type{Lagrange{$topology_type,$polynomial_degree}})
+            return $coord_tuple
         end
-
-        Base.@pure function Base.size(::Type{$name})
-            return ($D, $N)
-        end
-
-        function Base.size(::Type{$name}, j::Int)
-            j == 1 && return $D
-            j == 2 && return $N
-        end
-
-        Base.@pure function Base.length(::Type{$name})
-            return $N
-        end
-
-        function get_reference_element_coordinates(::Type{$name})
-            return $X
+        
+        function get_reference_element_coordinates(::Lagrange{$topology_type,$polynomial_degree})
+            return $coord_tuple
         end
 
         # Return tuple directly - zero allocations!
-        @inline function eval_basis!(::Type{$name}, ::Type{T}, xi::Vec) where T
+        @inline function eval_basis!(::Type{Lagrange{$topology_type,$polynomial_degree}}, ::Type{T}, xi::Vec) where T
+            $unpack
+            @inbounds return $basis_tuple
+        end
+        
+        @inline function eval_basis!(::Lagrange{$topology_type,$polynomial_degree}, ::Type{T}, xi::Vec) where T
             $unpack
             @inbounds return $basis_tuple
         end
 
         # Return NTuple{N,Vec{D}} directly - zero allocations!
-        @inline function eval_dbasis!(::Type{$name}, xi::Vec)
+        @inline function eval_dbasis!(::Type{Lagrange{$topology_type,$polynomial_degree}}, xi::Vec)
+            $unpack
+            @inbounds return $dbasis_tuple
+        end
+        
+        @inline function eval_dbasis!(::Lagrange{$topology_type,$polynomial_degree}, xi::Vec)
             $unpack
             @inbounds return $dbasis_tuple
         end
@@ -293,6 +297,26 @@ function create_basis(name, description, X::Vector{<:Vecish{D,T}}, basis, dbasis
 end
 
 create_basis_and_eval(args...) = eval(create_basis(args...))
+
+# Mapping from old element names to (topology_type, polynomial_degree)
+# This allows the generator to use the new parametric Lagrange{T,P} system
+const ELEMENT_TO_LAGRANGE = Dict{String, Tuple{Symbol, Int}}(
+    "Seg2" => (:Segment, 1),
+    "Seg3" => (:Segment, 2),
+    "Tri3" => (:Triangle, 1),
+    "Tri6" => (:Triangle, 2),
+    "Quad4" => (:Quadrilateral, 1),
+    "Quad8" => (:Quadrilateral, 2),  # Serendipity, special case
+    "Quad9" => (:Quadrilateral, 2),
+    "Tet4" => (:Tetrahedron, 1),
+    "Tet10" => (:Tetrahedron, 2),
+    "Hex8" => (:Hexahedron, 1),
+    "Hex20" => (:Hexahedron, 2),  # Serendipity, special case
+    "Hex27" => (:Hexahedron, 2),
+    "Pyr5" => (:Pyramid, 1),
+    "Wedge6" => (:Wedge, 1),
+    "Wedge15" => (:Wedge, 2),  # Serendipity, special case
+)
 
 # ==============================================================================
 # GENERATION SCRIPT - Run as: julia --project=. src/basis/lagrange_generator.jl
@@ -755,16 +779,27 @@ if abspath(PROGRAM_FILE) == @__FILE__
     println(output, "# ============================================================================")
     println(output)
 
-    # Export all basis types
-    basis_names = [Symbol(elem.name * "Basis") for elem in elements]
-    println(output, "# Export all basis types")
-    println(output, "export ", join(string.(basis_names), ", "))
+    # No exports needed - we generate methods for the parametric Lagrange{T,P} type
+    println(output, "# This file generates methods for Lagrange{T,P} where:")
+    println(output, "#   T = topology type (Segment, Triangle, Quadrilateral, etc.)")
+    println(output, "#   P = polynomial degree (1, 2, 3, ...)")
+    println(output, "#")
+    println(output, "# Example: Lagrange{Triangle, 2} is a quadratic triangular element")
     println(output)
 
     for (i, elem) in enumerate(elements)
         println("[$i/$(length(elements))] Generating $(elem.name)...")
 
         try
+            # Map old element name to (topology_type, polynomial_degree)
+            if !haskey(ELEMENT_TO_LAGRANGE, elem.name)
+                println("  ⚠ Warning: $(elem.name) not in ELEMENT_TO_LAGRANGE mapping")
+                println("  Skipping...")
+                continue
+            end
+            
+            topology_type, poly_degree = ELEMENT_TO_LAGRANGE[elem.name]
+            
             # Convert coordinates to proper format (tuples, not vectors)
             coords = [tuple(coord...) for coord in elem.coordinates]
 
@@ -776,10 +811,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
             end
 
             # Generate basis code using symbolic engine
-            # APPEND "Basis" SUFFIX to resolve name conflicts with topology types
-            basis_type_name = Symbol(elem.name * "Basis")
+            # Now generates methods for Lagrange{topology_type, poly_degree}
             basis_code_expr = create_basis(
-                basis_type_name,
+                topology_type,
+                poly_degree,
                 elem.description,
                 coords,
                 ansatz_expr
@@ -798,7 +833,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
             # Write to output with nice formatting
             println(output, "# " * "─"^78)
-            println(output, "# $(elem.name): $(elem.description)")
+            println(output, "# Lagrange{$(topology_type), $(poly_degree)}: $(elem.description)")
+            println(output, "# (Old name: $(elem.name))")
             println(output, "# " * "─"^78)
             println(output)
             println(output, basis_code_str)
