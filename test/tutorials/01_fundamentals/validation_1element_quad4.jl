@@ -104,11 +104,11 @@ update!(element, "poissons ratio", 0.3)
     @test length(geom) == 4  # 4 nodes
     @test geom[1] == [0.0, 0.0]
     @test geom[3] == [1.0, 1.0]
-    
+
     # Check material properties
     E = element("youngs modulus", 0.0)
     @test E == 200000.0
-    
+
     ν = element("poissons ratio", 0.0)
     @test ν == 0.3
 end
@@ -127,16 +127,16 @@ D_factor = E / (1 - ν^2)
     # Check the scaling factor
     @test D_factor ≈ 200000.0 / (1 - 0.09)
     @test D_factor ≈ 219780.21978021978
-    
+
     # Compute D matrix entries
     D11 = D_factor * 1.0
     D12 = D_factor * ν
     D33 = D_factor * (1 - ν) / 2
-    
+
     @test D11 ≈ 219780.21978021978
     @test D12 ≈ 65934.06593406593
     @test D33 ≈ 76923.07692307692
-    
+
     # Verify D is symmetric
     @test D11 > 0
     @test D33 > 0
@@ -152,17 +152,17 @@ end
     # Get all nodes at once
     X = element("geometry", 0.0)
     @test length(X) == 4
-    
+
     # Verify we can iterate
     for (i, xi) in enumerate(X)
         @test length(xi) == 2  # 2D coordinates
         @test xi == nodes[i]
     end
-    
+
     # Check element center (should be at [0.5, 0.5])
     center = sum(X) / length(X)
     @test center ≈ [0.5, 0.5]
-    
+
     # Check element area (for unit square, should be 1.0)
     # Area = (x2-x1)*(y4-y1) for aligned rectangle
     width = X[2][1] - X[1][1]
@@ -179,10 +179,10 @@ end
 @testset "Material Properties" begin
     E_retrieved = element("youngs modulus", 0.0)
     ν_retrieved = element("poissons ratio", 0.0)
-    
+
     @test E_retrieved == 200000.0
     @test ν_retrieved == 0.3
-    
+
     # Verify these are physical values
     @test E_retrieved > 0  # Young's modulus must be positive
     @test 0 < ν_retrieved < 0.5  # Poisson's ratio must be in (0, 0.5) for stability

@@ -55,13 +55,13 @@ nodeTags, coord, parametricCoord = gmsh.model.mesh.getNodes()
 # Let's reshape it into a more convenient format:
 
 num_nodes = length(nodeTags)
-nodes = Dict{Int, Vector{Float64}}()
+nodes = Dict{Int,Vector{Float64}}()
 
 for i in 1:num_nodes
     node_id = nodeTags[i]
-    x = coord[3*(i-1) + 1]
-    y = coord[3*(i-1) + 2]
-    z = coord[3*(i-1) + 3]
+    x = coord[3*(i-1)+1]
+    y = coord[3*(i-1)+2]
+    z = coord[3*(i-1)+3]
     nodes[node_id] = [x, y, z]
 end
 
@@ -80,25 +80,25 @@ all_elements = Element[]
 
 for entity in entities
     dim, tag = entity
-    
+
     # Get element data for this entity
     elemTypes, elemTags, nodeTags_elem = gmsh.model.mesh.getElements(dim, tag)
-    
+
     # Loop over element types (we have Quad4 = type 3)
     for (elemType, elemTag, elemNodeTags) in zip(elemTypes, elemTags, nodeTags_elem)
-        
+
         # Get element properties
-        elemName, elemDim, order, numNodes, localNodeCoord, numPrimaryNodes = 
+        elemName, elemDim, order, numNodes, localNodeCoord, numPrimaryNodes =
             gmsh.model.mesh.getElementProperties(elemType)
-        
+
         # Create JuliaFEM elements
         for i in 1:length(elemTag)
             # Extract connectivity for this element
-            start_idx = (i-1) * numNodes + 1
+            start_idx = (i - 1) * numNodes + 1
             end_idx = i * numNodes
             # Convert UInt64 to Int for JuliaFEM compatibility
             connectivity = Tuple(Int(tag) for tag in elemNodeTags[start_idx:end_idx])
-            
+
             # Map Gmsh element type to JuliaFEM element type
             if elemType == 3  # Gmsh Quad4
                 local elem = Element(Quad4, connectivity)
@@ -106,10 +106,10 @@ for entity in entities
                 @warn "Unknown element type: $elemType ($elemName)"
                 continue
             end
-            
+
             # Add geometry field
             update!(elem, "geometry", nodes)
-            
+
             push!(all_elements, elem)
         end
     end
@@ -136,20 +136,20 @@ gmsh.finalize()
 @testset "Gmsh Mesh Reading" begin
     # Correct number of nodes (2×5 structured quad mesh has 3×6 nodes)
     @test length(nodes) == 18
-    
+
     # Correct number of elements (2 × 5 = 10 quads)
     @test length(all_elements) == 10
-    
+
     # All elements should be Quad4
     @test all(e -> typeof(e.properties) == Quad4, all_elements)
-    
+
     # Node coordinates should be in [0,1] × [0,1]
     for (node_id, coord) in nodes
         @test 0.0 <= coord[1] <= 1.0  # x ∈ [0,1]
         @test 0.0 <= coord[2] <= 1.0  # y ∈ [0,1]
         @test coord[3] == 0.0         # z = 0 (2D mesh)
     end
-    
+
     # Each element should have 4 nodes
     for element in all_elements
         @test length(element.connectivity) == 4

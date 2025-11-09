@@ -112,11 +112,11 @@ E = element("youngs modulus", 0.0)
 @testset "Element Creation" begin
     # Element should have 4 nodes
     @test length(element.connectivity) == 4
-    
+
     # Geometry field returns a tuple of node coordinates
     @test length(geom) == 4  # 4 nodes
     @test geom[1] == [0.0, 0.0]  # First node
-    
+
     # Material properties should be retrievable
     @test E == 200.0e3
     @test ν == 0.3

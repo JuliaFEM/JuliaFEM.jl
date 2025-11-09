@@ -4,18 +4,14 @@ version = "0.5.2"
 author = ["Jukka Aho <ahojukka5@gmail.com>", "Tero Frondelius <tero.frondelius@gmail.com>", "Olli Väinölä"]
 
 [deps]
+Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 
-# Removed for minimal dependency approach:
-# - Arpack: Modal analysis (solvers_modal.jl commented out)
-# - Calculus: Symbolic basis generation (basis/create_basis.jl commented out)
-# - ForwardDiff: Only used in tutorial notebooks for plasticity
-# - HDF5/LightXML: I/O functionality (io.jl, AsterReader already commented out)
-
 [compat]
+Gmsh = "0.3.1"
 Tensors = "≥ 1.0.0"
 julia = "1.9"
 
@@ -23,6 +19,7 @@ julia = "1.9"
 Calculus = "49dc2e85-a5d0-5ad3-a950-438e2897f1b9"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
 HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
 LightXML = "9c8b4983-aa76-5018-a973-4c85ecc9e179"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -33,4 +30,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [targets]
-test = ["Test", "Statistics"]
+test = ["Test", "Statistics", "Gmsh"]

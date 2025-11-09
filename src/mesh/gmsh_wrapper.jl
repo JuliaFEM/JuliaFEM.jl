@@ -53,6 +53,4 @@ function gmsh_finalize()
     if Bool(gmsh.isInitialized())
         gmsh.finalize()
     end
-
-
-
+end
