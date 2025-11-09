@@ -93,6 +93,45 @@ function Element(::Type{T}, connectivity::Vector{<:Integer}) where T<:AbstractBa
     return Element(T, (connectivity...,))
 end
 
+# ============================================================================
+# Backwards compatibility shims: Accept topology types, map to basis types
+# ============================================================================
+# TODO (Phase 1B): Update for new Lagrange{Topology, P} parametric architecture
+# These old shims mapped Tri3 → Tri3Basis, but we're now using Lagrange{Triangle,1}
+# Commenting out until new architecture is fully implemented.
+
+# # Helper: Map topology type to basis type
+# topology_to_basis(::Type{Poi1}) = Poi1Basis
+# topology_to_basis(::Type{Seg2}) = Seg2Basis
+# topology_to_basis(::Type{Seg3}) = Seg3Basis
+# topology_to_basis(::Type{Tri3}) = Tri3Basis
+# topology_to_basis(::Type{Tri6}) = Tri6Basis
+# topology_to_basis(::Type{Tri7}) = Tri7Basis
+# topology_to_basis(::Type{Quad4}) = Quad4Basis
+# topology_to_basis(::Type{Quad8}) = Quad8Basis
+# topology_to_basis(::Type{Quad9}) = Quad9Basis
+# topology_to_basis(::Type{Tet4}) = Tet4Basis
+# topology_to_basis(::Type{Tet10}) = Tet10Basis
+# topology_to_basis(::Type{Hex8}) = Hex8Basis
+# topology_to_basis(::Type{Hex20}) = Hex20Basis
+# topology_to_basis(::Type{Hex27}) = Hex27Basis
+# topology_to_basis(::Type{Pyr5}) = Pyr5Basis
+# topology_to_basis(::Type{Wedge6}) = Wedge6Basis
+# topology_to_basis(::Type{Wedge15}) = Wedge15Basis
+
+# # Shim constructors that forward to basis-based constructors
+# function Element(::Type{T}, connectivity::NTuple{N,<:Integer}) where {N,T<:AbstractTopology}
+#     return Element(topology_to_basis(T), connectivity)
+# end
+
+# function Element(::Type{T}, ::Type{M}, connectivity::NTuple{N,<:Integer}) where {N,M<:AbstractFieldSet,T<:AbstractTopology}
+#     return Element(topology_to_basis(T), M, connectivity)
+# end
+
+# function Element(::Type{T}, connectivity::Vector{<:Integer}) where T<:AbstractTopology
+#     return Element(topology_to_basis(T), connectivity)
+# end
+
 function get_element_id(element::AbstractElement)
     return element.id
 end
