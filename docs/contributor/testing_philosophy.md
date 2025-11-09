@@ -1,4 +1,17 @@
-# JuliaFEM Testing Philosophy
+---
+title: "Testing Philosophy"
+description: "How and why we test in JuliaFEM"
+date: 2025-11-08
+author: "Jukka Aho"
+categories: ["testing", "quality assurance"]
+keywords: ["testing", "unit tests", "verification", "validation"]
+audience: "contributors"
+level: "intermediate"
+type: "guide"
+series: "Contributor Manual"
+---
+
+# Testing Philosophy
 
 **Date:** November 9, 2025  
 **Goal:** 99% code coverage with educational, fast, well-structured tests  

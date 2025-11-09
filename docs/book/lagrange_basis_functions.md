@@ -1,3 +1,20 @@
+---
+title: "Lagrange Basis Functions"
+subtitle: "Mathematical foundations of finite element interpolation"
+description: "Complete derivation of Lagrange basis functions using Vandermonde matrix method"
+date: 2025-11-09
+author: "Jukka Aho"
+categories: ["theory", "mathematics", "fem"]
+keywords: ["lagrange basis", "shape functions", "interpolation", "vandermonde matrix", "fem theory"]
+audience: "researchers and advanced users"
+level: "expert"
+type: "theory"
+series: "The JuliaFEM Book"
+chapter: "Part I: Foundations"
+math: true
+prerequisites: ["linear algebra", "numerical analysis", "fem basics"]
+---
+
 # Lagrange Basis Functions in JuliaFEM
 
 **Date:** November 9, 2025  

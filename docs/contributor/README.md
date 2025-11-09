@@ -1,3 +1,15 @@
+---
+title: "JuliaFEM Contributor Manual"
+description: "Technical guide for developers and contributors"
+date: 2025-11-09
+author: "Jukka Aho"
+categories: ["development", "contributor guide"]
+keywords: ["juliafem", "development", "architecture", "testing", "performance"]
+audience: "developers"
+level: "advanced"
+type: "manual"
+---
+
 # JuliaFEM Contributor Manual
 
 **Audience:** Developers, contributors, advanced users who want to extend or modify JuliaFEM.

@@ -1,3 +1,17 @@
+---
+title: "The JuliaFEM Book"
+subtitle: "A comprehensive manual mixing theory, software design, and personal experience"
+description: "Deep dive into FEM theory, design philosophy, and research directions"
+date: 2025-11-09
+author: "Jukka Aho"
+categories: ["theory", "research", "philosophy"]
+keywords: ["fem theory", "contact mechanics", "design philosophy", "research"]
+audience: "researchers and theory enthusiasts"
+level: "expert"
+type: "book"
+status: "work in progress"
+---
+
 # The JuliaFEM Book
 
 **Audience:** Advanced researchers, theory nerds, those who want to understand the "why" and "how" at a deep level. And Jukka.

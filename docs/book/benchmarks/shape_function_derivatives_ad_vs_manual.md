@@ -1,3 +1,22 @@
+---
+title: "Shape Function Derivatives: Hand-Calculated vs Automatic Differentiation"
+subtitle: "Performance benchmark for Tet10 element derivatives"
+description: "Comprehensive benchmark showing 30× performance difference between manual and AD derivatives"
+date: 2025-11-09
+author: "Jukka Aho"
+categories: ["benchmarks", "performance", "research"]
+keywords: ["automatic differentiation", "performance", "shape functions", "derivatives", "tensors.jl", "tet10"]
+audience: "developers and researchers"
+level: "advanced"
+type: "benchmark"
+series: "The JuliaFEM Book"
+chapter: "Part IV: Research"
+experiment_date: "2025-11-09"
+tools: ["BenchmarkTools.jl", "Tensors.jl"]
+status: "completed"
+context: "Major zero-allocation refactoring (immutable Element, tuple-based APIs)"
+---
+
 # Shape Function Derivatives: Hand-Calculated vs Automatic Differentiation
 
 **Date:** November 9, 2025  

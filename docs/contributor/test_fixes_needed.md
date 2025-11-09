@@ -1,3 +1,18 @@
+---
+title: "Test Fixes Needed"
+description: "Known test failures and fixes required for full test suite passing"
+date: 2025-11-09
+updated: 2025-11-09
+author: "Jukka Aho"
+categories: ["testing", "todo"]
+keywords: ["tests", "failures", "fixes", "todo"]
+audience: "contributors"
+level: "intermediate"
+type: "technical note"
+series: "Contributor Manual"
+status: "active maintenance"
+---
+
 # Test Fixes Needed
 
 **Date:** November 8, 2025  

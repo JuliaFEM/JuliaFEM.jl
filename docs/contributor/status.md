@@ -1,4 +1,18 @@
-# JuliaFEM Revival Status - November 8, 2025
+---
+title: "JuliaFEM Project Status"
+description: "Current state of the revival project as of November 2025"
+date: 2025-11-08
+updated: 2025-11-08
+author: "Jukka Aho"
+categories: ["status", "progress"]
+keywords: ["status", "progress", "revival", "roadmap"]
+audience: "contributors"
+level: "intermediate"
+type: "status report"
+series: "Contributor Manual"
+---
+
+# JuliaFEM Status
 
 ## ✅ SUCCESS: Package Loads!
 

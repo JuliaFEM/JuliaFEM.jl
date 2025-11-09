@@ -1,3 +1,13 @@
+---
+title: "JuliaFEM Documentation"
+description: "Three-tier documentation structure for users, contributors, and researchers"
+date: 2025-11-09
+author: "Jukka Aho"
+categories: ["documentation", "guide"]
+keywords: ["juliafem", "finite element", "documentation", "manual"]
+type: "index"
+---
+
 # JuliaFEM Documentation
 
 Welcome! JuliaFEM documentation is organized into **three manuals** for three different audiences:

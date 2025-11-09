@@ -1,3 +1,15 @@
+---
+title: "JuliaFEM Scripts"
+description: "Development and code generation scripts for JuliaFEM"
+date: 2025-11-09
+author: "Jukka Aho"
+categories: ["development", "tools", "automation"]
+keywords: ["scripts", "code generation", "automation", "development tools"]
+audience: "contributors"
+level: "intermediate"
+type: "technical documentation"
+---
+
 # JuliaFEM Scripts
 
 This directory contains development and code generation scripts for JuliaFEM.

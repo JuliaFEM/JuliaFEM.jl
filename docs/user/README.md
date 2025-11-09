@@ -1,3 +1,15 @@
+---
+title: "JuliaFEM User Manual"
+description: "Quick start guide and practical tutorials for end users"
+date: 2025-11-09
+author: "Jukka Aho"
+categories: ["user guide", "tutorial"]
+keywords: ["juliafem", "quick start", "tutorial", "examples"]
+audience: "end users"
+level: "beginner"
+type: "manual"
+---
+
 # JuliaFEM User Manual
 
 **Audience:** End users, engineers, students who want to run simulations and get results.
