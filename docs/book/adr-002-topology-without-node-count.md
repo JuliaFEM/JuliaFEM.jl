@@ -1,8 +1,18 @@
-# ADR 002: Topology Types Without Hardcoded Node Counts
-
-**Date:** November 9, 2025  
-**Status:** Accepted  
-**Supersedes:** ADR 001 (partial - corrects topology design)
+---
+title: "ADR 002: Topology Types Without Hardcoded Node Counts"
+description: "Architecture decision to separate topology (geometry) from node count (determined by basis)"
+date: "November 9, 2025"
+author: "Jukka Aho"
+categories: ["architecture", "design-decision", "adr"]
+keywords: ["topology", "basis", "lagrange", "separation-of-concerns", "node-count"]
+audience: "researchers"
+level: "advanced"
+type: "adr"
+series: "The JuliaFEM Book"
+chapter: 3
+status: "accepted"
+supersedes: "ADR 001 (partial)"
+---
 
 ## Context
 
