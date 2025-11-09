@@ -137,9 +137,9 @@ end
 include("basis/abstract.jl")
 include("basis/subs.jl")  # Symbolic substitution (includes minimal simplify from SymDiff.jl)
 include("basis/vandermonde.jl")
-# NOTE: lagrange_generator.jl is NOT included here - it's a tool, not runtime code!
-# It's only loaded by scripts/generate_lagrange_basis.jl during pre-generation.
-# The generated code is in lagrange_generated.jl (to be created).
+# TODO: Replace dynamic basis generation with pre-generated file
+# For now, still need this for existing lagrange_*.jl files
+include("basis/lagrange_generator.jl")
 include("basis/lagrange_segments.jl")
 include("basis/lagrange_quadrangles.jl")
 include("basis/lagrange_triangles.jl")
