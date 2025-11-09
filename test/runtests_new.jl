@@ -22,6 +22,7 @@ if RUN_TUTORIALS
         @testset "01_Fundamentals" begin
             include("tutorials/01_fundamentals/creating_elements.jl")
             include("tutorials/01_fundamentals/reading_gmsh_meshes.jl")
+            include("tutorials/01_fundamentals/validation_1element_quad4.jl")
         end
     end
 end
