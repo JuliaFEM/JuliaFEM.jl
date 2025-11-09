@@ -247,7 +247,7 @@ function create_basis(topology_type::Symbol, polynomial_degree::Int, description
     # Build tuple expression for eval_dbasis! return: (dN1, dN2, dN3, ...)
     dbasis_tuple_args = [:(Vec(float.(tuple($(dbasis[:, i]...))))) for i = 1:N]
     dbasis_tuple = Expr(:tuple, dbasis_tuple_args...)
-    
+
     # Build tuple expression for reference coordinates: (Vec(...), Vec(...), ...)
     coord_tuple_args = [:(Vec{$D,$T}(tuple($(X[i]...)))) for i = 1:N]
     coord_tuple = Expr(:tuple, coord_tuple_args...)
@@ -266,7 +266,7 @@ function create_basis(topology_type::Symbol, polynomial_degree::Int, description
         function get_reference_element_coordinates(::Type{Lagrange{$topology_type,$polynomial_degree}})
             return $coord_tuple
         end
-        
+
         function get_reference_element_coordinates(::Lagrange{$topology_type,$polynomial_degree})
             return $coord_tuple
         end
@@ -276,7 +276,7 @@ function create_basis(topology_type::Symbol, polynomial_degree::Int, description
             $unpack
             @inbounds return $basis_tuple
         end
-        
+
         @inline function eval_basis!(::Lagrange{$topology_type,$polynomial_degree}, ::Type{T}, xi::Vec) where T
             $unpack
             @inbounds return $basis_tuple
@@ -287,7 +287,7 @@ function create_basis(topology_type::Symbol, polynomial_degree::Int, description
             $unpack
             @inbounds return $dbasis_tuple
         end
-        
+
         @inline function eval_dbasis!(::Lagrange{$topology_type,$polynomial_degree}, xi::Vec)
             $unpack
             @inbounds return $dbasis_tuple
@@ -300,7 +300,7 @@ create_basis_and_eval(args...) = eval(create_basis(args...))
 
 # Mapping from old element names to (topology_type, polynomial_degree)
 # This allows the generator to use the new parametric Lagrange{T,P} system
-const ELEMENT_TO_LAGRANGE = Dict{String, Tuple{Symbol, Int}}(
+const ELEMENT_TO_LAGRANGE = Dict{String,Tuple{Symbol,Int}}(
     "Seg2" => (:Segment, 1),
     "Seg3" => (:Segment, 2),
     "Tri3" => (:Triangle, 1),
@@ -797,9 +797,9 @@ if abspath(PROGRAM_FILE) == @__FILE__
                 println("  Skipping...")
                 continue
             end
-            
+
             topology_type, poly_degree = ELEMENT_TO_LAGRANGE[elem.name]
-            
+
             # Convert coordinates to proper format (tuples, not vectors)
             coords = [tuple(coord...) for coord in elem.coordinates]
 
