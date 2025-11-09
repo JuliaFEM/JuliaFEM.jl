@@ -15,8 +15,6 @@ math: true
 prerequisites: ["linear algebra", "numerical analysis", "fem basics"]
 ---
 
-# Lagrange Basis Functions in JuliaFEM
-
 **Date:** November 9, 2025  
 **Author:** JuliaFEM Development Team
 

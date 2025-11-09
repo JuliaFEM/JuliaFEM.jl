@@ -17,8 +17,6 @@ status: "completed"
 context: "Major zero-allocation refactoring (immutable Element, tuple-based APIs)"
 ---
 
-# Shape Function Derivatives: Hand-Calculated vs Automatic Differentiation
-
 **Date:** November 9, 2025  
 **Author:** JuliaFEM Development Team  
 **Context:** Major zero-allocation refactoring (immutable Element, tuple-based APIs)
@@ -34,6 +32,7 @@ This is a fundamental design decision for JuliaFEM. Traditionally, FEM codes pre
 ## Background
 
 ### Traditional Approach (Hand-Calculated)
+
 ```julia
 # Shape functions for Tet10
 N1(u,v,w) = (1-u-v-w)*(1-2*u-2*v-2*w)
@@ -50,6 +49,7 @@ dN1_dv(u,v,w) = 4*u + 4*v + 4*w - 3
 **Cons:** Error-prone, maintenance burden, inflexible
 
 ### AD Approach (Tensors.jl / ForwardDiff.jl)
+
 ```julia
 # Just shape functions
 N1(ξ) = (1-ξ[1]-ξ[2]-ξ[3])*(1-2*ξ[1]-2*ξ[2]-2*ξ[3])
@@ -136,19 +136,23 @@ const dN_buffer = [zero(Vec{3}) for _ in 1:10]
 ### Decision Tree
 
 **For assembly loops (hot path):**
+
 - ❌ **Do NOT use AD** - 30× overhead is unacceptable
 - ✅ **Use hand-coded derivatives** - keep them for Tet10, Hex8, Quad4, Tri3
 - ✅ **Verify with AD in unit tests** - catch human errors
 
 **For prototyping/research:**
+
 - ✅ **Use AD freely** - development velocity matters more
 - ✅ **Profile before optimizing** - maybe it's not the bottleneck
 
 **For rare elements:**
+
 - ⚠️ **Consider symbolic generation** - SymPy/Symbolics.jl once, use forever
 - ✅ **Unit test against AD** - verify correctness
 
 **For exotic bases (NURBS, splines):**
+
 - ✅ **Must use AD** - hand derivatives are intractable
 - ⚠️ **Accept performance cost** - no alternative
 
@@ -157,6 +161,7 @@ const dN_buffer = [zero(Vec{3}) for _ in 1:10]
 ### Short Term (Current JuliaFEM)
 
 **Keep manual derivatives for common elements:**
+
 - Tet4, Tet10 (3D volume)
 - Hex8, Hex20, Hex27 (3D volume)
 - Quad4, Quad8, Quad9 (2D, shells)
@@ -166,6 +171,7 @@ const dN_buffer = [zero(Vec{3}) for _ in 1:10]
 These elements cover **>95% of real-world usage**. The 30× speedup justifies maintenance.
 
 **Use AD for everything else:**
+
 - Pyramid elements (rare)
 - Wedge elements (rare)
 - Research elements
@@ -174,6 +180,7 @@ These elements cover **>95% of real-world usage**. The 30× speedup justifies ma
 ### Long Term (v2.0+)
 
 **Symbolic derivative generation:**
+
 ```julia
 using Symbolics
 
@@ -190,6 +197,7 @@ code = Symbolics.build_function(dN1_dξ, [ξ, η, ζ])
 ```
 
 **Benefits:**
+
 - Hand-level performance
 - Zero human errors (symbolic math is exact)
 - Easy to add new elements (just define basis symbolically)
@@ -200,17 +208,20 @@ code = Symbolics.build_function(dN1_dξ, [ξ, η, ζ])
 **The data is clear:** For JuliaFEM's performance-critical code (element assembly), **manual derivatives are 30× faster** than AD.
 
 **Recommended strategy:**
+
 1. ✅ Keep hand-coded derivatives for common elements (Tet10, Hex8, Quad4, etc.)
 2. ✅ Use AD for prototyping and rare elements
 3. ✅ Add unit tests comparing manual vs AD (catch human errors)
 4. 🎯 Future: Generate derivatives symbolically (best of both worlds)
 
 **Why not AD everywhere?**
+
 - Assembly loops: millions of evaluations per solve
 - 30× overhead = 10+ seconds per solve on realistic problems
 - Users will notice the performance difference
 
 **Why not abandon AD?**
+
 - Excellent for prototyping
 - Required for exotic bases (NURBS)
 - Perfect for unit testing manual derivatives

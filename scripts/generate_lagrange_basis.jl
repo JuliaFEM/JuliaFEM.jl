@@ -7,6 +7,15 @@
 # This script generates pre-computed Lagrange basis functions for all standard
 # finite element types and writes them to src/basis/lagrange_generated.jl
 #
+# ARCHITECTURAL CONTEXT:
+#   Lagrange basis functions are INTERPOLATION SCHEMES, not element topologies.
+#   They belong in src/basis/ as they are independent of:
+#   - Topology (src/topology/): Reference element connectivity (Tri3, Quad4, etc.)
+#   - Integration (src/integration/): Quadrature rules (Gauss, Lobatto, etc.)
+#
+#   Element = Topology + Interpolation + Integration (composition, not conflation)
+#   See: docs/book/element_architecture.md for full design rationale
+#
 # USAGE:
 #   cd /path/to/JuliaFEM.jl
 #   julia --project=. scripts/generate_lagrange_basis.jl
