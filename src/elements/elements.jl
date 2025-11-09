@@ -24,15 +24,15 @@ const DefaultFieldSet = EmptyFieldSet
 
 Abstract supertype for all elements.
 """
-abstract type AbstractElement{M<:AbstractFieldSet, B<:AbstractBasis} end
+abstract type AbstractElement{M<:AbstractFieldSet,B<:AbstractBasis} end
 
 mutable struct Element{M,B} <: AbstractElement{M,B}
-    id :: Int
-    connectivity :: Vector{Int}
-    integration_points :: Vector{IP}
-    dfields :: Dict{Symbol, AbstractField}
-    sfields :: M
-    properties :: B
+    id::Int
+    connectivity::Vector{Int}
+    integration_points::Vector{IP}
+    dfields::Dict{Symbol,AbstractField}
+    sfields::M
+    properties::B
 end
 
 """
@@ -71,18 +71,18 @@ and connectivity contains node numbers where element is connected.
 element = Element(Tri3, (1, 2, 3))
 ```
 """
-function Element(::Type{T}, connectivity::NTuple{N, Int}) where {N, T<:AbstractBasis}
+function Element(::Type{T}, connectivity::NTuple{N,Int}) where {N,T<:AbstractBasis}
     return Element(T, DefaultFieldSet, connectivity)
 end
 
-function Element(::Type{T}, ::Type{M}, connectivity::NTuple{N, Int}) where {N, M<:AbstractFieldSet, T<:AbstractBasis}
+function Element(::Type{T}, ::Type{M}, connectivity::NTuple{N,Int}) where {N,M<:AbstractFieldSet,T<:AbstractBasis}
     element_id = -1
     topology = T()
     integration_points = Point{IntegrationPoint}[]
     dfields = Dict{Symbol,AbstractField}()
     sfields = M{N}()
     element = Element(element_id, collect(connectivity), integration_points,
-                      dfields, sfields, topology)
+        dfields, sfields, topology)
     return element
 end
 
@@ -174,7 +174,7 @@ function pick_data_(element, field_data)
     return picked_data
 end
 
-function update_dfield!(element, field_name, (time, field_data)::Pair{Float64, Dict{Int,V}}) where V
+function update_dfield!(element, field_name, (time, field_data)::Pair{Float64,Dict{Int,V}}) where V
     update_dfield!(element, field_name, time => pick_data_(element, field_data))
 end
 
@@ -183,7 +183,7 @@ function update_dfield!(element, field_name, field_data::Dict{Int,V}) where V
 end
 
 function update_dfield!(element, field_name, field_data::Function)
-    if hasmethod(field_data, Tuple{Element, Any, Any})
+    if hasmethod(field_data, Tuple{Element,Any,Any})
         element.dfields[field_name] = field((ip, time) -> field_data(element, ip, time))
     else
         element.dfields[field_name] = field(field_data)
@@ -362,9 +362,9 @@ end
 
 ## Interpolate fields in spatial direction
 
-const ConstantField = Union{DCTI, DCTV}
-const VariableFields = Union{DVTV, DVTI}
-const DictionaryFields = Union{DVTVd, DVTId}
+const ConstantField = Union{DCTI,DCTV}
+const VariableFields = Union{DVTV,DVTI}
+const DictionaryFields = Union{DVTVd,DVTId}
 
 function interpolate_field(::AbstractElement, field::ConstantField, ip, time)
     return interpolate_field(field, time)
@@ -374,7 +374,7 @@ function interpolate_field(element::AbstractElement, field::VariableFields, ip, 
     data = interpolate_field(field, time)
     basis = get_basis(element, ip, time)
     N = length(basis)
-    return sum(data[i]*basis[i] for i=1:N)
+    return sum(data[i] * basis[i] for i = 1:N)
 end
 
 function interpolate_field(element::AbstractElement, field::DictionaryFields, ip, time)
@@ -382,7 +382,7 @@ function interpolate_field(element::AbstractElement, field::DictionaryFields, ip
     basis = element(ip, time)
     N = length(element)
     c = get_connectivity(element)
-    return sum(data[c[i]]*basis[i] for i=1:N)
+    return sum(data[c[i]] * basis[i] for i = 1:N)
 end
 
 function interpolate_field(::AbstractElement, field::CVTV, ip, time)
@@ -398,16 +398,25 @@ end
 ## Other stuff
 
 function get_basis(element::AbstractElement{M,B}, ip, ::Any) where {M,B}
-    T = typeof(first(ip))
-    N = zeros(T, 1, length(element))
-    eval_basis!(B, N, tuple(ip...))
-    return N
+    # Handle both raw coordinates (Tuple) and IP struct
+    coords = isa(ip, IP) ? ip.coords : ip
+    T = typeof(first(coords))
+    N = zeros(T, length(element))  # Vector, not matrix!
+    # Convert to Vec for Tensors.jl compatibility
+    xi = Vec{length(coords),T}(coords)
+    eval_basis!(B, N, xi)
+    # Return as row matrix for compatibility with old code
+    return reshape(N, 1, length(element))
 end
 
 function get_dbasis(element::AbstractElement{M,B}, ip, ::Any) where {M,B}
-    T = typeof(first(ip))
+    # Handle both raw coordinates (Tuple) and IP struct
+    coords = isa(ip, IP) ? ip.coords : ip
+    T = typeof(first(coords))
     dN = zeros(T, size(element)...)
-    eval_dbasis!(B, dN, tuple(ip...))
+    # Convert to Vec for Tensors.jl compatibility
+    xi = Vec{length(coords),T}(coords)
+    eval_dbasis!(B, dN, xi)
     return dN
 end
 
@@ -429,16 +438,20 @@ end
 function (element::Element)(ip, time::Float64, dim::Int)
     dim == 1 && return get_basis(element, ip, time)
     Ni = vec(get_basis(element, ip, time))
-    N = zeros(dim, length(element)*dim)
-    for i=1:dim
-        N[i,i:dim:end] += Ni
+    N = zeros(dim, length(element) * dim)
+    for i = 1:dim
+        N[i, i:dim:end] += Ni
     end
     return N
 end
 
 function (element::Element)(ip, time, ::Type{Val{:Jacobian}})
-    X = element("geometry", time)
-    J = jacobian(element.properties, X, ip)
+    X_dict = element("geometry", time)
+    # Convert to Vector{Vec} for Tensors.jl compatibility
+    X = [Vec(x...) for x in X_dict]
+    # Convert ip.coords (Tuple) to Vec
+    xi = Vec(ip.coords)
+    J = jacobian(element.properties, X, xi)
     return J
 end
 
@@ -452,13 +465,13 @@ function (element::Element)(ip, time::Float64, ::Type{Val{:detJ}})
     if size(JT, 2) == 1  # boundary of 2d problem, || ∂X/∂ξ ||
         return norm(JT)
     else # manifold on 3d problem, || ∂X/∂ξ₁ × ∂X/∂ξ₂ ||
-        return norm(cross(JT[:,1], JT[:,2]))
+        return norm(cross(JT[:, 1], JT[:, 2]))
     end
 end
 
 function (element::Element)(ip, time::Float64, ::Type{Val{:Grad}})
     J = element(ip, time, Val{:Jacobian})
-    return inv(J)*get_dbasis(element, ip, time)
+    return inv(J) * get_dbasis(element, ip, time)
 end
 
 function (element::Element)(field_name::String, ip, time::Float64, ::Type{Val{:Grad}})
@@ -492,7 +505,7 @@ function get_local_coordinates(element::AbstractElement, X::Vector, time::Float6
     dim == length(X) || error("manifolds not supported.")
     xi = zeros(dim)
     dX = element("geometry", xi, time) - X
-    for i=1:max_iterations
+    for i = 1:max_iterations
         J = element(xi, time, Val{:Jacobian})'
         xi -= J \ dX
         dX = element("geometry", xi, time) - X
