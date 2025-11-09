@@ -113,16 +113,19 @@ test/
 ```
 
 **Timing targets:**
+
 - Unit tests: < 5 minutes (run during development)
 - Tutorial tests: < 15 minutes (run before commits)
 - Full suite: < 30 minutes (run in CI)
 
 **Strategy:**
 
-- Use small meshes in tutorials (10-100 elements, not 10,000)
+- Use realistic meshes in tutorials (~10 elements: not too trivial, not too slow)
 - Test correctness with analytical solutions, not big problems
 - Profile and optimize slow tests
 - Mark slow tests with `@testset "slow: hertz_contact"` (skip during dev)
+- Co-locate mesh files with tests (no shared `/test/meshes/` directory)
+- Include mesh generation recipes (show how mesh was created for reproducibility)
 
 ### 5. Coverage-Driven Development
 
@@ -268,18 +271,24 @@ end
 
 ## Implementation Roadmap
 
-### Phase 1: Infrastructure (Week 1)
+### Phase 1: Infrastructure (Week 1) ✅ IN PROGRESS
 
 **Goal:** Set up Literate.jl integration and test structure
 
 **Tasks:**
 
 1. ✅ Create `test/tutorials/` directory structure
-2. ✅ Add Literate.jl to `docs/Project.toml`
-3. ✅ Update `docs/make.jl` to process tutorials
-4. ✅ Create tutorial template file
-5. ✅ Update `test/runtests.jl` to run tutorials
-6. ✅ Add coverage tools (LocalCoverage.jl)
+2. ✅ Create new test runner (`test/runtests_new.jl`) with environment control
+3. ✅ Add Gmsh.jl to test dependencies
+4. ✅ Tutorial 1: Creating elements (5 tests passing)
+5. ✅ Tutorial 2: Reading Gmsh meshes (72 tests passing, with recipe and co-located .msh)
+6. ⏳ Tutorial 4: 1-element validation (priority for Issue #265)
+7. ⏳ Tutorial 3: Basis functions
+8. ⏳ Add Literate.jl to `docs/Project.toml`
+9. ⏳ Update `docs/make.jl` to process tutorials
+10. ⏳ Add coverage tools (LocalCoverage.jl)
+
+**Status:** 77/77 tests passing (Tutorial 1: 5, Tutorial 2: 72)
 
 **Deliverable:** Running CI that executes tutorials and reports coverage
 
@@ -289,16 +298,24 @@ end
 
 **Priority order:**
 
-1. Creating elements and updating fields ⭐
-2. Reading meshes (ABAQUS .inp format) ⭐
-3. Basis functions and integration ⭐
-4. Simple 1D elasticity ⭐
-5. 2D plane stress/strain ⭐
+1. ✅ Creating elements and updating fields ⭐ (Done: 5 tests passing)
+2. ✅ Reading meshes (Gmsh .msh format) ⭐ (Done: 72 tests passing)
+3. **1-element validation tests** ⭐⭐ (Next: helps others validate FEM software, see Issue #265)
+4. Basis functions and integration ⭐
+5. Simple 2D elasticity (10 elements) ⭐
 6. Boundary conditions (Dirichlet)
 7. Surface loads and tractions
 8. Heat transfer basics
 9. Assembly process
 10. Solving linear systems
+
+**Note on mesh format:** We use **Gmsh** (via Gmsh.jl) instead of ABAQUS because:
+
+- No license required (accessible to everyone)
+- Julia native package (Gmsh.jl)
+- Modern, actively developed
+- Programmatic mesh generation (reproducible)
+- Co-located mesh files with test files (self-contained tests)
 
 **Success metric:** 60%+ code coverage from tutorials alone
 
@@ -470,11 +487,13 @@ Already set up yesterday! Codecov will:
 **Do:**
 
 - ✅ Explain **why**, not just **what**
-- ✅ Use simple examples (1-4 elements)
+- ✅ Use realistic examples (~10 elements, not too simple or too complex)
 - ✅ Include mathematical notation where helpful
 - ✅ Show output/results
 - ✅ Link to related tutorials
 - ✅ Test the actual result (still a test!)
+- ✅ Co-locate mesh files with test files (self-contained)
+- ✅ Include mesh generation recipe (show how mesh was created)
 
 **Don't:**
 
@@ -550,15 +569,111 @@ test/test_elasticity_2d_linear_with_surface_load.jl  (old)
 
 ---
 
+## Special: 1-Element Validation Tests
+
+### Motivation (Issue #265)
+
+In 2019, JuliaFEM was used to **validate another FEM software**. A user computed a reference solution with JuliaFEM and compared it against their own implementation. This is a powerful use case we should embrace!
+
+### Design Philosophy
+
+**Goal:** Create 1-element tests that can be:
+
+1. **Hand-calculated** - Simple enough to verify by hand
+2. **Exact** - Integer or simple fractional results (no floating-point ambiguity)
+3. **Reference-quality** - Others can use to validate their FEM code
+4. **Educational** - Show the math, not just code
+
+### Example Pattern
+
+```julia
+# # 1-Element Validation: Quad4 Elasticity
+#
+# This tutorial computes the stiffness matrix for a single Quad4 element
+# under plane stress conditions. The solution can be verified by hand.
+#
+# **Use case:** Validating FEM implementations (see Issue #265)
+#
+# ## Problem Setup
+#
+# Geometry: Unit square [0,1] × [0,1]
+# Material: E = 100.0, ν = 0.3 (simple values)
+# Element: Single Quad4 with nodes at corners
+#
+# ## Hand Calculation
+#
+# For Quad4 under plane stress, the stiffness matrix has structure:
+# ... detailed derivation ...
+#
+# Expected K[1,1] = ... (show calculation)
+
+using JuliaFEM, Test
+
+# Define nodes (unit square)
+nodes = Dict(
+    1 => [0.0, 0.0],
+    2 => [1.0, 0.0],
+    3 => [1.0, 1.0],
+    4 => [0.0, 1.0]
+)
+
+# Create element
+element = Element(Quad4, (1, 2, 3, 4))
+update!(element, "geometry", nodes)
+update!(element, "youngs modulus", 100.0)
+update!(element, "poissons ratio", 0.3)
+
+# Assemble stiffness matrix
+K = assemble_stiffness_matrix(element)
+
+# Validate against hand calculation
+@testset "1-Element Validation: Quad4 Stiffness" begin
+    # Check specific entries that we calculated by hand
+    @test K[1,1] ≈ 42.5  # Hand calculated value
+    @test K[1,2] ≈ 10.0  # Hand calculated value
+    # ... more validations
+    
+    # Symmetry check
+    @test issymmetric(K)
+    
+    # Positive definite check (all eigenvalues > 0, after BC)
+    # ... (need to apply constraints first)
+end
+```
+
+### Benefits
+
+1. **Validation tool** - Others can use JuliaFEM as reference
+2. **Debugging aid** - If basic case fails, know where to look
+3. **Educational** - Shows the math behind FEM
+4. **Confidence** - Proves implementation is correct
+5. **Regression test** - Any refactoring must pass these
+
+### Implementation Priority
+
+**High priority** - These tests are foundational. Should be in Tutorial 4 (before basis functions).
+
+**Coverage:** Create 1-element tests for each element type:
+
+- Seg2 (1D bar)
+- Tri3 (2D triangle)
+- Quad4 (2D quadrilateral)
+- Tet4 (3D tetrahedron)
+- Hex8 (3D hexahedron)
+
+---
+
 ## Questions to Resolve
 
 ### 1. Literate.jl Execution Strategy
 
 **Option A:** Tutorials are in `test/tutorials/`, executed by `Pkg.test()`
+
 - Pro: Ensures tutorials always work
 - Con: Slows down test suite
 
 **Option B:** Tutorials are in `docs/tutorials/`, executed by docs build
+
 - Pro: Fast test suite
 - Con: Tutorials might break without noticing
 
@@ -580,37 +695,77 @@ Should tutorials include plots/visualizations?
 
 **Recommendation:** Option B initially, add plots later as optional
 
-### 3. Mesh Files
+### 3. Mesh Files ✅ DECIDED
 
-Many old tests use `.med` files (require HDF5). Options:
+**Decision:** Use Gmsh.jl for mesh generation (Option B)
 
-**Option A:** Convert all to `.inp` (ABAQUS format, no HDF5 needed)
-**Option B:** Generate meshes programmatically in tests
-**Option C:** Add HDF5 as package extension (Julia 1.9+)
+**Rationale:**
 
-**Recommendation:** Option B for tutorials (simple meshes), Option A for verification
+- No license required (ABAQUS needs license, not accessible)
+- No heavy dependencies (HDF5/MED format requires HDF5.jl)
+- Programmatic generation (reproducible, can show recipe)
+- Modern and well-maintained
+- Julia native integration
+
+**Implementation Pattern:**
+
+1. Create `*_recipe.jl` script showing how mesh was generated
+2. Run recipe to generate `*.msh` file
+3. Commit both recipe and .msh file to repository
+4. Test reads the .msh file (fast, reliable)
+5. Users can see recipe to understand mesh structure
+
+**Example:**
+
+```text
+test/tutorials/01_fundamentals/
+├── reading_gmsh_meshes.jl          # The actual test
+├── reading_gmsh_meshes.msh         # Pre-generated mesh (committed)
+└── reading_gmsh_meshes_recipe.jl   # Shows how mesh was created
+```
+
+**Benefits:**
+
+- Self-contained tests (mesh next to test file)
+- Reproducible (recipe shows exactly how to recreate)
+- Fast (don't generate mesh in CI, just read it)
+- Educational (recipe teaches mesh generation)
+- Accessible (no external software needed to run tests)
 
 ---
 
 ## Next Steps (This Week)
 
-### Immediate (Today/Tomorrow)
+### Immediate (November 9, 2025)
 
 1. ✅ Create this document (done!)
-2. ⏳ Add Literate.jl to docs dependencies
-3. ⏳ Create tutorial directory structure
-4. ⏳ Write first tutorial template
-5. ⏳ Update `test/runtests.jl` for new structure
+2. ✅ Create tutorial directory structure
+3. ✅ Write first tutorial (creating elements - 5 tests passing)
+4. ✅ Write second tutorial (reading Gmsh meshes - 72 tests passing)
+5. ✅ Create new test runner (`test/runtests_new.jl`)
+6. 🔄 **Now: Tutorial 4 - 1-element validation** (priority for Issue #265)
+7. ⏳ Tutorial 3 - Basis functions
+8. ⏳ Add Literate.jl to docs dependencies
+9. ⏳ Update `docs/make.jl` for HTML generation
 
-### This Week
+### This Week (Week 1 - November 9-15, 2025)
 
-1. Write 3 fundamental tutorials:
-   - Creating elements and fields
-   - Reading ABAQUS mesh
-   - Simple 1D elasticity
-2. Set up coverage workflow locally
-3. Test Literate.jl → HTML generation
-4. Update CI to run tutorials
+**Completed:**
+
+1. ✅ Tutorial 1: Creating elements and fields (5 tests)
+2. ✅ Tutorial 2: Reading Gmsh meshes (72 tests)
+
+**In Progress:**
+3. 🔄 Tutorial 4: 1-element validation (priority - helps validate other FEM software)
+4. 🔄 Tutorial 3: Basis functions and integration
+
+**Planned:**
+5. Tutorial 5: Simple 2D elasticity (10 elements, use Tutorial 2 mesh)
+6. Set up coverage workflow locally
+7. Test Literate.jl → HTML generation
+8. Update CI to run new test structure
+
+**Target:** 5 tutorials by end of week (currently 2/5)
 
 ### Next Week
 
