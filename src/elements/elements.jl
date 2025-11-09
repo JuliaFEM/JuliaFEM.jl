@@ -26,10 +26,11 @@ Abstract supertype for all elements.
 """
 abstract type AbstractElement{M<:AbstractFieldSet,B<:AbstractBasis} end
 
-mutable struct Element{M,B} <: AbstractElement{M,B}
-    id::UInt  # Changed from Int to match Gmsh (Issue #267)
-    connectivity::Vector{UInt}  # Changed from Vector{Int} to match Gmsh
-    integration_points::Vector{IP}
+# Immutable element with compile-time known connectivity and integration points
+struct Element{N,NIP,M,B} <: AbstractElement{M,B}
+    id::UInt
+    connectivity::NTuple{N,UInt}  # Tuple for zero-cost, compile-time known size
+    integration_points::NTuple{NIP,IP}  # Tuple for zero-cost
     dfields::Dict{Symbol,AbstractField}
     sfields::M
     properties::B
@@ -76,14 +77,14 @@ function Element(::Type{T}, connectivity::NTuple{N,<:Integer}) where {N,T<:Abstr
 end
 
 function Element(::Type{T}, ::Type{M}, connectivity::NTuple{N,<:Integer}) where {N,M<:AbstractFieldSet,T<:AbstractBasis}
-    element_id = UInt(0)  # Changed from -1, UInt has no negative values
+    element_id = UInt(0)
     topology = T()
-    integration_points = Point{IntegrationPoint}[]
+    integration_points = ntuple(i -> IP(UInt(0), 0.0, ()), 0)  # Empty tuple initially
     dfields = Dict{Symbol,AbstractField}()
     sfields = M{N}()
-    # Convert connectivity to UInt
-    connectivity_uint = UInt.(collect(connectivity))
-    element = Element(element_id, connectivity_uint, integration_points,
+    # Convert connectivity to UInt tuple
+    connectivity_uint = UInt.(connectivity)
+    element = Element{N,0,M{N},T}(element_id, connectivity_uint, integration_points,
         dfields, sfields, topology)
     return element
 end
@@ -403,23 +404,26 @@ function get_basis(element::AbstractElement{M,B}, ip, ::Any) where {M,B}
     # Handle both raw coordinates (Tuple) and IP struct
     coords = isa(ip, IP) ? ip.coords : ip
     T = typeof(first(coords))
-    N = zeros(T, length(element))  # Vector, not matrix!
     # Convert to Vec for Tensors.jl compatibility
     xi = Vec{length(coords),T}(coords)
-    eval_basis!(B, N, xi)
+    # eval_basis! now returns a tuple directly - zero allocations!
+    N_tuple = eval_basis!(B, T, xi)
     # Return as row matrix for compatibility with old code
-    return reshape(N, 1, length(element))
+    # This still allocates, but only at the API boundary
+    return reshape(collect(N_tuple), 1, length(element))
 end
 
 function get_dbasis(element::AbstractElement{M,B}, ip, ::Any) where {M,B}
     # Handle both raw coordinates (Tuple) and IP struct
     coords = isa(ip, IP) ? ip.coords : ip
     T = typeof(first(coords))
-    dN = zeros(T, size(element)...)
     # Convert to Vec for Tensors.jl compatibility
     xi = Vec{length(coords),T}(coords)
-    eval_dbasis!(B, dN, xi)
-    return dN
+    # eval_dbasis! now returns NTuple{N,Vec{D}} directly - zero allocations!
+    dN_tuple = eval_dbasis!(B, xi)
+    # Return as Vector for compatibility with old code
+    # This still allocates, but only at the API boundary
+    return collect(dN_tuple)
 end
 
 function (element::Element)(ip, time::Float64=0.0)
@@ -483,13 +487,14 @@ function (element::Element)(field_name::String, ip, time::Float64, ::Type{Val{:G
 end
 
 
-function get_integration_points(element::AbstractElement{E}) where E
-    # first time initialize default integration points
-    if length(element.integration_points) == 0
-        ips = get_integration_points(element.properties)
-        element.integration_points = [IP(i, w, xi) for (i, (w, xi)) in enumerate(ips)]
+function get_integration_points(element::Element{N,NIP,M,B}) where {N,NIP,M,B}
+    # If integration points already set, return them
+    if NIP > 0
+        return element.integration_points
     end
-    return element.integration_points
+    # Otherwise get default integration points for this element type
+    ips = get_integration_points(element.properties)
+    return tuple([IP(UInt(i), w, xi) for (i, (w, xi)) in enumerate(ips)]...)
 end
 
 """ This is a special case, temporarily change order
@@ -497,7 +502,18 @@ of integration scheme mainly for mass matrix.
 """
 function get_integration_points(element::AbstractElement{E}, change_order::Int) where E
     ips = get_integration_points(element.properties, Val{change_order})
-    return [IP(i, w, xi) for (i, (w, xi)) in enumerate(ips)]
+    return tuple([IP(UInt(i), w, xi) for (i, (w, xi)) in enumerate(ips)]...)
+end
+
+""" 
+    with_integration_points(element, integration_points_tuple) -> Element
+
+Create a new element with the given integration points. Since Element is immutable,
+this returns a new instance with updated integration points.
+"""
+function with_integration_points(element::Element{N,NIP,M,B}, ips::NTuple{NNEW,IP}) where {N,NIP,M,B,NNEW}
+    return Element{N,NNEW,M,B}(element.id, element.connectivity, ips,
+                                element.dfields, element.sfields, element.properties)
 end
 
 """ Find inverse isoparametric mapping of element. """

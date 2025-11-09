@@ -148,15 +148,13 @@ function create_basis(name, description, X::Vector{<:Vecish{D,T}}, basis, dbasis
     N = length(X)
     @debug "create basis given basis functions and derivatives" name description X basis dbasis
 
-    Q = Expr(:block)
-    for i = 1:N
-        push!(Q.args, :(N[$i] = $(basis[i])))
-    end
+    # Build tuple expression for eval_basis! return: (N1, N2, N3, ...)
+    basis_tuple_args = [basis[i] for i = 1:N]
+    basis_tuple = Expr(:tuple, basis_tuple_args...)
 
-    V = Expr(:block)
-    for i = 1:N
-        push!(V.args, :(dN[$i] = Vec(float.(tuple($(dbasis[:, i]...))))))
-    end
+    # Build tuple expression for eval_dbasis! return: (dN1, dN2, dN3, ...)
+    dbasis_tuple_args = [:(Vec(float.(tuple($(dbasis[:, i]...))))) for i = 1:N]
+    dbasis_tuple = Expr(:tuple, dbasis_tuple_args...)
 
     if D == 1
         unpack = :((u,) = xi)
@@ -187,18 +185,16 @@ function create_basis(name, description, X::Vector{<:Vecish{D,T}}, basis, dbasis
             return $X
         end
 
-        @inline function eval_basis!(::Type{$name}, N::Vector{<:Number}, xi::Vec)
-            @assert length(N) == $N
+        # Return tuple directly - zero allocations!
+        @inline function eval_basis!(::Type{$name}, ::Type{T}, xi::Vec) where T
             $unpack
-            @inbounds $Q
-            return N
+            @inbounds return $basis_tuple
         end
 
-        @inline function eval_dbasis!(::Type{$name}, dN::Vector{<:Vec{$D}}, xi::Vec)
-            @assert length(dN) == $N
+        # Return NTuple{N,Vec{D}} directly - zero allocations!
+        @inline function eval_dbasis!(::Type{$name}, xi::Vec)
             $unpack
-            @inbounds $V
-            return dN
+            @inbounds return $dbasis_tuple
         end
     end
     return code

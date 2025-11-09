@@ -45,27 +45,28 @@ abstract type AbstractBasis{dim} end
 # This allows calling methods on both Seg2 and Seg2()
 Base.length(B::T) where {T<:AbstractBasis} = length(T)
 Base.size(B::T) where {T<:AbstractBasis} = size(T)
-eval_basis!(B::T, N, xi) where {T<:AbstractBasis} = eval_basis!(T, N, xi)
-eval_dbasis!(B::T, dN, xi) where {T<:AbstractBasis} = eval_dbasis!(T, dN, xi)
+# Updated signatures: eval_basis! and eval_dbasis! now return tuples
+eval_basis!(B::T, ::Type{U}, xi) where {T<:AbstractBasis,U} = eval_basis!(T, U, xi)
+eval_dbasis!(B::T, xi) where {T<:AbstractBasis} = eval_dbasis!(T, xi)
 
-# Allocating versions (convenience wrappers)
+# Allocating versions (convenience wrappers) - now they just call and collect
 """
     eval_basis(basis::AbstractBasis{dim}, xi) -> Vector{Float64}
 
 Evaluate basis functions at point `xi`, allocating return vector.
 
-See also: [`eval_basis!`](@ref) for non-allocating version.
+See also: [`eval_basis!`](@ref) for non-allocating version that returns tuple.
 """
-eval_basis(B::AbstractBasis{dim}, xi) where {dim} = eval_basis!(B, zeros(length(B)), xi)
+eval_basis(B::AbstractBasis{dim}, ::Type{T}, xi) where {dim,T} = collect(eval_basis!(B, T, xi))
 
 """
     eval_dbasis(basis::AbstractBasis{dim}, xi) -> Vector{Vec{dim, Float64}}
 
 Evaluate basis function derivatives at point `xi`, allocating return vector.
 
-See also: [`eval_dbasis!`](@ref) for non-allocating version.
+See also: [`eval_dbasis!`](@ref) for non-allocating version that returns tuple.
 """
-eval_dbasis(B::AbstractBasis{dim}, xi) where {dim} = eval_dbasis!(B, zeros(Vec{dim}, length(B)), xi)
+eval_dbasis(B::AbstractBasis{dim}, xi) where {dim} = collect(eval_dbasis!(B, xi))
 
 # Declare interface functions (will be implemented by basis generator)
 function get_reference_element_coordinates end

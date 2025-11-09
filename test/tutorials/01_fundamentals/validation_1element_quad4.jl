@@ -87,7 +87,9 @@ element = Element(Quad4, [1, 2, 3, 4])
 
 @testset "Element Creation" begin
     @test typeof(element.properties) == Quad4
-    @test element.connectivity == [1, 2, 3, 4]
+    # connectivity is now a tuple of UInt, not Vector{Int}
+    @test element.connectivity == (UInt(1), UInt(2), UInt(3), UInt(4))
+    @test collect(element.connectivity) == [1, 2, 3, 4]  # Can still collect to vector
 end
 
 # ## Step 3: Update Element Fields
