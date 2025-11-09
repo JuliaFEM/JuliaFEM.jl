@@ -23,7 +23,7 @@ Assemble elements for problem.
 This should be overridden with own `assemble_elements!`-implementation.
 """
 function assemble_elements!(problem::Problem, assembly::Assembly,
-                            elements::Vector{T}, time) where T<:AbstractElement{E} where E
+    elements::Vector{T}, time) where T<:AbstractElement{E} where E
     elements2 = convert(Vector{Element}, elements)
     assemble!(assembly, problem, elements2, time)
 end
@@ -77,7 +77,7 @@ end
 function assemble_mass_matrix!(problem::Problem, time::Float64)
     if !isempty(problem.assembly.M)
         @info("Mass matrix for is already assembled, not assembling.",
-              problem.name)
+            problem.name)
         return nothing
     end
     elements = get_elements(problem)
@@ -99,25 +99,29 @@ function assemble_mass_matrix!(problem::Problem, elements::Vector{E}, time) wher
         for ip in get_integration_points(element, 2)
             detJ = element(ip, time, Val{:detJ})
             rho = element("density", ip, time)
-            w = ip.weight*rho*detJ
+            w = ip.weight * rho * detJ
             eval_basis!(B, N, ip)
             N = element(ip, time)
             mul!(NtN, transpose(N), N)
             rmul!(NtN, w)
-            for i=1:nnodes^2
+            for i = 1:nnodes^2
                 M[i] += NtN[i]
             end
         end
         for (i, j) in enumerate(get_connectivity(element))
-            @inbounds ldofs[i] = (j-1)*dim
+            @inbounds ldofs[i] = (j - 1) * dim
         end
-        for i=1:dim
-            add!(problem.assembly.M, ldofs.+i, ldofs.+i, M)
+        for i = 1:dim
+            add!(problem.assembly.M, ldofs .+ i, ldofs .+ i, M)
         end
     end
     return
 end
 
+# TODO (Phase 1B): Re-enable after resolving Tet10 topology vs Tet10Basis name conflict
+# This specialized method assumes Tet10 <: AbstractBasis, but Tet10 is now a topology type.
+# Need to refactor to use Tet10Basis or accept AbstractElement{M, T, Tet10Basis}
+#=
 """
     assemble_mass_matrix!(problem, elements::Vector{Element{Tet10}}, time)
 
@@ -194,3 +198,4 @@ function assemble_mass_matrix!(problem::Problem, elements::Vector{E}, time) wher
     @info("$n_CM of $(length(elements)) was constant metric.")
     return
 end
+=#
