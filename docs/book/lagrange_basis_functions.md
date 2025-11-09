@@ -186,7 +186,7 @@ create_basis_and_eval(:Tet10, "...", coords, ansatz)
 
 ```julia
 # Once, during development:
-scripts/generate_lagrange_basis.jl
+julia --project=. src/basis/lagrange_generator.jl
 # - Computes all bases symbolically
 # - Writes clean Julia code to src/basis/lagrange_generated.jl
 
@@ -235,7 +235,6 @@ See `test/test_basis_functions.jl` for comprehensive tests.
 
 ## See Also
 
-- `scripts/generate_lagrange_basis.jl` - Generation script
+- `src/basis/lagrange_generator.jl` - Symbolic engine AND generation script (run directly)
 - `src/basis/lagrange_generated.jl` - Generated code (do not edit manually)
-- `src/basis/lagrange_generator.jl` - Generator functions (symbolic engine)
 - `benchmarks/tet10_derivatives_benchmark.jl` - Performance analysis (manual vs AD)
