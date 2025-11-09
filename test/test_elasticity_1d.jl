@@ -26,6 +26,6 @@ detJ = element(xi, time, Val{:detJ})
 J = element(xi, time, Val{:Jacobian})
 # gradu = element("displacement", xi, time, Val{:Grad})
 @debug("1d seg2 info", xi, time, detJ, J)
-@test isapprox(detJ, sqrt(3)/2)
+@test isapprox(detJ, sqrt(3) / 2)
 # Jacobian is 3×1 (physical_dim × parametric_dim) for 1D element in 3D
 @test isapprox(J, [0.5; 0.5; 0.5])  # column vector
