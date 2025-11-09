@@ -30,7 +30,7 @@ if !isfile(mesh_file)
     if !isfile(geo_file)
         error("Geometry file $geo_file not found. Please create it first.")
     end
-    
+
     println("Generating mesh with Gmsh...")
     run(`gmsh -2 $geo_file -o $mesh_file`)
     println("✓ Mesh generated: $mesh_file")
@@ -44,7 +44,7 @@ println("\nCreating unit square mesh...")
 
 # Simple structured mesh: 10×10 grid
 n = 10  # divisions per side
-nodes = Dict{Int, Vector{Float64}}()
+nodes = Dict{Int,Vector{Float64}}()
 node_id = 1
 for j in 0:n
     for i in 0:n
@@ -56,8 +56,8 @@ for j in 0:n
 end
 
 # Create triangular elements (two triangles per square)
-elements = Vector{Tuple{Symbol, Vector{Int}}}()
-element_sets = Dict{String, Vector{Int}}()
+elements = Vector{Tuple{Symbol,Vector{Int}}}()
+element_sets = Dict{String,Vector{Int}}()
 body_elements = Int[]
 left_elements = Int[]
 right_elements = Int[]
@@ -68,16 +68,16 @@ elem_id = 1
 for j in 1:n
     for i in 1:n
         # Node indices for square [i,j]
-        n1 = (j-1)*(n+1) + i      # bottom-left
-        n2 = (j-1)*(n+1) + i + 1  # bottom-right
-        n3 = j*(n+1) + i + 1      # top-right
-        n4 = j*(n+1) + i          # top-left
-        
+        n1 = (j - 1) * (n + 1) + i      # bottom-left
+        n2 = (j - 1) * (n + 1) + i + 1  # bottom-right
+        n3 = j * (n + 1) + i + 1      # top-right
+        n4 = j * (n + 1) + i          # top-left
+
         # Triangle 1: [n1, n2, n3]
         push!(elements, (:Tri3, [n1, n2, n3]))
         push!(body_elements, elem_id)
         elem_id += 1
-        
+
         # Triangle 2: [n1, n3, n4]
         push!(elements, (:Tri3, [n1, n3, n4]))
         push!(body_elements, elem_id)
@@ -88,8 +88,8 @@ end
 # Boundary edges (1D line elements for visualization/BC)
 # Left edge: x = 0
 for j in 1:n
-    n1 = (j-1)*(n+1) + 1
-    n2 = j*(n+1) + 1
+    n1 = (j - 1) * (n + 1) + 1
+    n2 = j * (n + 1) + 1
     push!(elements, (:Seg2, [n1, n2]))
     push!(left_elements, elem_id)
     elem_id += 1
@@ -169,7 +169,7 @@ println("-"^80)
 println("For academic/research use (Issue #183):")
 println("After assembly, you can extract:")
 println("  • Stiffness matrix K (sparse)")
-println("  • Mass matrix M (sparse)")  
+println("  • Mass matrix M (sparse)")
 println("  • Force vector f")
 println()
 println("Then solve the ODE system:")
