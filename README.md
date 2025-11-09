@@ -55,6 +55,7 @@ efficient optimization loops.
 ## Installing JuliaFEM
 
 Inside Julia REPL, type:
+
 ```julia
 Pkg.add("JuliaFEM")
 ```
@@ -77,7 +78,7 @@ Also other people have wisdom in style as well:
 
 [The Zen of Python](https://www.python.org/dev/peps/pep-0020/):
 
-```
+```text
 Beautiful is better than ugly.
 Explicit is better than implicit.
 Simple is better than complex.
@@ -91,7 +92,8 @@ Errors should never pass silently.
 ## Citing
 
 If you like using our package, please consider citing our [article](https://rakenteidenmekaniikka.journal.fi/article/view/64224/26397)
-```
+
+```text
 @article{frondelius2017juliafem,
   title={Julia{FEM} - open source solver for both industrial and academia usage},
   volume={50}, 
@@ -105,12 +107,22 @@ If you like using our package, please consider citing our [article](https://rake
 }
 ```
 
-
 ## Contributing
 
-Developing JuliaFEM encourages good practices, starting from unit testing both
-for smaller and larger functions and continuing to full integration testing of
-different platforms. 
+We welcome contributions! JuliaFEM encourages good practices, starting from unit
+testing and continuing to full integration testing across platforms.
 
-Interested in participating? Please start by reading
-[contributing](http://www.juliafem.org/contributing).
+**Interested in contributing?** Please read:
+
+- **[Contributing Guide](docs/CONTRIBUTING.md)** - Quick start for contributors
+- **[Coding Standards](docs/contributor/coding_standards.md)** - Required reading (includes important rules like "no Greek letters in code")
+- **[Contributor Manual](docs/contributor/README.md)** - Technical details and architecture
+
+Key requirements:
+
+- ✅ Type-stable code (performance critical)
+- ✅ Tests included with all changes
+- ✅ Follow coding standards (use `u, v, w` not ξ, η, ζ)
+- ✅ Clean commit messages
+
+**Questions?** Open a GitHub Discussion or issue - we're happy to help!
