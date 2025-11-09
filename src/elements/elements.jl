@@ -27,8 +27,8 @@ Abstract supertype for all elements.
 abstract type AbstractElement{M<:AbstractFieldSet,B<:AbstractBasis} end
 
 mutable struct Element{M,B} <: AbstractElement{M,B}
-    id::Int
-    connectivity::Vector{Int}
+    id::UInt  # Changed from Int to match Gmsh (Issue #267)
+    connectivity::Vector{UInt}  # Changed from Vector{Int} to match Gmsh
     integration_points::Vector{IP}
     dfields::Dict{Symbol,AbstractField}
     sfields::M
@@ -71,22 +71,24 @@ and connectivity contains node numbers where element is connected.
 element = Element(Tri3, (1, 2, 3))
 ```
 """
-function Element(::Type{T}, connectivity::NTuple{N,Int}) where {N,T<:AbstractBasis}
+function Element(::Type{T}, connectivity::NTuple{N,<:Integer}) where {N,T<:AbstractBasis}
     return Element(T, DefaultFieldSet, connectivity)
 end
 
-function Element(::Type{T}, ::Type{M}, connectivity::NTuple{N,Int}) where {N,M<:AbstractFieldSet,T<:AbstractBasis}
-    element_id = -1
+function Element(::Type{T}, ::Type{M}, connectivity::NTuple{N,<:Integer}) where {N,M<:AbstractFieldSet,T<:AbstractBasis}
+    element_id = UInt(0)  # Changed from -1, UInt has no negative values
     topology = T()
     integration_points = Point{IntegrationPoint}[]
     dfields = Dict{Symbol,AbstractField}()
     sfields = M{N}()
-    element = Element(element_id, collect(connectivity), integration_points,
+    # Convert connectivity to UInt
+    connectivity_uint = UInt.(collect(connectivity))
+    element = Element(element_id, connectivity_uint, integration_points,
         dfields, sfields, topology)
     return element
 end
 
-function Element(::Type{T}, connectivity::Vector{Int}) where T<:AbstractBasis
+function Element(::Type{T}, connectivity::Vector{<:Integer}) where T<:AbstractBasis
     return Element(T, (connectivity...,))
 end
 

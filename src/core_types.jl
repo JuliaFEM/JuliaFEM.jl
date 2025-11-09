@@ -6,7 +6,7 @@ const Node = Vector{Float64}
 abstract type AbstractPoint end
 
 mutable struct Point{P<:AbstractPoint}
-    id :: Int
+    id :: UInt  # Changed from Int to match Gmsh (Issue #267)
     weight :: Float64
     coords :: Tuple{Vararg{Float64}}
     fields :: Dict{String, AbstractField}
