@@ -67,45 +67,136 @@ julia> get_rule_name(Gauss{2}(), Quad4())
 """
 function get_rule_name end
 
-# 1D rules (segments)
-get_rule_name(::Gauss{1}, ::Type{<:AbstractTopology}) = :GLSEG1
-get_rule_name(::Gauss{2}, ::Type{<:AbstractTopology}) = :GLSEG2
-get_rule_name(::Gauss{3}, ::Type{<:AbstractTopology}) = :GLSEG3
-get_rule_name(::Gauss{4}, ::Type{<:AbstractTopology}) = :GLSEG4
-get_rule_name(::Gauss{5}, ::Type{<:AbstractTopology}) = :GLSEG5
+# ============================================================================
+# 1D SEGMENT RULES (Seg2, Seg3)
+# ============================================================================
+# Generated tensor product: GLSEG1, GLSEG2, GLSEG3, GLSEG4, GLSEG5, ...
 
-# 2D triangular rules
+get_rule_name(::Gauss{1}, ::Seg2) = :GLSEG1
+get_rule_name(::Gauss{2}, ::Seg2) = :GLSEG2
+get_rule_name(::Gauss{3}, ::Seg2) = :GLSEG3
+get_rule_name(::Gauss{4}, ::Seg2) = :GLSEG4
+get_rule_name(::Gauss{5}, ::Seg2) = :GLSEG5
+
+# Seg3 (quadratic) uses same quadrature rules
+get_rule_name(::Gauss{1}, ::Seg3) = :GLSEG1
+get_rule_name(::Gauss{2}, ::Seg3) = :GLSEG2
+get_rule_name(::Gauss{3}, ::Seg3) = :GLSEG3
+get_rule_name(::Gauss{4}, ::Seg3) = :GLSEG4
+get_rule_name(::Gauss{5}, ::Seg3) = :GLSEG5
+
+# ============================================================================
+# 2D TRIANGULAR RULES (Tri3, Tri6, Tri7)
+# ============================================================================
+# Available: GLTRI1, GLTRI3, GLTRI3B, GLTRI4, GLTRI4B, GLTRI6, GLTRI7, GLTRI12
+
 get_rule_name(::Gauss{1}, ::Tri3) = :GLTRI1
 get_rule_name(::Gauss{3}, ::Tri3) = :GLTRI3
 get_rule_name(::Gauss{4}, ::Tri3) = :GLTRI4
 get_rule_name(::Gauss{6}, ::Tri3) = :GLTRI6
 get_rule_name(::Gauss{7}, ::Tri3) = :GLTRI7
+get_rule_name(::Gauss{12}, ::Tri3) = :GLTRI12
 
-# 2D quadrilateral rules (tensor product)
+# Tri6 (quadratic) - needs higher order rules
+get_rule_name(::Gauss{1}, ::Tri6) = :GLTRI1
+get_rule_name(::Gauss{3}, ::Tri6) = :GLTRI3
+get_rule_name(::Gauss{4}, ::Tri6) = :GLTRI4
+get_rule_name(::Gauss{6}, ::Tri6) = :GLTRI6
+get_rule_name(::Gauss{7}, ::Tri6) = :GLTRI7
+get_rule_name(::Gauss{12}, ::Tri6) = :GLTRI12
+
+# Tri7 (quadratic with center) - needs higher order rules
+get_rule_name(::Gauss{1}, ::Tri7) = :GLTRI1
+get_rule_name(::Gauss{3}, ::Tri7) = :GLTRI3
+get_rule_name(::Gauss{4}, ::Tri7) = :GLTRI4
+get_rule_name(::Gauss{6}, ::Tri7) = :GLTRI6
+get_rule_name(::Gauss{7}, ::Tri7) = :GLTRI7
+get_rule_name(::Gauss{12}, ::Tri7) = :GLTRI12
+
+# ============================================================================
+# 2D QUADRILATERAL RULES (Quad4, Quad8, Quad9)
+# ============================================================================
+# Generated tensor product: GLQUAD1, GLQUAD4, GLQUAD9, GLQUAD16, GLQUAD25, ...
+
 get_rule_name(::Gauss{1}, ::Quad4) = :GLQUAD1
 get_rule_name(::Gauss{2}, ::Quad4) = :GLQUAD4
 get_rule_name(::Gauss{3}, ::Quad4) = :GLQUAD9
 get_rule_name(::Gauss{4}, ::Quad4) = :GLQUAD16
 get_rule_name(::Gauss{5}, ::Quad4) = :GLQUAD25
 
-# 3D tetrahedral rules
-# get_rule_name(::Gauss{1}, ::Tet4) = :GLTET1
-# get_rule_name(::Gauss{4}, ::Tet4) = :GLTET4
-# get_rule_name(::Gauss{5}, ::Tet4) = :GLTET5
-# get_rule_name(::Gauss{15}, ::Tet4) = :GLTET15
+# Quad8 (Serendipity) - needs higher order
+get_rule_name(::Gauss{1}, ::Quad8) = :GLQUAD1
+get_rule_name(::Gauss{2}, ::Quad8) = :GLQUAD4
+get_rule_name(::Gauss{3}, ::Quad8) = :GLQUAD9
+get_rule_name(::Gauss{4}, ::Quad8) = :GLQUAD16
+get_rule_name(::Gauss{5}, ::Quad8) = :GLQUAD25
 
-# 3D hexahedral rules (tensor product)
-# get_rule_name(::Gauss{2}, ::Hex8) = :GLHEX8
-# get_rule_name(::Gauss{3}, ::Hex8) = :GLHEX27
-# get_rule_name(::Gauss{4}, ::Hex8) = :GLHEX64
-# get_rule_name(::Gauss{5}, ::Hex8) = :GLHEX125
+# Quad9 (quadratic with center) - needs higher order
+get_rule_name(::Gauss{1}, ::Quad9) = :GLQUAD1
+get_rule_name(::Gauss{2}, ::Quad9) = :GLQUAD4
+get_rule_name(::Gauss{3}, ::Quad9) = :GLQUAD9
+get_rule_name(::Gauss{4}, ::Quad9) = :GLQUAD16
+get_rule_name(::Gauss{5}, ::Quad9) = :GLQUAD25
 
-# 3D wedge rules (triangular prism)
-# get_rule_name(::Gauss{6}, ::Wedge6) = :GLWED6
-# get_rule_name(::Gauss{21}, ::Wedge6) = :GLWED21
+# ============================================================================
+# 3D TETRAHEDRAL RULES (Tet4, Tet10)
+# ============================================================================
+# Available: GLTET1, GLTET4, GLTET5, GLTET15
 
-# 3D pyramid rules
-# get_rule_name(::Gauss{5}, ::Pyr5) = :GLPYR5
+get_rule_name(::Gauss{1}, ::Tet4) = :GLTET1
+get_rule_name(::Gauss{4}, ::Tet4) = :GLTET4
+get_rule_name(::Gauss{5}, ::Tet4) = :GLTET5
+get_rule_name(::Gauss{15}, ::Tet4) = :GLTET15
+
+# Tet10 (quadratic) - needs higher order rules
+get_rule_name(::Gauss{1}, ::Tet10) = :GLTET1
+get_rule_name(::Gauss{4}, ::Tet10) = :GLTET4
+get_rule_name(::Gauss{5}, ::Tet10) = :GLTET5
+get_rule_name(::Gauss{15}, ::Tet10) = :GLTET15
+
+# ============================================================================
+# 3D HEXAHEDRAL RULES (Hex8, Hex20, Hex27)
+# ============================================================================
+# Generated tensor product: GLHEX1, GLHEX8, GLHEX27, GLHEX64, GLHEX125, ...
+
+get_rule_name(::Gauss{1}, ::Hex8) = :GLHEX1
+get_rule_name(::Gauss{2}, ::Hex8) = :GLHEX8
+get_rule_name(::Gauss{3}, ::Hex8) = :GLHEX27
+get_rule_name(::Gauss{4}, ::Hex8) = :GLHEX64
+get_rule_name(::Gauss{5}, ::Hex8) = :GLHEX125
+
+# Hex20 (Serendipity) - needs higher order
+get_rule_name(::Gauss{1}, ::Hex20) = :GLHEX1
+get_rule_name(::Gauss{2}, ::Hex20) = :GLHEX8
+get_rule_name(::Gauss{3}, ::Hex20) = :GLHEX27
+get_rule_name(::Gauss{4}, ::Hex20) = :GLHEX64
+get_rule_name(::Gauss{5}, ::Hex20) = :GLHEX125
+
+# Hex27 (quadratic with face/volume nodes) - needs higher order
+get_rule_name(::Gauss{1}, ::Hex27) = :GLHEX1
+get_rule_name(::Gauss{2}, ::Hex27) = :GLHEX8
+get_rule_name(::Gauss{3}, ::Hex27) = :GLHEX27
+get_rule_name(::Gauss{4}, ::Hex27) = :GLHEX64
+get_rule_name(::Gauss{5}, ::Hex27) = :GLHEX125
+
+# ============================================================================
+# 3D WEDGE/PRISM RULES (Wedge6, Wedge15)
+# ============================================================================
+# Available: GLWED6, GLWED6B, GLWED21
+
+get_rule_name(::Gauss{6}, ::Wedge6) = :GLWED6
+get_rule_name(::Gauss{21}, ::Wedge6) = :GLWED21
+
+# Wedge15 (quadratic) - needs higher order rules
+get_rule_name(::Gauss{6}, ::Wedge15) = :GLWED6
+get_rule_name(::Gauss{21}, ::Wedge15) = :GLWED21
+
+# ============================================================================
+# 3D PYRAMID RULES (Pyr5)
+# ============================================================================
+# Available: GLPYR5, GLPYR5B
+
+get_rule_name(::Gauss{5}, ::Pyr5) = :GLPYR5
 
 """
     integration_points(scheme::Gauss{N}, topology::AbstractTopology)
