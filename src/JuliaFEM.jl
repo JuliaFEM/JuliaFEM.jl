@@ -224,27 +224,27 @@ include("basis/nurbs.jl")
 # TODO: Rewrite math functions for new AbstractBasis
 # TEMPORARY: Define minimal jacobian function for testing
 function jacobian(B::AbstractBasis, X::Vector{<:Vec}, xi::Vec)
-    dB = eval_dbasis!(B, xi)
-    @assert length(X) == length(dB)
-    # Compute J = dX/dξ: rows are physical dims, columns are parametric dims
-    # J[i,j] = ∂X_i/∂ξ_j = sum_k X_k[i] * dN_k/dξ_j
-    dim_physical = length(first(X))
-    dim_parametric = length(xi)
-    
-    # Build Jacobian matrix manually for embedding case (e.g., 1D element in 3D space)
-    # Result is a dim_physical × dim_parametric matrix
-    J_data = zeros(dim_physical, dim_parametric)
-    @inbounds for k in 1:length(X)
-        for i in 1:dim_physical
-            for j in 1:dim_parametric
-                J_data[i,j] += X[k][i] * dB[k][j]
-            end
-        end
-    end
-    
-    # Convert to Tensor (note: Tensor{2,N} is N×N, but we need dim_physical×dim_parametric)
-    # For now, return as Matrix
-    return J_data
+   dB = eval_dbasis!(B, xi)
+   @assert length(X) == length(dB)
+   # Compute J = dX/dξ: rows are physical dims, columns are parametric dims
+   # J[i,j] = ∂X_i/∂ξ_j = sum_k X_k[i] * dN_k/dξ_j
+   dim_physical = length(first(X))
+   dim_parametric = length(xi)
+
+   # Build Jacobian matrix manually for embedding case (e.g., 1D element in 3D space)
+   # Result is a dim_physical × dim_parametric matrix
+   J_data = zeros(dim_physical, dim_parametric)
+   @inbounds for k in 1:length(X)
+      for i in 1:dim_physical
+         for j in 1:dim_parametric
+            J_data[i, j] += X[k][i] * dB[k][j]
+         end
+      end
+   end
+
+   # Convert to Tensor (note: Tensor{2,N} is N×N, but we need dim_physical×dim_parametric)
+   # For now, return as Matrix
+   return J_data
 end
 
 # Consolidate FEMBase.jl into src/ (Phase 1 continued)
@@ -258,7 +258,7 @@ include("fembase_compat.jl")
 
 include("sparse/sparse.jl")          # SparseMatrixCOO, SparseVectorCOO
 include("elements/elements.jl")      # Element type and interface
-# include("elements/elements_lagrange.jl")  # OLD - uses AbstractBasis{0} (Poi1)
+include("elements/elements_lagrange.jl")  # OLD - uses AbstractBasis{0} (Poi1)
 # include("elements/integrate.jl")     # OLD - references NSeg, Poi1, etc.
 include("assembly/problems.jl")      # Problem types
 include("assembly/assembly.jl")      # Assembly framework
@@ -285,8 +285,8 @@ include("graph/graph_ordering.jl")
 # export Elasticity
 # include("materials_plasticity.jl")  # Requires ForwardDiff for automatic differentiation
 # export plastic_von_mises
-# include("problems_dirichlet.jl")
-# export Dirichlet
+include("problems_dirichlet.jl")
+export Dirichlet
 
 # export assemble!, postprocess!
 
@@ -303,7 +303,7 @@ include("graph/graph_ordering.jl")
 # include("problems_mortar_3d.jl")
 # export calculate_normals, calculate_normals!, project_from_slave_to_master,
 #    project_from_master_to_slave, Mortar, get_slave_elements,
-#    get_polygon_clip
+#    get_polygon_clip, calculate_polygon_area
 # include("io.jl")  # Requires HDF5 and LightXML - skip for minimal deps
 # export Xdmf, h5file, xmffile, xdmf_filter, new_dataitem, update_xdmf!, save!
 include("solvers.jl")
@@ -337,7 +337,7 @@ export create_elements, Mesh, add_node!, add_nodes!,
 include("io/io.jl")
 using .IO
 export abaqus_read_mesh, create_surface_elements, create_nodal_elements
-# export aster_read_mesh  # Requires HDF5 - add when optional deps are set up
+export aster_read_mesh  # Requires HDF5 - add when optional deps are set up
 
 # Postprocess module
 
