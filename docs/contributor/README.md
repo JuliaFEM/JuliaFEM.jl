@@ -10,8 +10,6 @@ level: "advanced"
 type: "manual"
 ---
 
-# JuliaFEM Contributor Manual
-
 **Audience:** Developers, contributors, advanced users who want to extend or modify JuliaFEM.
 
 This manual is **technical and detailed** - it explains HOW the code works and WHY we made certain design choices.
@@ -19,7 +17,7 @@ This manual is **technical and detailed** - it explains HOW the code works and W
 ## What's Here
 
 - **Testing Philosophy:** How and why we test
-- **Code Style:** Conventions and best practices
+- **Coding Standards:** Required conventions for all contributions (variable names, types, performance)
 - **Architecture:** Module structure, data flow, key abstractions
 - **Performance:** Zero-allocation design, profiling, benchmarking
 - **Adding Elements:** How to implement new element types
@@ -37,6 +35,7 @@ This manual is **technical and detailed** - it explains HOW the code works and W
 **"Show me the code AND tell me why."**
 
 We assume you:
+
 - Know Julia reasonably well
 - Understand FEM basics
 - Want to add features or fix bugs
@@ -46,8 +45,8 @@ We assume you:
 ## Before Contributing
 
 1. Read [Testing Philosophy](testing_philosophy.md)
-2. Understand [Architecture](architecture.md)
-3. Follow [Code Style](code_style.md)
+2. Follow [Coding Standards](coding_standards.md) - **REQUIRED** for all contributions
+3. Understand [Architecture](architecture.md)
 4. Check [Performance Guidelines](performance.md)
 5. Review [Git Workflow](git_workflow.md)
 
