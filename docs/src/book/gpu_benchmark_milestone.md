@@ -1,7 +1,11 @@
-# GPU Nodal Assembly: A Milestone Achievement
+---
+title: "GPU Nodal Assembly: A Milestone Achievement"
+date: 2025-11-09
+author: "Jukka Aho"
+status: "Authoritative"
+tags: ["gpu", "nodal-assembly", "benchmark", "milestone"]
+---
 
-**Date:** November 9, 2025  
-**Status:** ✅ Working implementation with validated performance  
 **Significance:** Proof-of-concept for GPU-accelerated finite element assembly
 
 ---

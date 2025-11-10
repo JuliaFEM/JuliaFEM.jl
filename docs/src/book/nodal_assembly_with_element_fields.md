@@ -1,7 +1,11 @@
-# Nodal Assembly with Element Fields
+---
+title: "Nodal Assembly with Element Fields"
+date: 2025-11-09
+author: "Jukka Aho"
+status: "Draft"
+tags: ["nodal-assembly", "element-fields", "design"]
+---
 
-**Date:** November 9, 2025  
-**Status:** Design Discussion  
 **Context:** Both nodes AND elements need fields (immutable)
 
 ## The Key Insight

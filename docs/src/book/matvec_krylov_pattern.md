@@ -1,7 +1,10 @@
-# The Correct Pattern: Matrix-Free Krylov with ElementSet
-
-**Date:** November 9, 2025  
-**Status:** Demonstrated and validated
+---
+title: "The Correct Pattern: Matrix-Free Krylov with ElementSet"
+date: 2025-11-09
+author: "Jukka Aho"
+status: "Authoritative"
+tags: ["matrix-free", "krylov", "elementset", "design-pattern"]
+---
 
 ## The Key Insights (From User Feedback)
 

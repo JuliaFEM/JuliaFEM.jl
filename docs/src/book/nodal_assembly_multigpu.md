@@ -1,4 +1,10 @@
-# Nodal Assembly and Multi-GPU: The Winning Strategy for Scalable FEM
+---
+title: "Nodal Assembly and Multi-GPU: The Winning Strategy for Scalable FEM"
+date: 2025-11-09
+author: "Jukka Aho"
+status: "Authoritative"
+tags: ["architecture", "nodal-assembly", "multi-gpu", "scalability"]
+---
 
 ## Executive Summary
 

@@ -1,7 +1,11 @@
-# Nodal Assembly: The JuliaFEM Pattern
+---
+title: "Nodal Assembly: The JuliaFEM Pattern"
+date: 2025-11-09
+author: "Jukka Aho"
+status: "Authoritative"
+tags: ["nodal-assembly", "gpu", "design-pattern"]
+---
 
-**Date:** November 9, 2025  
-**Status:** Demonstrated and validated  
 **File:** `demos/gpu_nodal_assembly_demo.jl`
 
 ## The Key Realization

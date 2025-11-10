@@ -1,7 +1,11 @@
-# Multi-GPU Nodal Assembly: Complete Algorithm
+---
+title: "Multi-GPU Nodal Assembly: Complete Algorithm"
+date: 2025-11-09
+author: "Jukka Aho"
+status: "Draft"
+tags: ["multi-gpu", "nodal-assembly", "gpu-resident", "gmres"]
+---
 
-**Date:** November 9, 2025  
-**Status:** Design - Full GPU-Resident Solver  
 **Goal:** Keep ALL data on GPU, including GMRES iterations
 
 ## The Big Picture
