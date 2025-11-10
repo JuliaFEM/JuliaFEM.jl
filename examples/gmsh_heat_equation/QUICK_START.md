@@ -11,6 +11,7 @@ Complete workflow demonstration addressing [Issue #183](https://github.com/Julia
 ## What's Here
 
 This example shows:
+
 1. Mesh generation with Gmsh
 2. Loading mesh into JuliaFEM  
 3. FEM assembly (K and M matrices)
