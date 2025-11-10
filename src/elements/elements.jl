@@ -230,6 +230,88 @@ end
 #     return Element(topology_to_basis(T), connectivity)
 # end
 
+# ============================================================================
+# Immutable update: Returns new element with updated fields
+# ============================================================================
+
+"""
+    update(element::Element, pairs::Pair...) -> Element
+    update(element::Element; kwargs...) -> Element
+
+Create a new element with updated fields (immutable operation).
+
+Since elements are immutable, this function returns a **new** element with merged fields.
+The original element is unchanged.
+
+# Arguments
+- `element`: Original element
+- `pairs`: Field updates as `Pair` objects (`:field => value`)
+- `kwargs`: Field updates as keyword arguments
+
+# Returns
+New `Element` with updated fields (same connectivity, basis, id)
+
+# Examples
+```julia
+# Create element with initial fields:
+el = Element(Lagrange{Triangle,1}, (1,2,3), fields=(E=210e3, ν=0.3))
+
+# Update single field (returns NEW element):
+el2 = update(el, :E => 200e3)  # el.fields.E still 210e3, el2.fields.E is 200e3
+
+# Update multiple fields:
+el3 = update(el, :E => 200e3, :ν => 0.35)
+
+# Keyword syntax:
+el4 = update(el; E=200e3, ν=0.35)
+
+# Add new field:
+el5 = update(el, :temperature => 293.15)
+```
+
+# Performance
+Zero-allocation when fields are type-stable NamedTuples with same field types.
+May allocate if adding new fields with different types.
+
+# See Also
+- Old API: `update!(element, "field", value)` (DEPRECATED - mutates element)
+- New API: `update(element, :field => value)` (returns new element)
+"""
+function update(element::Element{N,NIP,F,B}, pairs::Pair{Symbol,<:Any}...) where {N,NIP,F,B}
+    # Convert pairs to NamedTuple
+    new_fields_dict = Dict{Symbol,Any}(pairs)
+
+    # Merge with existing fields
+    if F === Tuple{} || element.fields === ()
+        # No existing fields, create new NamedTuple
+        merged = NamedTuple(new_fields_dict)
+    else
+        # Merge existing fields with new ones
+        old_fields = element.fields
+        for field_name in fieldnames(typeof(old_fields))
+            if !haskey(new_fields_dict, field_name)
+                new_fields_dict[field_name] = getfield(old_fields, field_name)
+            end
+        end
+        merged = NamedTuple(new_fields_dict)
+    end
+
+    # Create new element with updated fields
+    return Element{N,NIP,typeof(merged),B}(
+        element.id,
+        element.connectivity,
+        element.integration_points,
+        merged,
+        element.basis
+    )
+end
+
+# Keyword argument version
+function update(element::Element{N,NIP,F,B}; kwargs...) where {N,NIP,F,B}
+    pairs = [k => v for (k, v) in kwargs]
+    return update(element, pairs...)
+end
+
 function get_element_id(element::AbstractElement)
     return element.id
 end
