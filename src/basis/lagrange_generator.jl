@@ -271,6 +271,10 @@ function create_basis(topology_type::Symbol, polynomial_degree::Int, description
             return $coord_tuple
         end
 
+        # ──────────────────────────────────────────────────────────────────────
+        # OLD API (for compatibility during transition)
+        # ──────────────────────────────────────────────────────────────────────
+
         # Return tuple directly - zero allocations!
         @inline function eval_basis!(::Type{Lagrange{$topology_type,$polynomial_degree}}, ::Type{T}, xi::Vec) where T
             $unpack
@@ -289,6 +293,33 @@ function create_basis(topology_type::Symbol, polynomial_degree::Int, description
         end
 
         @inline function eval_dbasis!(::Lagrange{$topology_type,$polynomial_degree}, xi::Vec)
+            $unpack
+            @inbounds return $dbasis_tuple
+        end
+
+        # ──────────────────────────────────────────────────────────────────────
+        # NEW API (separation of concerns: topology + basis)
+        # See: docs/book/adr-003-basis-function-api.md
+        # ──────────────────────────────────────────────────────────────────────
+
+        # Basis functions at a point in reference element
+        @inline function get_basis_functions(::Type{$topology_type}, ::Type{Lagrange{$topology_type,$polynomial_degree}}, xi::Vec)
+            $unpack
+            @inbounds return $basis_tuple
+        end
+
+        @inline function get_basis_functions(::$topology_type, ::Lagrange{$topology_type,$polynomial_degree}, xi::Vec)
+            $unpack
+            @inbounds return $basis_tuple
+        end
+
+        # Basis function derivatives (gradients) at a point in reference element
+        @inline function get_basis_derivatives(::Type{$topology_type}, ::Type{Lagrange{$topology_type,$polynomial_degree}}, xi::Vec)
+            $unpack
+            @inbounds return $dbasis_tuple
+        end
+
+        @inline function get_basis_derivatives(::$topology_type, ::Lagrange{$topology_type,$polynomial_degree}, xi::Vec)
             $unpack
             @inbounds return $dbasis_tuple
         end

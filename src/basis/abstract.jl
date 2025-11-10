@@ -48,9 +48,16 @@ nnodes(B::T) where {T<:AbstractBasis} = nnodes(T)
 function eval_basis! end
 function eval_dbasis! end
 
+# New API functions (declared here, implemented in basis_api.jl)
+function get_basis_functions end
+function get_basis_derivatives end
+
 # ============================================================================
-# Parametric Lagrange Basis Type
+# Parametric Lagrange Basis Type (OLD - with topology parameter)
 # ============================================================================
+# NOTE: This is the OLD API with topology in the type parameter.
+# New code should use LagrangeP{P} below (topology passed separately).
+# This is kept for backward compatibility during migration.
 
 """
     Lagrange{T<:AbstractTopology, P} <: AbstractBasis
