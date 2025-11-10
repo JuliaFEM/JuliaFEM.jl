@@ -6,6 +6,7 @@ author = ["Jukka Aho <ahojukka5@gmail.com>", "Tero Frondelius <tero.frondelius@g
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
+IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
@@ -14,6 +15,7 @@ Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 [compat]
 BenchmarkTools = "1.6.3"
 Gmsh = "0.3.1"
+IterativeSolvers = "0.9.4"
 Tensors = "≥ 1.0.0"
 julia = "1.9"
 
