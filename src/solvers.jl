@@ -14,13 +14,13 @@ end
 
 function Solver(::Type{S}, problems::Problem...) where S<:AbstractSolver
     solver = Solver(S, "$(S)Solver")
-    push!(solver.problems, problems...)
+    # CHANGED: Use add_problems! instead of push!
+    add_problems!(solver, problems...)
     return solver
 end
 
-function push!(solver::Solver, problem::Problem)
-    push!(solver.problems, problem)
-end
+# REMOVED: push!(solver, problem) - Use add_problems!(solver, problem) instead
+# This violated Julia semantics (push! should be for collections, not domain logic)
 
 function getindex(solver::Solver, problem_name::String)
     for problem in get_problems(solver)
@@ -83,7 +83,7 @@ function get_field_assembly(solver::Solver)
     K = sparse(K, N, N)
     if nnz(K) == 0
         @warn("Field assembly seems to be empty. Check that elements are ",
-              "pushed to problem and formulation is correct.")
+            "pushed to problem and formulation is correct.")
     end
     f = sparse(f, N, 1)
     Kg = sparse(Kg, N, N)
@@ -156,8 +156,8 @@ function get_boundary_assembly(solver::Solver, N)
         g_ = sparse(assembly.g, N, 1)
         for dof in assembly.removed_dofs
             @info("$(problem.name): removing dof $dof from assembly")
-            C1_[dof,:] .= 0.0
-            C2_[dof,:] .= 0.0
+            C1_[dof, :] .= 0.0
+            C2_[dof, :] .= 0.0
         end
         SparseArrays.dropzeros!(C1_)
         SparseArrays.dropzeros!(C2_)
@@ -202,15 +202,15 @@ function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{1}})
     if length(B) == 0
         @warn("No rows in C2, forget to set Dirichlet boundary conditions to model?")
     else
-        u[B] = lu(C2[B,B2]) \ Vector(g[B])
+        u[B] = lu(C2[B, B2]) \ Vector(g[B])
     end
 
     # solve interior domain using LDLt factorization
-    F = ldlt(K[I,I])
-    u[I] = F \ Vector(f[I] - K[I,B]*u[B])
+    F = ldlt(K[I, I])
+    u[I] = F \ Vector(f[I] - K[I, B] * u[B])
 
     # solve lagrange multipliers
-    la[B] = lu(C1[B2,B]) \ Vector(f[B] - K[B,I]*u[I] - K[B,B]*u[B])
+    la[B] = lu(C1[B2, B]) \ Vector(f[B] - K[B, I] * u[I] - K[B, B] * u[B])
 
     return true
 end
@@ -227,7 +227,7 @@ function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{2}})
     C1 == C2 || return false
     length(D) == 0 || return false
 
-    A = [K C1'; C2  D]
+    A = [K C1'; C2 D]
     b = [f; g]
     ndofs = size(K, 2)
 
@@ -235,8 +235,8 @@ function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{2}})
     nz2 = get_nonzero_columns(A)
     nz1 == nz2 || return false
 
-    x = zeros(2*ndofs)
-    x[nz1] = lufact(A[nz1,nz2]) \ full(b[nz1])
+    x = zeros(2 * ndofs)
+    x[nz1] = lufact(A[nz1, nz2]) \ full(b[nz1])
 
     u[:] = x[1:ndofs]
     la[:] = x[ndofs+1:end]
@@ -251,11 +251,11 @@ If matrix has zero rows, diagonal term is added to that matrix is invertible.
 """
 function solve!(solver::Solver, K, C1, C2, D, f, g, u, la, ::Type{Val{3}})
 
-    A = [K C1'; C2  D]
+    A = [K C1'; C2 D]
     b = [f; g]
 
     ndofs = size(K, 2)
-    nonzero_rows = zeros(2*ndofs)
+    nonzero_rows = zeros(2 * ndofs)
     for j in rowvals(A)
         nonzero_rows[j] = 1.0
     end
@@ -287,8 +287,8 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
     f = f + fg + fb
 
     if symmetric
-        K = 1/2*(K + K')
-        M = 1/2*(M + M')
+        K = 1 / 2 * (K + K')
+        M = 1 / 2 * (M + M')
     end
 
     if empty_assemblies_before_solution
@@ -324,7 +324,7 @@ function solve!(solver::Solver; empty_assemblies_before_solution=true, symmetric
     for i in [1, 2, 3]
         is_solved = solve!(solver, K, C1, C2, D, f, g, u, la, Val{i})
         if is_solved
-            t1 = round(Base.time()-t0; digits=2)
+            t1 = round(Base.time() - t0; digits=2)
             norms = (norm(u), norm(la))
             @info("Solved linear system in $t1 seconds using solver $i. " *
                   "Solution norms (||u||, ||la||): $norms.")
@@ -428,7 +428,7 @@ function initialize!(solver::Solver)
     end
     nnodes = length(nodes)
     @info("Total number of nodes in problems: $nnodes")
-    maxdof = maximum(nodes)*field_dim
+    maxdof = maximum(nodes) * field_dim
     @info("# of max dof (=size of solution vector) is $maxdof")
     solver.u = zeros(maxdof)
     solver.la = zeros(maxdof)
@@ -439,7 +439,7 @@ function initialize!(solver::Solver)
         problem.assembly.la = zeros(maxdof)
         # initialize(problem, ....)
     end
-    t1 = round(Base.time()-t0; digits=2)
+    t1 = round(Base.time() - t0; digits=2)
     @info("Initialized solver in $t1 seconds.")
     solver.initialized = true
 end
@@ -472,7 +472,7 @@ function (solver::Solver)(field_name::String, time::Float64)
         push!(fields, field)
     end
     if length(fields) == 0
-        return Dict{Integer, Vector{Float64}}()
+        return Dict{Integer,Vector{Float64}}()
     end
     return merge(fields...)
 end
@@ -537,12 +537,12 @@ end
 ### Nonlinear quasistatic solver
 
 mutable struct Nonlinear <: AbstractSolver
-    time :: Float64
-    iteration :: Int        # iteration counter
-    min_iterations :: Int64 # minimum number of iterations
-    max_iterations :: Int64 # maximum number of iterations
-    convergence_tolerance :: Float64
-    error_if_no_convergence :: Bool # throw error if no convergence
+    time::Float64
+    iteration::Int        # iteration counter
+    min_iterations::Int64 # minimum number of iterations
+    max_iterations::Int64 # maximum number of iterations
+    convergence_tolerance::Float64
+    error_if_no_convergence::Bool # throw error if no convergence
 end
 
 function Nonlinear()
@@ -584,7 +584,7 @@ function run!(solver::Solver{Nonlinear})
     end
 
     # 2. start non-linear iterations
-    for properties.iteration=1:properties.max_iterations
+    for properties.iteration = 1:properties.max_iterations
         @info(repeat("-", 80))
         @info("Starting nonlinear iteration #$(properties.iteration)")
         @info("Increment time t=$(round(time; digits=3))")
@@ -631,7 +631,7 @@ Main differences in this solver, compared to nonlinear solver are:
 
 """
 mutable struct Linear <: AbstractSolver
-    time :: Float64
+    time::Float64
 end
 
 function Linear()
