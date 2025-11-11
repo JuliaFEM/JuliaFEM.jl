@@ -44,12 +44,121 @@ abstract type AbstractBasis end
 Base.ndims(B::T) where {T<:AbstractBasis} = ndims(T)
 nnodes(B::T) where {T<:AbstractBasis} = nnodes(T)
 
-# Declare interface functions (will be implemented by basis generator or specific basis types)
+# ============================================================================
+# DEPRECATED API (Remove after migration)
+# ============================================================================
+# These functions are DEPRECATED and should not be used in new code.
+# They remain for backward compatibility during migration.
+#
+# OLD API: eval_basis!(basis_type, T, xi) → Returns NTuple{N, T}
+# NEW API: get_basis_functions(topology, basis, xi) → Returns NTuple{N, Float64}
+#
+# Migration guide:
+# OLD: N = eval_basis!(Lagrange{Triangle,1}, Float64, xi)
+# NEW: N = get_basis_functions(Triangle(), Lagrange{1}(), xi)
+#
+# OLD: dN = eval_dbasis!(Lagrange{Triangle,1}, xi)
+# NEW: dN = get_basis_derivatives(Triangle(), Lagrange{1}(), xi)
+#
+# Why deprecated:
+# - Topology and basis are separate concerns (should be passed separately)
+# - Naming is unclear (eval_basis! suggests mutation, but returns value)
+# - Type parameter T is redundant (always Float64 in practice)
+
+"""
+    eval_basis!(B::Type{<:AbstractBasis}, T::Type, xi::Vec) -> NTuple{N, T}
+
+**DEPRECATED:** Use `get_basis_functions(topology, basis, xi)` instead.
+
+This function will be removed in a future release. The new API separates
+topology and basis, has clearer naming, and follows consistent conventions.
+
+# Migration Example
+
+```julia
+# OLD (deprecated):
+N = eval_basis!(Lagrange{Triangle,1}, Float64, xi)
+
+# NEW (recommended):
+N = get_basis_functions(Triangle(), Lagrange{1}(), xi)
+```
+
+See: [`get_basis_functions`](@ref)
+"""
 function eval_basis! end
+
+"""
+    eval_dbasis!(B::Type{<:AbstractBasis}, xi::Vec) -> NTuple{N, Vec{D}}
+
+**DEPRECATED:** Use `get_basis_derivatives(topology, basis, xi)` instead.
+
+This function will be removed in a future release. The new API separates
+topology and basis, has clearer naming, and follows consistent conventions.
+
+# Migration Example
+
+```julia
+# OLD (deprecated):
+dN = eval_dbasis!(Lagrange{Triangle,1}, xi)
+
+# NEW (recommended):
+dN = get_basis_derivatives(Triangle(), Lagrange{1}(), xi)
+```
+
+See: [`get_basis_derivatives`](@ref)
+"""
 function eval_dbasis! end
 
-# New API functions (declared here, implemented in basis_api.jl)
+# ============================================================================
+# NEW API (Recommended)
+# ============================================================================
+# These are the recommended functions for all new code.
+# See basis_api.jl for full documentation and examples.
+
+"""
+    get_basis_functions(topology, basis, xi) -> NTuple{N, Float64}
+
+Evaluate all basis functions at parametric point `xi`.
+
+This is the **recommended API** for evaluating basis functions. See `basis_api.jl`
+for full documentation and performance benchmarks.
+
+# Quick Example
+
+```julia
+topology = Triangle()
+basis = Lagrange{1}()  # Linear
+xi = Vec(0.25, 0.25)
+
+N = get_basis_functions(topology, basis, xi)
+# Returns: (N1, N2, N3) as NTuple{3, Float64}
+```
+
+See also: [`get_basis_derivatives`](@ref)
+"""
 function get_basis_functions end
+
+"""
+    get_basis_derivatives(topology, basis, xi) -> NTuple{N, Vec{D, Float64}}
+
+Evaluate all basis function derivatives at parametric point `xi`.
+
+This is the **recommended API** for evaluating basis derivatives. See `basis_api.jl`
+for full documentation and performance benchmarks.
+
+# Quick Example
+
+```julia
+topology = Triangle()
+basis = Lagrange{1}()  # Linear
+xi = Vec(0.25, 0.25)
+
+dN = get_basis_derivatives(topology, basis, xi)
+# Returns: (∇N1, ∇N2, ∇N3) as NTuple{3, Vec{2, Float64}}
+```
+
+See also: [`get_basis_functions`](@ref)
+"""
 function get_basis_derivatives end
 
 # ============================================================================
