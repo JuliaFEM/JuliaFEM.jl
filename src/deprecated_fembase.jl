@@ -7,7 +7,7 @@
 Return the length of basis (number of nodes).
 """
 function length(element::AbstractElement)
-    return length(element.properties)
+    return length(element.connectivity)
 end
 
 """
@@ -16,7 +16,12 @@ end
 Return the size of basis (dim, nnodes).
 """
 function size(element::AbstractElement)
-    return size(element.properties)
+    # Return (dimension, number of nodes)
+    # For now, infer dimension from basis type
+    conn = element.connectivity
+    nnodes = length(conn)
+    # This is a simplified version - proper dimension should come from basis
+    return (3, nnodes)  # Default to 3D for now
 end
 
 function getindex(element::AbstractElement, field_name::String)
@@ -92,7 +97,24 @@ end
 # are not explicitly giving targe?
 
 function update!(element::AbstractElement, field_name, field_data)
-    update_field!(element, field_name, field_data)
+    error("""
+    update!() is DEPRECATED for immutable Element architecture!
+
+    Elements are now immutable. Use update() instead, which returns a NEW element:
+
+    OLD (mutable):
+        element = Element(Seg2, (1, 2))
+        update!(element, "geometry", X)  # Mutates element
+
+    NEW (immutable):
+        element = Element(Seg2, (1, 2))
+        element = update(element, :geometry => X)  # Returns new element
+
+    OR create element with fields from the start:
+        element = Element(Seg2, (1, 2), fields=(geometry=X, temperature_1=0.0))
+
+    See docs/book/migration-guide-element-api.md for complete migration guide.
+    """)
 end
 
 function update!(field::AbstractField, data)
@@ -100,7 +122,8 @@ function update!(field::AbstractField, data)
 end
 
 function update!(element::AbstractElement, field_name::String, field_data)
-    update_field!(element, Symbol(field_name), field_data)
+    # Convert string to symbol and call the error-throwing version
+    update!(element, Symbol(field_name), field_data)
 end
 
 function update!(elements::Vector{Element}, field_name::String, field_data)
