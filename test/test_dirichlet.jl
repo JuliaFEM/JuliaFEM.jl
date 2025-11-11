@@ -27,10 +27,9 @@ Matrix([
 
     time = 0.0
 
-    element = Element(Seg2, (1, 2))
+    # NEW API: Create element with fields from the start (immutable)
     X = Dict(1 => [0.0, 0.0], 2 => [6.0, 0.0])
-    update!(element, "geometry", X)
-    update!(element, "temperature 1", 0.0)
+    element = Element(Seg2, (1, 2), fields=(geometry=X, temperature_1=0.0))
 
     problem1 = Problem(Dirichlet, "test problem 1", 1, "temperature")
     problem1.properties.variational = true
@@ -52,14 +51,14 @@ Matrix([
     @test isapprox(C1, C2)
     @test isapprox(C1, [3.0 0.0; 0.0 3.0])
 
-    element = Element(Seg3, (1, 2, 3))
-    X = Dict(1 => [0.0, 0.0], 2 => [30.0, 0.0], 3 => [15.0, 0.0])
-    update!(element, "geometry", X)
-    update!(element, "temperature 1", 0.0)
+    # NEW API: Quadratic element with fields
+    X2 = Dict(1 => [0.0, 0.0], 2 => [30.0, 0.0], 3 => [15.0, 0.0])
+    element2 = Element(Seg3, (1, 2, 3), fields=(geometry=X2, temperature_1=0.0))
+
     problem3 = Problem(Dirichlet, "quadratic 1", 1, "temperature")
     problem3.properties.variational = true
     problem3.properties.dual_basis = false
-    add_element!(problem3, element)
+    add_element!(problem3, element2)
     assemble!(problem3, time)
     C1 = problem3.assembly.C1
     C2 = problem3.assembly.C2
@@ -69,7 +68,7 @@ Matrix([
     problem4 = Problem(Dirichlet, "quadratic 2", 1, "temperature")
     problem4.properties.variational = true
     problem4.properties.dual_basis = true
-    add_element!(problem4, element)
+    add_element!(problem4, element2)
     assemble!(problem4, time)
     C1 = problem4.assembly.C1
     C2 = problem4.assembly.C2
@@ -131,12 +130,12 @@ end
 
 @testset "test analytical boundary condition" begin
     X = Dict(1 => [0.0, 0.0],
-             2 => [1.0, 0.0])
+        2 => [1.0, 0.0])
     element = Element(Seg2, (1, 2))
     update!(element, "geometry", X)
     function f(element, ip, time)
         x, y = element("geometry", ip, time)
-        val = x*time
+        val = x * time
         @debug("analytical function called", ip, time, x, y, val)
         return val
     end
