@@ -230,8 +230,14 @@ function integration_points(scheme::Gauss{N}, topology::T) where {N,T<:AbstractT
     # Get points from quadrature module (src/quadrature/)
     quad_data = get_quadrature_points(Val{rule_name})
 
-    # Convert to tuple of IntegrationPoints (zero allocation)
-    return tuple((IntegrationPoint{D}(point, weight) for (weight, point) in quad_data)...)
+    # Convert to tuple of IntegrationPoints
+    # Collect first since quad_data is a zip iterator (cannot be indexed)
+    data_vec = collect(quad_data)
+    result = ntuple(length(data_vec)) do i
+        weight, point = data_vec[i]
+        IntegrationPoint(point, weight)  # Type inference from arguments
+    end
+    return result
 end
 
 # Number of integration points
