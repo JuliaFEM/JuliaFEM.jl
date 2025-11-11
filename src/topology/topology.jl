@@ -6,25 +6,46 @@
 
 Abstract base type for all reference element topologies.
 
-A topology defines the combinatorial structure of how nodes connect to form an element
-in parametric (reference) coordinates. Topologies are mathematical objects independent
-of interpolation schemes or integration rules.
+**IMPORTANT SEPARATION OF CONCERNS:**
+- **Topology** = Geometric shape (e.g., Triangle, Quadrilateral, Tetrahedron)
+- **Basis** = Interpolation scheme (e.g., Lagrange{Triangle, 1}, Serendipity{Quadrilateral, 2})
+- **Node count** comes from BASIS, not topology!
+
+A topology defines the **combinatorial structure** of how corner nodes connect to form 
+an element in parametric (reference) coordinates. Topologies are **mathematical shapes** 
+independent of interpolation schemes or integration rules.
 
 # Key Properties
-- Number of nodes
 - Spatial dimension (1D, 2D, 3D)
-- Reference element geometry
+- Number of **corner** nodes
+- Reference element geometry (corner positions only)
+- Edge and face connectivity (corner nodes only)
 - Node ordering convention
+
+# Topology vs Node Count
+
+The same topology supports different node counts via different basis functions:
+
+```julia
+# Same topology (Quadrilateral), different node counts:
+Lagrange{Quadrilateral, 1}      → 4 nodes (bilinear)
+Serendipity{Quadrilateral, 2}   → 8 nodes (no center)
+Lagrange{Quadrilateral, 2}      → 9 nodes (with center)
+```
 
 # Examples
 ```julia
-Tri3()   # 3-node triangle
-Quad4()  # 4-node quadrilateral
-Tet10()  # 10-node tetrahedron
-Hex8()   # 8-node hexahedron
+# New API (explicit separation)
+topology = Triangle()
+basis = Lagrange{Triangle, 1}()
+element = Element(basis, (1,2,3))
+
+# Old API (deprecated, but still works via aliases)
+element = Element(Tri3, (1,2,3))  # Tri3 is alias for Triangle
 ```
 
-See also: [`Tri3`](@ref), [`Quad4`](@ref), [`Tet10`](@ref), [`Hex8`](@ref)
+See also: [`Segment`](@ref), [`Triangle`](@ref), [`Quadrilateral`](@ref), 
+          [`Tetrahedron`](@ref), [`Hexahedron`](@ref), [`Pyramid`](@ref), [`Wedge`](@ref)
 """
 abstract type AbstractTopology end
 
