@@ -1,0 +1,922 @@
+================================================================================
+Material Models Performance Benchmark (Extended)
+================================================================================
+
+
+================================================================================
+NEWTON ITERATION STATE HANDLING EXAMPLE
+================================================================================
+
+Example 1: Stateless Material (LinearElastic)
+--------------------------------------------------------------------------------
+  Newton iteration with material state tracking:
+  ============================================================
+  Iteration 1:
+    strain: 0.0
+    stress: 0.0
+    state:  NoState()
+  Iteration 2:
+    strain: 0.0005
+    stress: 1.5741063022831637e8
+    state:  NoState()
+  Iteration 3:
+    strain: 0.00075
+    stress: 2.3611594534247452e8
+    state:  NoState()
+  → Failed to converge!
+  State NOT committed (keeping state_old)
+Result: state_final = NoState() (NoState, always)
+
+Example 2: Stateful Material (PerfectPlasticity)
+--------------------------------------------------------------------------------
+  Newton iteration with material state tracking:
+  ============================================================
+  Iteration 1:
+    strain: 0.0
+    stress: 0.0
+    state:  PlasticityState{Float64}([0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0], 0.0)
+  Iteration 2:
+    strain: 0.001
+    stress: 3.1482126045663273e8
+    state:  PlasticityState{Float64}([0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0], 0.0)
+  Iteration 3:
+    strain: 0.0015
+    stress: 4.7223189068494904e8
+    state:  PlasticityState{Float64}([0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0], 0.0)
+  → Failed to converge!
+  State NOT committed (keeping state_old)
+Result: state_final = PlasticityState{Float64}([0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0], 0.0) (plastic strain accumulated)
+
+Key insight: State handling is IDENTICAL for all materials due to
+AbstractMaterialState type hierarchy. Assembly code doesn't need
+to know whether material is stateless or stateful!
+
+Setting up materials and test cases...
+
+Materials configured:
+  - Linear Elastic: E = 200 GPa, ν = 0.3
+  - Neo-Hookean (AD): μ ≈ 3.4 MPa, λ ≈ 45 MPa (automatic differentiation)
+  - Neo-Hookean (Manual): μ ≈ 3.4 MPa, λ ≈ 45 MPa (hand-coded derivatives)
+  - Perfect Plasticity: E = 200 GPa, σ_y = 250 MPa
+
+Test strain: ε11 = 0.001 (uniaxial tension)
+
+================================================================================
+TYPE STABILITY ANALYSIS
+================================================================================
+
+Checking for type instabilities...
+
+1. Linear Elastic (Tensors.jl):
+MethodInstance for compute_stress(::LinearElastic, ::SymmetricTensor{2, 3, Float64, 6}, ::NoState, ::Float64)
+  from compute_stress(material::LinearElastic, ε::SymmetricTensor{2, 3, T}, state_old::NoState, Δt::Float64) where T @ Main ~/dev/JuliaFEM.jl/benchmarks/material_models_benchmark.jl:94
+Static Parameters
+  T = Float64
+Arguments
+  #self#::Core.Const(Main.compute_stress)
+  material::LinearElastic
+  ε::SymmetricTensor{2, 3, Float64, 6}
+  state_old::Core.Const(NoState())
+  Δt::Float64
+Locals
+  𝔻::SymmetricTensor{4, 3, Float64, 36}
+  𝕀ˢʸᵐ::SymmetricTensor{4, 3, Float64, 36}
+  σ::SymmetricTensor{2, 3, Float64, 6}
+  I::SymmetricTensor{2, 3, Float64, 6}
+  μ_val::Float64
+  λ_val::Float64
+Body::Tuple{SymmetricTensor{2, 3, Float64, 6}, SymmetricTensor{4, 3, Float64, 36}, NoState}
+1 ─ %1  = Main.λ::Core.Const(Main.λ)
+│         (λ_val = (%1)(material))
+│   %3  = Main.μ::Core.Const(Main.μ)
+│         (μ_val = (%3)(material))
+│   %5  = Main.one::Core.Const(one)
+│         (I = (%5)(ε))
+│   %7  = Main.:+::Core.Const(+)
+│   %8  = Main.:*::Core.Const(*)
+│   %9  = λ_val::Float64
+│   %10 = Main.tr::Core.Const(LinearAlgebra.tr)
+│   %11 = (%10)(ε)::Float64
+│   %12 = I::Core.Const([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
+│   %13 = (%8)(%9, %11, %12)::SymmetricTensor{2, 3, Float64, 6}
+│   %14 = Main.:*::Core.Const(*)
+│   %15 = Main.:*::Core.Const(*)
+│   %16 = μ_val::Float64
+│   %17 = (%15)(2, %16)::Float64
+│   %18 = (%14)(%17, ε)::SymmetricTensor{2, 3, Float64, 6}
+│         (σ = (%7)(%13, %18))
+│   %20 = Main.one::Core.Const(one)
+│   %21 = Main.SymmetricTensor::Core.Const(SymmetricTensor)
+│   %22 = $(Expr(:static_parameter, 1))::Core.Const(Float64)
+│   %23 = Core.apply_type(%21, 4, 3, %22)::Core.Const(SymmetricTensor{4, 3, Float64})
+│         (𝕀ˢʸᵐ = (%20)(%23))
+│   %25 = Main.:+::Core.Const(+)
+│   %26 = Main.:⊗::Core.Const(Tensors.otimes)
+│   %27 = Main.:*::Core.Const(*)
+│   %28 = λ_val::Float64
+│   %29 = I::Core.Const([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
+│   %30 = (%27)(%28, %29)::SymmetricTensor{2, 3, Float64, 6}
+│   %31 = I::Core.Const([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
+│   %32 = (%26)(%30, %31)::SymmetricTensor{4, 3, Float64, 36}
+│   %33 = Main.:*::Core.Const(*)
+│   %34 = Main.:*::Core.Const(*)
+│   %35 = μ_val::Float64
+│   %36 = (%34)(2, %35)::Float64
+│   %37 = 𝕀ˢʸᵐ::Core.Const([1.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0;;; 0.0 0.5 0.0; 0.5 0.0 0.0; 0.0 0.0 0.0;;; 0.0 0.0 0.5; 0.0 0.0 0.0; 0.5 0.0 0.0;;;; 0.0 0.5 0.0; 0.5 0.0 0.0; 0.0 0.0 0.0;;; 0.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 0.0;;; 0.0 0.0 0.0; 0.0 0.0 0.5; 0.0 0.5 0.0;;;; 0.0 0.0 0.5; 0.0 0.0 0.0; 0.5 0.0 0.0;;; 0.0 0.0 0.0; 0.0 0.0 0.5; 0.0 0.5 0.0;;; 0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 1.0])
+│   %38 = (%33)(%36, %37)::SymmetricTensor{4, 3, Float64, 36}
+│         (𝔻 = (%25)(%32, %38))
+│   %40 = σ::SymmetricTensor{2, 3, Float64, 6}
+│   %41 = 𝔻::SymmetricTensor{4, 3, Float64, 36}
+│   %42 = Main.NoState::Core.Const(NoState)
+│   %43 = (%42)()::Core.Const(NoState())
+│   %44 = Core.tuple(%40, %41, %43)::Tuple{SymmetricTensor{2, 3, Float64, 6}, SymmetricTensor{4, 3, Float64, 36}, NoState}
+└──       return %44
+
+
+2. Linear Elastic (Old Voigt/Dict):
+MethodInstance for compute_stress_old(::LinearElasticOld, ::Vector{Float64}, ::Dict{String, Any}, ::Float64)
+  from compute_stress_old(material::LinearElasticOld, ε_vec::Vector{Float64}, state_old::Dict{String, Any}, Δt::Float64) @ Main ~/dev/JuliaFEM.jl/benchmarks/material_models_benchmark.jl:413
+Arguments
+  #self#::Core.Const(Main.compute_stress_old)
+  material::LinearElasticOld
+  ε_vec::Vector{Float64}
+  state_old::Dict{String, Any}
+  Δt::Float64
+Locals
+  σ_vec::Vector{Float64}
+  D::Matrix{Float64}
+Body::Tuple{Vector{Float64}, Matrix{Float64}, Dict{String, Any}}
+1 ─ %1 = Main.constitutive_matrix::Core.Const(Main.constitutive_matrix)
+│        (D = (%1)(material))
+│   %3 = Main.:*::Core.Const(*)
+│   %4 = D::Matrix{Float64}
+│        (σ_vec = (%3)(%4, ε_vec))
+│   %6 = σ_vec::Vector{Float64}
+│   %7 = D::Matrix{Float64}
+│   %8 = Core.tuple(%6, %7, state_old)::Tuple{Vector{Float64}, Matrix{Float64}, Dict{String, Any}}
+└──      return %8
+
+
+3. Neo-Hookean AD (Tensors.jl with automatic differentiation):
+MethodInstance for compute_stress(::NeoHookeanAD, ::SymmetricTensor{2, 3, Float64, 6}, ::NoState, ::Float64)
+  from compute_stress(material::NeoHookeanAD, E::SymmetricTensor{2, 3, T}, state_old::NoState, Δt::Float64) where T @ Main ~/dev/JuliaFEM.jl/benchmarks/material_models_benchmark.jl:147
+Static Parameters
+  T = Float64
+Arguments
+  #self#::Core.Const(Main.compute_stress)
+  material::NeoHookeanAD
+  E::SymmetricTensor{2, 3, Float64, 6}
+  state_old::Core.Const(NoState())
+  Δt::Float64
+Locals
+  @_6::Int64
+  S::SymmetricTensor{2, 3, Float64, 6}
+  𝔻::SymmetricTensor{4, 3, Float64, 36}
+  ψ::var"#ψ#compute_stress##0"{NeoHookeanAD}
+  C::SymmetricTensor{2, 3, Float64, 6}
+  I::SymmetricTensor{2, 3, Float64, 6}
+Body::Tuple{SymmetricTensor{2, 3, Float64, 6}, SymmetricTensor{4, 3, Float64, 36}, NoState}
+1 ─ %1  = Main.one::Core.Const(one)
+│         (I = (%1)(E))
+│   %3  = Main.:+::Core.Const(+)
+│   %4  = Main.:*::Core.Const(*)
+│   %5  = (%4)(2, E)::SymmetricTensor{2, 3, Float64, 6}
+│   %6  = I::Core.Const([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
+│         (C = (%3)(%5, %6))
+│   %8  = Main.:(var"#ψ#compute_stress##0")::Core.Const(var"#ψ#compute_stress##0")
+│   %9  = Core._typeof_captured_variable(material)::Core.Const(NeoHookeanAD)
+│   %10 = Core.apply_type(%8, %9)::Core.Const(var"#ψ#compute_stress##0"{NeoHookeanAD})
+│         (ψ = %new(%10, material))
+│   %12 = Main.hessian::Core.Const(Tensors.hessian)
+│   %13 = ψ::var"#ψ#compute_stress##0"{NeoHookeanAD}
+│   %14 = C::SymmetricTensor{2, 3, Float64, 6}
+│   %15 = (%12)(%13, %14, :all)::Tuple{SymmetricTensor{4, 3, Float64, 36}, SymmetricTensor{2, 3, Float64, 6}, Float64}
+│   %16 = Base.indexed_iterate(%15, 1)::Core.PartialStruct(Tuple{SymmetricTensor{4, 3, Float64, 36}, Int64}, Any[SymmetricTensor{4, 3, Float64, 36}, Core.Const(2)])
+│         (𝔻 = Core.getfield(%16, 1))
+│         (@_6 = Core.getfield(%16, 2))
+│   %19 = @_6::Core.Const(2)
+│   %20 = Base.indexed_iterate(%15, 2, %19)::Core.PartialStruct(Tuple{SymmetricTensor{2, 3, Float64, 6}, Int64}, Any[SymmetricTensor{2, 3, Float64, 6}, Core.Const(3)])
+│         (S = Core.getfield(%20, 1))
+│   %22 = Main.:*::Core.Const(*)
+│   %23 = S::SymmetricTensor{2, 3, Float64, 6}
+│         (S = (%22)(2, %23))
+│   %25 = Main.:*::Core.Const(*)
+│   %26 = 𝔻::SymmetricTensor{4, 3, Float64, 36}
+│         (𝔻 = (%25)(4, %26))
+│   %28 = S::SymmetricTensor{2, 3, Float64, 6}
+│   %29 = 𝔻::SymmetricTensor{4, 3, Float64, 36}
+│   %30 = Main.NoState::Core.Const(NoState)
+│   %31 = (%30)()::Core.Const(NoState())
+│   %32 = Core.tuple(%28, %29, %31)::Tuple{SymmetricTensor{2, 3, Float64, 6}, SymmetricTensor{4, 3, Float64, 36}, NoState}
+└──       return %32
+
+
+4. Neo-Hookean Manual (Tensors.jl with hand-coded derivatives):
+MethodInstance for compute_stress(::NeoHookeanManual, ::SymmetricTensor{2, 3, Float64, 6}, ::NoState, ::Float64)
+  from compute_stress(material::NeoHookeanManual, E::SymmetricTensor{2, 3, T}, state_old::NoState, Δt::Float64) where T @ Main ~/dev/JuliaFEM.jl/benchmarks/material_models_benchmark.jl:203
+Static Parameters
+  T = Float64
+Arguments
+  #self#::Core.Const(Main.compute_stress)
+  material::NeoHookeanManual
+  E::SymmetricTensor{2, 3, Float64, 6}
+  state_old::Core.Const(NoState())
+  Δt::Float64
+Locals
+  𝔻::SymmetricTensor{4, 3, Float64, 36}
+  𝔻₂::SymmetricTensor{4, 3, Float64, 36}
+  coeff::Float64
+  𝕀ˢʸᵐ::SymmetricTensor{4, 3, Float64, 36}
+  𝔻₁::SymmetricTensor{4, 3, Float64, 36}
+  S::SymmetricTensor{2, 3, Float64, 6}
+  C_inv::SymmetricTensor{2, 3, Float64, 6}
+  J::Float64
+  C::SymmetricTensor{2, 3, Float64, 6}
+  I::SymmetricTensor{2, 3, Float64, 6}
+  λ::Float64
+  μ::Float64
+Body::Tuple{SymmetricTensor{2, 3, Float64, 6}, SymmetricTensor{4, 3, Float64, 36}, NoState}
+1 ─ %1  = Base.getproperty(material, :μ)::Float64
+│   %2  = Base.getproperty(material, :λ)::Float64
+│         (μ = %1)
+│         (λ = %2)
+│   %5  = Main.one::Core.Const(one)
+│         (I = (%5)(E))
+│   %7  = Main.:+::Core.Const(+)
+│   %8  = Main.:*::Core.Const(*)
+│   %9  = (%8)(2, E)::SymmetricTensor{2, 3, Float64, 6}
+│   %10 = I::Core.Const([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
+│         (C = (%7)(%9, %10))
+│   %12 = Main.:√::Core.Const(sqrt)
+│   %13 = Main.det::Core.Const(LinearAlgebra.det)
+│   %14 = C::SymmetricTensor{2, 3, Float64, 6}
+│   %15 = (%13)(%14)::Float64
+│         (J = (%12)(%15))
+│   %17 = Main.inv::Core.Const(inv)
+│   %18 = C::SymmetricTensor{2, 3, Float64, 6}
+│         (C_inv = (%17)(%18))
+│   %20 = Main.:+::Core.Const(+)
+│   %21 = Main.:*::Core.Const(*)
+│   %22 = μ::Float64
+│   %23 = Main.:-::Core.Const(-)
+│   %24 = I::Core.Const([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
+│   %25 = C_inv::SymmetricTensor{2, 3, Float64, 6}
+│   %26 = (%23)(%24, %25)::SymmetricTensor{2, 3, Float64, 6}
+│   %27 = (%21)(%22, %26)::SymmetricTensor{2, 3, Float64, 6}
+│   %28 = Main.:*::Core.Const(*)
+│   %29 = λ::Float64
+│   %30 = Main.log::Core.Const(log)
+│   %31 = J::Float64
+│   %32 = (%30)(%31)::Float64
+│   %33 = C_inv::SymmetricTensor{2, 3, Float64, 6}
+│   %34 = (%28)(%29, %32, %33)::SymmetricTensor{2, 3, Float64, 6}
+│         (S = (%20)(%27, %34))
+│   %36 = Main.:*::Core.Const(*)
+│   %37 = λ::Float64
+│   %38 = Main.:⊗::Core.Const(Tensors.otimes)
+│   %39 = C_inv::SymmetricTensor{2, 3, Float64, 6}
+│   %40 = C_inv::SymmetricTensor{2, 3, Float64, 6}
+│   %41 = (%38)(%39, %40)::SymmetricTensor{4, 3, Float64, 36}
+│         (𝔻₁ = (%36)(%37, %41))
+│   %43 = Main.one::Core.Const(one)
+│   %44 = Main.SymmetricTensor::Core.Const(SymmetricTensor)
+│   %45 = $(Expr(:static_parameter, 1))::Core.Const(Float64)
+│   %46 = Core.apply_type(%44, 4, 3, %45)::Core.Const(SymmetricTensor{4, 3, Float64})
+│         (𝕀ˢʸᵐ = (%43)(%46))
+│   %48 = Main.:*::Core.Const(*)
+│   %49 = Main.:-::Core.Const(-)
+│   %50 = μ::Float64
+│   %51 = Main.:*::Core.Const(*)
+│   %52 = λ::Float64
+│   %53 = Main.log::Core.Const(log)
+│   %54 = J::Float64
+│   %55 = (%53)(%54)::Float64
+│   %56 = (%51)(%52, %55)::Float64
+│   %57 = (%49)(%50, %56)::Float64
+│         (coeff = (%48)(2, %57))
+│   %59 = Main.:*::Core.Const(*)
+│   %60 = Main.:-::Core.Const(-)
+│   %61 = coeff::Float64
+│   %62 = (%60)(%61)::Float64
+│   %63 = Main.inv_symmetric_outer::Core.Const(Main.inv_symmetric_outer)
+│   %64 = C_inv::SymmetricTensor{2, 3, Float64, 6}
+│   %65 = (%63)(%64)::SymmetricTensor{4, 3, Float64, 36}
+│         (𝔻₂ = (%59)(%62, %65))
+│   %67 = Main.:+::Core.Const(+)
+│   %68 = 𝔻₁::SymmetricTensor{4, 3, Float64, 36}
+│   %69 = 𝔻₂::SymmetricTensor{4, 3, Float64, 36}
+│         (𝔻 = (%67)(%68, %69))
+│   %71 = S::SymmetricTensor{2, 3, Float64, 6}
+│   %72 = 𝔻::SymmetricTensor{4, 3, Float64, 36}
+│   %73 = Main.NoState::Core.Const(NoState)
+│   %74 = (%73)()::Core.Const(NoState())
+│   %75 = Core.tuple(%71, %72, %74)::Tuple{SymmetricTensor{2, 3, Float64, 6}, SymmetricTensor{4, 3, Float64, 36}, NoState}
+└──       return %75
+
+
+5. Perfect Plasticity (Tensors.jl):
+MethodInstance for compute_stress(::PerfectPlasticity, ::SymmetricTensor{2, 3, Float64, 6}, ::PlasticityState{Float64}, ::Float64)
+  from compute_stress(material::PerfectPlasticity, ε::SymmetricTensor{2, 3, T}, state_old::PlasticityState{T}, Δt::Float64) where T @ Main ~/dev/JuliaFEM.jl/benchmarks/material_models_benchmark.jl:328
+Static Parameters
+  T = Float64
+Arguments
+  #self#::Core.Const(Main.compute_stress)
+  material::PerfectPlasticity
+  ε::SymmetricTensor{2, 3, Float64, 6}
+  state_old::PlasticityState{Float64}
+  Δt::Float64
+Locals
+  𝔻::SymmetricTensor{4, 3, Float64, 36}
+  β::Float64
+  θ::Float64
+  state_new::PlasticityState{Float64}
+  α_new::Float64
+  ε_p_new::SymmetricTensor{2, 3, Float64, 6}
+  n::SymmetricTensor{2, 3, Float64, 6}
+  Δγ::Float64
+  σ::SymmetricTensor{2, 3, Float64, 6}
+  p::Float64
+  s_trial::SymmetricTensor{2, 3, Float64, 6}
+  f::Float64
+  σ_eq_trial::Float64
+  σ_trial::SymmetricTensor{2, 3, Float64, 6}
+  ε_e::SymmetricTensor{2, 3, Float64, 6}
+  𝔻ᵉ::SymmetricTensor{4, 3, Float64, 36}
+  𝕀ˢʸᵐ::SymmetricTensor{4, 3, Float64, 36}
+  I::SymmetricTensor{2, 3, Float64, 6}
+  σ_y::Float64
+  μ_val::Float64
+  λ_val::Float64
+Body::Tuple{SymmetricTensor{2, 3, Float64, 6}, SymmetricTensor{4, 3, Float64, 36}, PlasticityState{Float64}}
+1 ─        Core.NewvarNode(:(𝔻))
+│          Core.NewvarNode(:(β))
+│          Core.NewvarNode(:(θ))
+│          Core.NewvarNode(:(state_new))
+│          Core.NewvarNode(:(α_new))
+│          Core.NewvarNode(:(ε_p_new))
+│          Core.NewvarNode(:(n))
+│          Core.NewvarNode(:(Δγ))
+│          Core.NewvarNode(:(σ))
+│          Core.NewvarNode(:(p))
+│          Core.NewvarNode(:(s_trial))
+│   %12  = Main.λ::Core.Const(Main.λ)
+│          (λ_val = (%12)(material))
+│   %14  = Main.μ::Core.Const(Main.μ)
+│          (μ_val = (%14)(material))
+│          (σ_y = Base.getproperty(material, :σ_y))
+│   %17  = Main.one::Core.Const(one)
+│          (I = (%17)(ε))
+│   %19  = Main.one::Core.Const(one)
+│   %20  = Main.SymmetricTensor::Core.Const(SymmetricTensor)
+│   %21  = $(Expr(:static_parameter, 1))::Core.Const(Float64)
+│   %22  = Core.apply_type(%20, 4, 3, %21)::Core.Const(SymmetricTensor{4, 3, Float64})
+│          (𝕀ˢʸᵐ = (%19)(%22))
+│   %24  = Main.:+::Core.Const(+)
+│   %25  = Main.:⊗::Core.Const(Tensors.otimes)
+│   %26  = Main.:*::Core.Const(*)
+│   %27  = λ_val::Float64
+│   %28  = I::Core.Const([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
+│   %29  = (%26)(%27, %28)::SymmetricTensor{2, 3, Float64, 6}
+│   %30  = I::Core.Const([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
+│   %31  = (%25)(%29, %30)::SymmetricTensor{4, 3, Float64, 36}
+│   %32  = Main.:*::Core.Const(*)
+│   %33  = Main.:*::Core.Const(*)
+│   %34  = μ_val::Float64
+│   %35  = (%33)(2, %34)::Float64
+│   %36  = 𝕀ˢʸᵐ::Core.Const([1.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0;;; 0.0 0.5 0.0; 0.5 0.0 0.0; 0.0 0.0 0.0;;; 0.0 0.0 0.5; 0.0 0.0 0.0; 0.5 0.0 0.0;;;; 0.0 0.5 0.0; 0.5 0.0 0.0; 0.0 0.0 0.0;;; 0.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 0.0;;; 0.0 0.0 0.0; 0.0 0.0 0.5; 0.0 0.5 0.0;;;; 0.0 0.0 0.5; 0.0 0.0 0.0; 0.5 0.0 0.0;;; 0.0 0.0 0.0; 0.0 0.0 0.5; 0.0 0.5 0.0;;; 0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 1.0])
+│   %37  = (%32)(%35, %36)::SymmetricTensor{4, 3, Float64, 36}
+│          (𝔻ᵉ = (%24)(%31, %37))
+│   %39  = Main.:-::Core.Const(-)
+│   %40  = Base.getproperty(state_old, :ε_p)::SYMMETRICTENSOR{2, 3, FLOAT64}
+│          (ε_e = (%39)(ε, %40))
+│   %42  = Main.:+::Core.Const(+)
+│   %43  = Main.:*::Core.Const(*)
+│   %44  = λ_val::Float64
+│   %45  = Main.tr::Core.Const(LinearAlgebra.tr)
+│   %46  = ε_e::SymmetricTensor{2, 3, Float64, 6}
+│   %47  = (%45)(%46)::Float64
+│   %48  = I::Core.Const([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
+│   %49  = (%43)(%44, %47, %48)::SymmetricTensor{2, 3, Float64, 6}
+│   %50  = Main.:*::Core.Const(*)
+│   %51  = Main.:*::Core.Const(*)
+│   %52  = μ_val::Float64
+│   %53  = (%51)(2, %52)::Float64
+│   %54  = ε_e::SymmetricTensor{2, 3, Float64, 6}
+│   %55  = (%50)(%53, %54)::SymmetricTensor{2, 3, Float64, 6}
+│          (σ_trial = (%42)(%49, %55))
+│   %57  = Main.von_mises_stress::Core.Const(Main.von_mises_stress)
+│   %58  = σ_trial::SymmetricTensor{2, 3, Float64, 6}
+│          (σ_eq_trial = (%57)(%58))
+│   %60  = Main.:-::Core.Const(-)
+│   %61  = σ_eq_trial::Float64
+│   %62  = σ_y::Float64
+│          (f = (%60)(%61, %62))
+│   %64  = Main.:≤::Core.Const(<=)
+│   %65  = f::Float64
+│   %66  = (%64)(%65, 0.0)::Bool
+└──        goto #3 if not %66
+2 ─ %68  = σ_trial::SymmetricTensor{2, 3, Float64, 6}
+│          (σ = %68)
+│   %70  = 𝔻ᵉ::SymmetricTensor{4, 3, Float64, 36}
+│          (𝔻 = %70)
+│   %72  = state_old::PlasticityState{Float64}
+│          (state_new = %72)
+└──        goto #4
+3 ─ %75  = Main.dev::Core.Const(Tensors.dev)
+│   %76  = σ_trial::SymmetricTensor{2, 3, Float64, 6}
+│          (s_trial = (%75)(%76))
+│   %78  = Main.:/::Core.Const(/)
+│   %79  = Main.tr::Core.Const(LinearAlgebra.tr)
+│   %80  = σ_trial::SymmetricTensor{2, 3, Float64, 6}
+│   %81  = (%79)(%80)::Float64
+│          (p = (%78)(%81, 3))
+│   %83  = Main.:+::Core.Const(+)
+│   %84  = Main.:*::Core.Const(*)
+│   %85  = p::Float64
+│   %86  = I::Core.Const([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
+│   %87  = (%84)(%85, %86)::SymmetricTensor{2, 3, Float64, 6}
+│   %88  = Main.:*::Core.Const(*)
+│   %89  = Main.:/::Core.Const(/)
+│   %90  = σ_y::Float64
+│   %91  = σ_eq_trial::Float64
+│   %92  = (%89)(%90, %91)::Float64
+│   %93  = s_trial::SymmetricTensor{2, 3, Float64, 6}
+│   %94  = (%88)(%92, %93)::SymmetricTensor{2, 3, Float64, 6}
+│          (σ = (%83)(%87, %94))
+│   %96  = Main.:/::Core.Const(/)
+│   %97  = f::Float64
+│   %98  = Main.:*::Core.Const(*)
+│   %99  = μ_val::Float64
+│   %100 = (%98)(3, %99)::Float64
+│          (Δγ = (%96)(%97, %100))
+│   %102 = Main.:/::Core.Const(/)
+│   %103 = Main.:*::Core.Const(*)
+│   %104 = Main.:√::Core.Const(sqrt)
+│   %105 = Main.:/::Core.Const(/)
+│   %106 = (%105)(3, 2)::Core.Const(1.5)
+│   %107 = (%104)(%106)::Core.Const(1.224744871391589)
+│   %108 = s_trial::SymmetricTensor{2, 3, Float64, 6}
+│   %109 = (%103)(%107, %108)::SymmetricTensor{2, 3, Float64, 6}
+│   %110 = σ_eq_trial::Float64
+│          (n = (%102)(%109, %110))
+│   %112 = Main.:+::Core.Const(+)
+│   %113 = Base.getproperty(state_old, :ε_p)::SYMMETRICTENSOR{2, 3, FLOAT64}
+│   %114 = Main.:*::Core.Const(*)
+│   %115 = Δγ::Float64
+│   %116 = n::SymmetricTensor{2, 3, Float64, 6}
+│   %117 = (%114)(%115, %116)::SymmetricTensor{2, 3, Float64, 6}
+│          (ε_p_new = (%112)(%113, %117))
+│   %119 = Main.:+::Core.Const(+)
+│   %120 = Base.getproperty(state_old, :α)::Float64
+│   %121 = Δγ::Float64
+│          (α_new = (%119)(%120, %121))
+│   %123 = Main.PlasticityState::Core.Const(PlasticityState)
+│   %124 = ε_p_new::SymmetricTensor{2, 3, Float64, 6}
+│   %125 = α_new::Float64
+│          (state_new = (%123)(%124, %125))
+│   %127 = Main.:-::Core.Const(-)
+│   %128 = Main.:/::Core.Const(/)
+│   %129 = σ_y::Float64
+│   %130 = σ_eq_trial::Float64
+│   %131 = (%128)(%129, %130)::Float64
+│          (θ = (%127)(1, %131))
+│   %133 = Main.:/::Core.Const(/)
+│   %134 = Main.:*::Core.Const(*)
+│   %135 = Main.:^::Core.Const(^)
+│   %136 = μ_val::Float64
+│   %137 = Core.apply_type(Base.Val, 2)::Core.Const(Val{2})
+│   %138 = (%137)()::Core.Const(Val{2}())
+│   %139 = Base.literal_pow(%135, %136, %138)::Float64
+│   %140 = (%134)(6, %139)::Float64
+│   %141 = Main.:+::Core.Const(+)
+│   %142 = Main.:*::Core.Const(*)
+│   %143 = μ_val::Float64
+│   %144 = (%142)(3, %143)::Float64
+│   %145 = Main.:*::Core.Const(*)
+│   %146 = θ::Float64
+│   %147 = Main.:*::Core.Const(*)
+│   %148 = μ_val::Float64
+│   %149 = (%147)(3, %148)::Float64
+│   %150 = (%145)(%146, %149)::Float64
+│   %151 = (%141)(%144, %150)::Float64
+│          (β = (%133)(%140, %151))
+│   %153 = Main.:-::Core.Const(-)
+│   %154 = 𝔻ᵉ::SymmetricTensor{4, 3, Float64, 36}
+│   %155 = Main.:*::Core.Const(*)
+│   %156 = β::Float64
+│   %157 = Main.:⊗::Core.Const(Tensors.otimes)
+│   %158 = n::SymmetricTensor{2, 3, Float64, 6}
+│   %159 = n::SymmetricTensor{2, 3, Float64, 6}
+│   %160 = (%157)(%158, %159)::SymmetricTensor{4, 3, Float64, 36}
+│   %161 = (%155)(%156, %160)::SymmetricTensor{4, 3, Float64, 36}
+└──        (𝔻 = (%153)(%154, %161))
+4 ┄ %163 = σ::SymmetricTensor{2, 3, Float64, 6}
+│   %164 = 𝔻::SymmetricTensor{4, 3, Float64, 36}
+│   %165 = state_new::PlasticityState{Float64}
+│   %166 = Core.tuple(%163, %164, %165)::Tuple{SymmetricTensor{2, 3, Float64, 6}, SymmetricTensor{4, 3, Float64, 36}, PlasticityState{Float64}}
+└──        return %166
+
+
+6. Perfect Plasticity (Old Dict):
+MethodInstance for compute_stress_old(::PerfectPlasticityOld, ::Vector{Float64}, ::Dict{String, Any}, ::Float64)
+  from compute_stress_old(material::PerfectPlasticityOld, ε_vec::Vector{Float64}, state_old::Dict{String, Any}, Δt::Float64) @ Main ~/dev/JuliaFEM.jl/benchmarks/material_models_benchmark.jl:455
+Arguments
+  #self#::Core.Const(Main.compute_stress_old)
+  material::PerfectPlasticityOld
+  ε_vec::Vector{Float64}
+  state_old::Dict{String, Any}
+  Δt::Float64
+Locals
+  @_6::ANY
+  @_7::ANY
+  σ_vec::ANY
+  n_vec::ANY
+  Δγ::ANY
+  factor::ANY
+  state_new::Dict{String, Any}
+  f::ANY
+  σ_eq::ANY
+  dev_vec::ANY
+  p::ANY
+  s13::ANY
+  s23::ANY
+  s12::ANY
+  s33::ANY
+  s22::ANY
+  s11::ANY
+  σ_trial_vec::ANY
+  ε_e_vec::ANY
+  D::Matrix{Float64}
+  ε_p_vec::ANY
+Body::TUPLE{ANY, MATRIX{FLOAT64}, DICT{STRING, ANY}}
+1 ─        Core.NewvarNode(:(@_6))
+│          Core.NewvarNode(:(@_7))
+│          Core.NewvarNode(:(σ_vec))
+│          Core.NewvarNode(:(n_vec))
+│          Core.NewvarNode(:(Δγ))
+│          Core.NewvarNode(:(factor))
+│          Core.NewvarNode(:(state_new))
+│          Core.NewvarNode(:(f))
+│          Core.NewvarNode(:(σ_eq))
+│          Core.NewvarNode(:(dev_vec))
+│          Core.NewvarNode(:(p))
+│          Core.NewvarNode(:(s13))
+│          Core.NewvarNode(:(s23))
+│          Core.NewvarNode(:(s12))
+│          Core.NewvarNode(:(s33))
+│          Core.NewvarNode(:(s22))
+│          Core.NewvarNode(:(s11))
+│          Core.NewvarNode(:(σ_trial_vec))
+│          Core.NewvarNode(:(ε_e_vec))
+│          Core.NewvarNode(:(D))
+│          Core.NewvarNode(:(ε_p_vec))
+│   %22  = Main.haskey::Core.Const(haskey)
+│   %23  = (%22)(state_old, "epsilon_plastic")::Bool
+└──        goto #3 if not %23
+2 ─        (ε_p_vec = Base.getindex(state_old, "epsilon_plastic"))
+└──        goto #4
+3 ─ %27  = Main.zeros::Core.Const(zeros)
+└──        (ε_p_vec = (%27)(6))
+4 ┄ %29  = Main.constitutive_matrix::Core.Const(Main.constitutive_matrix)
+│   %30  = Main.LinearElasticOld::Core.Const(LinearElasticOld)
+│   %31  = Base.getproperty(material, :E)::Float64
+│   %32  = Base.getproperty(material, :ν)::Float64
+│   %33  = (%30)(%31, %32)::LinearElasticOld
+│          (D = (%29)(%33))
+│   %35  = Main.:-::Core.Const(-)
+│   %36  = ε_p_vec::ANY
+│          (ε_e_vec = (%35)(ε_vec, %36))
+│   %38  = Main.:*::Core.Const(*)
+│   %39  = D::Matrix{Float64}
+│   %40  = ε_e_vec::ANY
+│          (σ_trial_vec = (%38)(%39, %40))
+│   %42  = σ_trial_vec::ANY
+│   %43  = Main.:(:)::Core.Const(Colon())
+│   %44  = (%43)(1, 3)::Core.Const(1:3)
+│   %45  = Base.getindex(%42, %44)::ANY
+│   %46  = Base.indexed_iterate(%45, 1)::ANY
+│          (s11 = Core.getfield(%46, 1))
+│          (@_7 = Core.getfield(%46, 2))
+│   %49  = @_7::ANY
+│   %50  = Base.indexed_iterate(%45, 2, %49)::ANY
+│          (s22 = Core.getfield(%50, 1))
+│          (@_7 = Core.getfield(%50, 2))
+│   %53  = @_7::ANY
+│   %54  = Base.indexed_iterate(%45, 3, %53)::ANY
+│          (s33 = Core.getfield(%54, 1))
+│   %56  = σ_trial_vec::ANY
+│   %57  = Main.:(:)::Core.Const(Colon())
+│   %58  = (%57)(4, 6)::Core.Const(4:6)
+│   %59  = Base.getindex(%56, %58)::ANY
+│   %60  = Base.indexed_iterate(%59, 1)::ANY
+│          (s12 = Core.getfield(%60, 1))
+│          (@_6 = Core.getfield(%60, 2))
+│   %63  = @_6::ANY
+│   %64  = Base.indexed_iterate(%59, 2, %63)::ANY
+│          (s23 = Core.getfield(%64, 1))
+│          (@_6 = Core.getfield(%64, 2))
+│   %67  = @_6::ANY
+│   %68  = Base.indexed_iterate(%59, 3, %67)::ANY
+│          (s13 = Core.getfield(%68, 1))
+│   %70  = Main.:/::Core.Const(/)
+│   %71  = Main.:+::Core.Const(+)
+│   %72  = s11::ANY
+│   %73  = s22::ANY
+│   %74  = s33::ANY
+│   %75  = (%71)(%72, %73, %74)::ANY
+│          (p = (%70)(%75, 3))
+│   %77  = Main.:-::Core.Const(-)
+│   %78  = s11::ANY
+│   %79  = p::ANY
+│   %80  = (%77)(%78, %79)::ANY
+│   %81  = Main.:-::Core.Const(-)
+│   %82  = s22::ANY
+│   %83  = p::ANY
+│   %84  = (%81)(%82, %83)::ANY
+│   %85  = Main.:-::Core.Const(-)
+│   %86  = s33::ANY
+│   %87  = p::ANY
+│   %88  = (%85)(%86, %87)::ANY
+│   %89  = s12::ANY
+│   %90  = s23::ANY
+│   %91  = s13::ANY
+│          (dev_vec = Base.vect(%80, %84, %88, %89, %90, %91))
+│   %93  = Main.:√::Core.Const(sqrt)
+│   %94  = Main.:*::Core.Const(*)
+│   %95  = Main.:/::Core.Const(/)
+│   %96  = (%95)(3, 2)::Core.Const(1.5)
+│   %97  = Main.:+::Core.Const(+)
+│   %98  = Main.:^::Core.Const(^)
+│   %99  = dev_vec::ANY
+│   %100 = Base.getindex(%99, 1)::ANY
+│   %101 = Core.apply_type(Base.Val, 2)::Core.Const(Val{2})
+│   %102 = (%101)()::Core.Const(Val{2}())
+│   %103 = Base.literal_pow(%98, %100, %102)::ANY
+│   %104 = Main.:^::Core.Const(^)
+│   %105 = dev_vec::ANY
+│   %106 = Base.getindex(%105, 2)::ANY
+│   %107 = Core.apply_type(Base.Val, 2)::Core.Const(Val{2})
+│   %108 = (%107)()::Core.Const(Val{2}())
+│   %109 = Base.literal_pow(%104, %106, %108)::ANY
+│   %110 = Main.:^::Core.Const(^)
+│   %111 = dev_vec::ANY
+│   %112 = Base.getindex(%111, 3)::ANY
+│   %113 = Core.apply_type(Base.Val, 2)::Core.Const(Val{2})
+│   %114 = (%113)()::Core.Const(Val{2}())
+│   %115 = Base.literal_pow(%110, %112, %114)::ANY
+│   %116 = Main.:*::Core.Const(*)
+│   %117 = Main.:+::Core.Const(+)
+│   %118 = Main.:^::Core.Const(^)
+│   %119 = dev_vec::ANY
+│   %120 = Base.getindex(%119, 4)::ANY
+│   %121 = Core.apply_type(Base.Val, 2)::Core.Const(Val{2})
+│   %122 = (%121)()::Core.Const(Val{2}())
+│   %123 = Base.literal_pow(%118, %120, %122)::ANY
+│   %124 = Main.:^::Core.Const(^)
+│   %125 = dev_vec::ANY
+│   %126 = Base.getindex(%125, 5)::ANY
+│   %127 = Core.apply_type(Base.Val, 2)::Core.Const(Val{2})
+│   %128 = (%127)()::Core.Const(Val{2}())
+│   %129 = Base.literal_pow(%124, %126, %128)::ANY
+│   %130 = Main.:^::Core.Const(^)
+│   %131 = dev_vec::ANY
+│   %132 = Base.getindex(%131, 6)::ANY
+│   %133 = Core.apply_type(Base.Val, 2)::Core.Const(Val{2})
+│   %134 = (%133)()::Core.Const(Val{2}())
+│   %135 = Base.literal_pow(%130, %132, %134)::ANY
+│   %136 = (%117)(%123, %129, %135)::ANY
+│   %137 = (%116)(2, %136)::ANY
+│   %138 = (%97)(%103, %109, %115, %137)::ANY
+│   %139 = (%94)(%96, %138)::ANY
+│          (σ_eq = (%93)(%139))
+│   %141 = Main.:-::Core.Const(-)
+│   %142 = σ_eq::ANY
+│   %143 = Base.getproperty(material, :σ_y)::Float64
+│          (f = (%141)(%142, %143))
+│   %145 = Main.copy::Core.Const(copy)
+│          (state_new = (%145)(state_old))
+│   %147 = Main.:>::Core.Const(>)
+│   %148 = f::ANY
+│   %149 = (%147)(%148, 0.0)::ANY
+└──        goto #6 if not %149
+5 ─ %151 = Main.:/::Core.Const(/)
+│   %152 = Base.getproperty(material, :σ_y)::Float64
+│   %153 = σ_eq::ANY
+│          (factor = (%151)(%152, %153))
+│   %155 = Main.:+::Core.Const(+)
+│   %156 = p::ANY
+│   %157 = p::ANY
+│   %158 = p::ANY
+│   %159 = Base.vect(%156, %157, %158, 0.0, 0.0, 0.0)::ANY
+│   %160 = Main.:*::Core.Const(*)
+│   %161 = factor::ANY
+│   %162 = dev_vec::ANY
+│   %163 = (%160)(%161, %162)::ANY
+│          (σ_vec = (%155)(%159, %163))
+│   %165 = Main.:/::Core.Const(/)
+│   %166 = f::ANY
+│   %167 = Main.:/::Core.Const(/)
+│   %168 = Main.:*::Core.Const(*)
+│   %169 = Base.getproperty(material, :E)::Float64
+│   %170 = (%168)(3, %169)::Float64
+│   %171 = Main.:*::Core.Const(*)
+│   %172 = Main.:+::Core.Const(+)
+│   %173 = Base.getproperty(material, :ν)::Float64
+│   %174 = (%172)(1, %173)::Float64
+│   %175 = (%171)(2, %174)::Float64
+│   %176 = (%167)(%170, %175)::Float64
+│          (Δγ = (%165)(%166, %176))
+│   %178 = Main.:/::Core.Const(/)
+│   %179 = Main.:*::Core.Const(*)
+│   %180 = Main.:√::Core.Const(sqrt)
+│   %181 = Main.:/::Core.Const(/)
+│   %182 = (%181)(3, 2)::Core.Const(1.5)
+│   %183 = (%180)(%182)::Core.Const(1.224744871391589)
+│   %184 = dev_vec::ANY
+│   %185 = (%179)(%183, %184)::ANY
+│   %186 = σ_eq::ANY
+│          (n_vec = (%178)(%185, %186))
+│   %188 = Main.:+::Core.Const(+)
+│   %189 = ε_p_vec::ANY
+│   %190 = Main.:*::Core.Const(*)
+│   %191 = Δγ::ANY
+│   %192 = n_vec::ANY
+│   %193 = (%190)(%191, %192)::ANY
+│   %194 = (%188)(%189, %193)::ANY
+│   %195 = state_new::Dict{String, Any}
+│          Base.setindex!(%195, %194, "epsilon_plastic")
+└──        goto #7
+6 ─ %198 = σ_trial_vec::ANY
+└──        (σ_vec = %198)
+7 ┄ %200 = σ_vec::ANY
+│   %201 = D::Matrix{Float64}
+│   %202 = state_new::Dict{String, Any}
+│   %203 = Core.tuple(%200, %201, %202)::TUPLE{ANY, MATRIX{FLOAT64}, DICT{STRING, ANY}}
+└──        return %203
+
+
+================================================================================
+ALLOCATION TESTS
+================================================================================
+
+Testing for allocations (should be 0 for new approach)...
+
+1. Linear Elastic
+   NEW (Tensors.jl):
+     Allocations: 0 bytes
+   OLD (Voigt/Dict):
+     Allocations: 496 bytes
+
+2. Neo-Hookean
+   NEW (Tensors.jl + AD):
+     Allocations: 0 bytes
+   NEW (Tensors.jl + Manual):
+     Allocations: 0 bytes
+   OLD (Array):
+     Allocations: 496 bytes
+
+3. Perfect Plasticity (elastic branch)
+   NEW (Tensors.jl):
+     Allocations: 0 bytes
+   OLD (Dict):
+     Allocations: 8828848 bytes
+
+================================================================================
+PERFORMANCE BENCHMARKS
+================================================================================
+
+Running detailed benchmarks (this may take a minute)...
+
+1. LINEAR ELASTIC
+----------------------------------------
+NEW (Tensors.jl):
+BenchmarkTools.Trial: 10000 samples with 997 evaluations per sample.
+ Range (min … max):  19.464 ns … 45.831 ns  ┊ GC (min … max): 0.00% … 0.00%
+ Time  (median):     19.577 ns              ┊ GC (median):    0.00%
+ Time  (mean ± σ):   19.670 ns ±  0.675 ns  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+  ▁█▄                                                          
+  ███▇▄▃▂▂▂▂▂▁▁▂▂▂▂▂▂▂▂▂▂▂▂▁▁▁▂▁▁▁▂▁▁▁▂▂▁▁▁▁▂▁▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂ ▂
+  19.5 ns         Histogram: frequency by time        22.8 ns <
+
+ Memory estimate: 0 bytes, allocs estimate: 0.
+
+OLD (Voigt/Dict):
+BenchmarkTools.Trial: 10000 samples with 950 evaluations per sample.
+ Range (min … max):   93.356 ns …   8.107 μs  ┊ GC (min … max):  0.00% … 97.34%
+ Time  (median):     100.107 ns               ┊ GC (median):     0.00%
+ Time  (mean ± σ):   139.733 ns ± 249.840 ns  ┊ GC (mean ± σ):  25.28% ± 13.73%
+
+  █▂  ▁                                                         ▁
+  ██▄▄██▁▁▁▁▁▁▁▁▁▁▁▁▁▃▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▃▆▇▇▄▃▄▅▄▄▅▅▅▅▅▃▆ █
+  93.4 ns       Histogram: log(frequency) by time       1.74 μs <
+
+ Memory estimate: 496 bytes, allocs estimate: 4.
+
+SPEEDUP: 5.1×
+
+2. NEO-HOOKEAN
+----------------------------------------
+NEW (Tensors.jl + Automatic Differentiation):
+BenchmarkTools.Trial: 10000 samples with 23 evaluations per sample.
+ Range (min … max):  1.050 μs …  2.802 μs  ┊ GC (min … max): 0.00% … 0.00%
+ Time  (median):     1.051 μs              ┊ GC (median):    0.00%
+ Time  (mean ± σ):   1.055 μs ± 31.780 ns  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+  █                                                           
+  █▄▂▂▁▂▁▂▂▁▁▁▁▁▁▁▁▁▂▁▁▂▁▁▁▁▁▁▁▁▁▁▁▂▁▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂ ▂
+  1.05 μs        Histogram: frequency by time        1.19 μs <
+
+ Memory estimate: 0 bytes, allocs estimate: 0.
+
+NEW (Tensors.jl + Manual Derivatives):
+BenchmarkTools.Trial: 10000 samples with 987 evaluations per sample.
+ Range (min … max):  49.806 ns …  1.787 μs  ┊ GC (min … max): 0.00% … 0.00%
+ Time  (median):     49.922 ns              ┊ GC (median):    0.00%
+ Time  (mean ± σ):   50.262 ns ± 17.399 ns  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+  ▅██▄▁                                                       ▂
+  █████▆▄▁▄▄▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▃▁▁▃▄▄▅▅▆▆▆▆▆▇▇█▇▇▇▇▇██▇▇▆▇▇ █
+  49.8 ns      Histogram: log(frequency) by time      53.3 ns <
+
+ Memory estimate: 0 bytes, allocs estimate: 0.
+
+OLD (Array):
+BenchmarkTools.Trial: 10000 samples with 955 evaluations per sample.
+ Range (min … max):   91.182 ns …   9.723 μs  ┊ GC (min … max):  0.00% … 97.56%
+ Time  (median):      99.922 ns               ┊ GC (median):     0.00%
+ Time  (mean ± σ):   142.795 ns ± 307.090 ns  ┊ GC (mean ± σ):  22.77% ± 11.92%
+
+  █▃  ▄▁                                                        ▁
+  ██▆▄██▃▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▄▇█ █
+  91.2 ns       Histogram: log(frequency) by time       1.77 μs <
+
+ Memory estimate: 496 bytes, allocs estimate: 4.
+
+SPEEDUP (AD):     0.1×
+SPEEDUP (Manual): 2.0×
+AD OVERHEAD:      21.1× (AD / Manual)
+
+3. PERFECT PLASTICITY (elastic branch)
+----------------------------------------
+NEW (Tensors.jl):
+BenchmarkTools.Trial: 10000 samples with 976 evaluations per sample.
+ Range (min … max):  69.677 ns … 151.814 ns  ┊ GC (min … max): 0.00% … 0.00%
+ Time  (median):     70.389 ns               ┊ GC (median):    0.00%
+ Time  (mean ± σ):   70.566 ns ±   1.326 ns  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+   ▂▆▇▆▇▆▇▇▇█▇▆▇▆▅▃                            ▁▁▁▁▁▁▂▁▁▁▁▁    ▃
+  ▆███████████████████▇▇▇▆▇▆▆▄▃▁▁▁▁▁▆▅▅▆▇▆▇▇██████████████████ █
+  69.7 ns       Histogram: log(frequency) by time      73.9 ns <
+
+ Memory estimate: 0 bytes, allocs estimate: 0.
+
+OLD (Dict):
+BenchmarkTools.Trial: 10000 samples with 10 evaluations per sample.
+ Range (min … max):  1.371 μs … 998.345 μs  ┊ GC (min … max): 0.00% … 99.45%
+ Time  (median):     1.480 μs               ┊ GC (median):    0.00%
+ Time  (mean ± σ):   1.701 μs ±   9.970 μs  ┊ GC (mean ± σ):  5.84% ±  0.99%
+
+      ▅█▆▂                                                     
+  ▁▂▃▆████▆▅▄▃▃▃▃▂▂▂▂▂▁▁▂▁▁▁▁▁▂▂▂▂▂▂▂▂▂▂▃▃▃▃▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁ ▂
+  1.37 μs         Histogram: frequency by time        2.16 μs <
+
+ Memory estimate: 1.98 KiB, allocs estimate: 53.
+
+SPEEDUP: 21.0×
+
+================================================================================
+SUMMARY
+================================================================================
+
+ALLOCATIONS:
+  LinearElastic:      NEW = 0 bytes, OLD = 496 bytes
+  NeoHookean (AD):    NEW = 0 bytes, OLD = 496 bytes
+  NeoHookean (Manual): NEW = 0 bytes
+  PerfectPlasticity:  NEW = 0 bytes, OLD = 8828848 bytes
+
+MEDIAN TIMING:
+  LinearElastic:      NEW = 19.576730190571716 ns, OLD = 100.10684210526315 ns
+  NeoHookean (AD):    NEW = 1051.304347826087 ns, OLD = 99.92198952879582 ns
+  NeoHookean (Manual): NEW = 49.92198581560284 ns
+  PerfectPlasticity:  NEW = 70.38934426229508 ns, OLD = 1479.55 ns
+
+SPEEDUP (OLD / NEW):
+  LinearElastic:      5.1×
+  NeoHookean (AD):    0.1×
+  NeoHookean (Manual): 2.0×
+  PerfectPlasticity:  21.0×
+
+AD OVERHEAD:
+  NeoHookean: AD is 21.1× slower than manual derivatives
+
+AVERAGE SPEEDUP: 9.4× (using manual Neo-Hookean)
+
+VALIDATION OF CLAIMS:
+  - Zero allocations for new approach: ✓ PASS
+  - Manual derivatives outperform AD: ✓ PASS
+  - Type stability with NoState return: Check @code_warntype output above
+
+================================================================================
+Benchmark complete! Results saved to: material_models_benchmark_results.txt
+================================================================================
