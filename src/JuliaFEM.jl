@@ -2,114 +2,107 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 """
-    JuliaFEM.jl - an open source solver for both industrial and academia usage
+    JuliaFEM.jl - Modern Finite Element Method Library for Julia
 
-The JuliaFEM software library is a framework that allows for the distributed
-processing of large Finite Element Models across clusters of computers using
-simple programming models. It is designed to scale up from single servers to
-thousands of machines, each offering local computation and storage. The basic
-design principle is: everything is nonlinear. All physics models are nonlinear
-from which the linearization are made as a special cases.
+JuliaFEM is an open-source FEM library focused on **contact mechanics**, with a modern
+architecture designed for GPU acceleration and educational transparency.
 
-# Examples
+**Project Status:** Revived November 2025 (original: 2015-2019) with complete architectural overhaul.
 
-Typical workflow to use JuliaFEM to solve a partial differential equations,
-is 1) read mesh, 2) create elements, 3) update element properties, 4) create
-problems, 5) create analysis, and 6) run analysis. A simple linear static
-analysis of elastic block is clarifying these steps.
+# Key Features
+
+- **Contact Mechanics Focus**: Primary differentiation from general-purpose FEM libraries
+- **Nodal Assembly**: GPU-friendly architecture without atomic operations
+- **Tensors.jl Integration**: Natural tensor notation for stress, strain, and stiffness
+- **Type-Stable Fields**: NamedTuple-based fields for 100× performance vs Dict
+- **Matrix-Free Solvers**: Krylov methods (GMRES) for large-scale problems
+- **Backend Abstraction**: Identical user code runs on CPU or GPU
+
+# Modern API (November 2025)
+
+## Physics-Based Interface
 
 ```julia
 using JuliaFEM
+
+# Create physics problem
+physics = Physics(Elasticity, "cantilever beam", 3)
+
+# Add elements with type-stable fields
+add_elements!(physics, body_elements)
+
+# Apply boundary conditions
+add_dirichlet!(physics, fixed_nodes, [1,2,3], 0.0)  # Fix all DOFs
+add_neumann!(physics, surface_elements, traction)    # Surface load
+
+# Solve (automatically selects backend)
+solution = solve!(physics, backend=GPU())  # or backend=CPU()
 ```
 
-1. Usually the first thing to do is to create a geometry of domain. Typically
-   this is done by reading a mesh file from disk. Currently JuliaFEM supports
-   reading a mesh from Code Aster file format (using `aster_read_mesh`) and
-   from ABAQUS file format (using `abaqus_read_mesh`).
+## Element Creation (Immutable, Type-Stable)
 
 ```julia
-mesh = aster_read_mesh("mesh.med")
+# Modern approach: NamedTuple fields (type-stable!)
+element = Element(Lagrange{Triangle,1}, (1,2,3),
+                 fields=(E=210e3, ν=0.3, ρ=7850.0))
+
+# Update immutably (returns new element)
+element2 = update(element, :displacement => u_values)
+
+# Access fields (compile-time type known!)
+E = element.fields.E  # Float64, no Dict lookup!
 ```
 
-2. Next step is to create one or several sets of elements from a mesh. This is
-   done using a function `create_elements(mesh, set_name)`.
+# Architecture Highlights
+
+**Nodal Assembly** (GPU-friendly):
+- Loop over nodes (not elements) → no atomic operations on GPU
+- 3×3 stiffness blocks using Tensor{2,3} from Tensors.jl
+- Matrix-free K*v without forming global matrix
+
+**Separation of Concerns**:
+- Topology: Reference element geometry (Triangle, Quadrilateral, Tetrahedron, etc.)
+- Integration: Gauss quadrature rules (zero-allocation tuple-based)
+- Basis: Shape functions (Lagrange, Serendipity)
+- Materials: Stress computation (LinearElastic, NeoHookean, PerfectPlasticity)
+
+**Contact Mechanics**:
+- Mortar methods for interface coupling
+- 2D and 3D contact with friction
+- GPU-accelerated contact detection
+
+# Documentation
+
+Comprehensive guides in `docs/book/`:
+
+- `element_architecture.md` - Element composition philosophy
+- `nodal_assembly_concept.md` - GPU-friendly assembly
+- `multigpu_nodal_assembly.md` - Multi-GPU architecture (in progress)
+
+# Legacy API Support
+
+The old `Problem` API is maintained for backward compatibility:
 
 ```julia
-body_elements = create_elements(mesh, "body")
-traction_elements = create_elements(mesh, "traction")
-bc_elements = create_elements(mesh, "bc")
+problem = Problem(Elasticity, "body", 3)
+add_elements!(problem, elements)  # Still works
 ```
 
-3. In JuliaFEM, all properties of elements are given using so called fields.
-   Fields can depend from time or spatial coordinates elements. In special cases
-   field is constant in time, spatial or both directions. Updating fields to
-   element is done using `update!`-function.
+**Migration:** Gradually transitioning to `Physics` API for new code.
 
-```julia
-update!(body_elements, "youngs modulus", 210.0e3)
-update!(body_elements, "poissons ratio", 0.3)
-update!(traction_elements, "surface pressure", 100.0)
-update!(bc_elements, "displacement 1", 0.0)
-update!(bc_elements, "displacement 2", 0.0)
-update!(bc_elements, "displacement 3", 0.0)
-```
+# More Information
 
-4. The physics considered to be solve is given using `Problem`. Problem type can
-   be e.g. `Elasticity` for hyperelasticity, `Heat` for solving the heat equation
-   and so on. Problems are defined by giving the problem type as first argument,
-   problem name in second argument and the last argument is giving the dimension
-   of problem, meaning degrees of freedom connected to each node. After problems
-   are created, elements are added to them by using function `add_elements!`.
-
-```julia
-body = Problem(Elasticity, "body", 3)
-traction = Problem(Elasticity, "traction", 3)
-bc = Problem(Dirichlet, "bc", 3, "displacement")
-add_elements!(body, body_elements)
-add_elements!(traction, traction_elements)
-add_elements!(bc, bc_elements)
-```
-
-5. After geometry and physics is defined, we next define what kind of analysis
-   are we going to perform. Analysis can be, for example, quasistatic analysis,
-   analysis of dynamics of system, natural frequency analysis and so on. Some
-   other special analysis types also exists, like performing model dimension
-   reduction by creating super-elements or running optimization loop, given
-   geometry, another analysis and initial conditions. For simplicity, we now
-   create a linear quasistatic analysis of given problems. Problems are added
-   to analysis using `add_problems!`.
-
-```julia
-analysis = Analysis(Linear)
-add_problems!(analysis, body, traction, bc)
-```
-
-6. The last thing to do is to request the results of analysis to be written to
-   disk for later use and actually perform the analysis. Currently, Xdmf output
-   is supported, which can then be read using ParaView.
-
-```julia
-xdmf_output = Xdmf("analysis_results")
-add_results_writer!(analysis, xdmf_output)
-run!(analysis)
-close(xdmf)
-```
-
-After analysis is ready, types and variables can be accessed using REPL or
-Jupyter notebook for further postprocessing. Simulation can also be written
-into a function to be a part of a larger analysis process. For more information
-about JuliaFEM, please visit our website at
-
-    www.juliafem.org
+Website: www.juliafem.org
+GitHub: github.com/JuliaFEM/JuliaFEM.jl
 
 """
 module JuliaFEM
 
 # Import Base functions FIRST before defining any methods
+# Only import what we actually use - removed unused: similar, first, last, vec, 
+# +, -, *, /, isempty, empty!, push!
 import Base: getindex, setindex!, convert, length, size, isapprox,
-   similar, first, last, vec,
-   ==, +, -, *, /, haskey, copy, push!, isempty, empty!,
-   append!, read
+   ==, haskey, copy, read, append!
 
 using SparseArrays, LinearAlgebra
 using Logging  # For mesh readers
@@ -137,51 +130,43 @@ end
 # TOPOLOGY: Reference element geometries (NEW - separation of concerns)
 # ============================================================================
 include("topology/topology.jl")       # Abstract topology interface
-# 1D elements
-include("topology/seg2.jl")
-include("topology/seg3.jl")
-# 2D triangular elements
-include("topology/tri3.jl")
-include("topology/tri6.jl")
-include("topology/tri7.jl")
-# 2D quadrilateral elements
-include("topology/quad4.jl")
-include("topology/quad8.jl")
-include("topology/quad9.jl")
-# 3D tetrahedral elements
-include("topology/tet4.jl")
-include("topology/tet10.jl")
-# 3D hexahedral elements
-include("topology/hex8.jl")
-include("topology/hex20.jl")
-include("topology/hex27.jl")
-# 3D pyramid elements
-include("topology/pyr5.jl")
-# 3D wedge/prism elements
-include("topology/wedge6.jl")
-include("topology/wedge15.jl")
 
-# Export topology types (new names without hardcoded node counts)
+# Consolidated topology files (one per shape family)
+include("topology/segments.jl")       # Segment (1D)
+include("topology/triangles.jl")      # Triangle (2D simplex)
+include("topology/quadrilaterals.jl") # Quadrilateral (2D quad)
+include("topology/tetrahedra.jl")     # Tetrahedron (3D simplex)
+include("topology/hexahedra.jl")      # Hexahedron (3D hex)
+include("topology/pyramids.jl")       # Pyramid (3D)
+include("topology/wedges.jl")         # Wedge (3D prism)
+
+# Export topology types (shape names, NOT node counts!)
 export AbstractTopology, dim, reference_coordinates, edges, faces
-export Point  # 0D
-export Segment  # 1D (was Seg2/Seg3, but those had node counts)
-export Triangle, Quadrilateral  # 2D (was Tri3/Tri6/Tri7, Quad4/Quad8/Quad9)
-export Tetrahedron, Hexahedron, Pyramid, Wedge  # 3D (was Tet4/Tet10, Hex8/Hex20/Hex27, Pyr5, Wedge6/Wedge15)
+export Segment        # 1D line
+export Triangle       # 2D simplex
+export Quadrilateral  # 2D quad
+export Tetrahedron    # 3D simplex
+export Hexahedron     # 3D hex
+export Pyramid        # 3D pyramid
+export Wedge          # 3D prism
 
-# Export old names as deprecated aliases (for backwards compatibility)
-export Seg2, Seg3
-export Tri3, Tri6, Tri7  # All map to Triangle
-export Quad4, Quad8, Quad9  # All map to Quadrilateral
-export Tet4, Tet10  # Both map to Tetrahedron
-export Hex8, Hex20, Hex27  # All map to Hexahedron
-export Pyr5  # Maps to Pyramid
-export Wedge6, Wedge15  # Both map to Wedge
+# Export deprecated aliases (backward compatibility)
+# These resolve to topology types, NOT separate types!
+export Seg2, Seg3                    # → Segment
+export Tri3, Tri6, Tri7             # → Triangle
+export Quad4, Quad8, Quad9          # → Quadrilateral
+export Tet4, Tet10                  # → Tetrahedron
+export Hex8, Hex20, Hex27           # → Hexahedron
+export Pyr5                         # → Pyramid
+export Wedge6, Wedge15              # → Wedge
 
-# Note: Node count is no longer in topology! It comes from basis:
-# - Triangle + Lagrange{Triangle, 1} → 3 nodes
-# - Triangle + Lagrange{Triangle, 2} → 6 nodes
-# - Quadrilateral + Lagrange{Quadrilateral, 1} → 4 nodes
-# - Quadrilateral + Lagrange{Quadrilateral, 2} → 9 nodes
+# Note: Node count is NO LONGER in topology name! It comes from basis:
+# Examples:
+#   Triangle + Lagrange{Triangle, 1} → 3 nodes (Tri3 → Triangle)
+#   Triangle + Lagrange{Triangle, 2} → 6 nodes (Tri6 → Triangle)
+#   Quadrilateral + Lagrange{Quadrilateral, 1} → 4 nodes (Quad4 → Quadrilateral)
+#   Quadrilateral + Serendipity{Quadrilateral, 2} → 8 nodes (Quad8 → Quadrilateral)
+#   Quadrilateral + Lagrange{Quadrilateral, 2} → 9 nodes (Quad9 → Quadrilateral)
 
 # ============================================================================
 # QUADRATURE: Low-level integration point data (consolidated from FEMQuad.jl)
@@ -193,9 +178,17 @@ include("quadrature.jl")
 # ============================================================================
 include("integration/integration.jl")  # Abstract integration interface, IntegrationPoint
 include("integration/gauss.jl")        # Gauss-Legendre quadrature
+include("integration/gauss_points.jl") # NEW: Compile-time integration points (zero-allocation)
 
 export AbstractIntegration, IntegrationPoint, integration_points, npoints
 export Gauss
+export get_gauss_points!  # NEW: Zero-allocation integration point API
+
+# ============================================================================
+# GEOMETRY: Jacobian computation and coordinate transformations
+# ============================================================================
+include("geometry/jacobian.jl")
+export compute_jacobian, physical_derivatives
 
 # ============================================================================
 # BASIS: Interpolation schemes (consolidated from FEMBasis.jl)
@@ -273,6 +266,10 @@ include("solvers/solvers_base.jl")   # Base solver types
 include("analysis.jl")               # Analysis and AbstractResultsWriter
 include("deprecated_fembase.jl")     # Deprecated/legacy methods from FEMBase (length, size, etc.)
 
+# GPU Physics (new architecture - pure GPU, all BCs in device code)
+# Note: CUDA is loaded by the demo script, not here
+# The gpu_physics_elasticity.jl module should be included directly by demos
+
 # Mesh readers (consolidated from AbaqusReader.jl and AsterReader.jl)
 include("readers.jl")
 
@@ -313,6 +310,32 @@ export assemble!, postprocess!
 #    get_polygon_clip, calculate_polygon_area
 # include("io.jl")  # Requires HDF5 and LightXML - skip for minimal deps
 # export Xdmf, h5file, xmffile, xdmf_filter, new_dataitem, update_xdmf!, save!
+# Backend-transparent physics API
+include("physics_api.jl")
+export Physics, Elasticity, DirichletBC, NeumannBC
+export add_elements!, add_dirichlet!, add_neumann!
+
+# Assembly structures (element and nodal)
+include("element_assembly_structures.jl")
+export ElementAssemblyData, ElementContribution
+export scatter_to_global!, compute_residual!, apply_dirichlet_bc!
+export matrix_vector_product, get_dof_indices
+
+include("nodal_assembly_structures.jl")
+export NodeToElementsMap, get_node_spider
+
+# Backend abstraction (CPU/GPU selection)
+include("backend/abstract.jl")
+export solve!, Auto, GPU, CPU
+export ElasticitySolution
+
+# CPU backend (fallback for now)
+include("backend/cpu.jl")
+
+# GPU backend is now loaded via extension (ext/JuliaFEMCUDAExt.jl)
+# Extension automatically loads when user does 'using CUDA'
+# No need to manually include anymore!
+
 include("solvers.jl")
 export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
    get_unknown_field_name, get_formulation_type, get_problems,
