@@ -131,9 +131,12 @@ element = Element(Tet10, (1,2,3,4,5,6,7,8,9,10))  # → Lagrange{Tet10,2}
 ```
 """
 function Element(::Type{T}, connectivity::NTuple{N,<:Integer}; kwargs...) where {N,T<:AbstractTopology}
+    # Map to base topology for basis functions (Seg3 → Segment, Tri6 → Triangle, etc.)
+    base_topo = get_base_topology(T)
     # Determine order from number of nodes
     order = infer_lagrange_order(T, N)
-    BasisType = Lagrange{T,order}
+    # Use base topology in Lagrange type (not Seg3, but Segment!)
+    BasisType = Lagrange{base_topo,order}
     return Element(BasisType, connectivity; kwargs...)
 end
 
@@ -574,7 +577,13 @@ interpolate(element, "my field", 0.5)
 """
 function interpolate(element::AbstractElement, field_name::String, time::Float64)
     field = element[field_name]
-    result = interpolate(field, time)
+    # If field is an AbstractField, interpolate it
+    if field isa AbstractField
+        result = interpolate(field, time)
+    else
+        # For raw data (Dict, NamedTuple, etc.), it's time-invariant
+        result = field
+    end
     if isa(result, Dict)
         connectivity = get_connectivity(element)
         return tuple((result[i] for i in connectivity)...)
@@ -721,8 +730,9 @@ end
 
 function (element::Element)(ip, time, ::Type{Val{:Jacobian}})
     X_dict = element("geometry", time)
-    # Convert to Vector{Vec} for Tensors.jl compatibility
-    X = [Vec(x...) for x in X_dict]
+    # Convert Dict to Vector{Vec} in connectivity order
+    # (Dict iteration is unordered, must use element.connectivity)
+    X = [Vec(X_dict[node_id]...) for node_id in element.connectivity]
     # Convert ip to Vec - handle both Tuple and IntegrationPoint
     if isa(ip, Tuple)
         xi = Vec(ip)
@@ -767,17 +777,72 @@ function get_integration_points(element::Element{N,NIP,M,B}) where {N,NIP,M,B}
     if NIP > 0
         return element.integration_points
     end
-    # Otherwise get default integration points for this element type
-    ips = get_integration_points(element.properties)
+    # Otherwise get default integration points based on basis type
+    ips = get_integration_points_from_basis(B)
     return tuple([IP(UInt(i), w, xi) for (i, (w, xi)) in enumerate(ips)]...)
 end
 
 """ This is a special case, temporarily change order
 of integration scheme mainly for mass matrix.
 """
-function get_integration_points(element::AbstractElement{E}, change_order::Int) where E
-    ips = get_integration_points(element.properties, Val{change_order})
-    return tuple([IP(UInt(i), w, xi) for (i, (w, xi)) in enumerate(ips)]...)
+function get_integration_points(element::AbstractElement{M,B}, change_order::Int) where {M,B}
+    ips = get_integration_points_from_basis(B, change_order)
+    # Convert from new API format (weight, Vec{D}) to old IP structs
+    # Vec{D} needs to be converted to Tuple for IP constructor
+    return tuple([IP(UInt(i), w, Tuple(xi)) for (i, (w, xi)) in enumerate(ips)]...)
+end
+
+# Helper function to map Lagrange basis types to new integration points API
+function get_integration_points_from_basis(::Type{Lagrange{T,P}}, order::Int=0) where {T,P}
+    # Map topology type to base topology for integration points
+    # (Seg2, Seg3 → Segment; Tri3, Tri6, Tri7 → Triangle, etc.)
+    base_topology = get_base_topology(T)
+
+    # Map polynomial order to Gauss quadrature order
+    # For polynomial order P, we need at least (P+1)/2 integration order
+    # With order parameter, we can increase accuracy
+    gauss_order = max(P, P + order)
+
+    # Return integration points using new zero-allocation API
+    # Note: get_gauss_points! expects Type{Gauss{N}}, not instance
+    if gauss_order == 1
+        return get_gauss_points!(base_topology, Gauss{1})
+    elseif gauss_order == 2
+        return get_gauss_points!(base_topology, Gauss{2})
+    elseif gauss_order == 3
+        return get_gauss_points!(base_topology, Gauss{3})
+    elseif gauss_order == 4
+        return get_gauss_points!(base_topology, Gauss{4})
+    elseif gauss_order == 5
+        return get_gauss_points!(base_topology, Gauss{5})
+    else
+        error("Gauss quadrature order $gauss_order not supported for topology $T")
+    end
+end
+
+# Map topology types to their base forms for integration
+function get_base_topology(::Type{T}) where T
+    name = string(nameof(T))
+    # 1D elements
+    if startswith(name, "Seg") || name == "Segment"
+        return Segment
+        # 2D elements
+    elseif startswith(name, "Tri") || name == "Triangle"
+        return Triangle
+    elseif startswith(name, "Quad") || name == "Quadrilateral"
+        return Quadrilateral
+        # 3D elements
+    elseif startswith(name, "Tet") || name == "Tetrahedron"
+        return Tetrahedron
+    elseif startswith(name, "Hex") || name == "Hexahedron"
+        return Hexahedron
+    elseif startswith(name, "Wedge")
+        return Wedge
+    elseif startswith(name, "Pyr") || name == "Pyramid"
+        return Pyramid
+    else
+        error("Unknown topology type: $T")
+    end
 end
 
 """ 
