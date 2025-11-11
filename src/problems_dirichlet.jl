@@ -5,10 +5,10 @@
 Problem u(X) = u₀ in Γ(d)
 """
 mutable struct Dirichlet <: BoundaryProblem
-    formulation :: Symbol
-    variational :: Bool
-    dual_basis :: Bool
-    order :: Int
+    formulation::Symbol
+    variational::Bool
+    dual_basis::Bool
+    order::Int
 end
 
 function Dirichlet()
@@ -22,12 +22,12 @@ function get_dualbasis(element::Element, time::Float64, order=1)
     Me = zeros(nnodes, nnodes)
     for ip in get_integration_points(element, order)
         detJ = element(ip, time, Val{:detJ})
-        w = ip.weight*detJ
+        w = ip.weight * detJ
         N = element(ip, time)
-        De += w*Matrix(Diagonal(vec(N)))
-        Me += w*N'*N
+        De += w * Matrix(Diagonal(vec(N)))
+        Me += w * N' * N
     end
-    return De, Me, De*inv(Me)
+    return De, Me, De * inv(Me)
 end
 
 function get_formulation_type(problem::Problem{Dirichlet})
@@ -35,7 +35,7 @@ function get_formulation_type(problem::Problem{Dirichlet})
 end
 
 function assemble!(problem::Problem{Dirichlet}, time::Float64=0.0;
-                   auto_initialize=true)
+    auto_initialize=true)
     # FIXME: boilerplate
     if !isempty(problem.assembly)
         @warn("Assemble problem $(problem.name): problem.assembly is not empty and assembling, are you sure you know what are you doing?")
@@ -43,18 +43,13 @@ function assemble!(problem::Problem{Dirichlet}, time::Float64=0.0;
     if isempty(problem.elements)
         @warn("Assemble problem $(problem.name): problem.elements is empty, no elements in problem?")
     else
-        first_element = first(problem.elements)
-        unknown_field_name = get_unknown_field_name(problem)
-        if !haskey(first_element, unknown_field_name)
-            @warn("Assemble problem $(problem.name): seems that problem is uninitialized.")
-            if auto_initialize
-                @info("Initializing problem $(problem.name) at time $time automatically.")
-                initialize!(problem, time)
-            end
-        end
+        # NOTE: For Dirichlet problems, the unknown field is optional
+        # The assembly checks haskey() and only processes elements with the field
+        # So we don't need to initialize if elements don't have it
+        # (Unlike domain problems which require the field for assembly)
     end
 
-    if hasmethod(assemble_prehook!, Tuple{typeof(problem), Float64})
+    if hasmethod(assemble_prehook!, Tuple{typeof(problem),Float64})
         assemble_prehook!(problem, time)
     end
 
@@ -63,18 +58,18 @@ function assemble!(problem::Problem{Dirichlet}, time::Float64=0.0;
             assemble!(problem.assembly, problem, element, time)
         end
     else # nodal collocation
-        field_vals = Dict{Int64, Float64}()
+        field_vals = Dict{Int64,Float64}()
         field_name = get_parent_field_name(problem)
         field_dim = get_unknown_field_dimension(problem)
         for element in get_elements(problem)
             gdofs = get_gdofs(problem, element)
-            for i=1:field_dim
-                haskey(element, field_name*" $i") || continue
+            for i = 1:field_dim
+                haskey(element, field_name * " $i") || continue
                 ldofs = gdofs[i:field_dim:end]
                 xis = get_reference_coordinates(element)
                 vals = Float64[]
                 for xi in xis
-                    g = element(field_name*" $i", xi, time)
+                    g = element(field_name * " $i", xi, time)
                     # u = u_prev + Δu ⇒ Δu = u - u_prev
                     if haskey(element, field_name)
                         g_prev = element(field_name, xi, time)
@@ -94,13 +89,13 @@ function assemble!(problem::Problem{Dirichlet}, time::Float64=0.0;
         end
     end
 
-    if hasmethod(assemble_posthook!, Tuple{typeof(problem), Float64})
+    if hasmethod(assemble_posthook!, Tuple{typeof(problem),Float64})
         assemble_posthook!(problem, time)
     end
 end
 
 function assemble!(assembly::Assembly, problem::Problem{Dirichlet},
-                   element::Element, time::Float64)
+    element::Element, time::Float64)
 
     # get dimension and name of PARENT field
     nnodes = length(element)
@@ -117,14 +112,14 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet},
         for ip in get_integration_points(element, props.order)
             N = element(ip, time)
             detJ = element(ip, time, Val{:detJ})
-            De += ip.weight*N'*N*detJ
+            De += ip.weight * N' * N * detJ
         end
     end
 
     # left hand side
-    for i=1:field_dim
+    for i = 1:field_dim
         ldofs = gdofs[i:field_dim:end]
-        if haskey(element, field_name*" $i")
+        if haskey(element, field_name * " $i")
             add!(assembly.C1, ldofs, ldofs, De)
             add!(assembly.C2, ldofs, ldofs, De)
         end
@@ -133,19 +128,19 @@ function assemble!(assembly::Assembly, problem::Problem{Dirichlet},
     # right hand side
     for ip in get_integration_points(element, props.order)
         detJ = element(ip, time, Val{:detJ})
-        w = ip.weight*detJ
+        w = ip.weight * detJ
         N = element(ip, time)
 
-        for i=1:field_dim
+        for i = 1:field_dim
             ldofs = gdofs[i:field_dim:end]
-            if haskey(element, field_name*" $i")
-                g = element(field_name*" $i", ip, time)
+            if haskey(element, field_name * " $i")
+                g = element(field_name * " $i", ip, time)
                 # u = u_prev + Δu ⇒ Δu = u - u_prev
                 if haskey(element, field_name)
                     g_prev = element(field_name, ip, time)
                     g -= g_prev[i]
                 end
-                add!(assembly.g, ldofs, w*g*Ae*N')
+                add!(assembly.g, ldofs, w * g * Ae * N')
             end
         end
 
