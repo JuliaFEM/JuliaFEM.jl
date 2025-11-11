@@ -2,9 +2,9 @@
 # License is MIT: see https://github.com/JuliaFEM/FEMBase.jl/blob/master/LICENSE
 
 abstract type AbstractProblem end
-abstract type FieldProblem<:AbstractProblem end
-abstract type BoundaryProblem<:AbstractProblem end
-abstract type MixedProblem<:AbstractProblem end
+abstract type FieldProblem <: AbstractProblem end
+abstract type BoundaryProblem <: AbstractProblem end
+abstract type MixedProblem <: AbstractProblem end
 
 """
 General linearized problem to solve
@@ -13,30 +13,30 @@ General linearized problem to solve
 """
 mutable struct Assembly
 
-    M :: SparseMatrixCOO  # mass matrix
+    M::SparseMatrixCOO  # mass matrix
 
     # for field assembly
-    K :: SparseMatrixCOO   # stiffness matrix
-    Kg :: SparseMatrixCOO  # geometric stiffness matrix
-    f :: SparseMatrixCOO   # force vector
-    fg :: SparseMatrixCOO  #
+    K::SparseMatrixCOO   # stiffness matrix
+    Kg::SparseMatrixCOO  # geometric stiffness matrix
+    f::SparseMatrixCOO   # force vector
+    fg::SparseMatrixCOO  #
 
     # for boundary assembly
-    C1 :: SparseMatrixCOO
-    C2 :: SparseMatrixCOO
-    D :: SparseMatrixCOO
-    g :: SparseMatrixCOO
-    c :: SparseMatrixCOO
+    C1::SparseMatrixCOO
+    C2::SparseMatrixCOO
+    D::SparseMatrixCOO
+    g::SparseMatrixCOO
+    c::SparseMatrixCOO
 
-    u :: Vector{Float64}  # solution vector u
-    u_prev :: Vector{Float64}  # previous solution vector u
-    u_norm_change :: Real  # change of norm in u
+    u::Vector{Float64}  # solution vector u
+    u_prev::Vector{Float64}  # previous solution vector u
+    u_norm_change::Real  # change of norm in u
 
-    la :: Vector{Float64}  # solution vector la
-    la_prev :: Vector{Float64}  # previous solution vector u
-    la_norm_change :: Real # change of norm in la
+    la::Vector{Float64}  # solution vector la
+    la_prev::Vector{Float64}  # previous solution vector u
+    la_norm_change::Real # change of norm in la
 
-    removed_dofs :: Vector{Int} # manually remove dofs from assembly
+    removed_dofs::Vector{Int} # manually remove dofs from assembly
 end
 
 function Assembly()
@@ -93,15 +93,15 @@ of the problem is described by heat equation -∇⋅(k∇u) = f.
 
 """
 mutable struct Problem{P<:AbstractProblem}
-    name :: AbstractString           # descriptive name for the problem
-    dimension :: Int                 # degrees of freedom per node
-    parent_field_name :: AbstractString # (optional) name of the parent field e.g. "displacement"
-    elements :: Vector{Element}
-    dofmap :: Dict{Element, Vector{Int}} # connects the element local dofs to the global dofs
-    assembly :: Assembly
-    fields :: Dict{String, AbstractField}
-    postprocess_fields :: Vector{String}
-    properties :: P
+    name::AbstractString           # descriptive name for the problem
+    dimension::Int                 # degrees of freedom per node
+    parent_field_name::AbstractString # (optional) name of the parent field e.g. "displacement"
+    elements::Vector{Element}
+    dofmap::Dict{Element,Vector{Int}} # connects the element local dofs to the global dofs
+    assembly::Assembly
+    fields::Dict{String,AbstractField}
+    postprocess_fields::Vector{String}
+    properties::P
 end
 
 """
@@ -134,7 +134,7 @@ function Problem(::Type{P}, name::AbstractString, dimension::Int) where P<:Field
     postprocess_fields = Vector()
     properties = P()
     problem = Problem{P}(name, dimension, parent_field_name, elements, dofmap,
-                         assembly, fields, postprocess_fields, properties)
+        assembly, fields, postprocess_fields, properties)
     @info("Creating a new problem of type $P, having name `$name` and " *
           "dimension $dimension dofs/node.")
     return problem
@@ -171,7 +171,7 @@ function Problem(::Type{P}, name, dimension, parent_field_name) where P<:Boundar
     postprocess_fields = Vector()
     properties = P()
     problem = Problem{P}(name, dimension, parent_field_name, elements, dofmap,
-                         assembly, fields, postprocess_fields, properties)
+        assembly, fields, postprocess_fields, properties)
     @info("Creating a new boundary problem of type $P, having name `$name` and " *
           "dimension $dimension dofs/node. This boundary problems fixes field " *
           "`$parent_field_name`.")
@@ -226,7 +226,7 @@ function get_elements(problem::Problem)
     return problem.elements
 end
 
-function update!(problem::P, attr::Pair{String, String}...) where P<:AbstractProblem
+function update!(problem::P, attr::Pair{String,String}...) where P<:AbstractProblem
     for (name, value) in attr
         setfield!(problem, Meta.parse(name), Meta.parse(value))
     end
@@ -249,7 +249,7 @@ function initialize!(problem::Problem, element::AbstractElement, time::Float64)
     else  # vector field
         # FIXME: the most effective way to do
         # ([0.0,0.0], [0.0,0.0], ..., [0.0,0.0]) ?
-        empty_field = tuple(map((x)->zeros(field_dim)*x, 1:nnodes)...)
+        empty_field = tuple(map((x) -> zeros(field_dim) * x, 1:nnodes)...)
     end
 
     # initialize primary field
@@ -330,11 +330,11 @@ function get_global_solution(problem::Problem, assembly::Assembly)
     if field_dim == 1
         return u, la
     else
-        nnodes = round(Int, length(u)/field_dim)
+        nnodes = round(Int, length(u) / field_dim)
         u = reshape(u, field_dim, nnodes)
-        u = Vector{Float64}[u[:,i] for i in 1:nnodes]
+        u = Vector{Float64}[u[:, i] for i in 1:nnodes]
         la = reshape(la, field_dim, nnodes)
-        la = Vector{Float64}[la[:,i] for i in 1:nnodes]
+        la = Vector{Float64}[la[:, i] for i in 1:nnodes]
         return u, la
     end
 end
@@ -420,7 +420,7 @@ function (problem::Problem)(field_name::String, time::Float64)
     #if haskey(problem, field_name)
     #    return problem[field_name](time)
     #end
-    f = Dict{Int, Any}()
+    f = Dict{Int,Any}()
     for element in get_elements(problem)
         haskey(element, field_name) || continue
         for (c, v) in zip(get_connectivity(element), element(field_name, time))
@@ -439,15 +439,9 @@ function (problem::Problem)(field_name::String, time::Float64)
     return f
 end
 
-function push!(problem::Problem, elements...)
-    push!(problem.elements, elements...)
-end
-
-function push!(problem::Problem, elements_::Vector...)
-    for elements in elements_
-        push!(problem.elements, elements...)
-    end
-end
+# REMOVED: push!(problem, elements) - Use add_elements!(problem, elements) instead
+# This violated Julia semantics (push! should be for collections, not domain logic)
+# The modern Physics API uses add_elements!, add_dirichlet!, add_neumann!
 
 """
     set_gdofs!(problem, element)
@@ -476,9 +470,9 @@ function get_gdofs(problem::Problem, element::AbstractElement)
     conn = get_connectivity(element)
     if length(conn) == 0
         error("element connectivity not defined, cannot determine global ",
-              "degrees of freedom for element #: $(element.id)")
+            "degrees of freedom for element #: $(element.id)")
     end
     dim = get_unknown_field_dimension(problem)
-    gdofs = [dim*(i-1)+j for i in conn for j=1:dim]
+    gdofs = [dim * (i - 1) + j for i in conn for j = 1:dim]
     return gdofs
 end
