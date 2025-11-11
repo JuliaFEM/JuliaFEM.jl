@@ -8,6 +8,33 @@ These demos validate that type-stable field storage enables modern high-performa
 
 ## Demonstrations
 
+### Assembly Strategy Comparison (`cantilever_cpu_comparison.jl`)
+
+**Purpose:** Algorithm-level comparison of assembly strategies (RESEARCH).
+
+⚠️ **NOT a user-facing example!** This is low-level performance research.
+
+**What it demonstrates:**
+
+- Element-by-element assembly (traditional FEM)
+- Node-by-node assembly (GPU-friendly, contact-ready)
+- Matrix-free iterative solvers
+- Direct comparison: assembly time, iterations, accuracy
+
+**Why low-level:**
+
+- Uses `ElementAssemblyData` and `NodeToElementsMap` structures directly
+- Manually constructs element stiffness matrices
+- Not representative of user workflow
+
+**For users:** See `examples/linear_static.jl` or `cantilever_gmsh_gpu.jl` instead.
+
+**Results (135 Tet4 elements):**
+
+- Nodal assembly: 4.7× faster than element assembly
+- Nodal CG: 2× fewer iterations (215 vs 417)
+- All methods give identical displacements
+
 ### 1. GPU and MPI Communication (`gpu_mpi_demo.jl`)
 
 **Purpose:** Prove that type-stable data structures flow efficiently to GPU and MPI.
