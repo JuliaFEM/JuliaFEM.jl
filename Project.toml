@@ -19,6 +19,12 @@ IterativeSolvers = "0.9.4"
 Tensors = "≥ 1.0.0"
 julia = "1.9"
 
+[weakdeps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+
+[extensions]
+JuliaFEMCUDAExt = ["CUDA"]
+
 [extras]
 Calculus = "49dc2e85-a5d0-5ad3-a950-438e2897f1b9"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
