@@ -190,6 +190,9 @@ export get_gauss_points!  # NEW: Zero-allocation integration point API
 include("geometry/jacobian.jl")
 export compute_jacobian, physical_derivatives
 
+include("geometry/strain.jl")
+export compute_strain
+
 # ============================================================================
 # BASIS: Interpolation schemes (consolidated from FEMBasis.jl)
 # ============================================================================

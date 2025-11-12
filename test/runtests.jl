@@ -7,6 +7,9 @@ using JuliaFEM, Test
     @testset "test_dirichlet.jl" begin
         include("test_dirichlet.jl")
     end
+    @testset "test_strain.jl" begin
+        include("test_strain.jl")
+    end
     @testset "test_elasticity_1d.jl" begin
         include("test_elasticity_1d.jl")
     end
