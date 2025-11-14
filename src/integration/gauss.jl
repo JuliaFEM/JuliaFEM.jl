@@ -1,6 +1,10 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+# NOTE: Must create alias before core_types.jl shadows IntegrationPoint!
+# This is defined in integration/integration.jl as IntegrationPoint{D}
+const IntegrationPointNEW = IntegrationPoint  # Capture NEW API type before it's shadowed
+
 """
     Gauss{N} <: AbstractIntegration
 
@@ -235,7 +239,8 @@ function integration_points(scheme::Gauss{N}, topology::T) where {N,T<:AbstractT
     data_vec = collect(quad_data)
     result = ntuple(length(data_vec)) do i
         weight, point = data_vec[i]
-        IntegrationPoint(point, weight)  # Type inference from arguments
+        # Use NEW API IntegrationPoint{D} (aliased as IntegrationPointNEW to avoid shadowing)
+        IntegrationPointNEW{D}(point, weight)
     end
     return result
 end
