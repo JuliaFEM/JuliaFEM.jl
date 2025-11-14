@@ -106,10 +106,13 @@ USES NEW API:
 - integration_points(Gauss{order}(), topology) for quadrature
 - get_basis_derivatives(topology, basis, xi) for shape function gradients
 - Tensors.jl for all math (NO B-matrix!)
+
+Implementation follows golden standard: docs/src/book/multigpu_nodal_assembly.md
+Uses 4th-order elasticity tensor with double contractions (NO Voigt notation!)
 """
 function compute_element_stiffness(element::Element{N,NIP,F,B}, time::Float64) where {N,NIP,F,B}
     # Get element properties from fields
-    X = element.fields.geometry  # Vector of node coordinates
+    X = element.fields.geometry  # Vector{Vec{3}} of node coordinates
     E = element.fields.youngs_modulus
     ν = element.fields.poissons_ratio
 
@@ -117,7 +120,8 @@ function compute_element_stiffness(element::Element{N,NIP,F,B}, time::Float64) w
     λ = E * ν / ((1 + ν) * (1 - 2ν))
     μ = E / (2(1 + ν))
 
-    # 4th-order elasticity tensor (using Tensors.jl)
+    # 4th-order elasticity tensor (Tensors.jl, symmetric in all index pairs)
+    # C_ijkl = λ δ_ij δ_kl + μ (δ_ik δ_jl + δ_il δ_jk)
     δ(i, j) = i == j ? 1.0 : 0.0
     C_ijkl = [(λ * δ(i, j) * δ(k, l) + μ * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)))
               for i in 1:3, j in 1:3, k in 1:3, l in 1:3]
@@ -125,13 +129,15 @@ function compute_element_stiffness(element::Element{N,NIP,F,B}, time::Float64) w
 
     # Extract topology and basis from element type parameter B
     # B is Lagrange{Topology, Order}
-    topology = extract_topology(B)
+    topology_type = extract_topology_type(B)
+    # Create topology instance - use N from element (8 for Hex8, etc.)
+    topology = topology_type{N}()
     basis = B()
 
     # NEW API: integration points from topology module
     ips = integration_points(Gauss{2}(), topology)
 
-    # Initialize element stiffness as 3×3 blocks
+    # Initialize element stiffness as 3×3 blocks (Tensors.jl approach)
     K_blocks = [[zero(Tensor{2,3}) for _ in 1:N] for _ in 1:N]
 
     # Integrate over element
@@ -140,22 +146,46 @@ function compute_element_stiffness(element::Element{N,NIP,F,B}, time::Float64) w
         w = ip.weight
 
         # NEW API: Basis function derivatives (shape function gradients in reference coords)
-        # BLOCKER: get_basis_derivatives() NOT IMPLEMENTED YET!
-        # dN_dξ = get_basis_derivatives(topology, basis, ξ)  # Returns NTuple{N, Vec{3}}
+        dN_dξ = get_basis_derivatives(topology, basis, ξ)  # Returns NTuple{N, Vec{3}}
 
-        # Jacobian: J = ∑ X_i ⊗ dN_i/dξ
-        # J = sum(Tensor{2,3}((X[i] ⊗ dN_dξ[i])[:]) for i in 1:N)
-        # detJ = det(J)
-        # J_inv = inv(J)
+        # Jacobian transformation: J_ij = ∑_k X_k^i ∂N_k/∂ξ^j
+        # Build Jacobian as Tensor{2,3} (3×3 matrix)
+        J = zero(Tensor{2,3})
+        for k in 1:N
+            # Outer product: X[k] ⊗ dN_dξ[k] gives 3×3 tensor
+            J += X[k] ⊗ dN_dξ[k]
+        end
+        detJ = det(J)
+        J_inv = inv(J)
 
-        # Shape derivatives in physical coordinates
-        # dN_dx = tuple([J_inv ⋅ dN_dξ[i] for i in 1:N]...)
+        # Shape derivatives in physical coordinates: ∂N_i/∂x = J^{-T} ⋅ ∂N_i/∂ξ
+        dN_dx = tuple([J_inv ⋅ dN_dξ[i] for i in 1:N]...)
 
-        # Assemble stiffness blocks (Tensors.jl, no B-matrix!)
-        # ... (rest of assembly using dN_dx)
+        # Assemble stiffness blocks using Tensors.jl (NO B-matrix!)
+        # K_ij^{αβ} = ∫ (∂N_i/∂x_γ) C_{αβγδ} (∂N_j/∂x_δ) detJ dξ
+        for i in 1:N, j in 1:N
+            # Gradient tensors: ∂N/∂x as Vec{3}
+            grad_i = dN_dx[i]  # Vec{3}
+            grad_j = dN_dx[j]  # Vec{3}
+
+            # Compute stiffness contribution: K_ij^{αβ} += (∂N_i/∂x_γ) C_{αβγδ} (∂N_j/∂x_δ) detJ w
+            # Use double contraction over γ and δ indices
+            K_contrib = zero(Tensor{2,3})
+            for α in 1:3, β in 1:3
+                stiffness_component = 0.0
+                for γ in 1:3, δ in 1:3
+                    stiffness_component += grad_i[γ] * C[α, β, γ, δ] * grad_j[δ]
+                end
+                # Construct 3×3 tensor contribution (only αβ component nonzero)
+                e_α = basevec(Val{3}(), α)  # Unit vector in direction α
+                e_β = basevec(Val{3}(), β)  # Unit vector in direction β
+                K_contrib += stiffness_component * (e_α ⊗ e_β)
+            end
+            K_blocks[i][j] += K_contrib * detJ * w
+        end
     end
 
-    # Convert blocked format to standard matrix
+    # Convert blocked Tensor{2,3} format to standard Float64 matrix
     ndofs = 3 * N
     K_e = zeros(ndofs, ndofs)
     for i in 1:N, j in 1:N
@@ -167,8 +197,11 @@ function compute_element_stiffness(element::Element{N,NIP,F,B}, time::Float64) w
     return K_e
 end
 
-# Helper to extract topology from Lagrange{T, O} type
-extract_topology(::Type{Lagrange{T,O}}) where {T,O} = T()
+# Helper: Unit basis vector
+@inline basevec(::Val{3}, i::Int) = Vec{3}(ntuple(j -> j == i ? 1.0 : 0.0, 3))
+
+# Helper to extract topology TYPE from Lagrange{T, O} (returns TYPE, not instance)
+extract_topology_type(::Type{Lagrange{T,O}}) where {T,O} = T
 
 """
     solve_backend!(data::ElasticityDataCPU, physics::Physics{ElasticityPhysicsType}; kwargs...)
