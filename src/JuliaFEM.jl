@@ -119,6 +119,33 @@ macro timeit(args...)
    return esc(args[end])
 end
 
+# ============================================================================
+# CORE API - Include FIRST (all abstract types and interfaces)
+# ============================================================================
+
+# This is the Julia equivalent of C/C++ header files.
+# All abstract types and lightweight structs are defined here.
+# This MUST be included before any concrete implementations.
+include("api.jl")
+
+# Concrete Physics implementation (uses abstracts from api.jl)
+include("physics.jl")
+
+# Export core API types
+export AbstractMesh, AbstractTopology
+export AbstractMaterial, AbstractElasticMaterial, AbstractPlasticMaterial
+export AbstractField, Displacement, Temperature, DisplacementRotation
+export AbstractFormulation, ContinuumFormulation, BeamFormulation, ShellFormulation, TrussFormulation
+export FullThreeD, PlaneStress, PlaneStrain, Axisymmetric
+export EulerBernoulli, Timoshenko, ReissnerMindlin, KirchhoffLove
+export AbstractPhysics, Physics, Constraint
+export DirichletBC, NeumannBC
+
+# Export generic API functions (stubs defined in api.jl, implementations in various files)
+export assemble!, assemble_v2!, solve!
+export add_dirichlet!, add_neumann!
+export dofs_per_node
+
 # import FEMSparse  # Consolidated into src/sparse/
 # import FEMQuad   # Consolidated into src/quadrature.jl
 
@@ -225,30 +252,6 @@ include("basis/nurbs.jl")
 # TODO: Rewrite for new AbstractBasis (non-parametric)
 # include("basis/math.jl")  # Uses AbstractBasis{dim} throughout (jacobian, grad, interpolate, etc.)
 # TODO: Rewrite math functions for new AbstractBasis
-# TEMPORARY: Define minimal jacobian function for testing
-function jacobian(B::AbstractBasis, X::Vector{<:Vec}, xi::Vec)
-   dB = eval_dbasis!(B, xi)
-   @assert length(X) == length(dB)
-   # Compute J = dX/dξ: rows are physical dims, columns are parametric dims
-   # J[i,j] = ∂X_i/∂ξ_j = sum_k X_k[i] * dN_k/dξ_j
-   dim_physical = length(first(X))
-   dim_parametric = length(xi)
-
-   # Build Jacobian matrix manually for embedding case (e.g., 1D element in 3D space)
-   # Result is a dim_physical × dim_parametric matrix
-   J_data = zeros(dim_physical, dim_parametric)
-   @inbounds for k in 1:length(X)
-      for i in 1:dim_physical
-         for j in 1:dim_parametric
-            J_data[i, j] += X[k][i] * dB[k][j]
-         end
-      end
-   end
-
-   # Convert to Tensor (note: Tensor{2,N} is N×N, but we need dim_physical×dim_parametric)
-   # For now, return as Matrix
-   return J_data
-end
 
 # Consolidate FEMBase.jl into src/ (Phase 1 continued)
 # Order matters: fields → types → sparse → elements → integrate → problems → assembly
@@ -313,10 +316,19 @@ export assemble!, postprocess!
 #    get_polygon_clip, calculate_polygon_area
 # include("io.jl")  # Requires HDF5 and LightXML - skip for minimal deps
 # export Xdmf, h5file, xmffile, xdmf_filter, new_dataitem, update_xdmf!, save!
-# Backend-transparent physics API
-include("physics_api.jl")
-export Physics, Elasticity, DirichletBC, NeumannBC
-export add_elements!, add_dirichlet!, add_neumann!
+
+# Note: Physics API now defined in api.jl (included at top of file)
+# physics_api.jl is deprecated and will be removed
+
+# Material models
+include("materials/abstract_material.jl")
+# Note: abstract_material.jl redefines AbstractMaterial (already in api.jl)
+# TODO: Remove duplicate from abstract_material.jl
+include("materials/linear_elastic.jl")
+export LinearElastic
+
+include("materials/neo_hookean.jl")
+export NeoHookean
 
 # Assembly structures (element and nodal)
 include("element_assembly_structures.jl")
@@ -328,12 +340,19 @@ include("nodal_assembly_structures.jl")
 export NodeToElementsMap, get_node_spider
 
 # Backend abstraction (CPU/GPU selection)
-include("backend/abstract.jl")
-export solve!, Auto, GPU, CPU
-export ElasticitySolution
+# TODO: These need to be updated to work with new Physics API
+# Temporarily commented out until backend dispatch is updated
+# include("backend/abstract.jl")
+# export solve!, Auto, GPU, CPU
+# export ElasticitySolution
 
 # CPU backend (fallback for now)
-include("backend/cpu.jl")
+# include("backend/cpu.jl")
+
+# Assembly module (NEW API)
+include("assembly/continuum_3d.jl")
+include("assembly/continuum_3d_v2.jl")  # Ferrite-style two-pointer merge
+export compute_element_stiffness  # For testing and advanced use
 
 # GPU backend is now loaded via extension (ext/JuliaFEMCUDAExt.jl)
 # Extension automatically loads when user does 'using CUDA'
@@ -360,11 +379,36 @@ module Preprocess
 end
 
 using SparseArrays, LinearAlgebra
-include("preprocess.jl")
-export create_elements, Mesh, add_node!, add_nodes!,
-   add_element_to_element_set!, add_node_to_node_set!,
-   find_nearest_nodes, find_nearest_node, reorder_element_connectivity!,
-   create_node_set_from_element_set!, filter_by_element_set
+
+# NEW: Include modern parametric Mesh{T<:AbstractTopology} infrastructure
+include("mesh/mesh.jl")
+export Mesh, topology_type, nnodes_per_element, nelements, nnodes_total
+export get_elements_for_node, connectivity_matrix, get_node
+export find_nearest_nodes, find_nearest_node
+export get_element_set, get_elements_in_set
+export get_node_set, get_nodes_in_set, create_node_set_from_element_set!
+export extract_surface, validate, info
+export set_node_id!, get_node_by_id, set_element_id!, get_element_by_id
+export set_node_color!, get_node_color, set_element_color!, get_element_color, get_elements_with_color
+export mark_ghost_node!, is_ghost_node, mark_ghost_element!, is_ghost_element
+export get_local_nodes, get_local_elements
+export apply_node_permutation!, apply_element_permutation!
+
+# Mesh refinement strategies
+include("mesh/refine.jl")
+export AbstractRefineStrategy, LongestEdgeBisection, refine
+
+# Structured mesh generation utilities
+include("mesh/structured.jl")
+export create_structured_box_mesh, create_unit_cube_mesh
+export create_cantilever_mesh, create_thin_plate_mesh
+
+# OLD: Comment out Dict-based Mesh (conflicts with new Mesh{T})
+# include("preprocess.jl")
+# export create_elements, Mesh, add_node!, add_nodes!,
+#    add_element_to_element_set!, add_node_to_node_set!,
+#    find_nearest_nodes, find_nearest_node, reorder_element_connectivity!,
+#    create_node_set_from_element_set!, filter_by_element_set
 
 # IO submodule for mesh readers and result writers
 include("io/io.jl")
