@@ -90,3 +90,39 @@ julia> npoints(Gauss{2}(), Quad4())
 ```
 """
 function npoints end
+
+"""
+    default_integration(topology::Type{<:AbstractTopology{N}}) where N
+    -> AbstractIntegration
+
+Return the default (recommended) integration scheme for a given topology type.
+
+# Default Rules
+- Linear elements (P1): Use minimal integration that's exact for linear basis
+- Quadratic elements (P2): Use integration exact for quadratic basis
+
+# Examples
+```julia
+julia> default_integration(Hexahedron{8})
+Gauss{2}()  # 2×2×2 = 8 points (exact for trilinear)
+
+julia> default_integration(Tetrahedron{4})
+Gauss{1}()  # 1 point (exact for linear)
+
+julia> default_integration(Hexahedron{27})
+Gauss{3}()  # 3×3×3 = 27 points (exact for triquadratic)
+```
+"""
+function default_integration end
+
+# Default integration rules for common topologies
+default_integration(::Type{Tetrahedron{4}}) = Gauss{1}()
+default_integration(::Type{Tetrahedron{10}}) = Gauss{2}()
+default_integration(::Type{Hexahedron{8}}) = Gauss{2}()
+default_integration(::Type{Hexahedron{20}}) = Gauss{3}()
+default_integration(::Type{Hexahedron{27}}) = Gauss{3}()
+default_integration(::Type{Triangle{3}}) = Gauss{1}()
+default_integration(::Type{Triangle{6}}) = Gauss{2}()
+default_integration(::Type{Quadrilateral{4}}) = Gauss{2}()
+default_integration(::Type{Quadrilateral{8}}) = Gauss{3}()
+default_integration(::Type{Quadrilateral{9}}) = Gauss{3}()
