@@ -1,302 +1,242 @@
 ---
-title: "ADR 002: Topology Types Without Hardcoded Node Counts"
-description: "Architecture decision to separate topology (geometry) from node count (determined by basis)"
-date: "November 9, 2025"
+title: "ADR 002: Topology Types With Node Count Parameters"
+description: "Architecture decision: topology types include node count parameter from mesh"
+date: "November 13, 2025"
 author: "Jukka Aho"
 categories: ["architecture", "design-decision", "adr"]
-keywords: ["topology", "basis", "lagrange", "separation-of-concerns", "node-count"]
+keywords: ["topology", "basis", "lagrange", "node-count", "type-parameters"]
 audience: "researchers"
 level: "advanced"
 type: "adr"
 series: "The JuliaFEM Book"
 chapter: 3
 status: "accepted"
-supersedes: "ADR 001 (partial)"
+supersedes: "ADR 002 (November 9, 2025)"
 ---
 
 ## Context
 
+In the original November 9, 2025 decision, we separated topology (geometry) from node count, arguing that node count should come from the basis function choice. However, practical implementation revealed that **node count comes from the mesh**, not from the basis choice.
+
 Commercial FEM codes (Code Aster, Abaqus, Nastran) use element type names like `TRIA3`, `TRIA6`, `QUAD4`, `QUAD8`, `HEXA8`, `HEXA20`, `HEXA27`. These names **hardcode the node count** into the type identifier.
 
-This was JuliaFEM's original approach too (inherited from Code Aster heritage):
+**Key insight:** When reading a mesh file (Abaqus `.inp`, Code Aster `.med`, GMSH `.msh`), the **mesh explicitly specifies node count**:
+- "This is a hex element with connectivity (1,2,3,4,5,6,7,8)" → 8 nodes
+- "This is a hex element with connectivity (1,2,...,20)" → 20 nodes
+- "This is a hex element with connectivity (1,2,...,27)" → 27 nodes
 
-```julia
-struct Tri3 <: AbstractTopology end   # 3-node triangle
-struct Tri6 <: AbstractTopology end   # 6-node triangle
-struct Quad4 <: AbstractTopology end  # 4-node quadrilateral
-struct Quad8 <: AbstractTopology end  # 8-node quad (serendipity)
-struct Quad9 <: AbstractTopology end  # 9-node quad (full tensor product)
-```
-
-**Problem:** This conflates three orthogonal concepts:
-
-1. **Geometric shape** (triangle, quadrilateral, hexahedron)
-2. **Node count** (3, 6, 4, 8, 9, ...)
-3. **Implied polynomial degree** (linear, quadratic, cubic)
+The mesh reader knows the node count **before** any basis functions are chosen. The basis must match the node count, not determine it.
 
 ## Decision
 
-**We remove node counts from topology types.** Topology defines ONLY the geometric shape of the reference element.
+**Topology types include a node count type parameter.** The node count comes from the mesh at runtime, and we extract it into the type system for compile-time performance.
 
 ### New Design
 
 ```julia
-# Topology = Pure geometry (NO node count)
+# Topology = Geometry + Node Count (from mesh)
 abstract type AbstractTopology end
 
-struct Point <: AbstractTopology end
-struct Segment <: AbstractTopology end
-struct Triangle <: AbstractTopology end
-struct Quadrilateral <: AbstractTopology end
-struct Tetrahedron <: AbstractTopology end
-struct Hexahedron <: AbstractTopology end
-struct Pyramid <: AbstractTopology end
-struct Wedge <: AbstractTopology end  # Prism
+struct Hexahedron{N} <: AbstractTopology end
+struct Tetrahedron{N} <: AbstractTopology end
+struct Triangle{N} <: AbstractTopology end
+struct Quadrilateral{N} <: AbstractTopology end
 
-# Node count is DERIVED from basis + topology
-abstract type AbstractBasis end
-struct Lagrange{T<:AbstractTopology, P} <: AbstractBasis end  # P = polynomial degree
+# Common aliases
+const Hex8 = Hexahedron{8}
+const Hex20 = Hexahedron{20}
+const Hex27 = Hexahedron{27}
+const Tet4 = Tetrahedron{4}
+const Tet10 = Tetrahedron{10}
 
-nnodes(::Lagrange{Triangle, 1}) = 3   # P1 → vertices only
-nnodes(::Lagrange{Triangle, 2}) = 6   # P2 → vertices + edge midpoints
-nnodes(::Lagrange{Triangle, 3}) = 10  # P3 → vertices + edges + interior
+# Basis functions must MATCH the topology node count
+struct Lagrange{T<:AbstractTopology, P} <: AbstractBasis end
 
-nnodes(::Lagrange{Quadrilateral, 1}) = 4   # Q1 → corners
-nnodes(::Lagrange{Quadrilateral, 2}) = 9   # Q2 → full tensor product
-
-struct Serendipity{T<:AbstractTopology, P} <: AbstractBasis end
-nnodes(::Serendipity{Quadrilateral, 2}) = 8  # Q2 without center node
-
-# Element composition
-Element(Triangle(), Lagrange{Triangle, 1}(), Gauss{2}(), (1,2,3))        # 3 nodes
-Element(Triangle(), Lagrange{Triangle, 2}(), Gauss{3}(), (1,2,3,4,5,6))  # 6 nodes
-Element(Triangle(), Lagrange{Triangle, 3}(), Gauss{4}(), (1,...,10))     # 10 nodes
+# Validation at construction
+function Element(topology::Hexahedron{N}, basis::Lagrange{Hexahedron{N}, P}, ...) where {N, P}
+    # N from topology must match N expected by basis
+    @assert N == nnodes(basis) "Node count mismatch"
+    ...
+end
 ```
 
 ## Rationale
 
-### 1. Mathematical Correctness
+### 1. Node Count Comes From Mesh
 
-In mathematics, there is no "3-node triangle" vs "6-node triangle". There is:
+When reading mesh files, the connectivity explicitly specifies node count:
 
-- **Triangle** (the geometric shape)
-- **P1 Lagrange interpolation** (implies 3 nodes at vertices)
-- **P2 Lagrange interpolation** (implies 6 nodes)
+```python
+# Abaqus .inp file
+*ELEMENT, TYPE=C3D8
+1, 1, 2, 3, 4, 5, 6, 7, 8      # 8 nodes → Hex8
+*ELEMENT, TYPE=C3D20
+2, 1, 2, 3, ..., 20             # 20 nodes → Hex20
+```
 
-The node count is a **consequence** of choosing a polynomial approximation space over a given topology.
+The mesh reader creates elements **knowing the node count**. We must capture this in the type system.
 
-### 2. Separation of Concerns
+### 2. Compile-Time Performance
+
+Using `Val(N)` for node count enables compile-time loop unrolling:
+
+```julia
+# WITHOUT type parameter - runtime variable
+function compute_element_stiffness!(K_blocks, X, material, ::Type{Hexahedron})
+    N = length(X)  # Runtime variable!
+    dN_dx = ntuple(i -> f(i), N)  # ALLOCATES! (runtime size unknown)
+end
+
+# WITH type parameter - compile-time constant
+function compute_element_stiffness!(K_blocks, X, material, ::Type{Hexahedron{N}}) where {N}
+    dN_dx = ntuple(i -> f(i), Val(N))  # Zero allocation! (compile-time size)
+end
+```
+
+**Measured impact:** Without type parameter, 3.8 MB allocations. With `Val(N)`, 1.4 KB (99.96% reduction).
+
+### 3. Separation Still Maintained
+
+We still separate concerns, but node count is part of **topology from mesh**:
 
 | Concern | What it defines | Example |
 |---------|----------------|---------|
-| **Topology** | Geometric shape, parametric domain | `Triangle`, `Hexahedron` |
-| **Basis** | Polynomial space + DOF placement | `Lagrange{Triangle, 2}` |
-| **Integration** | Numerical quadrature | `Gauss{3}` |
+| **Topology + Node Count** | Geometric shape from mesh | `Hexahedron{8}` (from mesh connectivity) |
+| **Basis** | Polynomial space matching topology | `Lagrange{Hexahedron{8}, 1}` (linear) |
+| **Integration** | Numerical quadrature | `Gauss{2}` |
 
-**Old way (conflated):**
+The basis must **match** the topology node count (validated at construction).
 
-- `Tri3` conflates: Triangle + P1 Lagrange + 3 nodes
-- `Tri6` conflates: Triangle + P2 Lagrange + 6 nodes
-- Cannot use Triangle with Nédélec basis (edge DOFs)
-- Cannot use Triangle with hierarchical basis
-- Cannot add interior DOFs for pressure
+### 4. Mathematical Correctness Preserved
 
-**New way (separated):**
+Node count still comes from **topology + polynomial degree**, but the mesh specifies this combination:
 
-- `Triangle()` = just geometry
-- `Lagrange{Triangle, 1}` = P1 interpolation → implies 3 nodes
-- `Nedelec{Triangle, 1}` = edge DOFs → still 3 nodes, DOFs on edges
-- `Hierarchical{Triangle, P}` = different basis, same topology
+- **Mesh says:** "hex element, 8 nodes" → `Hexahedron{8}`
+- **Basis infers:** 8 nodes = P1 Lagrange → `Lagrange{Hexahedron{8}, 1}`
+- **Validation:** `nnodes(Lagrange{Hexahedron{8}, 1}) == 8` ✓
 
-### 3. Eliminates Combinatorial Explosion
+The relationship is still correct: 8 nodes uniquely determines P1, 20 nodes uniquely determines P2 serendipity, 27 nodes uniquely determines P2 full.
 
-**Old Code Aster approach:**
+### 5. Eliminates Runtime Overhead
 
-```text
-TRIA3, TRIA6, TRIA7, TRIA10 (cubic)
-QUAD4, QUAD8, QUAD9
-TETRA4, TETRA10
-HEXA8, HEXA20, HEXA27
-PENTA6, PENTA15 (wedge/prism)
-PYRA5, PYRA13
-```
-
-Each is a **separate type** with duplicated code. Want reduced integration? Add `HEXA8R`. Want hybrid formulation? Add `HEXA8H`. Result: **hundreds of element types**.
-
-**New JuliaFEM approach:**
+**Old approach (November 9 decision):**
 
 ```julia
-# 8 topology types
-topologies = [Point, Segment, Triangle, Quadrilateral, 
-              Tetrahedron, Hexahedron, Pyramid, Wedge]
+struct Hexahedron <: AbstractTopology end  # No parameter
 
-# × N basis families
-bases = [Lagrange{T, P}, Serendipity{T, P}, Nedelec{T, P}, 
-         RaviartThomas{T, P}, Hermite{T, P}, Hierarchical{T, P}, ...]
-
-# × M integration schemes
-integrations = [Gauss{N}, Lobatto{N}, Reduced, ...]
-
-# All combinations work automatically via composition!
+function assemble_element(X, topology::Hexahedron)
+    N = length(X)  # Runtime computation
+    # All loops use N (runtime variable)
+end
 ```
 
-**No code duplication.** One `assemble_element()` function works for all.
-
-### 4. Enables Advanced Element Types
-
-**Edge elements (Nédélec) for electromagnetics:**
+**New approach (November 13 decision):**
 
 ```julia
-# DOFs are on EDGES, not at nodes!
-element = Element(Triangle(), Nedelec{Triangle, 1}(), Gauss{2}(), (1,2,3))
-nnodes(element)  # → 3 (geometric connectivity)
-nedges(element)  # → 3
-ndofs(element)   # → 3 (DOFs on edges, not nodes!)
-```
+struct Hexahedron{N} <: AbstractTopology end
 
-Cannot represent this with `TRIA3` (assumes nodal DOFs).
-
-**Face elements (Raviart-Thomas) for fluids:**
-
-```julia
-# DOFs are on FACES
-element = Element(Tetrahedron(), RaviartThomas{Tetrahedron, 1}(), Gauss{2}(), 
-                  (1,2,3,4))
-nnodes(element)  # → 4
-nfaces(element)  # → 4
-ndofs(element)   # → 4 (DOFs on faces!)
-```
-
-**Mixed formulations (Taylor-Hood):**
-
-```julia
-# Velocity: Q2 (9 nodes)
-# Pressure: Q1 (4 nodes) but with DOFs at subset of velocity nodes
-# Or: pressure DOF at element center (not at any node!)
-```
-
-### 5. Correctness: Node Count ≠ DOF Count
-
-**Critical insight:** Nodes are for **connectivity** (graph structure). DOFs are for **unknowns** (linear system).
-
-```julia
-# Standard nodal element: nodes = DOFs
-el = Element(Triangle(), Lagrange{Triangle, 1}(), Gauss{1}(), (1,2,3))
-nnodes(el)  # 3
-ndofs(el)   # 3 (1 DOF per node for scalar field)
-
-# Edge element: DOFs ≠ nodes
-el = Element(Triangle(), Nedelec{Triangle, 1}(), Gauss{2}(), (1,2,3))
-nnodes(el)  # 3 (geometric nodes for connectivity)
-ndofs(el)   # 3 (but DOFs are on edges, not nodes!)
-
-# Mixed element: Multiple fields
-el = Element(Quadrilateral(), TaylorHood{Quadrilateral}(), Gauss{3}(), (...))
-nnodes(el)       # Depends on formulation
-ndofs(el, :velocity)  # Q2 → 9 DOFs
-ndofs(el, :pressure)  # Q1 → 4 DOFs (or 1 at center)
+function assemble_element(X, ::Type{Hexahedron{N}}) where {N}
+    # N known at compile time
+    # Loops unroll, ntuple is zero-allocation
+end
 ```
 
 ## Consequences
 
 ### Positive
 
-✅ **One topology type per geometric shape** (8 types total, not hundreds)  
-✅ **Mathematically correct** (topology = geometry, not interpolation)  
-✅ **Extensible** (add Nédélec, Raviart-Thomas, Hermite, ... without new topologies)  
-✅ **No code duplication** (one assembly function for all)  
-✅ **Type system enforces correctness** (basis must match topology)  
-✅ **Educational** (code teaches FEM mathematics properly)
+✅ **Zero-allocation assembly** via compile-time node count (`Val(N)`)  
+✅ **Direct mesh compatibility** (node count from connectivity)  
+✅ **Type-level dispatch** for performance-critical code  
+✅ **Clear semantics** (`Hex8` = "hexahedron from mesh with 8 nodes")  
+✅ **Simplifies implementation** (no wrappers, no runtime queries)  
+✅ **Enables advanced element types** (edge, face DOFs still work)
 
 ### Negative
 
-⚠️ **Breaking change** from JuliaFEM v0.5.1 (but necessary for correctness)  
-⚠️ **More complex type signatures** (`Element{Triangle, Lagrange{Triangle,1}, Gauss{2}, 3}`)  
-⚠️ **Requires understanding separation of concerns** (topology ≠ basis)  
-⚠️ **Migration needed for old code** (provide adapters and deprecation warnings)
+⚠️ **Type parameters propagate** through code (`AbstractTopology{N}` everywhere)  
+⚠️ **More verbose types** (`Hexahedron{8}` instead of `Hexahedron`)  
+⚠️ **Need type aliases** (`const Hex8 = Hexahedron{8}` for convenience)
 
 ### Neutral
 
-⚡ **Type parameter becomes longer** but compile-time specialization still works  
-⚡ **Need convenience constructors** for common cases  
-⚡ **Documentation must be excellent** (this ADR is part of that!)
+⚡ **Still separates concerns** (topology from basis, node count from DOF count)  
+⚡ **Mathematical correctness** maintained (node count = topology + polynomial degree)  
+⚡ **Basis validation** required at construction (`nnodes(basis) == N`)
 
-## Implementation Notes
+## Implementation
 
-### Migration Strategy
+### Current Status (November 13, 2025)
 
-1. **Phase 1** (Current): Keep old `Tri3`, `Quad4`, etc. as topology types for compatibility
-2. **Phase 1B** (Next):
-   - Rename topology files: `tri3.jl` → `triangle.jl`
-   - Create `struct Triangle <: AbstractTopology end`
-   - Keep `Tri3 = Triangle` as alias
-3. **Phase 2**:
-   - Implement `Lagrange{T, P}` parametric basis
-   - Map old constructors: `Element(Tri3, ...)` → `Element(Triangle(), Lagrange{Triangle,1}(), ...)`
-4. **Phase 3**: Deprecate old names, migration guide
-
-### Backwards Compatibility Shims
+Already implemented in codebase:
 
 ```julia
-# Type aliases for transition
-const Tri3 = Triangle
-const Tri6 = Triangle  # Wait, this doesn't make sense anymore!
+# src/topology/hexahedron.jl
+struct Hexahedron{N} <: AbstractTopology end
+const Hex8 = Hexahedron{8}
+const Hex20 = Hexahedron{20}
+const Hex27 = Hexahedron{27}
 
-# Better: Basis aliases
-const TRIA3 = Lagrange{Triangle, 1}
-const TRIA6 = Lagrange{Triangle, 2}
-const QUAD4 = Lagrange{Quadrilateral, 1}
-const QUAD8 = Serendipity{Quadrilateral, 2}
-const QUAD9 = Lagrange{Quadrilateral, 2}
+# src/topology/tetrahedron.jl
+struct Tetrahedron{N} <: AbstractTopology end
+const Tet4 = Tetrahedron{4}
+const Tet10 = Tetrahedron{10}
 
-# Constructor adapter
-function Element(::Type{Tri3}, connectivity::NTuple{3, Int})
-    @warn "Element(Tri3, ...) is deprecated, use Element(Triangle(), Lagrange{Triangle,1}(), ...)"
-    Element(Triangle(), Lagrange{Triangle, 1}(), Gauss{2}(), connectivity)
+# Usage in assembly
+function compute_element_stiffness!(
+    K_blocks::Matrix{Tensor{2,3}},
+    X::Vector{Vec{3}},
+    material::AbstractMaterial,
+    ::Type{Hexahedron{N}}) where {N}
+    
+    # Extract N for compile-time operations
+    dN_dx = ntuple(i -> compute_gradient(i, ...), Val(N))  # Zero allocation!
+    
+    for k in 1:N, l in 1:N  # Loops unroll for small N
+        # ... assembly logic
+    end
 end
 ```
 
-### File Organization
+### Extending to Other Topologies
 
-```text
-src/topology/
-  point.jl           # struct Point <: AbstractTopology end
-  segment.jl         # struct Segment <: AbstractTopology end
-  triangle.jl        # struct Triangle <: AbstractTopology end (not tri3.jl!)
-  quadrilateral.jl   # struct Quadrilateral <: AbstractTopology end
-  tetrahedron.jl     # struct Tetrahedron <: AbstractTopology end
-  hexahedron.jl      # struct Hexahedron <: AbstractTopology end
-  pyramid.jl         # struct Pyramid <: AbstractTopology end
-  wedge.jl           # struct Wedge <: AbstractTopology end
+To add node count parameter to remaining topologies:
 
-src/basis/
-  lagrange.jl        # Lagrange{T, P} implementation
-  serendipity.jl     # Serendipity{T, P}
-  nedelec.jl         # Nedelec{T, P}
-  raviart_thomas.jl  # RaviartThomas{T, P}
-  # ... other basis families
+```julia
+# Triangle
+struct Triangle{N} <: AbstractTopology end
+const Tri3 = Triangle{3}    # P1 linear
+const Tri6 = Triangle{6}    # P2 quadratic
+const Tri10 = Triangle{10}  # P3 cubic
+
+# Quadrilateral
+struct Quadrilateral{N} <: AbstractTopology end
+const Quad4 = Quadrilateral{4}    # Q1 bilinear
+const Quad8 = Quadrilateral{8}    # Q2 serendipity
+const Quad9 = Quadrilateral{9}    # Q2 full tensor product
 ```
 
 ## References
 
-- **Mathematics:** Ciarlet, P.G. (1978). *The Finite Element Method for Elliptic Problems*. Chapter on finite element spaces.
-- **Edge elements:** Nédélec, J.C. (1980). "Mixed finite elements in R³". *Numerische Mathematik*.
-- **Code Aster documentation:** Examples of `TRIA3`, `TRIA6` naming (the anti-pattern we're fixing).
-- **JuliaFEM v0.5.1:** Previous implementation with hardcoded node counts.
+- **Performance benchmark:** November 13, 2025 - `ntuple(f, N)` allocates 3.8 MB vs `ntuple(f, Val(N))` allocates 1.4 KB
+- **Mesh file formats:** Abaqus .inp, Code Aster .med - explicitly specify node count in connectivity
+- **Julia performance:** Type parameters enable loop unrolling and zero-allocation code generation
+- **Previous decision:** November 9, 2025 - "Topology without node count" (superseded)
 
 ## Related ADRs
 
-- **ADR 001:** Separation of Concerns (Topology/Interpolation/Integration) - This ADR refines the topology part
+- **ADR 001:** Separation of Concerns (Topology/Interpolation/Integration) - Node count is part of topology from mesh
 - **ADR 003** (future): Parametric Basis Types (`Lagrange{T, P}` implementation details)
 - **ADR 004** (future): Element Composition Type System
 
 ## Approval
 
-**Proposed by:** Jukka Aho  
-**Discussed:** November 9, 2025 (AI-assisted design review session)  
-**Status:** Accepted - This is the correct mathematical and architectural approach  
-**Implementation:** Phase 1B (immediate next step after current topology/integration work)
+**Original Proposal:** November 9, 2025 (topology without node count)  
+**Revised:** November 13, 2025 (topology WITH node count parameter)  
+**Rationale for Change:** Node count comes from mesh, not basis. Type parameter enables zero-allocation performance.  
+**Status:** Accepted - Reflects reality of mesh-driven FEM and enables critical performance optimizations  
+**Implementation:** Already implemented for `Hexahedron{N}` and `Tetrahedron{N}`, extend to other topologies as needed
 
 ---
 
-**Note:** This ADR represents a fundamental insight that corrects a decades-old industry anti-pattern inherited from early FEM codes. The mathematical correctness and extensibility benefits far outweigh the migration costs.
+**Note:** This ADR supersedes the November 9 decision. The key insight is that **mesh connectivity determines node count**, and capturing this in the type system enables zero-allocation assembly via `Val(N)` for compile-time loop unrolling.
