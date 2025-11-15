@@ -89,8 +89,8 @@ function append!(A::SparseMatrixCOO, B::SparseMatrixCOO)
     return nothing
 end
 
-function isempty(A::SparseMatrixCOO)
-    return isempty(A.I) && isempty(A.J) && isempty(A.V)
+function Base.isempty(A::SparseMatrixCOO)
+    return Base.isempty(A.I) && Base.isempty(A.J) && Base.isempty(A.V)
 end
 
 """
