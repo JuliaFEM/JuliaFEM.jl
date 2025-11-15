@@ -222,29 +222,29 @@ function calculate_interpolation_polynomial_derivatives(basis, D)
     return dbasis
 end
 
-function create_basis(topology_type::Symbol, polynomial_degree::Int, description, X::Vector{<:Vecish{D}}, p::Expr) where D
-    @debug "create basis given ansatz polynomial" topology_type polynomial_degree description X p
+function create_basis(topology_type_expr, polynomial_degree::Int, description, X::Vector{<:Vecish{D}}, p::Expr) where D
+    @debug "create basis given ansatz polynomial" topology_type_expr polynomial_degree description X p
     V = vandermonde_matrix(p, X)
     basis = calculate_interpolation_polynomials(p, V)
-    return create_basis(topology_type, polynomial_degree, description, X, basis)
+    return create_basis(topology_type_expr, polynomial_degree, description, X, basis)
 end
 
-function create_basis(topology_type::Symbol, polynomial_degree::Int, description, X::Vector{<:Vecish{D}}, basis::Vector) where D
+function create_basis(topology_type_expr, polynomial_degree::Int, description, X::Vector{<:Vecish{D}}, basis::Vector) where D
     @assert length(X) == length(basis)
-    @debug "create basis given basis functions" topology_type polynomial_degree description X basis
+    @debug "create basis given basis functions" topology_type_expr polynomial_degree description X basis
     dbasis = calculate_interpolation_polynomial_derivatives(basis, D)
-    return create_basis(topology_type, polynomial_degree, description, Vec.(X), basis, dbasis)
+    return create_basis(topology_type_expr, polynomial_degree, description, Vec.(X), basis, dbasis)
 end
 
-function create_basis(topology_type::Symbol, polynomial_degree::Int, description, X::Vector{<:Vecish{D,T}}, basis, dbasis) where {D,T}
+function create_basis(topology_type_expr, polynomial_degree::Int, description, X::Vector{<:Vecish{D,T}}, basis, dbasis) where {D,T}
     N = length(X)
-    @debug "create basis given basis functions and derivatives" topology_type polynomial_degree description X basis dbasis
+    @debug "create basis given basis functions and derivatives" topology_type_expr polynomial_degree description X basis dbasis
 
-    # Build tuple expression for eval_basis! return: (N1, N2, N3, ...)
+    # Build tuple expression for basis functions: (N1, N2, N3, ...)
     basis_tuple_args = [basis[i] for i = 1:N]
     basis_tuple = Expr(:tuple, basis_tuple_args...)
 
-    # Build tuple expression for eval_dbasis! return: (dN1, dN2, dN3, ...)
+    # Build tuple expression for derivatives: (dN1, dN2, dN3, ...)
     dbasis_tuple_args = [:(Vec(float.(tuple($(dbasis[:, i]...))))) for i = 1:N]
     dbasis_tuple = Expr(:tuple, dbasis_tuple_args...)
 
@@ -260,66 +260,39 @@ function create_basis(topology_type::Symbol, polynomial_degree::Int, description
         unpack = :((u, v, w) = xi)
     end
 
-    # Generate code for Lagrange{Topology, P} instead of TopologyBasis
+    # Generate code for NEW API only
     code = quote
         # $description
-        function get_reference_element_coordinates(::Type{Lagrange{$topology_type,$polynomial_degree}})
+        function get_reference_element_coordinates(::Type{Lagrange{$topology_type_expr,$polynomial_degree}})
             return $coord_tuple
         end
 
-        function get_reference_element_coordinates(::Lagrange{$topology_type,$polynomial_degree})
+        function get_reference_element_coordinates(::Lagrange{$topology_type_expr,$polynomial_degree})
             return $coord_tuple
         end
 
         # ──────────────────────────────────────────────────────────────────────
-        # OLD API (for compatibility during transition)
-        # ──────────────────────────────────────────────────────────────────────
-
-        # Return tuple directly - zero allocations!
-        @inline function eval_basis!(::Type{Lagrange{$topology_type,$polynomial_degree}}, ::Type{T}, xi::Vec) where T
-            $unpack
-            @inbounds return $basis_tuple
-        end
-
-        @inline function eval_basis!(::Lagrange{$topology_type,$polynomial_degree}, ::Type{T}, xi::Vec) where T
-            $unpack
-            @inbounds return $basis_tuple
-        end
-
-        # Return NTuple{N,Vec{D}} directly - zero allocations!
-        @inline function eval_dbasis!(::Type{Lagrange{$topology_type,$polynomial_degree}}, xi::Vec)
-            $unpack
-            @inbounds return $dbasis_tuple
-        end
-
-        @inline function eval_dbasis!(::Lagrange{$topology_type,$polynomial_degree}, xi::Vec)
-            $unpack
-            @inbounds return $dbasis_tuple
-        end
-
-        # ──────────────────────────────────────────────────────────────────────
-        # NEW API (separation of concerns: topology + basis)
+        # NEW API: Basis functions at a point in reference element
         # See: docs/book/adr-003-basis-function-api.md
         # ──────────────────────────────────────────────────────────────────────
 
-        # Basis functions at a point in reference element
-        @inline function get_basis_functions(::Type{$topology_type}, ::Type{Lagrange{$topology_type,$polynomial_degree}}, xi::Vec)
+        @inline function get_basis_functions(::Type{$topology_type_expr}, ::Type{Lagrange{$topology_type_expr,$polynomial_degree}}, xi::Vec)
             $unpack
             @inbounds return $basis_tuple
         end
 
-        @inline function get_basis_functions(::$topology_type, ::Lagrange{$topology_type,$polynomial_degree}, xi::Vec)
+        @inline function get_basis_functions(::$topology_type_expr, ::Lagrange{$topology_type_expr,$polynomial_degree}, xi::Vec)
             $unpack
             @inbounds return $basis_tuple
         end
 
         # Basis function derivatives (gradients) at a point in reference element
-        @inline function get_basis_derivatives(::Type{$topology_type}, ::Type{Lagrange{$topology_type,$polynomial_degree}}, xi::Vec)
+        @inline function get_basis_derivatives(::Type{$topology_type_expr}, ::Type{Lagrange{$topology_type_expr,$polynomial_degree}}, xi::Vec)
             $unpack
             @inbounds return $dbasis_tuple
         end
 
-        @inline function get_basis_derivatives(::$topology_type, ::Lagrange{$topology_type,$polynomial_degree}, xi::Vec)
+        @inline function get_basis_derivatives(::$topology_type_expr, ::Lagrange{$topology_type_expr,$polynomial_degree}, xi::Vec)
             $unpack
             @inbounds return $dbasis_tuple
         end
@@ -329,24 +302,24 @@ end
 
 create_basis_and_eval(args...) = eval(create_basis(args...))
 
-# Mapping from old element names to (topology_type, polynomial_degree)
-# This allows the generator to use the new parametric Lagrange{T,P} system
-const ELEMENT_TO_LAGRANGE = Dict{String,Tuple{Symbol,Int}}(
-    "Seg2" => (:Segment, 1),
-    "Seg3" => (:Segment, 2),
-    "Tri3" => (:Triangle, 1),
-    "Tri6" => (:Triangle, 2),
-    "Quad4" => (:Quadrilateral, 1),
-    "Quad8" => (:Quadrilateral, 2),  # Serendipity, special case
-    "Quad9" => (:Quadrilateral, 2),
-    "Tet4" => (:Tetrahedron, 1),
-    "Tet10" => (:Tetrahedron, 2),
-    "Hex8" => (:Hexahedron, 1),
-    "Hex20" => (:Hexahedron, 2),  # Serendipity, special case
-    "Hex27" => (:Hexahedron, 2),
-    "Pyr5" => (:Pyramid, 1),
-    "Wedge6" => (:Wedge, 1),
-    "Wedge15" => (:Wedge, 2),  # Serendipity, special case
+# Mapping from old element names to (topology_type_template, num_nodes, polynomial_degree)
+# topology_type_template is either a Symbol (for non-parametric types) or a function that takes N
+const ELEMENT_TO_LAGRANGE = Dict{String,Tuple{Any,Int,Int}}(
+    "Seg2" => (:Segment, 2, 1),
+    "Seg3" => (:Segment, 3, 2),
+    "Tri3" => (:Triangle, 3, 1),
+    "Tri6" => (:Triangle, 6, 2),
+    "Quad4" => (:Quadrilateral, 4, 1),
+    "Quad8" => (:Quadrilateral, 8, 2),
+    "Quad9" => (:Quadrilateral, 9, 2),
+    "Tet4" => (N -> :(Tetrahedron{$N}), 4, 1),
+    "Tet10" => (N -> :(Tetrahedron{$N}), 10, 2),
+    "Hex8" => (N -> :(Hexahedron{$N}), 8, 1),
+    "Hex20" => (N -> :(Hexahedron{$N}), 20, 2),
+    "Hex27" => (N -> :(Hexahedron{$N}), 27, 2),
+    "Pyr5" => (:Pyramid, 5, 1),
+    "Wedge6" => (:Wedge, 6, 1),
+    "Wedge15" => (:Wedge, 15, 2),
 )
 
 # ==============================================================================
@@ -822,14 +795,23 @@ if abspath(PROGRAM_FILE) == @__FILE__
         println("[$i/$(length(elements))] Generating $(elem.name)...")
 
         try
-            # Map old element name to (topology_type, polynomial_degree)
+            # Map old element name to (topology_type_template, num_nodes, polynomial_degree)
             if !haskey(ELEMENT_TO_LAGRANGE, elem.name)
                 println("  ⚠ Warning: $(elem.name) not in ELEMENT_TO_LAGRANGE mapping")
                 println("  Skipping...")
                 continue
             end
 
-            topology_type, poly_degree = ELEMENT_TO_LAGRANGE[elem.name]
+            topology_type_template, num_nodes, poly_degree = ELEMENT_TO_LAGRANGE[elem.name]
+
+            # Generate the topology type expression
+            # For parametric types like Hexahedron{N}, call the function with num_nodes
+            # For simple types like Triangle, use the symbol directly
+            topology_type_expr = if isa(topology_type_template, Function)
+                topology_type_template(num_nodes)
+            else
+                topology_type_template
+            end
 
             # Convert coordinates to proper format (tuples, not vectors)
             coords = [tuple(coord...) for coord in elem.coordinates]
@@ -842,9 +824,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
             end
 
             # Generate basis code using symbolic engine
-            # Now generates methods for Lagrange{topology_type, poly_degree}
             basis_code_expr = create_basis(
-                topology_type,
+                topology_type_expr,
                 poly_degree,
                 elem.description,
                 coords,
@@ -864,8 +845,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
             # Write to output with nice formatting
             println(output, "# " * "─"^78)
-            println(output, "# Lagrange{$(topology_type), $(poly_degree)}: $(elem.description)")
-            println(output, "# (Old name: $(elem.name))")
+            println(output, "# Lagrange{$(topology_type_expr), $(poly_degree)}: $(elem.description)")
+            println(output, "# (Old name: $(elem.name), $num_nodes nodes)")
             println(output, "# " * "─"^78)
             println(output)
             println(output, basis_code_str)
