@@ -46,8 +46,27 @@ element = Element(Tri3, (1,2,3))  # Tri3 is alias for Triangle
 
 See also: [`Segment`](@ref), [`Triangle`](@ref), [`Quadrilateral`](@ref), 
           [`Tetrahedron`](@ref), [`Hexahedron`](@ref), [`Pyramid`](@ref), [`Wedge`](@ref)
+
+# Type Parameter
+
+`AbstractTopology{N}` where `N` is the number of nodes. Node count comes from mesh connectivity.
+
+# Examples
+```julia
+Hexahedron{8} <: AbstractTopology{8}   # 8-node hex (linear)
+Hexahedron{20} <: AbstractTopology{20} # 20-node hex (quadratic serendipity)
+Hexahedron{27} <: AbstractTopology{27} # 27-node hex (quadratic full)
+```
+
+# Rationale
+
+Node count is included in the type parameter for compile-time performance optimization:
+- Enables `Val(N)` for zero-allocation ntuple operations
+- Allows loop unrolling for small N
+- Node count comes from mesh connectivity, not basis choice
+- See ADR-002 for detailed design rationale
 """
-abstract type AbstractTopology end
+abstract type AbstractTopology{N} end
 
 """
     nnodes(topology::AbstractTopology) -> Int
