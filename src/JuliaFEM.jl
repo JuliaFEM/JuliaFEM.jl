@@ -126,25 +126,51 @@ end
 # This is the Julia equivalent of C/C++ header files.
 # All abstract types and lightweight structs are defined here.
 # This MUST be included before any concrete implementations.
-include("api.jl")
+include("api.jl")  # Documentation-only (no type definitions)
 
-# Concrete Physics implementation (uses abstracts from api.jl)
-include("physics.jl")
+# Formulation domain API (discretization strategies)
+include("formulations/api.jl")
+export AbstractFormulation, ContinuumFormulation
+export AbstractContinuumTheory, FullThreeD, PlaneStress, PlaneStrain, Axisymmetric
 
-# Export core API types
-export AbstractMesh, AbstractTopology
-export AbstractMaterial, AbstractElasticMaterial, AbstractPlasticMaterial
+# Field domain API (field variable types and DOF counting)
+include("fields/api.jl")
 export AbstractField, Displacement, Temperature, DisplacementRotation
-export AbstractFormulation, ContinuumFormulation, BeamFormulation, ShellFormulation, TrussFormulation
-export FullThreeD, PlaneStress, PlaneStrain, Axisymmetric
-export EulerBernoulli, Timoshenko, ReissnerMindlin, KirchhoffLove
-export AbstractPhysics, Physics, Constraint
-export DirichletBC, NeumannBC
-
-# Export generic API functions (stubs defined in api.jl, implementations in various files)
-export assemble!, assemble_v2!, solve!
-export add_dirichlet!, add_neumann!
 export dofs_per_node
+
+# Material domain API
+include("materials/api.jl")
+export AbstractMaterial, AbstractElasticMaterial, AbstractPlasticMaterial
+export compute_stress, elasticity_tensor
+
+# Mesh domain API  
+include("mesh/api.jl")
+export AbstractMesh, AbstractRefineStrategy
+export nnodes_total, nelements, get_node, connectivity_matrix
+export get_elements_for_node, get_element_set, get_node_set
+export refine
+
+# Subdomain API files (define their own abstractions and formulations)
+include("beams/api.jl")    # AbstractBeamTheory, BeamFormulation{Theory}, EulerBernoulli, Timoshenko
+export AbstractBeamTheory, BeamFormulation, EulerBernoulli, Timoshenko
+
+include("shells/api.jl")   # AbstractShellTheory, ShellFormulation{Theory}, ReissnerMindlin, KirchhoffLove
+export AbstractShellTheory, ShellFormulation, ReissnerMindlin, KirchhoffLove
+
+include("trusses/api.jl")  # AbstractTrussTheory, TrussFormulation{Theory}, SimpleTruss
+export AbstractTrussTheory, TrussFormulation, SimpleTruss
+
+# Physics domain API (abstract type and interface functions)
+include("physics/api.jl")
+export AbstractPhysics, assemble!, solve!, add_dirichlet!, add_neumann!
+
+# Concrete Physics implementation (uses abstractions from physics/api.jl)
+include("physics.jl")
+export Physics, Constraint, DirichletBC, NeumannBC
+
+# Export additional assembly functions
+export assemble_v2!
+export AbstractTopology
 
 # import FEMSparse  # Consolidated into src/sparse/
 # import FEMQuad   # Consolidated into src/quadrature.jl
@@ -156,7 +182,12 @@ export dofs_per_node
 # ============================================================================
 # TOPOLOGY: Reference element geometries (NEW - separation of concerns)
 # ============================================================================
-include("topology/topology.jl")       # Abstract topology interface
+# Topology domain API (abstract type and interface)
+include("topology/api.jl")
+export AbstractTopology, nnodes, dim, reference_coordinates, edges, faces
+
+# Topology implementations (concrete types)
+include("topology/topology.jl")       # Helper functions (interface in api.jl)
 
 # Consolidated topology files (one per shape family)
 include("topology/segments.jl")       # Segment (1D)
@@ -177,9 +208,8 @@ export Hexahedron     # 3D hex
 export Pyramid        # 3D pyramid
 export Wedge          # 3D prism
 
-# Export deprecated aliases (backward compatibility)
-# These resolve to topology types, NOT separate types!
-export Seg2, Seg3                    # → Segment
+# Export aliases. These resolve to topology types, NOT separate types!
+export Seg2, Seg3                   # → Segment
 export Tri3, Tri6, Tri7             # → Triangle
 export Quad4, Quad8, Quad9          # → Quadrilateral
 export Tet4, Tet10                  # → Tetrahedron
