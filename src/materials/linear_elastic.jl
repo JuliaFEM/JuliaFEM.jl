@@ -178,3 +178,48 @@ steel = LinearElastic(E=200e9, ν=0.3)
 """
 compute_stress(material::LinearElastic, ε::SymmetricTensor{2,3,T}) where T =
     compute_stress(material, ε, nothing, 0.0)
+
+"""
+    elasticity_tensor(material::LinearElastic) -> Tensor{4,3,Float64}
+
+Return 4th-order elasticity tensor C_{ijkl} for assembly.
+
+# Formula
+Linear isotropic elasticity:
+    C_{ijkl} = λ δ_{ij} δ_{kl} + μ (δ_{ik} δ_{jl} + δ_{il} δ_{jk})
+
+Where:
+- λ = E·ν/((1+ν)(1-2ν)) - First Lamé parameter
+- μ = E/(2(1+ν)) - Shear modulus
+- δ_{ij} = Kronecker delta
+
+# Returns
+- `C::Tensor{4,3,Float64}` - Fourth-order elasticity tensor [Pa]
+
+# Usage in Assembly
+```julia
+material = LinearElastic(E=210e9, ν=0.3)
+C = elasticity_tensor(material)
+
+# Use in stiffness computation:
+# K_ij^{αβ} = ∫ (∂N_i/∂x_γ) C_{αβγδ} (∂N_j/∂x_δ) dV
+```
+
+# Implementation Note
+Returns non-symmetric Tensor{4,3} for indexing convenience in assembly.
+The tensor has minor and major symmetries: C_{ijkl} = C_{jikl} = C_{ijlk} = C_{klij}
+"""
+function elasticity_tensor(material::LinearElastic)
+    # Lamé parameters
+    λ_val = λ(material)
+    μ_val = μ(material)
+
+    # Kronecker delta
+    δ(i, j) = i == j ? 1.0 : 0.0
+
+    # Build tensor: C_{ijkl} = λ δ_{ij} δ_{kl} + μ (δ_{ik} δ_{jl} + δ_{il} δ_{jk})
+    C_ijkl = [(λ_val * δ(i, j) * δ(k, l) + μ_val * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)))
+              for i in 1:3, j in 1:3, k in 1:3, l in 1:3]
+
+    return Tensor{4,3}(tuple(C_ijkl...))
+end
