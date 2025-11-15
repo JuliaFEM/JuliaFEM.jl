@@ -677,29 +677,82 @@ end
 
 ## Other stuff
 
-function get_basis(element::AbstractElement{M,B}, ip, ::Any) where {M,B}
+# Helper: Create topology instance from basis type
+function _create_topology_instance(::Type{Lagrange{T,P}}) where {T,P}
+    N_nodes = nnodes(Lagrange{T,P}())
+    if T <: Segment
+        return Segment{N_nodes}()
+    elseif T <: Triangle
+        return Triangle()
+    elseif T <: Quadrilateral
+        return Quadrilateral()
+    elseif T <: Tetrahedron
+        return Tetrahedron()
+    elseif T <: Hexahedron
+        return Hexahedron()
+    elseif T <: Wedge
+        return Wedge()
+    elseif T <: Pyramid
+        return Pyramid()
+    else
+        error("Unknown topology type: $T")
+    end
+end
+
+# Jacobian computation using new API
+# Handles embedded elements (e.g., 1D element in 2D/3D space)
+function jacobian(B::Lagrange{T,P}, X::Vector{<:Vec}, xi::Vec) where {T,P}
+    topo_instance = _create_topology_instance(Lagrange{T,P})
+    dN_dξ_tuple = get_basis_derivatives(topo_instance, B, xi)
+
+    # Handle embedding: X can be Vec{D_phys} while dN_dξ is Vec{D_param}
+    # where D_phys > D_param (e.g., 1D element in 2D/3D space)
+    dim_physical = length(first(X))
+    dim_parametric = length(xi)
+
+    # Build Jacobian matrix manually for embedding case
+    # J[i,j] = ∂X_i/∂ξ_j = sum_k X_k[i] * dN_k/dξ_j
+    J_data = zeros(dim_physical, dim_parametric)
+    @inbounds for k in 1:length(X)
+        for i in 1:dim_physical
+            for j in 1:dim_parametric
+                J_data[i, j] += X[k][i] * dN_dξ_tuple[k][j]
+            end
+        end
+    end
+
+    return J_data
+end
+
+function get_basis(element::AbstractElement{M,B}, ip, ::Any) where {M,B<:Lagrange}
     # Handle both raw coordinates (Tuple) and IP struct
     coords = isa(ip, IP) ? ip.coords : ip
     T = typeof(first(coords))
     # Convert to Vec for Tensors.jl compatibility
     xi = Vec{length(coords),T}(coords)
-    # eval_basis! now returns a tuple directly - zero allocations!
-    N_tuple = eval_basis!(B, T, xi)
+
+    # Create topology instance once per basis type (will be inlined/constant folded)
+    topo_instance = _create_topology_instance(B)
+
+    # Call new API
+    N_tuple = get_basis_functions(topo_instance, B(), xi)
     # Return as row matrix for compatibility with old code
-    # This still allocates, but only at the API boundary
     return reshape(collect(N_tuple), 1, length(element))
 end
 
-function get_dbasis(element::AbstractElement{M,B}, ip, ::Any) where {M,B}
+function get_dbasis(element::AbstractElement{M,B}, ip, ::Any) where {M,B<:Lagrange}
     # Handle both raw coordinates (Tuple) and IP struct
     coords = isa(ip, IP) ? ip.coords : ip
     T = typeof(first(coords))
     # Convert to Vec for Tensors.jl compatibility
     xi = Vec{length(coords),T}(coords)
-    # eval_dbasis! now returns NTuple{N,Vec{D}} directly - zero allocations!
-    dN_tuple = eval_dbasis!(B, xi)
+
+    # Create topology instance once per basis type (will be inlined/constant folded)
+    topo_instance = _create_topology_instance(B)
+
+    # Call new API
+    dN_tuple = get_basis_derivatives(topo_instance, B(), xi)
     # Return as Vector for compatibility with old code
-    # This still allocates, but only at the API boundary
     return collect(dN_tuple)
 end
 
