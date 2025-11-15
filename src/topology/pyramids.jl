@@ -2,111 +2,43 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE
 
 """
-    Pyramid <: AbstractTopology
+    Pyramid{N} <: AbstractTopology{N}
 
-Pyramidal element topology (3D).
+Pyramidal topology with N nodes.
 
-**Important:** This type defines ONLY the geometric shape. Node count is determined
-by the interpolation scheme (basis functions):
-- `Lagrange{Pyramid, 1}` → 5 nodes (linear)
-- `Lagrange{Pyramid, 2}` → 13 nodes (quadratic, with edge midpoints)
-
-# Reference Element
-```
-        N5 (apex)
-        /|\\
-       / | \\
-      /  |  \\
-     /   |   \\
-    N4---+---N3
-    |    |   |
-    |    N1  |
-    |   /    |
-    |  /     |
-    | /      |
-    N1------N2
-```
-
-# Standard Corner Node Positions
-1-4: Square base in z=0 plane
-5: Apex
-
-# Topology Properties
-- Dimension: 3
-- Corner nodes: 5
-- Edges: 8
-- Faces: 5 (1 quad + 4 triangles)
-
-**Zero allocation:** All functions return compile-time sized tuples.
-
-See also: [`AbstractTopology`](@ref), [`Wedge`](@ref)
+# Node Count Variants
+- `Pyramid{5}` (alias `Pyr5`): Linear pyramid (P1)
+- `Pyramid{13}` (alias `Pyr13`): Quadratic pyramid (P2)
 """
-struct Pyramid <: AbstractTopology end
+struct Pyramid{N} <: AbstractTopology{N} end
 
-dim(::Pyramid) = 3
+const Pyr5 = Pyramid{5}
 
-"""
-    reference_coordinates(::Pyramid)
+nnodes(::Pyramid{N}) where {N} = N
+dim(::Pyramid{N}) where {N} = 3
 
-Get corner node positions for Pyramid (5 vertices).
-"""
-function reference_coordinates(::Pyramid)
+function reference_coordinates(::Pyramid{5})
     return (
-        (-1.0, -1.0, 0.0),  # Node 1: Base corner
-        (1.0, -1.0, 0.0),  # Node 2: Base corner
-        (1.0, 1.0, 0.0),  # Node 3: Base corner
-        (-1.0, 1.0, 0.0),  # Node 4: Base corner
-        (0.0, 0.0, 1.0),  # Node 5: Apex
+        (-1.0, -1.0, 0.0), (1.0, -1.0, 0.0), (1.0, 1.0, 0.0), (-1.0, 1.0, 0.0),
+        (0.0, 0.0, 1.0)
     )
 end
 
-"""
-    edges(::Pyramid)
-
-Edge connectivity for pyramid (corner nodes).
-"""
-function edges(::Pyramid)
+function edges(::Pyramid{N}) where {N}
     return (
         (1, 2), (2, 3), (3, 4), (4, 1),  # Base edges
-        (1, 5), (2, 5), (3, 5), (4, 5),  # Edges to apex
+        (1, 5), (2, 5), (3, 5), (4, 5)   # Edges to apex
     )
 end
 
-"""
-    faces(::Pyramid)
-
-Face connectivity for pyramid (1 quad base + 4 triangular faces).
-"""
-function faces(::Pyramid)
+function faces(::Pyramid{N}) where {N}
     return (
-        (1, 4, 3, 2),  # Face 1: Quadrilateral base
-        (1, 2, 5),     # Face 2: Triangle
-        (2, 3, 5),     # Face 3: Triangle
-        (3, 4, 5),     # Face 4: Triangle
-        (4, 1, 5),     # Face 5: Triangle
+        (1, 4, 3, 2),  # Quad base
+        (1, 2, 5),     # Triangle face 1
+        (2, 3, 5),     # Triangle face 2
+        (3, 4, 5),     # Triangle face 3
+        (4, 1, 5)      # Triangle face 4
     )
 end
 
-# ============================================================================
-# Deprecated aliases (for backwards compatibility)
-# ============================================================================
-
-"""
-    Pyr5
-
-**DEPRECATED:** Backward compatibility alias. Use `Pyramid` with `Lagrange{Pyramid, 1}`.
-
-This alias allows old code to work:
-```julia
-# Old style (still works)
-element = Element(Pyr5, (1, 2, 3, 4, 5))
-# Internally converted to:
-element = Element(Pyramid, (1, 2, 3, 4, 5))  # Infers Lagrange{Pyramid, 1}
-```
-
-New code should use explicit topology + basis:
-```julia
-element = Element(Lagrange{Pyramid, 1}, (1, 2, 3, 4, 5))
-```
-"""
-const Pyr5 = Pyramid
+export Pyr5
