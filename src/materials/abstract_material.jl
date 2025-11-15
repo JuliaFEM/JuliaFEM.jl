@@ -100,7 +100,8 @@ compute_stress(
 - [`AbstractPlasticMaterial`](@ref) - Base type for stateful materials
 - [`compute_stress`](@ref) - Standard interface function
 """
-abstract type AbstractMaterial end
+# abstract type AbstractMaterial end
+# MOVED TO: src/api.jl (included first to avoid order dependencies)
 
 """
     AbstractElasticMaterial <: AbstractMaterial
@@ -119,7 +120,8 @@ For these materials:
 - `LinearElastic` - Linear isotropic elasticity (Hooke's law)
 - `NeoHookean` - Hyperelastic material (finite strain)
 """
-abstract type AbstractElasticMaterial <: AbstractMaterial end
+# abstract type AbstractElasticMaterial <: AbstractMaterial end
+# MOVED TO: src/api.jl (included first to avoid order dependencies)
 
 """
     AbstractPlasticMaterial <: AbstractMaterial
@@ -138,7 +140,8 @@ For these materials:
 - `PerfectPlasticity` - Von Mises plasticity without hardening
 - `FiniteStrainPlasticity` - Multiplicative plasticity (finite strain)
 """
-abstract type AbstractPlasticMaterial <: AbstractMaterial end
+# abstract type AbstractPlasticMaterial <: AbstractMaterial end
+# MOVED TO: src/api.jl (included first to avoid order dependencies)
 
 """
     compute_stress(material, ε, state_old, Δt) -> (σ, 𝔻, state_new)
