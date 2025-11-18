@@ -175,47 +175,37 @@ function compute_element_stiffness!(
 
     # Get element node coordinates
     @inbounds for (i, node_id) in enumerate(conn)
-        cache.coords[i, :] .= mesh.nodes[node_id]
+        node_coords = mesh.nodes[node_id]
+        cache.coords[i, :] .= node_coords
+        # Fill pre-allocated X_buffer (zero allocations)
+        cache.X_buffer[i] = node_coords
     end
 
-    # Convert coords to Vector{Vec{3}} for kernel calls
-    X_buffer = [Vec{3}(cache.coords[i, :]) for i in 1:nnodes_elem]
+    # Zero out pre-allocated buffers (zero allocations!)
+    K_blocks_view = @view cache.K_blocks[1:nnodes_elem, 1:nnodes_elem]
+    fill!(K_blocks_view, zero(Tensor{2,3}))
 
-    # Get topology type from mesh
-    # For Mesh{8, Hexahedron{8}}, this is Hexahedron{8}
-    # Extract topology type directly from Mesh{N,T} type parameters
-    MeshType = typeof(mesh)
-    TopologyType = MeshType.parameters[2]  # T from Mesh{N,T}
+    # Zero displacement DOFs (for linear elastic, needed for nonlinear)
+    u_elem_view = @view cache.u_buffer[1:ndofs_elem]
+    fill!(u_elem_view, 0.0)
 
-    # Create topology, basis, integration instances
-    topology = TopologyType()
-    basis = Lagrange{TopologyType,1}()
-    integration_scheme = default_integration(TopologyType)
-    ips = integration_points(integration_scheme, topology)
-
-    # Compute element stiffness using blocked tensor format
-    # Allocate K_blocks (small, stack-allocated for typical elements)
-    K_blocks = Matrix{Tensor{2,3,Float64,9}}(undef, nnodes_elem, nnodes_elem)
-    fill!(K_blocks, zero(Tensor{2,3}))
-
-    # Displacement DOFs (zero for linear elastic, needed for nonlinear)
-    u_elem = zeros(ndofs_elem)
-
-    # Call material-dispatched stiffness computation
+    # Call material-dispatched stiffness computation (zero allocations!)
+    # Use pre-computed topology, basis, ips from cache
+    X_view = @view cache.X_buffer[1:nnodes_elem]
     compute_element_stiffness_blocked!(
-        K_blocks,
-        X_buffer,
+        K_blocks_view,
+        X_view,
         kernel.material,
-        u_elem,
-        topology,
-        basis,
-        ips
+        u_elem_view,
+        cache.topology,
+        cache.basis,
+        cache.ips
     )
 
-    # Convert blocked tensor to Float64 matrix (cache.Ke)
+    # Convert blocked tensor to Float64 matrix (cache.Ke) (zero allocations!)
     blocked_tensor_to_matrix_view!(
         @view(cache.Ke[1:ndofs_elem, 1:ndofs_elem]),
-        K_blocks
+        K_blocks_view
     )
 
     # TODO: Add body forces to fe if needed
@@ -243,11 +233,11 @@ Compute element stiffness for LinearElastic material **in-place**.
 
 Uses constant elasticity tensor C for efficiency.
 """
-function compute_element_stiffness_blocked!(
+@inline function compute_element_stiffness_blocked!(
     K_blocks::AbstractMatrix{Tensor{2,3,Float64,9}},
-    X::Vector{Vec{3,Float64}},
+    X::AbstractVector{Vec{3,Float64}},
     material::LinearElastic,
-    u_elem::Vector{Float64},
+    u_elem::AbstractVector{Float64},
     topology::T,
     basis::B,
     ips
@@ -256,8 +246,13 @@ function compute_element_stiffness_blocked!(
     # Pre-compute elasticity tensor once
     C = elasticity_tensor(material)
 
+    # Basis vectors
+    e_1, e_2, e_3 = Vec{3}((1.0, 0.0, 0.0)), Vec{3}((0.0, 1.0, 0.0)), Vec{3}((0.0, 0.0, 1.0))
+    e = (e_1, e_2, e_3)
+
     # Integrate over node pairs
     for k in 1:N, l in 1:N
+        K_kl = zero(Tensor{2,3,Float64})
         # Accumulate contributions from all integration points
         for ip in ips
             ξ = Vec{3}(ip.ξ)
@@ -279,12 +274,25 @@ function compute_element_stiffness_blocked!(
             grad_k = J_inv_T ⋅ dN_dξ[k]
             grad_l = J_inv_T ⋅ dN_dξ[l]
 
-            # Compute 3×3 stiffness block
-            K_kl = compute_stiffness_block(grad_k, grad_l, C)
+            # Compute stiffness block inline (zero allocations)
+            K_kl_ip = zero(Tensor{2,3,Float64})
+            for α in 1:3, β in 1:3
+                e_α, e_β = e[α], e[β]
+
+                # Strain-displacement B-matrices
+                B_k_α = 0.5 * (grad_k ⊗ e_α + e_α ⊗ grad_k)
+                B_l_β = 0.5 * (grad_l ⊗ e_β + e_β ⊗ grad_l)
+
+                # Double contraction: B_k : C : B_l
+                k_αβ = dcontract(B_k_α, dcontract(C, B_l_β))
+
+                K_kl_ip += k_αβ * (e_α ⊗ e_β)
+            end
 
             # Accumulate with quadrature weight and Jacobian
-            K_blocks[k, l] += K_kl * detJ * w
+            K_kl += K_kl_ip * detJ * w
         end
+        K_blocks[k, l] = K_kl
     end
 
     return nothing
@@ -307,9 +315,9 @@ Uses strain-dependent tangent modulus 𝔻(E).
 """
 function compute_element_stiffness_blocked!(
     K_blocks::AbstractMatrix{Tensor{2,3,Float64,9}},
-    X::Vector{Vec{3,Float64}},
+    X::AbstractVector{Vec{3,Float64}},
     material::NeoHookean,
-    u_elem::Vector{Float64},
+    u_elem::AbstractVector{Float64},
     topology::T,
     basis::B,
     ips
