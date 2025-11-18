@@ -25,8 +25,7 @@ body = create_elements(mesh, "BODY")
 """
 module IO
 
-using ..JuliaFEM: Element, Mesh, add_node!, add_element_to_element_set!,
-    add_node_to_node_set!
+using ..JuliaFEM: Element, Mesh
 
 # Re-export for convenience
 import ..JuliaFEM.Preprocess
