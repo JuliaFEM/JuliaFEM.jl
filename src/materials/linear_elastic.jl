@@ -209,17 +209,38 @@ C = elasticity_tensor(material)
 Returns non-symmetric Tensor{4,3} for indexing convenience in assembly.
 The tensor has minor and major symmetries: C_{ijkl} = C_{jikl} = C_{ijlk} = C_{klij}
 """
-function elasticity_tensor(material::LinearElastic)
-    # Lamé parameters
-    λ_val = λ(material)
-    μ_val = μ(material)
-
-    # Kronecker delta
+@generated function elasticity_tensor(material::LinearElastic)
+    # Generate tensor construction at compile time for zero allocations
+    # C_{ijkl} = λ δ_{ij} δ_{kl} + μ (δ_{ik} δ_{jl} + δ_{il} δ_{jk})
     δ(i, j) = i == j ? 1.0 : 0.0
 
-    # Build tensor: C_{ijkl} = λ δ_{ij} δ_{kl} + μ (δ_{ik} δ_{jl} + δ_{il} δ_{jk})
-    C_ijkl = [(λ_val * δ(i, j) * δ(k, l) + μ_val * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)))
-              for i in 1:3, j in 1:3, k in 1:3, l in 1:3]
+    # Pre-compute symbolic expressions for all 81 components
+    exprs = []
+    for i in 1:3, j in 1:3, k in 1:3, l in 1:3
+        if δ(i,j) != 0.0 && δ(k,l) != 0.0
+            # Has λ term
+            if δ(i,k) != 0.0 && δ(j,l) != 0.0
+                # λ + 2μ (diagonal component)
+                push!(exprs, :(λ_val + 2*μ_val))
+            else
+                # λ only (off-diagonal coupling)
+                push!(exprs, :(λ_val))
+            end
+        elseif δ(i,k) != 0.0 && δ(j,l) != 0.0 && i != j
+            # μ (shear component)
+            push!(exprs, :(μ_val))
+        elseif δ(i,l) != 0.0 && δ(j,k) != 0.0 && i != j
+            # μ (shear component, swapped indices)
+            push!(exprs, :(μ_val))
+        else
+            # Zero
+            push!(exprs, :(0.0))
+        end
+    end
 
-    return Tensor{4,3}(tuple(C_ijkl...))
+    return quote
+        λ_val = λ(material)
+        μ_val = μ(material)
+        Tensor{4,3,Float64,81}(($(exprs...),))
+    end
 end
