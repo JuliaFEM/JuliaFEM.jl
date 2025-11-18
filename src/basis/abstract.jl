@@ -298,5 +298,33 @@ nnodes(::Type{Pyr5}) = 5
 nnodes(::Type{Wedge6}) = 6
 nnodes(::Type{Wedge15}) = 15
 
-# Export the new parametric type and node count function
-export Lagrange, nnodes
+# ============================================================================
+# Additional Interface Methods
+# ============================================================================
+
+"""
+    ndofs(basis::AbstractBasis) -> Int
+    ndofs(::Type{<:AbstractBasis}) -> Int
+
+Number of degrees of freedom for this basis.
+
+For standard nodal elements (Lagrange), ndofs == nnodes.
+For plate elements and others with multiple DOFs per node, ndofs > nnodes.
+
+# Example
+
+```julia
+ndofs(Lagrange{Triangle, 1}())  # → 3 (same as nnodes)
+ndofs(DKT())                     # → 9 (3 nodes × 3 DOFs/node)
+```
+
+See also: [`nnodes`](@ref), [`AbstractPlateBasis`](@ref)
+"""
+function ndofs end
+
+# Default: For standard elements, ndofs == nnodes
+ndofs(B::AbstractBasis) = nnodes(B)
+ndofs(B::Type{<:AbstractBasis}) = nnodes(B)
+
+# Export the new parametric type and interface functions
+export Lagrange, nnodes, ndofs
