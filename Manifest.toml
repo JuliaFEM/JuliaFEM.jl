@@ -207,7 +207,7 @@ uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
 version = "3.1.3+0"
 
 [[deps.JuliaFEM]]
-deps = ["BenchmarkTools", "Gmsh", "IterativeSolvers", "LinearAlgebra", "Logging", "SparseArrays", "Tensors"]
+deps = ["BenchmarkTools", "Gmsh", "IterativeSolvers", "LinearAlgebra", "LinearOperators", "Logging", "SparseArrays", "Tensors"]
 path = "."
 uuid = "f80590ac-b429-510a-8a99-e7c46989f22d"
 version = "0.5.2"
