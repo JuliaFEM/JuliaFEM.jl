@@ -4,122 +4,12 @@
 """
 Physics API definitions.
 
-This file defines physics problem abstractions - how we couple mesh, material,
-field variables, and formulation into a solvable system.
+This file defines the interface functions for physics problems.
+Abstract type `AbstractPhysics` is defined in `src/physics/abstract.jl`.
+Concrete implementations are in `src/physics/types.jl` and `src/physics/boundary_conditions.jl`.
 
 Must be included after core api.jl, fields/api.jl, materials/api.jl, and formulations.
 """
-
-# ============================================================================
-# PHYSICS ABSTRACTIONS
-# ============================================================================
-
-"""
-    AbstractPhysics
-
-Abstract type for all physics problems.
-
-Physics is the **coupling** of four components:
-- **Mesh**: Topology/geometry (where)
-- **Material**: Constitutive law (what material)
-- **Field**: Solution variables (what we solve for)
-- **Formulation**: Discretization strategy (how we discretize)
-
-# Interface Requirements
-
-All physics types must support:
-- `assemble!(physics)` - Assemble global system matrices/operators
-- `solve!(physics)` - Solve the physics problem
-- `add_dirichlet!(physics, ...)` - Apply essential boundary conditions
-- `add_neumann!(physics, ...)` - Apply natural boundary conditions
-
-# Concrete Types
-
-- `Physics{Formulation, Field, Mesh, Material}` - Standard FEM physics problem
-
-# Design Philosophy
-
-**Physics references Mesh (does not own it)**:
-- Multiple physics can share one mesh (multiphysics coupling)
-- No mesh duplication (memory efficient)
-- Mesh is the topology owner
-- Physics is the problem owner
-
-**Type parameters enable dispatch specialization**:
-```julia
-# Specialize assembly for formulation × field combinations
-assemble!(::Physics{ContinuumFormulation{FullThreeD}, Displacement{3}, M, Mat})
-assemble!(::Physics{BeamFormulation{Timoshenko}, DisplacementRotation{3}, M, Mat})
-
-# Generic fallback
-assemble!(::Physics{Fm, F, M, Mat}) where {Fm, F, M, Mat}
-```
-
-# Examples
-
-```julia
-# 3D solid mechanics
-physics = Physics(
-    name = "cantilever",
-    mesh = mesh,
-    element_set = :all,
-    field = Displacement{3}(),
-    formulation = ContinuumFormulation{FullThreeD}(),
-    material = LinearElastic(E=210e9, ν=0.3)
-)
-
-# Heat transfer
-physics_thermal = Physics(
-    name = "heat_conduction",
-    mesh = mesh,
-    element_set = :solid,
-    field = Temperature(),
-    formulation = ContinuumFormulation{FullThreeD}(),
-    material = ThermalMaterial(k=50.0, ρ=7850.0, c=450.0)
-)
-
-# 3D beam
-physics_beam = Physics(
-    name = "beam",
-    mesh = beam_mesh,
-    element_set = :all,
-    field = DisplacementRotation{3}(),
-    formulation = BeamFormulation{Timoshenko}(),
-    material = steel
-)
-```
-
-# Multiphysics Example
-
-```
-# Share one mesh between structural and thermal physics
-mesh = Mesh{Hex8}(nodes, connectivity)
-
-physics_structural = Physics(
-    name = "structure",
-    mesh = mesh,  # Reference, not copy!
-    field = Displacement{3}(),
-    formulation = ContinuumFormulation{FullThreeD}(),
-    material = steel
-)
-
-physics_thermal = Physics(
-    name = "thermal",
-    mesh = mesh,  # Same mesh reference!
-    field = Temperature(),
-    formulation = ContinuumFormulation{FullThreeD}(),
-    material = thermal_steel
-)
-```
-
-# See Also
-- [`assemble!`](@ref) - System assembly
-- [`solve!`](@ref) - Solve physics problem
-- [`add_dirichlet!`](@ref) - Essential BCs
-- [`add_neumann!`](@ref) - Natural BCs
-- Concrete type: `Physics` in `src/physics.jl`
-"""
-abstract type AbstractPhysics end
 
 # ============================================================================
 # PHYSICS INTERFACE FUNCTIONS
@@ -144,7 +34,8 @@ This is the core FEM operation that builds:
 # Implementation Strategy
 
 **Dispatch on formulation × field combination:**
-```
+
+```julia
 # 3D solid mechanics with displacement field
 function assemble!(physics::Physics{ContinuumFormulation{FullThreeD}, Displacement{3}, M, Mat})
     # Standard displacement-based elasticity
@@ -163,7 +54,7 @@ end
 
 # Examples
 
-```
+```julia
 physics = Physics(
     name = "cantilever",
     mesh = mesh,
@@ -205,7 +96,7 @@ Automatically selects appropriate solver based on problem type:
 
 # Solver Selection Logic
 
-```
+```julia
 function solve!(physics::Physics)
     if is_linear(physics.material)
         # Linear solver
@@ -221,7 +112,7 @@ end
 
 # Examples
 
-```
+```julia
 # Apply boundary conditions first
 add_dirichlet!(physics, fixed_nodes, [1,2,3], 0.0)
 add_neumann!(physics, loaded_surface, traction)
@@ -259,7 +150,8 @@ Essential BCs prescribe field values at specific nodes:
 # Implementation Methods
 
 **Elimination method** (modify K, f):
-```
+
+```julia
 # Remove rows/columns for constrained DOFs
 K_reduced, f_reduced = eliminate_constraints(K, f, bc_nodes, bc_values)
 u_free = K_reduced \\ f_reduced
@@ -267,7 +159,8 @@ u_full = insert_constrained_values(u_free, bc_nodes, bc_values)
 ```
 
 **Penalty method** (add large stiffness):
-```
+
+```julia
 # Add penalty terms to K
 for (node, component, value) in constraints
     dof = get_dof(node, component)
@@ -277,14 +170,15 @@ end
 ```
 
 **Lagrange multipliers** (augmented system):
-```
+
+```julia
 # Solve [K  G^T] [u]   [f]
 #       [G   0 ] [λ] = [g]
 ```
 
 # Examples
 
-```
+```julia
 # Fix all DOFs at nodes 1, 2, 3
 add_dirichlet!(physics, [1,2,3], [1,2,3], 0.0)
 
@@ -323,7 +217,8 @@ Natural BCs apply forces, tractions, or fluxes:
 # Implementation
 
 Natural BCs contribute to force vector:
-```
+
+```julia
 # For each surface element
 for surf_elem in surface_elements
     # Integrate traction over surface
@@ -335,7 +230,7 @@ end
 
 # Examples
 
-```
+```julia
 # Apply traction to surface
 traction = Vec{3}(0.0, -1000.0, 0.0)  # 1000 N/m² downward
 add_neumann!(physics, surface_elements, traction)
