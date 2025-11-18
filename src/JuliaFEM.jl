@@ -388,7 +388,11 @@ export LinearElastic
 include("materials/neo_hookean.jl")
 export NeoHookean
 
-# Assembly structures (element and nodal)
+# ============================================================================
+# LEVEL 4: ASSEMBLY FRAMEWORK (Generic assembly strategies)
+# ============================================================================
+
+# Legacy assembly structures (element and nodal) - MUST come first for NodeToElementsMap
 include("assembly/element_structures.jl")
 export ElementAssemblyData, ElementContribution
 export scatter_to_global!, compute_residual!, apply_dirichlet_bc!
@@ -396,6 +400,44 @@ export matrix_vector_product, get_dof_indices
 
 include("assembly/nodal_structures.jl")
 export NodeToElementsMap, get_node_spider
+
+# Generic assemblers (domain-agnostic)
+include("assemblers/abstract.jl")
+export AbstractAssembler, AbstractAssemblerCache, AbstractKernel
+export ElementBasedAssembler, NodalBasedAssembler
+export COOAssembler, CSCAssembler, NodalAssembler
+export ElementCache, NodeCache
+export create_element_cache, create_node_cache
+
+include("assemblers/caches.jl")
+export COOCache, CSCCache, NodalCache
+export reset!, extract_system, build_sparsity_pattern
+
+include("assemblers/kernel_interface.jl")
+export compute_element_stiffness!, dofs_per_node, get_dof_mapping!
+export compute_b_matrix, compute_jacobian, validate_kernel
+
+include("assemblers/element_based_coo.jl")
+export assemble!, create_cache
+
+include("assemblers/element_based_csc.jl")
+# assemble!, create_cache already exported
+
+include("assemblers/nodal_based.jl")
+# assemble!, create_cache already exported (placeholders)
+
+# ============================================================================
+# LEVEL 5: PHYSICAL DOMAINS (Domain-specific assembly kernels)
+# ============================================================================
+
+# Continuum mechanics kernel
+include("domains/continuum/kernel.jl")
+export ContinuumKernel
+
+# Continuum assembly (uses generic assemblers)
+include("domains/continuum/assemble.jl")
+include("domains/continuum/assemble_v2.jl")  # Ferrite-style (backup)
+export compute_element_stiffness  # For testing and advanced use
 
 # Backend abstraction (CPU/GPU selection)
 # TODO: These need to be updated to work with new Physics API
@@ -406,11 +448,6 @@ export NodeToElementsMap, get_node_spider
 
 # CPU backend (fallback for now)
 # include("backend/cpu.jl")
-
-# Assembly module (NEW API - moved to domains/continuum/)
-include("domains/continuum/assemble.jl")
-include("domains/continuum/assemble_v2.jl")  # Ferrite-style two-pointer merge
-export compute_element_stiffness  # For testing and advanced use
 
 # GPU backend is now loaded via extension (ext/JuliaFEMCUDAExt.jl)
 # Extension automatically loads when user does 'using CUDA'
