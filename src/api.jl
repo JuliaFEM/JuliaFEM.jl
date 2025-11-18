@@ -56,25 +56,32 @@ in a dedicated `api.jl` file:
 # Design Philosophy
 
 **Zero Duplication:**
+
 Each abstract type is defined in exactly ONE place. No type appears in multiple api.jl files.
 
 **Domain Ownership:**
+
 Each domain owns its abstractions. Want to know about materials? Look in src/materials/api.jl.
 Want to know about meshes? Look in src/mesh/api.jl.
 
 **Minimal Core:**
+
 This file (src/api.jl) contains NO type definitions - only documentation.
 All abstractions live in their domain-specific api.jl files.
 
 **Clear Boundaries:**
+
 Each api.jl file documents:
+
 - What types it defines
 - What interfaces it declares
 - What belongs in that domain
 - What does NOT belong (and where to find it)
 
 **Systematic Pattern:**
+
 All domains follow identical structure:
+
 - Abstract base types
 - Interface function stubs
 - Comprehensive documentation with examples
