@@ -91,7 +91,7 @@ physics_beam = Physics(
 
 # Multiphysics Example
 
-```julia
+```
 # Share one mesh between structural and thermal physics
 mesh = Mesh{Hex8}(nodes, connectivity)
 
@@ -144,7 +144,7 @@ This is the core FEM operation that builds:
 # Implementation Strategy
 
 **Dispatch on formulation × field combination:**
-```julia
+```
 # 3D solid mechanics with displacement field
 function assemble!(physics::Physics{ContinuumFormulation{FullThreeD}, Displacement{3}, M, Mat})
     # Standard displacement-based elasticity
@@ -157,13 +157,13 @@ end
 
 # Generic fallback
 function assemble!(physics::Physics{Fm, F, M, Mat}) where {Fm, F, M, Mat}
-    error("No assembly method for formulation $Fm with field $F")
+    error("No assembly method for formulation \$Fm with field \$F")
 end
 ```
 
 # Examples
 
-```julia
+```
 physics = Physics(
     name = "cantilever",
     mesh = mesh,
@@ -205,7 +205,7 @@ Automatically selects appropriate solver based on problem type:
 
 # Solver Selection Logic
 
-```julia
+```
 function solve!(physics::Physics)
     if is_linear(physics.material)
         # Linear solver
@@ -221,7 +221,7 @@ end
 
 # Examples
 
-```julia
+```
 # Apply boundary conditions first
 add_dirichlet!(physics, fixed_nodes, [1,2,3], 0.0)
 add_neumann!(physics, loaded_surface, traction)
@@ -259,7 +259,7 @@ Essential BCs prescribe field values at specific nodes:
 # Implementation Methods
 
 **Elimination method** (modify K, f):
-```julia
+```
 # Remove rows/columns for constrained DOFs
 K_reduced, f_reduced = eliminate_constraints(K, f, bc_nodes, bc_values)
 u_free = K_reduced \\ f_reduced
@@ -267,7 +267,7 @@ u_full = insert_constrained_values(u_free, bc_nodes, bc_values)
 ```
 
 **Penalty method** (add large stiffness):
-```julia
+```
 # Add penalty terms to K
 for (node, component, value) in constraints
     dof = get_dof(node, component)
@@ -277,14 +277,14 @@ end
 ```
 
 **Lagrange multipliers** (augmented system):
-```julia
+```
 # Solve [K  G^T] [u]   [f]
 #       [G   0 ] [λ] = [g]
 ```
 
 # Examples
 
-```julia
+```
 # Fix all DOFs at nodes 1, 2, 3
 add_dirichlet!(physics, [1,2,3], [1,2,3], 0.0)
 
@@ -323,7 +323,7 @@ Natural BCs apply forces, tractions, or fluxes:
 # Implementation
 
 Natural BCs contribute to force vector:
-```julia
+```
 # For each surface element
 for surf_elem in surface_elements
     # Integrate traction over surface
@@ -335,7 +335,7 @@ end
 
 # Examples
 
-```julia
+```
 # Apply traction to surface
 traction = Vec{3}(0.0, -1000.0, 0.0)  # 1000 N/m² downward
 add_neumann!(physics, surface_elements, traction)
