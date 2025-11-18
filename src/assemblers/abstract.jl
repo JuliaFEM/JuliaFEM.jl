@@ -180,16 +180,25 @@ Contains pre-allocated arrays for:
 - Local stiffness matrix `Ke` [ndofs_elem × ndofs_elem]
 - Local force vector `fe` [ndofs_elem]
 - Node coordinates `coords` [nnodes_elem × ndim]
+- Node coordinates as Vec{3} `X_buffer` [nnodes_elem]
+- Blocked stiffness matrix `K_blocks` [nnodes_elem × nnodes_elem of Tensor{2,3}]
+- Displacement buffer `u_buffer` [ndofs_elem]
 - Global DOF indices `dofs` [ndofs_elem]
-- Integration point data
+- Pre-computed topology, basis, integration points (zero allocations!)
 
-Zero allocations during assembly - all arrays reused.
+Zero allocations during assembly - all arrays and objects reused.
 """
-struct ElementCache
+struct ElementCache{T<:AbstractTopology,B<:AbstractBasis,IPS}
     Ke::Matrix{Float64}       # Local stiffness matrix
     fe::Vector{Float64}       # Local force vector
-    coords::Matrix{Float64}   # Element node coordinates
+    coords::Matrix{Float64}   # Element node coordinates (raw)
+    X_buffer::Vector{Vec{3,Float64}}  # Element node coordinates (as Vec{3})
+    K_blocks::Matrix{Tensor{2,3,Float64,9}}  # Blocked stiffness matrix
+    u_buffer::Vector{Float64}  # Element displacement DOFs
     dofs::Vector{Int}         # Global DOF indices
+    topology::T               # Pre-computed topology instance
+    basis::B                  # Pre-computed basis instance
+    ips::IPS                  # Pre-computed integration points (now typed!)
 end
 
 """
@@ -231,11 +240,23 @@ function create_element_cache(mesh::AbstractMesh, kernel::AbstractKernel)
     max_ndofs_elem = max_nnodes_elem * ndofs_per_node
     ndim = dim(TopologyType())
 
+    # Pre-compute topology, basis, and integration points (zero allocations in loop!)
+    topology = TopologyType()
+    basis = Lagrange{TopologyType,1}()
+    integration_scheme = default_integration(TopologyType)
+    ips = integration_points(integration_scheme, topology)
+
     return ElementCache(
         zeros(max_ndofs_elem, max_ndofs_elem),  # Ke
         zeros(max_ndofs_elem),                   # fe
         zeros(max_nnodes_elem, ndim),            # coords
-        zeros(Int, max_ndofs_elem)               # dofs
+        [zero(Vec{3,Float64}) for _ in 1:max_nnodes_elem],  # X_buffer
+        Matrix{Tensor{2,3,Float64,9}}(undef, max_nnodes_elem, max_nnodes_elem),  # K_blocks
+        zeros(max_ndofs_elem),                   # u_buffer
+        zeros(Int, max_ndofs_elem),              # dofs
+        topology,                                # Pre-computed topology
+        basis,                                   # Pre-computed basis
+        ips                                      # Pre-computed integration points
     )
 end
 
