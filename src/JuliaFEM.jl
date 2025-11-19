@@ -142,6 +142,9 @@ export dofs_per_node
 include("materials/api.jl")
 export AbstractMaterial, AbstractElasticMaterial, AbstractPlasticMaterial
 export compute_stress, elasticity_tensor
+# Material behavior traits (for generic integration)
+export MaterialBehavior, StatelessConstantTangent, StatelessStrainDependent, StatefulStrainDependent
+export material_behavior, needs_deformation, needs_state
 
 # Mesh domain API  
 include("mesh/api.jl")
