@@ -211,6 +211,9 @@ steel_perfect = PerfectPlasticity(E=200e9, ν=0.3, σ_y=250e6, H=0.0)
 PerfectPlasticity(; E::Real, ν::Real, σ_y::Real, H::Real) =
     PerfectPlasticity(Float64(E), Float64(ν), Float64(σ_y), Float64(H))
 
+# Trait declaration: PerfectPlasticity has strain-dependent tangent and state
+material_behavior(::PerfectPlasticity) = StatefulStrainDependent()
+
 """
     compute_stress(material::PerfectPlasticity, 
                    ε::SymmetricTensor{2,3},
