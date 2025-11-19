@@ -442,10 +442,14 @@ export apply_neumann_bcs!, apply_dirichlet_bcs!  # Explicit BC application
 # CONTINUUM MECHANICS DOMAIN
 # ============================================================================
 
-# Continuum mechanics kernel
+# Continuum mechanics kernel (weak form only)
 include("domains/continuum/kernel.jl")
 export ContinuumKernel
-export PreparedElement, prepare_element!, compute_block!, compute_block_at_point  # Block API
+export compute_block_at_point  # Weak form (atomic operation)
+
+# Continuum integration utilities (geometry preprocessing, integration wrappers)
+include("domains/continuum/integration.jl")
+export PreparedElement, prepare_element!, compute_block!  # Integration API
 
 # Continuum assembly (uses generic assemblers)
 include("domains/continuum/assemble.jl")
