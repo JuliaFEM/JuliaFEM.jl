@@ -11,6 +11,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearOperators = "5c8ed15e-5a4c-59e4-a42b-c7e8811fb125"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 
 [weakdeps]
@@ -24,6 +25,7 @@ BenchmarkTools = "1.6.3"
 Gmsh = "0.3.1"
 IterativeSolvers = "0.9.4"
 LinearOperators = "2.11.0"
+StaticArrays = "1.9.15"
 Tensors = "≥ 1.0.0"
 julia = "1.9"
 
