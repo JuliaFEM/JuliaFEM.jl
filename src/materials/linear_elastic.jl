@@ -206,7 +206,7 @@ C = elasticity_tensor(material)
 ```
 
 # Implementation Note
-Returns non-symmetric Tensor{4,3} for indexing convenience in assembly.
+Returns SymmetricTensor{4,3} encoding the full material symmetry.
 The tensor has minor and major symmetries: C_{ijkl} = C_{jikl} = C_{ijlk} = C_{klij}
 """
 @generated function elasticity_tensor(material::LinearElastic)
@@ -214,7 +214,7 @@ The tensor has minor and major symmetries: C_{ijkl} = C_{jikl} = C_{ijlk} = C_{k
     # C_{ijkl} = λ δ_{ij} δ_{kl} + μ (δ_{ik} δ_{jl} + δ_{il} δ_{jk})
     δ(i, j) = i == j ? 1.0 : 0.0
 
-    # Pre-compute symbolic expressions for all 81 components
+    # Build full 81-component tensor first
     exprs = []
     for i in 1:3, j in 1:3, k in 1:3, l in 1:3
         if δ(i,j) != 0.0 && δ(k,l) != 0.0
@@ -241,6 +241,8 @@ The tensor has minor and major symmetries: C_{ijkl} = C_{jikl} = C_{ijlk} = C_{k
     return quote
         λ_val = λ(material)
         μ_val = μ(material)
-        Tensor{4,3,Float64,81}(($(exprs...),))
+        # Create as Tensor{4,3} then convert - Tensors.jl handles the symmetry extraction
+        C_full = Tensor{4,3,Float64}(($(exprs...),))
+        SymmetricTensor{4,3}(C_full)
     end
 end
