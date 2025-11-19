@@ -33,6 +33,11 @@ using JuliaFEM, Test
         @test Tet4 isa Type
     end
 
+    # Domain-specific tests
+    @testset "Continuum Domain" begin
+        include("domains/continuum/runtests.jl")
+    end
+
     # Validation tests
     include("validation/test_cantilever_regression.jl")
 end
