@@ -103,6 +103,9 @@ function NeoHookean(; μ::Real=NaN, λ::Real=NaN, E_mod::Real=NaN, nu::Real=NaN)
     end
 end
 
+# Trait declaration: NeoHookean has strain-dependent tangent modulus
+material_behavior(::NeoHookean) = StatelessStrainDependent()
+
 """
     strain_energy(material::NeoHookean, C::SymmetricTensor{2,3}) -> Float64
 
