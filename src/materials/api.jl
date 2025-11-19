@@ -106,11 +106,161 @@ Common state variables:
 abstract type AbstractPlasticMaterial <: AbstractMaterial end
 
 # ============================================================================
+# MATERIAL BEHAVIOR TRAITS
+# ============================================================================
+
+"""
+    MaterialBehavior
+
+Abstract type for material behavior traits.
+
+Material behavior traits allow integration code to query what computational
+requirements a material has (constant vs strain-dependent tangent, stateless
+vs stateful) without writing material-specific integration functions.
+
+# Type Hierarchy
+- `StatelessConstantTangent` - Tangent is constant (e.g., LinearElastic)
+- `StatelessStrainDependent` - Tangent depends on strain (e.g., NeoHookean)
+- `StatefulStrainDependent` - Has internal state variables (e.g., PerfectPlasticity)
+
+# Usage
+Each material declares its behavior via:
+```julia
+material_behavior(::MyMaterial) = StatelessConstantTangent()
+```
+
+Integration code can then dispatch on behavior:
+```julia
+behavior = material_behavior(material)
+𝔻 = compute_tangent_at_point(material, behavior, ...)
+```
+
+# See Also
+- [`material_behavior`](@ref) - Trait function
+- [`needs_deformation`](@ref) - Query if material needs displacement field
+- [`needs_state`](@ref) - Query if material has internal state
+"""
+abstract type MaterialBehavior end
+
+"""
+    StatelessConstantTangent <: MaterialBehavior
+
+Material with constant tangent modulus (independent of strain).
+
+Materials with this behavior:
+- Compute tangent once (e.g., at reference strain E=0)
+- Reuse same tangent at all integration points
+- No displacement field needed during integration
+- No internal state variables
+
+**Examples:** LinearElastic
+
+**Performance:** Fastest - tangent computed once per element
+"""
+struct StatelessConstantTangent <: MaterialBehavior end
+
+"""
+    StatelessStrainDependent <: MaterialBehavior
+
+Material with strain-dependent tangent modulus (no internal state).
+
+Materials with this behavior:
+- Tangent depends on current strain/deformation
+- Must compute tangent at each integration point
+- Requires displacement field to compute deformation gradient F
+- No internal state variables (path-independent)
+
+**Examples:** NeoHookean, Mooney-Rivlin, Ogden
+
+**Performance:** Moderate - tangent computed at each integration point
+"""
+struct StatelessStrainDependent <: MaterialBehavior end
+
+"""
+    StatefulStrainDependent <: MaterialBehavior
+
+Material with strain-dependent tangent and internal state variables.
+
+Materials with this behavior:
+- Tangent depends on current strain and state history
+- Must compute tangent at each integration point
+- Requires displacement field to compute strain
+- Has internal state variables (e.g., plastic strain, damage)
+- History-dependent (path-dependent)
+
+**Examples:** PerfectPlasticity, FiniteStrainPlasticity, ContinuumDamage
+
+**Performance:** Slowest - tangent + state update at each integration point
+"""
+struct StatefulStrainDependent <: MaterialBehavior end
+
+"""
+    material_behavior(material::AbstractMaterial) -> MaterialBehavior
+
+Trait function declaring what computational requirements a material has.
+
+# Returns
+- `StatelessConstantTangent()` - Constant tangent (e.g., LinearElastic)
+- `StatelessStrainDependent()` - Strain-dependent tangent, no state (e.g., NeoHookean)
+- `StatefulStrainDependent()` - Strain-dependent tangent + state (e.g., PerfectPlasticity)
+
+# Examples
+```julia
+material_behavior(::LinearElastic) = StatelessConstantTangent()
+material_behavior(::NeoHookean) = StatelessStrainDependent()
+material_behavior(::PerfectPlasticity) = StatefulStrainDependent()
+```
+
+# Implementation Required
+All concrete material types must implement this trait function.
+
+# See Also
+- [`MaterialBehavior`](@ref) - Behavior trait types
+- [`needs_deformation`](@ref) - Convenience query
+- [`needs_state`](@ref) - Convenience query
+"""
+function material_behavior end
+
+"""
+    needs_deformation(material::AbstractMaterial) -> Bool
+
+Query whether material needs displacement field for tangent computation.
+
+Returns `true` for materials with strain-dependent tangent, `false` for
+materials with constant tangent.
+
+# Examples
+```julia
+needs_deformation(LinearElastic(E=210e9, ν=0.3))      # false
+needs_deformation(NeoHookean(μ=1e6, λ=1e9))           # true
+needs_deformation(PerfectPlasticity(...))              # true
+```
+"""
+needs_deformation(mat::AbstractMaterial) = !(material_behavior(mat) isa StatelessConstantTangent)
+
+"""
+    needs_state(material::AbstractMaterial) -> Bool
+
+Query whether material has internal state variables.
+
+Returns `true` for stateful materials (plasticity, damage), `false` for
+stateless materials (elasticity).
+
+# Examples
+```julia
+needs_state(LinearElastic(E=210e9, ν=0.3))      # false
+needs_state(NeoHookean(μ=1e6, λ=1e9))           # false
+needs_state(PerfectPlasticity(...))              # true
+```
+"""
+needs_state(mat::AbstractMaterial) = material_behavior(mat) isa StatefulStrainDependent
+
+# ============================================================================
 # MATERIAL MODEL FUNCTIONS
 # ============================================================================
 
 """
-    compute_stress(material::AbstractMaterial, ε, state_old, Δt) 
+    compute_stress(material::AbstractMaterial, ε, state_old, Δt)
     -> (σ, 𝔻, state_new)
 
 Compute stress, tangent, and updated state for a material model.
@@ -134,7 +284,7 @@ Compute stress, tangent, and updated state for a material model.
 
 # Plastic material (with state)
 state = (εᵖ=zero(SymmetricTensor{2,3}), κ=0.0)
-σ, 𝔻, state_new = compute_stress(PerfectPlasticity(E=210e9, ν=0.3, σ_y=250e6), 
+σ, 𝔻, state_new = compute_stress(PerfectPlasticity(E=210e9, ν=0.3, σ_y=250e6),
                                    ε, state, Δt)
 ```
 
