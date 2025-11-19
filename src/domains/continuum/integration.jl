@@ -130,106 +130,221 @@ Returns immutable struct with SVector/NTuple fields → stack-only, zero heap.
 end
 
 # ============================================================================
-# INTEGRATION WRAPPERS (material-specific)
+# INTEGRATION WRAPPERS (generic, trait-based)
 # ============================================================================
 
 """
-    compute_block!(
-        prepared::PreparedElement,
-        material::LinearElastic,
-        k_local::Int,
-        l_local::Int
-    ) -> Tensor{2,3}
+    compute_tangent_at_point(
+        behavior::StatelessConstantTangent,
+        material,
+        prepared,
+        q,
+        u_elem,
+        state_old,
+        Δt
+    ) -> 𝔻
 
-Integrate weak form over element to get stiffness block between nodes k and l.
+Compute tangent modulus for materials with constant tangent.
 
-For LinearElastic, the tangent modulus 𝔻 is constant (equal to C), so we
-compute it once via compute_stress and integrate using compute_block_at_point.
-
-# Returns
-Fully integrated 3×3 stiffness block K[k,l]
+For constant tangent materials (e.g., LinearElastic), tangent is independent
+of strain and integration point. Computed once at reference strain.
 """
-@inline function compute_block!(
-    prepared::PreparedElement{N,NIP},
-    material::LinearElastic,
-    k_local::Int,
-    l_local::Int
-) where {N,NIP}
-
-    # For LinearElastic, tangent modulus is constant (𝔻 = C)
-    # Compute at reference strain E = 0
+@inline function compute_tangent_at_point(
+    ::StatelessConstantTangent,
+    material,
+    prepared,
+    q::Int,
+    u_elem,
+    state_old,
+    Δt
+)
+    # Constant tangent - compute at reference strain
     E_ref = zero(SymmetricTensor{2,3,Float64})
-    S, 𝔻, _ = compute_stress(material, E_ref)
+    _, 𝔻, _ = compute_stress(material, E_ref, nothing, 0.0)
+    return 𝔻
+end
 
-    K_kl = zero(Tensor{2,3,Float64})
+"""
+    compute_tangent_at_point(
+        behavior::StatelessStrainDependent,
+        material,
+        prepared,
+        q,
+        u_elem,
+        state_old,
+        Δt
+    ) -> 𝔻
 
-    # Integrate over all quadrature points
-    @inbounds for q in 1:NIP
-        grad_k = prepared.∇N_data[q][k_local]
-        grad_l = prepared.∇N_data[q][l_local]
+Compute tangent modulus for materials with strain-dependent tangent.
 
-        # Weak form contribution at this point using material tangent
-        K_kl_ip = compute_block_at_point(grad_k, grad_l, 𝔻)
+For strain-dependent materials (e.g., NeoHookean), tangent depends on
+deformation state at each integration point. Computes strain from
+displacement field and queries material.
+"""
+@inline function compute_tangent_at_point(
+    ::StatelessStrainDependent,
+    material,
+    prepared::PreparedElement{N},
+    q::Int,
+    u_elem::AbstractVector{Float64},
+    state_old,
+    Δt
+) where N
+    # Compute strain at this integration point
+    I = one(Tensor{2,3,Float64})
+    ∇N_q = prepared.∇N_data[q]
 
-        # Accumulate with integration weight
-        K_kl += K_kl_ip * prepared.detJ_w[q]
+    # Deformation gradient: F = I + ∇u
+    F = I
+    @inbounds for k in 1:N
+        k_offset = 3(k - 1)
+        u_k = Vec{3}((u_elem[k_offset+1], u_elem[k_offset+2], u_elem[k_offset+3]))
+        F += u_k ⊗ ∇N_q[k]
     end
 
-    return K_kl
+    # Green-Lagrange strain: E = ½(C - I) = ½(F'F - I)
+    C_tensor = symmetric(F' ⋅ F)
+    E = SymmetricTensor{2,3}(0.5 * (C_tensor - I))
+
+    # Get strain-dependent tangent
+    _, 𝔻, _ = compute_stress(material, E, nothing, 0.0)
+    return 𝔻
+end
+
+"""
+    compute_tangent_at_point(
+        behavior::StatefulStrainDependent,
+        material,
+        prepared,
+        q,
+        u_elem,
+        state_old,
+        Δt
+    ) -> (𝔻, state_new)
+
+Compute tangent modulus and update state for stateful materials.
+
+For stateful materials (e.g., PerfectPlasticity), tangent depends on
+strain and internal state. Updates state variables during computation.
+
+# Returns
+- `𝔻`: Material tangent modulus
+- `state_new`: Updated material state at this integration point
+"""
+@inline function compute_tangent_at_point(
+    ::StatefulStrainDependent,
+    material,
+    prepared::PreparedElement{N},
+    q::Int,
+    u_elem::AbstractVector{Float64},
+    state_old,
+    Δt
+) where N
+    # Compute strain at this integration point (small strain for plasticity)
+    I = one(Tensor{2,3,Float64})
+    ∇N_q = prepared.∇N_data[q]
+
+    # Small strain: ε = sym(∇u)
+    ε = zero(SymmetricTensor{2,3,Float64})
+    @inbounds for k in 1:N
+        k_offset = 3(k - 1)
+        u_k = Vec{3}((u_elem[k_offset+1], u_elem[k_offset+2], u_elem[k_offset+3]))
+        ε += symmetric(u_k ⊗ ∇N_q[k])
+    end
+
+    # Get state at this integration point (if provided)
+    state_q = state_old === nothing ? nothing : state_old[q]
+
+    # Compute stress, tangent, and updated state
+    _, 𝔻, state_new = compute_stress(material, ε, state_q, Δt)
+
+    return 𝔻, state_new
 end
 
 """
     compute_block!(
         prepared::PreparedElement,
-        material::NeoHookean,
+        material::AbstractMaterial,
         k_local::Int,
         l_local::Int,
-        u_elem::AbstractVector{Float64}
+        u_elem::AbstractVector{Float64} = Float64[],
+        state_old = nothing,
+        Δt::Float64 = 0.0
     ) -> Tensor{2,3}
 
-Integrate weak form for NeoHookean material (strain-dependent tangent).
+**Generic** integration function for **all materials**.
 
-For nonlinear materials, the material tensor depends on strain, so we must
-compute it at each integration point using the current displacement field.
+Integrates weak form over element to get stiffness block K[k,l] between
+nodes k and l. Uses material behavior traits to dispatch to appropriate
+tangent computation.
 
 # Arguments
-- `u_elem`: Element displacement DOFs [3N] (for computing deformation gradient)
+- `prepared`: Precomputed element geometry
+- `material`: Any material (LinearElastic, NeoHookean, PerfectPlasticity, etc.)
+- `k_local`, `l_local`: Local node indices
+- `u_elem`: Element displacement DOFs [3N] (optional, needed for strain-dependent materials)
+- `state_old`: Material state (optional, needed for stateful materials)
+- `Δt`: Time increment (optional, for rate-dependent materials)
+
+# Returns
+Fully integrated 3×3 stiffness block K[k,l]
+
+# Performance
+Uses trait-based dispatch on `material_behavior(material)`:
+- `StatelessConstantTangent`: Tangent computed once, O(1) material queries
+- `StatelessStrainDependent`: Tangent computed at each IP, O(NIP) queries
+- `StatefulStrainDependent`: Tangent + state update at each IP, O(NIP) queries
+
+# Examples
+```julia
+# Linear elastic (no u_elem needed)
+K_kl = compute_block!(prepared, LinearElastic(E=210e9, ν=0.3), 1, 2)
+
+# Nonlinear elastic (needs u_elem)
+K_kl = compute_block!(prepared, NeoHookean(μ=1e6, λ=1e9), 1, 2, u_elem)
+
+# Plastic (needs u_elem and state)
+K_kl = compute_block!(prepared, PerfectPlasticity(...), 1, 2, u_elem, state_old, Δt)
+```
 """
 @inline function compute_block!(
     prepared::PreparedElement{N,NIP},
-    material::NeoHookean,
+    material::AbstractMaterial,
     k_local::Int,
     l_local::Int,
-    u_elem::AbstractVector{Float64}
+    u_elem::AbstractVector{Float64} = Float64[],
+    state_old = nothing,
+    Δt::Float64 = 0.0
 ) where {N,NIP}
 
-    I = one(Tensor{2,3,Float64})
+    behavior = material_behavior(material)
     K_kl = zero(Tensor{2,3,Float64})
 
-    @inbounds for q in 1:NIP
-        ∇N_q = prepared.∇N_data[q]
+    # Optimization: For constant tangent, compute once and reuse
+    if behavior isa StatelessConstantTangent
+        𝔻 = compute_tangent_at_point(behavior, material, prepared, 1, u_elem, state_old, Δt)
 
-        # Compute deformation gradient F at this integration point
-        F = I
-        for k in 1:N
-            k_offset = 3(k - 1)
-            u_k = Vec{3}((u_elem[k_offset+1], u_elem[k_offset+2], u_elem[k_offset+3]))
-            F += u_k ⊗ ∇N_q[k]
+        @inbounds for q in 1:NIP
+            grad_k = prepared.∇N_data[q][k_local]
+            grad_l = prepared.∇N_data[q][l_local]
+            K_kl_ip = compute_block_at_point(grad_k, grad_l, 𝔻)
+            K_kl += K_kl_ip * prepared.detJ_w[q]
         end
+    else
+        # Strain-dependent: compute tangent at each integration point
+        @inbounds for q in 1:NIP
+            # Dispatch handles both stateless and stateful cases
+            if behavior isa StatefulStrainDependent
+                𝔻, _ = compute_tangent_at_point(behavior, material, prepared, q, u_elem, state_old, Δt)
+            else
+                𝔻 = compute_tangent_at_point(behavior, material, prepared, q, u_elem, state_old, Δt)
+            end
 
-        # Right Cauchy-Green and Green-Lagrange strain
-        C_tensor = symmetric(F' ⋅ F)
-        E = SymmetricTensor{2,3}(0.5 * (C_tensor - I))
-
-        # Get material tangent modulus (strain-dependent)
-        _, 𝔻, _ = compute_stress(material, E)
-
-        # Weak form contribution at this point with current tangent
-        grad_k = ∇N_q[k_local]
-        grad_l = ∇N_q[l_local]
-        K_kl_ip = compute_block_at_point(grad_k, grad_l, 𝔻)
-
-        K_kl += K_kl_ip * prepared.detJ_w[q]
+            grad_k = prepared.∇N_data[q][k_local]
+            grad_l = prepared.∇N_data[q][l_local]
+            K_kl_ip = compute_block_at_point(grad_k, grad_l, 𝔻)
+            K_kl += K_kl_ip * prepared.detJ_w[q]
+        end
     end
 
     return K_kl
@@ -243,48 +358,50 @@ end
     compute_all_blocks!(
         K_blocks::AbstractMatrix{Tensor{2,3}},
         prepared::PreparedElement,
-        material::LinearElastic,
-        u_elem,
-        N::Int
+        material::AbstractMaterial,
+        u_elem::AbstractVector{Float64},
+        Nnodes::Int,
+        state_old = nothing,
+        Δt::Float64 = 0.0
     )
 
-Compute all N×N blocks for LinearElastic material.
+**Generic** function to compute all N×N stiffness blocks for **any material**.
 
 Helper for element-based assemblers. For nodal assemblers, call compute_block!
 directly for only the needed blocks.
+
+# Arguments
+- `K_blocks`: Output matrix [N×N] of 3×3 tensor blocks
+- `prepared`: Precomputed element geometry
+- `material`: Any material (LinearElastic, NeoHookean, PerfectPlasticity, etc.)
+- `u_elem`: Element displacement DOFs [3N]
+- `Nnodes`: Number of nodes in element
+- `state_old`: Material state (optional, for stateful materials)
+- `Δt`: Time increment (optional, for rate-dependent materials)
+
+# Examples
+```julia
+# Linear elastic
+compute_all_blocks!(K_blocks, prepared, LinearElastic(E=210e9, ν=0.3), u_elem, 8)
+
+# Nonlinear elastic
+compute_all_blocks!(K_blocks, prepared, NeoHookean(μ=1e6, λ=1e9), u_elem, 8)
+
+# Plastic
+compute_all_blocks!(K_blocks, prepared, PerfectPlasticity(...), u_elem, 8, state_old, Δt)
+```
 """
 @inline function compute_all_blocks!(
     K_blocks::AbstractMatrix{<:Tensor{2,3}},
     prepared::PreparedElement{N},
-    material::LinearElastic,
-    u_elem,
-    Nnodes::Int
-) where {N}
-    @inbounds for k in 1:Nnodes, l in 1:Nnodes
-        K_blocks[k, l] = compute_block!(prepared, material, k, l)
-    end
-end
-
-"""
-    compute_all_blocks!(
-        K_blocks::AbstractMatrix{Tensor{2,3}},
-        prepared::PreparedElement,
-        material::NeoHookean,
-        u_elem::AbstractVector{Float64},
-        N::Int
-    )
-
-Compute all N×N blocks for NeoHookean material (requires displacement field).
-"""
-@inline function compute_all_blocks!(
-    K_blocks::AbstractMatrix{<:Tensor{2,3}},
-    prepared::PreparedElement{N},
-    material::NeoHookean,
+    material::AbstractMaterial,
     u_elem::AbstractVector{Float64},
-    Nnodes::Int
+    Nnodes::Int,
+    state_old = nothing,
+    Δt::Float64 = 0.0
 ) where {N}
     @inbounds for k in 1:Nnodes, l in 1:Nnodes
-        K_blocks[k, l] = compute_block!(prepared, material, k, l, u_elem)
+        K_blocks[k, l] = compute_block!(prepared, material, k, l, u_elem, state_old, Δt)
     end
 end
 
