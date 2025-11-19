@@ -68,6 +68,9 @@ steel = LinearElastic(E=200e9, ν=0.3)
 """
 LinearElastic(; E, ν) = LinearElastic(Float64(E), Float64(ν))
 
+# Trait declaration: LinearElastic has constant tangent modulus
+material_behavior(::LinearElastic) = StatelessConstantTangent()
+
 """
     λ(material::LinearElastic) -> Float64
 
