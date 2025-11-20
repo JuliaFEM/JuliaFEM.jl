@@ -72,7 +72,13 @@
 
             # Automatic integration using compute_block!
             K_blocks = Matrix{Tensor{2,3,Float64,9}}(undef, N, N)
-            JuliaFEM.compute_block!(K_blocks, geometry_cache, material_cache, 1, 2)
+            JuliaFEM.compute_block!(
+                K_blocks,
+                geometry_cache.∇N_data,
+                geometry_cache.detJ_w,
+                material_cache.𝔻,
+                1, 2
+            )
             K_auto = K_blocks[1, 2]
 
             # Should match (within numerical precision)
