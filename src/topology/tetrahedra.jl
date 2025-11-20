@@ -161,7 +161,7 @@ dim(::Tetrahedron{N}) where {N} = 3
 # ============================================================================
 
 """
-    reference_coordinates(::Tetrahedron{4}) -> NTuple{4, NTuple{3, Float64}}
+    reference_coordinates(::Tetrahedron{4}) -> SVector{4, Vec{3,Float64}}
 
 Return reference coordinates for linear tetrahedron (Tet4) - 4 corner nodes only.
 
@@ -188,16 +188,16 @@ Tuple of 4 coordinate triples: ((ξ₁, η₁, ζ₁), (ξ₂, η₂, ζ₂), (�
 - Node 4: (0.0, 0.0, 1.0) - Along ζ-axis
 """
 function reference_coordinates(::Tetrahedron{4})
-    return (
-        (0.0, 0.0, 0.0),  # N1: Corner at origin
-        (1.0, 0.0, 0.0),  # N2: Corner along ξ
-        (0.0, 1.0, 0.0),  # N3: Corner along η
-        (0.0, 0.0, 1.0)   # N4: Corner along ζ
+    return SVector(
+        Vec{3,Float64}((0.0, 0.0, 0.0)),  # N1: Corner at origin
+        Vec{3,Float64}((1.0, 0.0, 0.0)),  # N2: Corner along ξ
+        Vec{3,Float64}((0.0, 1.0, 0.0)),  # N3: Corner along η
+        Vec{3,Float64}((0.0, 0.0, 1.0))   # N4: Corner along ζ
     )
 end
 
 """
-    reference_coordinates(::Tetrahedron{10}) -> NTuple{10, NTuple{3, Float64}}
+    reference_coordinates(::Tetrahedron{10}) -> SVector{10, Vec{3,Float64}}
 
 Return reference coordinates for quadratic tetrahedron (Tet10) - 10 nodes total.
 
@@ -211,17 +211,17 @@ Return reference coordinates for quadratic tetrahedron (Tet10) - 10 nodes total.
 - Node 10: Edge midpoint between N3-N4 (0.0, 0.5, 0.5)
 """
 function reference_coordinates(::Tetrahedron{10})
-    return (
-        (0.0, 0.0, 0.0),  # N1: Corner
-        (1.0, 0.0, 0.0),  # N2: Corner
-        (0.0, 1.0, 0.0),  # N3: Corner
-        (0.0, 0.0, 1.0),  # N4: Corner
-        (0.5, 0.0, 0.0),  # N5: Midpoint edge 1-2
-        (0.5, 0.5, 0.0),  # N6: Midpoint edge 2-3
-        (0.0, 0.5, 0.0),  # N7: Midpoint edge 3-1
-        (0.0, 0.0, 0.5),  # N8: Midpoint edge 1-4
-        (0.5, 0.0, 0.5),  # N9: Midpoint edge 2-4
-        (0.0, 0.5, 0.5)   # N10: Midpoint edge 3-4
+    return SVector(
+        Vec{3,Float64}((0.0, 0.0, 0.0)),  # N1: Corner
+        Vec{3,Float64}((1.0, 0.0, 0.0)),  # N2: Corner
+        Vec{3,Float64}((0.0, 1.0, 0.0)),  # N3: Corner
+        Vec{3,Float64}((0.0, 0.0, 1.0)),  # N4: Corner
+        Vec{3,Float64}((0.5, 0.0, 0.0)),  # N5: Midpoint edge 1-2
+        Vec{3,Float64}((0.5, 0.5, 0.0)),  # N6: Midpoint edge 2-3
+        Vec{3,Float64}((0.0, 0.5, 0.0)),  # N7: Midpoint edge 3-1
+        Vec{3,Float64}((0.0, 0.0, 0.5)),  # N8: Midpoint edge 1-4
+        Vec{3,Float64}((0.5, 0.0, 0.5)),  # N9: Midpoint edge 2-4
+        Vec{3,Float64}((0.0, 0.5, 0.5))   # N10: Midpoint edge 3-4
     )
 end
 
