@@ -20,8 +20,7 @@ Must be included after core api.jl.
 Abstract type for element topology (geometric shape and node ordering).
 
 Topology defines the **shape** of an element in its reference (parametric) space:
-- Number of nodes
-- Reference element coordinates (ξ, η, ζ positions)
+- Reference element coordinates (ξ, η, ζ positions for its nodes)
 - Edge connectivity (which nodes form edges)
 - Face connectivity (which nodes form faces, 3D only)
 - Spatial dimension (1D, 2D, or 3D)
@@ -31,7 +30,7 @@ Topology defines the **shape** of an element in its reference (parametric) space
 All topology types must implement:
 - `nnodes(topology)` - Number of nodes
 - `dim(topology)` - Spatial dimension (1, 2, or 3)
-- `reference_coordinates(topology)` - Node positions in reference element (returns tuple of tuples)
+- `reference_coordinates(topology)` - Node positions in reference element (returns `SVector` of `Vec`)
 - `edges(topology)` - Edge connectivity (returns tuple of tuples)
 - `faces(topology)` - Face connectivity (returns tuple of tuples, 3D only)
 
@@ -52,39 +51,39 @@ All topology types must implement:
 
 # Design Philosophy
 
-**Key Insight:** Topology defines SHAPE, not node count!
+**Key Insight:** Topology defines SHAPE, not interpolation.
 
-Node count comes from the **basis function order**:
-- Linear basis (P=1): Corner nodes only
-- Quadratic basis (P=2): Corner + mid-edge nodes
-- Cubic basis (P=3): Corner + edge + face nodes
+Node count is part of the topology type parameter and comes from mesh connectivity,
+while interpolation comes from the basis. Keep them separate so any topology can pair
+with any basis family/order that makes sense.
 
 **Examples:**
 ```julia
 # Triangle with different basis orders
-Triangle + Lagrange{Triangle, 1} → 3 nodes  (corners)
-Triangle + Lagrange{Triangle, 2} → 6 nodes  (corners + mid-edges)
-Triangle + Lagrange{Triangle, 3} → 10 nodes (corners + edges + interior)
+Triangle + Lagrange{1} → 3 nodes  (corners)
+Triangle + Lagrange{2} → 6 nodes  (corners + mid-edges)
+Triangle + Lagrange{3} → 10 nodes (corners + edges + interior)
 
-# Quadrilateral with different basis types
-Quadrilateral + Lagrange{Quadrilateral, 1}     → 4 nodes  (corners)
-Quadrilateral + Serendipity{Quadrilateral, 2} → 8 nodes  (corners + mid-edges, no center)
-Quadrilateral + Lagrange{Quadrilateral, 2}     → 9 nodes  (corners + mid-edges + center)
+# Quadrilateral with different basis families
+Quadrilateral + Lagrange{1}      → 4 nodes  (corners)
+Quadrilateral + Serendipity{2}   → 8 nodes  (corners + mid-edges, no center)
+Quadrilateral + Lagrange{2}      → 9 nodes  (corners + mid-edges + center)
 ```
 
 **Separation of Concerns:**
-- Topology: "This is a triangle" (shape)
-- Basis: "This triangle has 6 nodes" (interpolation)
+- Topology: "This is a triangle" (shape + node ownership in the mesh)
+- Basis: "These are the interpolation functions over that topology"
 - Integration: "Use 3-point Gauss rule" (numerical quadrature)
 
 # Backward Compatibility
 
 Old names like `Tri3`, `Quad4`, `Tet10` are **deprecated** but aliased:
-- `Tri3` → `Triangle` (with implied linear basis)
-- `Quad4` → `Quadrilateral` (with implied linear basis)
-- `Tet10` → `Tetrahedron` (with implied quadratic basis)
+- `Tri3` → `Triangle{3}`
+- `Quad4` → `Quadrilateral{4}`
+- `Tet10` → `Tetrahedron{10}`
 
-New code should use shape names (`Triangle`) with explicit basis specification.
+New code should use shape names (`Triangle`, `Quadrilateral`, etc.) with explicit basis
+specification passed separately.
 
 # Reference Element Coordinates
 
@@ -117,7 +116,7 @@ element_quad   = Element(Triangle, Lagrange{Triangle,2}, (1,2,3,4,5,6))  # 6 nod
 # See Also
 - [`dim`](@ref) - Spatial dimension
 - [`nnodes`](@ref) - Number of nodes (depends on basis, not topology!)
-- [`reference_coordinates`](@ref) - Reference element node positions
+- [`reference_coordinates`](@ref) - Reference element node positions (SVector of Vec)
 - [`edges`](@ref) - Edge connectivity
 - [`faces`](@ref) - Face connectivity (3D only)
 - Architecture docs: `docs/book/element_architecture.md`
@@ -208,24 +207,34 @@ dim(::Tetrahedron) = 3
 function dim end
 
 """
-    reference_coordinates(topology::AbstractTopology) -> NTuple{N, NTuple{D, Float64}}
+    Base.ndims(topology::AbstractTopology) -> Int
+    Base.ndims(::Type{<:AbstractTopology}) -> Int
+
+Alias to `dim` for interoperability with Base API.
+"""
+Base.ndims(t::AbstractTopology) = dim(t)
+Base.ndims(::Type{T}) where {T<:AbstractTopology} = dim(T())
+
+"""
+    reference_coordinates(topology::AbstractTopology) -> SVector{N, Vec{D,Float64}}
 
 Reference element coordinates for the topology's nodes.
 
-Returns a tuple of coordinate tuples, one per node.
+Returns an `SVector` of `Vec{D}` coordinate vectors, one per node.
 The actual number of nodes depends on the basis order (not shown here).
 
 # Examples
 
 ```julia
 # Triangle (linear: 3 nodes, quadratic: 6 nodes, etc.)
-reference_coordinates(Triangle())
+reference_coordinates(Triangle{3}())
 # For linear basis (3 nodes):
-# ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0))
+# SVector(Vec{2,Float64}((0.0, 0.0)), Vec{2,Float64}((1.0, 0.0)), Vec{2,Float64}((0.0, 1.0)))
 
 # Quadrilateral (4 corner nodes minimum)
-reference_coordinates(Quadrilateral())
-# ((-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0))
+reference_coordinates(Quadrilateral{4}())
+# SVector(Vec{2,Float64}((-1.0, -1.0)), Vec{2,Float64}((1.0, -1.0)),
+#         Vec{2,Float64}((1.0, 1.0)), Vec{2,Float64}((-1.0, 1.0)))
 ```
 
 # Note
@@ -237,8 +246,11 @@ Mid-edge and interior nodes are computed by the basis function module.
 
 Each concrete topology type must provide:
 ```julia
-reference_coordinates(::Triangle) = ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0))
-reference_coordinates(::Quadrilateral) = ((-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0))
+reference_coordinates(::Triangle) =
+    SVector(Vec{2,Float64}((0.0, 0.0)), Vec{2,Float64}((1.0, 0.0)), Vec{2,Float64}((0.0, 1.0)))
+reference_coordinates(::Quadrilateral) =
+    SVector(Vec{2,Float64}((-1.0, -1.0)), Vec{2,Float64}((1.0, -1.0)),
+            Vec{2,Float64}((1.0, 1.0)), Vec{2,Float64}((-1.0, 1.0)))
 # etc.
 ```
 """
