@@ -1,12 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/FEMBase.jl/blob/master/LICENSE
 
-"""
-    AbstractField
-
-Abstract supertype for all fields in JuliaFEM.
-"""
-abstract type AbstractField end
+# Note: AbstractField is defined in fields/api.jl
 
 function length(f::F) where F<:AbstractField
     return length(f.data)
