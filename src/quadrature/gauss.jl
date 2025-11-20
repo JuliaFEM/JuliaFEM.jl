@@ -239,8 +239,10 @@ function integration_points(scheme::Gauss{N}, topology::T) where {N,T<:AbstractT
     data_vec = collect(quad_data)
     result = ntuple(length(data_vec)) do i
         weight, point = data_vec[i]
+        # Convert tuple to Vec{D}
+        ξ = Vec{D}(point)
         # Use NEW API IntegrationPoint{D} (aliased as IntegrationPointNEW to avoid shadowing)
-        IntegrationPointNEW{D}(point, weight)
+        IntegrationPointNEW{D}(ξ, weight)
     end
     return result
 end
