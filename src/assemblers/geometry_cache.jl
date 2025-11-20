@@ -195,7 +195,7 @@ function create_geometry_cache(
     # Compute gradients and weights at all integration points
     ∇N_data_tuple = ntuple(NIP) do q
         ip = ips[q]
-        ξ = Vec{3}(ip.ξ)
+        ξ = ip.ξ
         w = ip.weight
 
         # Compute Jacobian and physical gradients
@@ -220,7 +220,7 @@ function create_geometry_cache(
     # Compute detJ * weight
     detJ_w_tuple = ntuple(NIP) do q
         ip = ips[q]
-        ξ = Vec{3}(ip.ξ)
+        ξ = ip.ξ
         w = ip.weight
 
         # Recompute Jacobian (could optimize by storing from above)
