@@ -6,10 +6,9 @@ Continuum mechanics kernel - defines the weak form only.
 
 This module defines:
 1. The ContinuumKernel type
-2. Kernel interface (dofs_per_node, get_dof_mapping!)
-3. The weak form: compute_block_at_point (atomic operation)
+2. The weak form: compute_block_at_point (atomic operation)
 
-Everything else (geometry preprocessing, integration, assembly) belongs elsewhere.
+Everything else (geometry preprocessing, integration, assembly, DOF mapping) belongs elsewhere.
 """
 
 using Tensors
@@ -56,50 +55,18 @@ function ContinuumKernel(
 end
 
 # ============================================================================
-# KERNEL INTERFACE IMPLEMENTATION
+# FIELD ACCESS (for DOF mapping delegation)
 # ============================================================================
 
 """
-    dofs_per_node(kernel::ContinuumKernel) -> Int
+    get_field(kernel::ContinuumKernel) -> Displacement{3}
 
-Continuum mechanics uses 3 DOFs per node (ux, uy, uz).
+Return the field associated with this kernel.
+
+DOF mapping should use dofs_per_node(get_field(kernel)) and similar field-based
+functions, not kernel-specific methods.
 """
-function dofs_per_node(kernel::ContinuumKernel)
-    return 3  # ux, uy, uz displacements
-end
-
-"""
-    get_dof_mapping!(
-        dofs::Vector{Int},
-        kernel::ContinuumKernel,
-        element_id::Int,
-        mesh::AbstractMesh
-    ) -> Nothing
-
-Fill DOF indices for continuum element (node-major ordering).
-
-DOF numbering: Node k has DOFs [3*(k-1)+1, 3*(k-1)+2, 3*(k-1)+3] for [ux, uy, uz].
-"""
-function get_dof_mapping!(
-    dofs::AbstractVector{Int},
-    kernel::ContinuumKernel,
-    element_id::Int,
-    mesh::AbstractMesh
-)
-    conn = mesh.connectivity[element_id]
-    nnodes_elem = length(conn)
-
-    # Fill DOF indices (node-major: all DOFs for node 1, then node 2, ...)
-    idx = 1
-    @inbounds for node_id in conn
-        for α in 1:3  # ux, uy, uz
-            dofs[idx] = 3 * (node_id - 1) + α
-            idx += 1
-        end
-    end
-
-    return nothing
-end
+get_field(kernel::ContinuumKernel) = kernel.field
 
 # ============================================================================
 # WEAK FORM - The heart of continuum mechanics
@@ -168,7 +135,7 @@ K_kl_ip = compute_block_at_point(grad_k, grad_l, C)
 @inline function compute_block_at_point(
     grad_k::Vec{3,Float64},
     grad_l::Vec{3,Float64},
-    C::SymmetricTensor{4,3,Float64}
+    C::SymmetricTensor{4,3,Float64,36}
 )
     # Basis vectors for displacement components
     e_1 = Vec{3}((1.0, 0.0, 0.0))
@@ -176,7 +143,7 @@ K_kl_ip = compute_block_at_point(grad_k, grad_l, C)
     e_3 = Vec{3}((0.0, 0.0, 1.0))
     e = (e_1, e_2, e_3)
 
-    K_kl_ip = zero(Tensor{2,3,Float64})
+    K_kl_ip = zero(Tensor{2,3,Float64,9})
 
     # Loop over displacement components (α, β ∈ {x, y, z})
     @inbounds for α in 1:3, β in 1:3
