@@ -150,7 +150,7 @@ kernel = ContinuumKernel(
 ndofs = dofs_per_node(kernel)  # Returns 3
 ```
 """
-function dofs_per_node end
+# Note: dofs_per_node function stub is defined in fields/api.jl
 
 # Default implementation: delegate to field
 """
