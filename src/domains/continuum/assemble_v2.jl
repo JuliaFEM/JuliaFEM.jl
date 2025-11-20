@@ -88,7 +88,7 @@ struct AssemblyCacheFerrite{N,T<:AbstractTopology{N},Mat<:AbstractMaterial}
     # Pre-computed material/topology data
     C::Tensor{4,3,Float64,81}
     topology::T
-    basis::Lagrange{T,1}
+    basis::Lagrange{1}  # Basis order only (topology passed separately)
     ips::Any  # Integration points tuple
 end
 
@@ -208,7 +208,7 @@ function AssemblyCacheFerrite(
     # Pre-compute material and topology data
     C = elasticity_tensor(material)
     topology = T()
-    basis = Lagrange{T,1}()
+    basis = Lagrange{1}()  # Basis order only (topology passed separately)
     integration_scheme = default_integration(T)
     ips = integration_points(integration_scheme, topology)
 
