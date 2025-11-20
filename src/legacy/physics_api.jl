@@ -33,17 +33,8 @@ abstract type AbstractMaterial end
 # Abstract Types for Field and Formulation (Double Dispatch)
 # ============================================================================
 
-"""
-    AbstractField
-
-Abstract type for field variables we solve for.
-
-Subtypes define what physical quantity is being solved:
-- `Displacement{Dim}`: Displacement field (3D, 2D, etc.)
-- `Temperature`: Temperature field
-- `DisplacementRotation{Dim}`: Displacement + rotation (beams, shells)
-"""
-abstract type AbstractField end
+# Note: AbstractField is defined in fields/api.jl
+# Note: Displacement{Dim} is defined in fields/api.jl
 
 """
     Displacement{Dim} <: AbstractField
