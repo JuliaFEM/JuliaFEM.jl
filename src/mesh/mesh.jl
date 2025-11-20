@@ -155,16 +155,6 @@ end
 # Positional constructor for convenience (backward compatibility)
 function Mesh{T}(
     nodes::Vector{Vec{3,Float64}},
-    connectivity::Vector{NTuple{N,UInt32}},
-    element_sets::Dict{Symbol,Set{UInt32}}=Dict{Symbol,Set{UInt32}}(),
-    node_sets::Dict{Symbol,Set{UInt32}}=Dict{Symbol,Set{UInt32}}()
-) where {N,T<:AbstractTopology{N}}
-    Mesh{N,T}(nodes, connectivity, element_sets, node_sets)
-end
-
-# Keyword constructor for convenience
-function Mesh{T}(
-    nodes::Vector{Vec{3,Float64}},
     connectivity::Vector{NTuple{N,UInt32}};
     element_sets::Dict{Symbol,Set{UInt32}}=Dict{Symbol,Set{UInt32}}(),
     node_sets::Dict{Symbol,Set{UInt32}}=Dict{Symbol,Set{UInt32}}()
