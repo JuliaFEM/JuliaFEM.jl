@@ -42,7 +42,7 @@ function gmsh_initialize(argv=String[]; finalize_atexit=true)
         atexit(finalize)
     end
     return true
-
+end
 
 """
     Gmsh.finalize()
