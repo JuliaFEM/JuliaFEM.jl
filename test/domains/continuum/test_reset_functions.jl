@@ -6,7 +6,7 @@ using LinearAlgebra
 using SparseArrays  # For nnz()
 using Test
 
-include("test_helpers.jl")
+# test_helpers.jl is included by runtests.jl
 
 @testset "reset! functions" begin
     kernel = create_test_kernel()
