@@ -91,7 +91,13 @@ function assemble_element!(
     # Assemble only upper triangle (k ≤ l) since stiffness matrix is symmetric
     # This halves computation and memory usage
     @inbounds for k in 1:N, l in k:N  # Only l ≥ k (upper triangle)
-        compute_block!(element_cache.K_blocks, geometry_cache, material_cache, k, l)
+        compute_block!(
+            element_cache.K_blocks,
+            geometry_cache.∇N_data,
+            geometry_cache.detJ_w,
+            material_cache.𝔻,
+            k, l
+        )
     end
 
     return nothing
@@ -221,7 +227,8 @@ function assemble!(
     end
 
     # Write counter back ONCE after loop
-    # cache.counter[] = counter
+    # NOTE: counter MUST be written back so extract_system() knows how many triplets to extract
+    cache.counter[] = counter
 
     return nothing
 end
