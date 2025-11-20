@@ -19,11 +19,18 @@ nnodes(::Segment{N}) where {N} = N
 dim(::Segment{N}) where {N} = 1
 
 function reference_coordinates(::Segment{2})
-    return ((-1.0,), (1.0,))
+    return SVector(
+        Vec{1,Float64}((-1.0,)),
+        Vec{1,Float64}((1.0,))
+    )
 end
 
 function reference_coordinates(::Segment{3})
-    return ((-1.0,), (1.0,), (0.0,))
+    return SVector(
+        Vec{1,Float64}((-1.0,)),
+        Vec{1,Float64}((1.0,)),
+        Vec{1,Float64}((0.0,))
+    )
 end
 
 function edges(::Segment{N}) where {N}
