@@ -135,8 +135,8 @@ function Element(::Type{T}, connectivity::NTuple{N,<:Integer}; kwargs...) where 
     base_topo = get_base_topology(T)
     # Determine order from number of nodes
     order = infer_lagrange_order(T, N)
-    # Use base topology in Lagrange type (not Seg3, but Segment!)
-    BasisType = Lagrange{base_topo,order}
+    # Use NEW API: basis order only (topology passed separately)
+    BasisType = Lagrange{order}
     return Element(BasisType, connectivity; kwargs...)
 end
 
@@ -677,6 +677,9 @@ end
 
 ## Other stuff
 
+# TEMPORARY: Commented out during basis refactoring - uses old Lagrange{T,P} API
+# TODO: Rewrite to use new Lagrange{P} API with topology passed separately
+#=
 # Helper: Create topology instance from basis type
 function _create_topology_instance(::Type{Lagrange{T,P}}) where {T,P}
     N_nodes = nnodes(Lagrange{T,P}())
@@ -755,6 +758,9 @@ function get_dbasis(element::AbstractElement{M,B}, ip, ::Any) where {M,B<:Lagran
     # Return as Vector for compatibility with old code
     return collect(dN_tuple)
 end
+=#
+
+# END COMMENTED OUT SECTION
 
 function (element::Element)(ip, time::Float64=0.0)
     return get_basis(element, ip, time)
@@ -845,6 +851,8 @@ function get_integration_points(element::AbstractElement{M,B}, change_order::Int
     return tuple([IP(UInt(i), w, Tuple(xi)) for (i, (w, xi)) in enumerate(ips)]...)
 end
 
+# TEMPORARY: Commented out during basis refactoring - uses old Lagrange{T,P} API
+#=
 # Helper function to map Lagrange basis types to new integration points API
 function get_integration_points_from_basis(::Type{Lagrange{T,P}}, order::Int=0) where {T,P}
     # Map topology type to base topology for integration points
@@ -872,8 +880,11 @@ function get_integration_points_from_basis(::Type{Lagrange{T,P}}, order::Int=0) 
         error("Gauss quadrature order $gauss_order not supported for topology $T")
     end
 end
+=#
+# END COMMENTED OUT SECTION (get_integration_points_from_basis)
 
 # Map topology types to their base forms for integration
+# NOTE: Restored from commented section - needed by Element constructor
 function get_base_topology(::Type{T}) where T
     name = string(nameof(T))
     # 1D elements
