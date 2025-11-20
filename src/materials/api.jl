@@ -105,6 +105,72 @@ Common state variables:
 """
 abstract type AbstractPlasticMaterial <: AbstractMaterial end
 
+"""
+    AbstractMaterialState
+
+Abstract type for material internal state at integration points.
+
+Concrete types must be immutable and contain all internal variables
+needed for incremental material models (plasticity, damage, etc.).
+
+# Concrete Types
+- `PlasticityState` - J2 plasticity state (εᵖ, α, κ)
+- `FiniteStrainPlasticityState` - Multiplicative plasticity state
+- Add more as needed for damage, viscoelasticity, etc.
+
+# Design
+States are immutable structs for thread safety. Updates create new instances.
+
+# Usage
+State types are used in:
+- `MaterialStateCache{M<:Union{Nothing,AbstractMaterialState}}` - Cache storage
+- `Matrix{M<:AbstractMaterialState}` - Global state storage [nips, nelems]
+- Material `compute_stress` functions for state evolution
+
+# Examples
+```julia
+# Define concrete state type
+struct PlasticityState <: AbstractMaterialState
+    εᵖ::SymmetricTensor{2,3,Float64,6}
+    α::SymmetricTensor{2,3,Float64,6}
+    κ::Float64
+end
+
+# Initialize state
+state = PlasticityState(zero(SymmetricTensor{2,3}), zero(SymmetricTensor{2,3}), 0.0)
+
+# Use in compute_stress
+σ, 𝔻, state_new = compute_stress(material, ε, state, Δt)
+```
+
+# See Also
+- [`AbstractPlasticMaterial`](@ref) - Materials that use state
+- [`MaterialStateCache`](@ref) - Cache structure for state storage
+- [`compute_stress`](@ref) - Material constitutive function
+"""
+abstract type AbstractMaterialState end
+
+"""
+    EmptyState <: AbstractMaterialState
+
+Empty material state for stateless materials (e.g., LinearElastic).
+
+Stateless materials don't need internal state variables, but the type system
+requires a concrete `M <: AbstractMaterialState` for `MaterialStateCache{M}`.
+`EmptyState` serves as a placeholder that carries no data.
+
+# Usage
+```julia
+# LinearElastic uses EmptyState
+material = LinearElastic(E=210.0e9, ν=0.3)
+cache = MaterialStateCache{EmptyState}(...)
+```
+"""
+struct EmptyState <: AbstractMaterialState end
+
+# Zero constructor for Base.zero compatibility
+Base.zero(::Type{EmptyState}) = EmptyState()
+
 # ============================================================================
 # MATERIAL BEHAVIOR TRAITS
 # ============================================================================
@@ -254,6 +320,32 @@ needs_state(PerfectPlasticity(...))              # true
 ```
 """
 needs_state(mat::AbstractMaterial) = material_behavior(mat) isa StatefulStrainDependent
+
+"""
+    state_type(::Type{<:AbstractMaterial}) -> Type{<:AbstractMaterialState}
+
+Return the concrete state type for a given material type.
+
+This trait function maps material types to their corresponding state types:
+- Stateless materials (elastic) → `EmptyState`
+- Stateful materials (plastic) → `PlasticityState` (or other state types)
+
+# Examples
+```julia
+state_type(LinearElastic) → EmptyState
+state_type(PerfectPlasticity) → PlasticityState
+```
+
+# Implementation
+Materials must define:
+```julia
+state_type(::Type{PerfectPlasticity}) = PlasticityState
+```
+
+# Default
+By default, materials are stateless (return `EmptyState`).
+"""
+state_type(::Type{<:AbstractMaterial}) = EmptyState
 
 # ============================================================================
 # MATERIAL MODEL FUNCTIONS
