@@ -223,7 +223,7 @@ For GPU compatibility:
 - [`AbstractElasticMaterial`](@ref) - Stateless materials
 - [`AbstractPlasticMaterial`](@ref) - Stateful materials
 """
-function compute_stress end
+# Note: compute_stress function stub is defined in materials/api.jl
 
 # Note: Concrete implementations are in separate files:
 # - src/materials/linear_elastic.jl
