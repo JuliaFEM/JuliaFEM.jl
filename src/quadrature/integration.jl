@@ -1,8 +1,16 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
+# DEPRECATED: This file contains the old integration API.
+# New code should use the types from api.jl:
+#   - AbstractQuadratureRule (replaces AbstractIntegration)
+#   - QuadraturePoint (replaces IntegrationPoint)
+#   - GaussLegendre{N} (replaces Gauss{N})
+
 """
     AbstractIntegration
+
+DEPRECATED: Use `AbstractQuadratureRule` instead.
 
 Abstract base type for all numerical integration (quadrature) schemes.
 
@@ -31,15 +39,22 @@ abstract type AbstractIntegration end
 """
     IntegrationPoint{D}
 
+DEPRECATED: Use `QuadraturePoint{D,T}` instead.
+
 Represents a single integration point in D-dimensional parametric space.
 
 # Fields
 - `ξ::Vec{D, Float64}`: Location in parametric coordinates
 - `weight::Float64`: Integration weight
 
-# Examples
+# Migration
 ```julia
-ip = IntegrationPoint(Vec(0.0, 0.0), 1.0)  # 2D point at origin with weight 1
+# Old:
+ip = IntegrationPoint(Vec(0.0, 0.0), 1.0)
+
+# New:
+qp = QuadraturePoint(SVector(0.0, 0.0), 1.0)
+# Access: qp.coords instead of ip.ξ
 ```
 """
 struct IntegrationPoint{D}
