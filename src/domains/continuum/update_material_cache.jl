@@ -87,13 +87,12 @@ No internal state tracking.
 
     # Compute at each integration point
     @inbounds for q in 1:nips
-        ∇N_q = geometry_cache.∇N_data[q]
-
         # Deformation gradient: F = I + ∇u
         F = I
         for k in 1:nnodes
             u_k = element_cache.u_buffer[k]
-            F += u_k ⊗ ∇N_q[k]
+            ∇N_k_q = geometry_cache.∇N_data[q, k]
+            F += u_k ⊗ ∇N_k_q
         end
 
         # Green-Lagrange strain: E = ½(C - I) = ½(F'F - I)
@@ -146,13 +145,12 @@ Uses old state from previous time step.
 
     # Compute and update state at each integration point
     @inbounds for q in 1:nips
-        ∇N_q = geometry_cache.∇N_data[q]
-
         # Small strain: ε = sym(∇u)
         ε = zero(SymmetricTensor{2,3,Float64,6})
         for k in 1:nnodes
             u_k = element_cache.u_buffer[k]
-            ε += symmetric(u_k ⊗ ∇N_q[k])
+            ∇N_k_q = geometry_cache.∇N_data[q, k]
+            ε += symmetric(u_k ⊗ ∇N_k_q)
         end
 
         # Get old state at this IP
