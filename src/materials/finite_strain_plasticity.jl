@@ -29,8 +29,8 @@ using LinearAlgebra
 State variables for finite strain plasticity.
 
 Fields:
-- `F_p::Tensor{2,3,Float64}`: Plastic deformation gradient (intermediate config)
-- `α_bar::SymmetricTensor{2,3,Float64}`: Backstress in intermediate config
+- `F_p::Tensor{2,3,Float64,9}`: Plastic deformation gradient (intermediate config)
+- `α_bar::SymmetricTensor{2,3,Float64,6}`: Backstress in intermediate config
 - `κ::Float64`: Equivalent plastic strain (≥ 0)
 
 Invariants:
@@ -44,7 +44,7 @@ struct FiniteStrainPlasticityState
 
     function FiniteStrainPlasticityState(
         F_p::Tensor{2,3,Float64,9}=one(Tensor{2,3,Float64}),
-        α_bar::SymmetricTensor{2,3,Float64,6}=zero(SymmetricTensor{2,3,Float64}),
+        α_bar::SymmetricTensor{2,3,Float64,6}=zero(SymmetricTensor{2,3,Float64,6}),
         κ::Float64=0.0
     )
         κ < 0.0 && throw(ArgumentError("κ must be non-negative, got $κ"))
