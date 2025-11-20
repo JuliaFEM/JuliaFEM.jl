@@ -184,7 +184,7 @@ dim(::Triangle{N}) where {N} = 2
 # ============================================================================
 
 """
-    reference_coordinates(::Triangle{3}) -> NTuple{3, NTuple{2, Float64}}
+    reference_coordinates(::Triangle{3}) -> SVector{3, Vec{2,Float64}}
 
 Return reference coordinates for linear triangle (Tri3) - 3 corner nodes only.
 
@@ -210,15 +210,15 @@ Tuple of 3 coordinate pairs: ((ξ₁, η₁), (ξ₂, η₂), (ξ₃, η₃))
 - Node 3: (0.0, 1.0) - Along η-axis
 """
 function reference_coordinates(::Triangle{3})
-    return (
-        (0.0, 0.0),  # N1: Corner at origin
-        (1.0, 0.0),  # N2: Corner along ξ
-        (0.0, 1.0)   # N3: Corner along η
+    return SVector(
+        Vec{2,Float64}((0.0, 0.0)),  # N1: Corner at origin
+        Vec{2,Float64}((1.0, 0.0)),  # N2: Corner along ξ
+        Vec{2,Float64}((0.0, 1.0))   # N3: Corner along η
     )
 end
 
 """
-    reference_coordinates(::Triangle{6}) -> NTuple{6, NTuple{2, Float64}}
+    reference_coordinates(::Triangle{6}) -> SVector{6, Vec{2,Float64}}
 
 Return reference coordinates for quadratic triangle (Tri6) - 6 nodes total.
 
@@ -230,18 +230,18 @@ Return reference coordinates for quadratic triangle (Tri6) - 6 nodes total.
 - Node 6: Edge midpoint between N3-N1 (0.0, 0.5)
 """
 function reference_coordinates(::Triangle{6})
-    return (
-        (0.0, 0.0),  # N1: Corner
-        (1.0, 0.0),  # N2: Corner
-        (0.0, 1.0),  # N3: Corner
-        (0.5, 0.0),  # N4: Midpoint of edge 1-2
-        (0.5, 0.5),  # N5: Midpoint of edge 2-3
-        (0.0, 0.5)   # N6: Midpoint of edge 3-1
+    return SVector(
+        Vec{2,Float64}((0.0, 0.0)),  # N1: Corner
+        Vec{2,Float64}((1.0, 0.0)),  # N2: Corner
+        Vec{2,Float64}((0.0, 1.0)),  # N3: Corner
+        Vec{2,Float64}((0.5, 0.0)),  # N4: Midpoint of edge 1-2
+        Vec{2,Float64}((0.5, 0.5)),  # N5: Midpoint of edge 2-3
+        Vec{2,Float64}((0.0, 0.5))   # N6: Midpoint of edge 3-1
     )
 end
 
 """
-    reference_coordinates(::Triangle{7}) -> NTuple{7, NTuple{2, Float64}}
+    reference_coordinates(::Triangle{7}) -> SVector{7, Vec{2,Float64}}
 
 Return reference coordinates for quadratic triangle with centroid (Tri7).
 
@@ -252,19 +252,19 @@ Return reference coordinates for quadratic triangle with centroid (Tri7).
 - Node 7: Face centroid (1/3, 1/3)
 """
 function reference_coordinates(::Triangle{7})
-    return (
-        (0.0, 0.0),          # N1: Corner
-        (1.0, 0.0),          # N2: Corner
-        (0.0, 1.0),          # N3: Corner
-        (0.5, 0.0),          # N4: Midpoint edge 1-2
-        (0.5, 0.5),          # N5: Midpoint edge 2-3
-        (0.0, 0.5),          # N6: Midpoint edge 3-1
-        (1.0 / 3.0, 1.0 / 3.0)   # N7: Face centroid
+    return SVector(
+        Vec{2,Float64}((0.0, 0.0)),          # N1: Corner
+        Vec{2,Float64}((1.0, 0.0)),          # N2: Corner
+        Vec{2,Float64}((0.0, 1.0)),          # N3: Corner
+        Vec{2,Float64}((0.5, 0.0)),          # N4: Midpoint edge 1-2
+        Vec{2,Float64}((0.5, 0.5)),          # N5: Midpoint edge 2-3
+        Vec{2,Float64}((0.0, 0.5)),          # N6: Midpoint edge 3-1
+        Vec{2,Float64}((1.0 / 3.0, 1.0 / 3.0))   # N7: Face centroid
     )
 end
 
 """
-    reference_coordinates(::Triangle{10}) -> NTuple{10, NTuple{2, Float64}}
+    reference_coordinates(::Triangle{10}) -> SVector{10, Vec{2,Float64}}
 
 Return reference coordinates for cubic triangle (Tri10) - 10 nodes total.
 
@@ -278,17 +278,17 @@ Return reference coordinates for cubic triangle (Tri10) - 10 nodes total.
 - Node 10: Face centroid (1/3, 1/3)
 """
 function reference_coordinates(::Triangle{10})
-    return (
-        (0.0, 0.0),          # N1: Corner
-        (1.0, 0.0),          # N2: Corner
-        (0.0, 1.0),          # N3: Corner
-        (1.0 / 3.0, 0.0),      # N4: Edge 1-2, 1/3
-        (2.0 / 3.0, 0.0),      # N5: Edge 1-2, 2/3
-        (2.0 / 3.0, 1.0 / 3.0),  # N6: Edge 2-3, 1/3
-        (1.0 / 3.0, 2.0 / 3.0),  # N7: Edge 2-3, 2/3
-        (0.0, 2.0 / 3.0),      # N8: Edge 3-1, 1/3
-        (0.0, 1.0 / 3.0),      # N9: Edge 3-1, 2/3
-        (1.0 / 3.0, 1.0 / 3.0)   # N10: Face centroid
+    return SVector(
+        Vec{2,Float64}((0.0, 0.0)),          # N1: Corner
+        Vec{2,Float64}((1.0, 0.0)),          # N2: Corner
+        Vec{2,Float64}((0.0, 1.0)),          # N3: Corner
+        Vec{2,Float64}((1.0 / 3.0, 0.0)),      # N4: Edge 1-2, 1/3
+        Vec{2,Float64}((2.0 / 3.0, 0.0)),      # N5: Edge 1-2, 2/3
+        Vec{2,Float64}((2.0 / 3.0, 1.0 / 3.0)),  # N6: Edge 2-3, 1/3
+        Vec{2,Float64}((1.0 / 3.0, 2.0 / 3.0)),  # N7: Edge 2-3, 2/3
+        Vec{2,Float64}((0.0, 2.0 / 3.0)),      # N8: Edge 3-1, 1/3
+        Vec{2,Float64}((0.0, 1.0 / 3.0)),      # N9: Edge 3-1, 2/3
+        Vec{2,Float64}((1.0 / 3.0, 1.0 / 3.0))   # N10: Face centroid
     )
 end
 
