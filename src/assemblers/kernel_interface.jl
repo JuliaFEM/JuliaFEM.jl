@@ -422,78 +422,82 @@ update_material_cache!(material_cache, geometry_cache, material, element_cache, 
 
 # Phase 2: Assemble all blocks (no material calls!)
 for k in 1:N, l in 1:N
-    K_kl = compute_block!(geometry_cache, material_cache, k, l)
+    K_kl = compute_block!(∇N_data, detJ_w, 𝔻, k, l)
 end
 ```
 """
 function compute_block(
-    geometry_cache::GeometryCache,
-    material_cache::MaterialStateCache,
+    ∇N_data::Matrix{Vec{3,Float64}},
+    detJ_w::Vector{Float64},
+    𝔻::Vector{SymmetricTensor{4,3,Float64,36}},
     k_local::Int,
     l_local::Int
 )
-
-    # TODO: instead of using geometry_cache and material_cache here,
-    # pass in pre-extracted arrays to avoid field access overhead.
-    # pass in: D, dNdx, detJ_w and remove caches from arguments.
-
     K_kl = zero(Tensor{2,3,Float64,9})
 
-    # Get NIP from cache
-    NIP = length(geometry_cache.detJ_w)
+    # Get NIP from input
+    NIP = length(detJ_w)
 
     # Integrate using precomputed tangent at each IP
     @inbounds for q in 1:NIP
-        grad_k = geometry_cache.∇N_data[q, k_local]
-        grad_l = geometry_cache.∇N_data[q, l_local]
-        detJ_w = geometry_cache.detJ_w[q]
+        grad_k = ∇N_data[q, k_local]
+        grad_l = ∇N_data[q, l_local]
+        w = detJ_w[q]
+        D = 𝔻[q]
 
-        𝔻 = material_cache.𝔻[q]
-
-        K_kl_ip = compute_block_at_point(grad_k, grad_l, 𝔻)
-        K_kl += K_kl_ip * detJ_w
+        K_kl_ip = compute_block_at_point(grad_k, grad_l, D)
+        K_kl += K_kl_ip * w
     end
 
     return K_kl
-    # return nothing
 end
 
 """
-    compute_block!(K_blocks, geometry_cache, material_cache, k_local, l_local)
+    compute_block!(
+        K_blocks::Matrix{Tensor{2,3,Float64,9}},
+        ∇N_data::Matrix{Vec{3,Float64}},
+        detJ_w::Vector{Float64},
+        𝔻::Vector{SymmetricTensor{4,3,Float64,36}},
+        k_local::Int,
+        l_local::Int
+    ) -> Nothing
 
 Mutating version that writes directly to K_blocks matrix.
 Avoids return value allocation by writing result in-place.
 
-This version achieves **zero allocations** by avoiding the return value overhead
-that occurs when returning Tensor across module boundaries (80 bytes/call in compute_block).
+# Arguments
+- `K_blocks`: Output matrix [N×N] of 3×3 tensor blocks
+- `∇N_data`: Shape function gradients [NIP × N] at all integration points
+- `detJ_w`: Jacobian determinant times weight [NIP] at all integration points
+- `𝔻`: Material tangent moduli [NIP] at all integration points
+- `k_local`, `l_local`: Local node indices
+
+# Performance
+Direct array access eliminates field overhead from cache structs.
+Achieves **zero allocations** by avoiding return value overhead.
 """
 function compute_block!(
     K_blocks::Matrix{Tensor{2,3,Float64,9}},
-    geometry_cache::GeometryCache,
-    material_cache::MaterialStateCache,
+    ∇N_data::Matrix{Vec{3,Float64}},
+    detJ_w::Vector{Float64},
+    𝔻::Vector{SymmetricTensor{4,3,Float64,36}},
     k_local::Int,
     l_local::Int
 )
-
-    # TODO: instead of using geometry_cache and material_cache here,
-    # pass in pre-extracted arrays to avoid field access overhead.
-    # pass in: D, dNdx, detJ_w and remove caches from arguments.
-
     K_kl = zero(Tensor{2,3,Float64,9})
 
-    # Get NIP from cache
-    NIP = length(geometry_cache.detJ_w)
+    # Get NIP from input
+    NIP = length(detJ_w)
 
     # Integrate using precomputed tangent at each IP
     @inbounds for q in 1:NIP
-        grad_k = geometry_cache.∇N_data[q, k_local]
-        grad_l = geometry_cache.∇N_data[q, l_local]
-        detJ_w = geometry_cache.detJ_w[q]
+        grad_k = ∇N_data[q, k_local]
+        grad_l = ∇N_data[q, l_local]
+        w = detJ_w[q]
+        D = 𝔻[q]
 
-        𝔻 = material_cache.𝔻[q]
-
-        K_kl_ip = compute_block_at_point(grad_k, grad_l, 𝔻)
-        K_kl += K_kl_ip * detJ_w
+        K_kl_ip = compute_block_at_point(grad_k, grad_l, D)
+        K_kl += K_kl_ip * w
     end
 
     # Write directly to matrix - avoids return value allocation
@@ -504,9 +508,10 @@ end
 """
     compute_all_blocks!(
         K_blocks::AbstractMatrix{Tensor{2,3,Float64,9}},
-        geometry_cache::AbstractGeometryCache,
-        material_cache::AbstractMaterialStateCache
-    )
+        ∇N_data::Matrix{Vec{3,Float64}},
+        detJ_w::Vector{Float64},
+        𝔻::Vector{SymmetricTensor{4,3,Float64,36}}
+    ) -> Nothing
 
 **Phase 2:** Compute all N×N stiffness blocks using **precomputed material state**.
 
@@ -516,8 +521,9 @@ Helper for element-based assemblers. Uses two-phase approach:
 
 # Arguments
 - `K_blocks`: Output matrix [N×N] of 3×3 tensor blocks
-- `geometry_cache`: Precomputed element geometry (gradients, detJ*w)
-- `material_cache`: Precomputed material state at all IPs
+- `∇N_data`: Shape function gradients [NIP × N] at all integration points
+- `detJ_w`: Jacobian determinant times weight [NIP] at all integration points
+- `𝔻`: Material tangent moduli [NIP] at all integration points
 
 # Examples
 ```julia
@@ -526,19 +532,20 @@ update_geometry_cache!(geometry_cache, element_cache, kernel, elem_id, mesh)
 update_material_cache!(material_cache, geometry_cache, material, element_cache, state_old, elem_id, Δt)
 
 # Phase 2: Assemble all blocks (no material calls!)
-compute_all_blocks!(K_blocks, geometry_cache, material_cache)
+compute_all_blocks!(K_blocks, geometry_cache.∇N_data, geometry_cache.detJ_w, material_cache.𝔻)
 ```
 """
 function compute_all_blocks!(
     K_blocks::AbstractMatrix{<:Tensor{2,3}},
-    geometry_cache::GeometryCache,
-    material_cache::MaterialStateCache
+    ∇N_data::Matrix{Vec{3,Float64}},
+    detJ_w::Vector{Float64},
+    𝔻::Vector{SymmetricTensor{4,3,Float64,36}}
 )
-    # N is inferred from cache size at runtime
-    N = length(geometry_cache.X)
+    # N is inferred from ∇N_data size at runtime
+    N = size(∇N_data, 2)
 
     @inbounds for k in 1:N, l in 1:N
-        K_blocks[k, l] = compute_block(geometry_cache, material_cache, k, l)
+        compute_block!(K_blocks, ∇N_data, detJ_w, 𝔻, k, l)
     end
 end
 
