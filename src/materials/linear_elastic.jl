@@ -71,6 +71,9 @@ LinearElastic(; E, ν) = LinearElastic(Float64(E), Float64(ν))
 # Trait declaration: LinearElastic has constant tangent modulus
 material_behavior(::LinearElastic) = StatelessConstantTangent()
 
+# State type trait: LinearElastic is stateless (uses EmptyState)
+state_type(::Type{LinearElastic}) = EmptyState
+
 """
     λ(material::LinearElastic) -> Float64
 
@@ -154,7 +157,7 @@ function compute_stress(
     σ = λ_val * tr(ε) * I + 2μ_val * ε
 
     # Tangent modulus: 𝔻 = λ·I⊗I + 2μ·𝕀ˢʸᵐ
-    𝕀ˢʸᵐ = one(SymmetricTensor{4,3,T})  # Symmetric 4th order identity
+    𝕀ˢʸᵐ = one(SymmetricTensor{4,3,T,36})  # Symmetric 4th order identity
     𝔻 = λ_val * (I ⊗ I) + 2μ_val * 𝕀ˢʸᵐ
 
     return σ, 𝔻, nothing  # No state change (stateless material)
@@ -220,19 +223,19 @@ The tensor has minor and major symmetries: C_{ijkl} = C_{jikl} = C_{ijlk} = C_{k
     # Build full 81-component tensor first
     exprs = []
     for i in 1:3, j in 1:3, k in 1:3, l in 1:3
-        if δ(i,j) != 0.0 && δ(k,l) != 0.0
+        if δ(i, j) != 0.0 && δ(k, l) != 0.0
             # Has λ term
-            if δ(i,k) != 0.0 && δ(j,l) != 0.0
+            if δ(i, k) != 0.0 && δ(j, l) != 0.0
                 # λ + 2μ (diagonal component)
-                push!(exprs, :(λ_val + 2*μ_val))
+                push!(exprs, :(λ_val + 2 * μ_val))
             else
                 # λ only (off-diagonal coupling)
                 push!(exprs, :(λ_val))
             end
-        elseif δ(i,k) != 0.0 && δ(j,l) != 0.0 && i != j
+        elseif δ(i, k) != 0.0 && δ(j, l) != 0.0 && i != j
             # μ (shear component)
             push!(exprs, :(μ_val))
-        elseif δ(i,l) != 0.0 && δ(j,k) != 0.0 && i != j
+        elseif δ(i, l) != 0.0 && δ(j, k) != 0.0 && i != j
             # μ (shear component, swapped indices)
             push!(exprs, :(μ_val))
         else
@@ -245,7 +248,7 @@ The tensor has minor and major symmetries: C_{ijkl} = C_{jikl} = C_{ijlk} = C_{k
         λ_val = λ(material)
         μ_val = μ(material)
         # Create as Tensor{4,3} then convert - Tensors.jl handles the symmetry extraction
-        C_full = Tensor{4,3,Float64}(($(exprs...),))
-        SymmetricTensor{4,3}(C_full)
+        C_full = Tensor{4,3,Float64,81}(($(exprs...),))
+        SymmetricTensor{4,3,Float64,36}(C_full)
     end
 end
