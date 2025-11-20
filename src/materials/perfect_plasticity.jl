@@ -92,25 +92,25 @@ using LinearAlgebra
 include("abstract_material.jl")
 
 """
-    PlasticityState
+    PlasticityState <: AbstractMaterialState
 
 State variables for perfect plasticity model.
 
 # Fields
-- `ε_p::SymmetricTensor{2,3,Float64}` - Plastic strain tensor
-- `α::SymmetricTensor{2,3,Float64}` - Backstress (kinematic hardening)
+- `ε_p::SymmetricTensor{2,3,Float64,6}` - Plastic strain tensor
+- `α::SymmetricTensor{2,3,Float64,6}` - Backstress (kinematic hardening)
 - `κ::Float64` - Equivalent plastic strain (scalar)
 
 # Notes
 Immutable for thread safety. Updates create new state.
 """
-struct PlasticityState
-    ε_p::SymmetricTensor{2,3,Float64}  # Plastic strain
-    α::SymmetricTensor{2,3,Float64}    # Backstress
-    κ::Float64                          # Equivalent plastic strain
+struct PlasticityState <: AbstractMaterialState
+    ε_p::SymmetricTensor{2,3,Float64,6}  # Plastic strain
+    α::SymmetricTensor{2,3,Float64,6}    # Backstress
+    κ::Float64                            # Equivalent plastic strain
 
-    function PlasticityState(ε_p::SymmetricTensor{2,3,Float64},
-        α::SymmetricTensor{2,3,Float64},
+    function PlasticityState(ε_p::SymmetricTensor{2,3,Float64,6},
+        α::SymmetricTensor{2,3,Float64,6},
         κ::Float64)
         κ ≥ 0.0 || throw(ArgumentError("Equivalent plastic strain must be non-negative, got κ = $κ"))
         new(ε_p, α, κ)
@@ -125,6 +125,9 @@ Initialize state with zero plastic strain and backstress.
 PlasticityState() = PlasticityState(zero(SymmetricTensor{2,3}),
     zero(SymmetricTensor{2,3}),
     0.0)
+
+# Zero constructor for Base.zero compatibility
+Base.zero(::Type{PlasticityState}) = PlasticityState()
 
 """
     PerfectPlasticity <: AbstractPlasticMaterial
@@ -213,6 +216,9 @@ PerfectPlasticity(; E::Real, ν::Real, σ_y::Real, H::Real) =
 
 # Trait declaration: PerfectPlasticity has strain-dependent tangent and state
 material_behavior(::PerfectPlasticity) = StatefulStrainDependent()
+
+# State type trait: PerfectPlasticity uses PlasticityState
+state_type(::Type{PerfectPlasticity}) = PlasticityState
 
 """
     compute_stress(material::PerfectPlasticity, 
