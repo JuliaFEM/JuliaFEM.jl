@@ -1,12 +1,7 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-"""
-    AbstractRefineStrategy
-
-Abstract base type for mesh refinement strategies.
-"""
-abstract type AbstractRefineStrategy end
+# Note: AbstractRefineStrategy is defined in mesh/api.jl
 
 """
     LongestEdgeBisection <: AbstractRefineStrategy
