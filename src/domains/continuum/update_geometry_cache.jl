@@ -71,7 +71,7 @@ function update_geometry_cache!(
 
     @inbounds for ip_idx in 1:nips
         ip = ips[ip_idx]
-        ξ = Vec{3}(ip.ξ)
+        ξ = ip.ξ
 
         # Reference gradients
         dN_dξ = get_basis_derivatives(element_cache.topology, element_cache.basis, ξ)
