@@ -120,7 +120,7 @@ function create_element_cache(mesh::AbstractMesh, kernel::AbstractKernel)
 
     # Pre-compute topology, basis, and integration points
     topology = TopologyType()
-    basis = Lagrange{TopologyType,1}()
+    basis = Lagrange{1}()  # New API: basis order only (topology passed separately)
     integration_scheme = default_integration(TopologyType)
     ips = integration_points(integration_scheme, topology)
 
