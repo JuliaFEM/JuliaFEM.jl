@@ -20,7 +20,7 @@
 # Generator:
 #   src/basis/lagrange_generator.jl (symbolic engine)
 #
-# Generated: 2025-11-13 02:42:16
+# Generated: 2025-11-20 18:14:22
 # ============================================================================
 
 # This file generates methods for Lagrange{T,P} where:
@@ -170,29 +170,29 @@
         end
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Lagrange{Quadrilateral, 2}: 8-node serendipity quadrilateral element
+# Serendipity{Quadrilateral, 2}: 8-node serendipity quadrilateral element
 # (Old name: Quad8, 8 nodes)
 # ──────────────────────────────────────────────────────────────────────────────
 
-    function get_reference_element_coordinates(::Type{Lagrange{Quadrilateral, 2}})
+    function get_reference_element_coordinates(::Type{Serendipity{Quadrilateral, 2}})
                         return (Vec{2, Float64}(tuple(-1.0, -1.0)), Vec{2, Float64}(tuple(1.0, -1.0)), Vec{2, Float64}(tuple(1.0, 1.0)), Vec{2, Float64}(tuple(-1.0, 1.0)), Vec{2, Float64}(tuple(0.0, -1.0)), Vec{2, Float64}(tuple(1.0, 0.0)), Vec{2, Float64}(tuple(0.0, 1.0)), Vec{2, Float64}(tuple(-1.0, 0.0)))
     end
-        function get_reference_element_coordinates(::Lagrange{Quadrilateral, 2})
+        function get_reference_element_coordinates(::Serendipity{Quadrilateral, 2})
                         return (Vec{2, Float64}(tuple(-1.0, -1.0)), Vec{2, Float64}(tuple(1.0, -1.0)), Vec{2, Float64}(tuple(1.0, 1.0)), Vec{2, Float64}(tuple(-1.0, 1.0)), Vec{2, Float64}(tuple(0.0, -1.0)), Vec{2, Float64}(tuple(1.0, 0.0)), Vec{2, Float64}(tuple(0.0, 1.0)), Vec{2, Float64}(tuple(-1.0, 0.0)))
     end
-         @inline function get_basis_functions(::Type{Quadrilateral}, ::Type{Lagrange{Quadrilateral, 2}}, xi::Vec)
+         @inline function get_basis_functions(::Type{Quadrilateral}, ::Type{Serendipity{Quadrilateral, 2}}, xi::Vec)
                                     (u, v) = xi
                          @inbounds return (-0.25 + 0.25 * u ^ 2 + 0.25 * (u * v) + 0.25 * v ^ 2 + -0.25 * (u ^ 2 * v) + -0.25 * (u * v ^ 2), -0.25 + 0.25 * u ^ 2 + -0.25 * (u * v) + 0.25 * v ^ 2 + -0.25 * (u ^ 2 * v) + 0.25 * (u * v ^ 2), -0.25 + 0.25 * u ^ 2 + 0.25 * (u * v) + 0.25 * v ^ 2 + 0.25 * (u ^ 2 * v) + 0.25 * (u * v ^ 2), -0.25 + 0.25 * u ^ 2 + -0.25 * (u * v) + 0.25 * v ^ 2 + 0.25 * (u ^ 2 * v) + -0.25 * (u * v ^ 2), 0.5 + -0.5v + -0.5 * u ^ 2 + 0.5 * (u ^ 2 * v), 0.5 + 0.5u + -0.5 * v ^ 2 + -0.5 * (u * v ^ 2), 0.5 + 0.5v + -0.5 * u ^ 2 + -0.5 * (u ^ 2 * v), 0.5 + -0.5u + -0.5 * v ^ 2 + 0.5 * (u * v ^ 2))
         end
-         @inline function get_basis_functions(::Quadrilateral, ::Lagrange{Quadrilateral, 2}, xi::Vec)
+         @inline function get_basis_functions(::Quadrilateral, ::Serendipity{Quadrilateral, 2}, xi::Vec)
                                     (u, v) = xi
                          @inbounds return (-0.25 + 0.25 * u ^ 2 + 0.25 * (u * v) + 0.25 * v ^ 2 + -0.25 * (u ^ 2 * v) + -0.25 * (u * v ^ 2), -0.25 + 0.25 * u ^ 2 + -0.25 * (u * v) + 0.25 * v ^ 2 + -0.25 * (u ^ 2 * v) + 0.25 * (u * v ^ 2), -0.25 + 0.25 * u ^ 2 + 0.25 * (u * v) + 0.25 * v ^ 2 + 0.25 * (u ^ 2 * v) + 0.25 * (u * v ^ 2), -0.25 + 0.25 * u ^ 2 + -0.25 * (u * v) + 0.25 * v ^ 2 + 0.25 * (u ^ 2 * v) + -0.25 * (u * v ^ 2), 0.5 + -0.5v + -0.5 * u ^ 2 + 0.5 * (u ^ 2 * v), 0.5 + 0.5u + -0.5 * v ^ 2 + -0.5 * (u * v ^ 2), 0.5 + 0.5v + -0.5 * u ^ 2 + -0.5 * (u ^ 2 * v), 0.5 + -0.5u + -0.5 * v ^ 2 + 0.5 * (u * v ^ 2))
         end
-         @inline function get_basis_derivatives(::Type{Quadrilateral}, ::Type{Lagrange{Quadrilateral, 2}}, xi::Vec)
+         @inline function get_basis_derivatives(::Type{Quadrilateral}, ::Type{Serendipity{Quadrilateral, 2}}, xi::Vec)
                                     (u, v) = xi
                          @inbounds return (Vec(float.(tuple(0.25 * (2 * u ^ (2 - 1)) + 0.25v + -0.25 * ((2 * u ^ (2 - 1)) * v) + -0.25 * v ^ 2, 0.25u + 0.25 * (2 * v ^ (2 - 1)) + -0.25 * u ^ 2 + -0.25 * (u * (2 * v ^ (2 - 1)))))), Vec(float.(tuple(0.25 * (2 * u ^ (2 - 1)) + -0.25v + -0.25 * ((2 * u ^ (2 - 1)) * v) + 0.25 * v ^ 2, -0.25u + 0.25 * (2 * v ^ (2 - 1)) + -0.25 * u ^ 2 + 0.25 * (u * (2 * v ^ (2 - 1)))))), Vec(float.(tuple(0.25 * (2 * u ^ (2 - 1)) + 0.25v + 0.25 * ((2 * u ^ (2 - 1)) * v) + 0.25 * v ^ 2, 0.25u + 0.25 * (2 * v ^ (2 - 1)) + 0.25 * u ^ 2 + 0.25 * (u * (2 * v ^ (2 - 1)))))), Vec(float.(tuple(0.25 * (2 * u ^ (2 - 1)) + -0.25v + 0.25 * ((2 * u ^ (2 - 1)) * v) + -0.25 * v ^ 2, -0.25u + 0.25 * (2 * v ^ (2 - 1)) + 0.25 * u ^ 2 + -0.25 * (u * (2 * v ^ (2 - 1)))))), Vec(float.(tuple(-0.5 * (2 * u ^ (2 - 1)) + 0.5 * ((2 * u ^ (2 - 1)) * v), -0.5 + 0.5 * u ^ 2))), Vec(float.(tuple(0.5 + -0.5 * v ^ 2, -0.5 * (2 * v ^ (2 - 1)) + -0.5 * (u * (2 * v ^ (2 - 1)))))), Vec(float.(tuple(-0.5 * (2 * u ^ (2 - 1)) + -0.5 * ((2 * u ^ (2 - 1)) * v), 0.5 + -0.5 * u ^ 2))), Vec(float.(tuple(-0.5 + 0.5 * v ^ 2, -0.5 * (2 * v ^ (2 - 1)) + 0.5 * (u * (2 * v ^ (2 - 1)))))))
         end
-         @inline function get_basis_derivatives(::Quadrilateral, ::Lagrange{Quadrilateral, 2}, xi::Vec)
+         @inline function get_basis_derivatives(::Quadrilateral, ::Serendipity{Quadrilateral, 2}, xi::Vec)
                                     (u, v) = xi
                          @inbounds return (Vec(float.(tuple(0.25 * (2 * u ^ (2 - 1)) + 0.25v + -0.25 * ((2 * u ^ (2 - 1)) * v) + -0.25 * v ^ 2, 0.25u + 0.25 * (2 * v ^ (2 - 1)) + -0.25 * u ^ 2 + -0.25 * (u * (2 * v ^ (2 - 1)))))), Vec(float.(tuple(0.25 * (2 * u ^ (2 - 1)) + -0.25v + -0.25 * ((2 * u ^ (2 - 1)) * v) + 0.25 * v ^ 2, -0.25u + 0.25 * (2 * v ^ (2 - 1)) + -0.25 * u ^ 2 + 0.25 * (u * (2 * v ^ (2 - 1)))))), Vec(float.(tuple(0.25 * (2 * u ^ (2 - 1)) + 0.25v + 0.25 * ((2 * u ^ (2 - 1)) * v) + 0.25 * v ^ 2, 0.25u + 0.25 * (2 * v ^ (2 - 1)) + 0.25 * u ^ 2 + 0.25 * (u * (2 * v ^ (2 - 1)))))), Vec(float.(tuple(0.25 * (2 * u ^ (2 - 1)) + -0.25v + 0.25 * ((2 * u ^ (2 - 1)) * v) + -0.25 * v ^ 2, -0.25u + 0.25 * (2 * v ^ (2 - 1)) + 0.25 * u ^ 2 + -0.25 * (u * (2 * v ^ (2 - 1)))))), Vec(float.(tuple(-0.5 * (2 * u ^ (2 - 1)) + 0.5 * ((2 * u ^ (2 - 1)) * v), -0.5 + 0.5 * u ^ 2))), Vec(float.(tuple(0.5 + -0.5 * v ^ 2, -0.5 * (2 * v ^ (2 - 1)) + -0.5 * (u * (2 * v ^ (2 - 1)))))), Vec(float.(tuple(-0.5 * (2 * u ^ (2 - 1)) + -0.5 * ((2 * u ^ (2 - 1)) * v), 0.5 + -0.5 * u ^ 2))), Vec(float.(tuple(-0.5 + 0.5 * v ^ 2, -0.5 * (2 * v ^ (2 - 1)) + 0.5 * (u * (2 * v ^ (2 - 1)))))))
         end
