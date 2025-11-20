@@ -126,9 +126,38 @@ end
 struct CSCAssembler <: ElementBasedAssembler end
 
 """
+    NodeBasedCOOAssembler <: NodalBasedAssembler
+
+Node-by-node assembly using COO format with block integration.
+
+**Strategy**: Loop over nodes, compute 3×3 stiffness blocks for touching elements,
+scatter to COO triplets. Uses `PreparedElement` and `compute_block!` from
+continuum kernel for efficient block-based integration.
+
+**Performance**: 
+- CPU single-thread: ~1.5-2× slower than element-based (more kernel calls)
+- CPU multi-thread: ~1.5-2× faster (better parallelization)
+- GPU: ~10-50× faster (massive parallelism, no atomics)
+
+**Best for**: GPU acceleration, contact mechanics, matrix-free methods.
+
+**Status**: ✅ Implemented
+
+# Usage
+
+```julia
+assembler = NodeBasedCOOAssembler()
+cache = create_cache(assembler, mesh, kernel)
+assemble!(cache, assembler, kernel, mesh)  # Nodal traversal!
+K, f = extract_system(cache)
+```
+"""
+struct NodeBasedCOOAssembler <: NodalBasedAssembler end
+
+"""
     NodalAssembler <: NodalBasedAssembler
 
-Node-by-node assembly using inverse connectivity (node-to-elements map).
+Generic node-by-node assembly (future: CSC, GPU variants).
 
 **Strategy**: For each node, gather contributions from all touching elements.
 Natural for GPU parallelization (one thread per node).
@@ -137,7 +166,7 @@ Natural for GPU parallelization (one thread per node).
 
 **Best for**: GPU acceleration, very large problems.
 
-**Status**: Planned for future implementation.
+**Status**: Placeholder for future GPU-optimized implementations.
 
 # Usage
 
@@ -169,119 +198,41 @@ See `src/assemblers/kernel_interface.jl` for detailed interface specification.
 """
 abstract type AbstractKernel end
 
-# Cache types for element/node-level workspace
+# ============================================================================
+# ELEMENT-LEVEL CACHE ABSTRACTIONS
+# ============================================================================
 
 """
-    ElementCache
+    AbstractGeometryCache
 
-Workspace for element-level computations.
+Abstract base type for geometry caches.
 
-Contains pre-allocated arrays for:
-- Local stiffness matrix `Ke` [ndofs_elem × ndofs_elem]
-- Local force vector `fe` [ndofs_elem]
-- Node coordinates `coords` [nnodes_elem × ndim]
-- Node coordinates as Vec{3} `X_buffer` [nnodes_elem]
-- Blocked stiffness matrix `K_blocks` [nnodes_elem × nnodes_elem of Tensor{2,3}]
-- Displacement buffer `u_buffer` [ndofs_elem]
-- Global DOF indices `dofs` [ndofs_elem]
-- Pre-computed topology, basis, integration points (zero allocations!)
+All geometry cache implementations must:
+- Store node coordinates, shape function gradients, and integration weights
+- Support indexing: `cache.X[i]`, `cache.∇N_data[q, k]`, `cache.detJ_w[q]`
 
-Zero allocations during assembly - all arrays and objects reused.
+Concrete implementations:
+- `GeometryCache`: Mutable, Vector-based (convenient for updates)
+- `ImmutableGeometryCache{N,NIP}`: Immutable, NTuple-based (zero allocations, still parametric)
+
+Note: Type parameters removed from GeometryCache to avoid 80 bytes allocation in hot loops.
+Sizes (N, NIP) can be inferred from field dimensions at runtime.
 """
-struct ElementCache{T<:AbstractTopology,B<:AbstractBasis,IPS}
-    Ke::Matrix{Float64}       # Local stiffness matrix
-    fe::Vector{Float64}       # Local force vector
-    coords::Matrix{Float64}   # Element node coordinates (raw)
-    X_buffer::Vector{Vec{3,Float64}}  # Element node coordinates (as Vec{3})
-    K_blocks::Matrix{Tensor{2,3,Float64,9}}  # Blocked stiffness matrix
-    u_buffer::Vector{Float64}  # Element displacement DOFs
-    dofs::Vector{Int}         # Global DOF indices
-    topology::T               # Pre-computed topology instance
-    basis::B                  # Pre-computed basis instance
-    ips::IPS                  # Pre-computed integration points (now typed!)
-end
+abstract type AbstractGeometryCache end
 
 """
-    NodeCache
+    AbstractMaterialStateCache{M<:AbstractMaterialState}
 
-Workspace for node-level computations (nodal assembly).
+Abstract base type for material state caches.
 
-Contains pre-allocated arrays for:
-- Node DOF contributions
-- Element indices touching this node
-- Local-to-global mapping buffers
+All material cache implementations must:
+- Store stress σ, tangent 𝔻, and internal state at all integration points
+- Support indexing: `cache.σ[q]`, `cache.𝔻[q]`, `cache.states[q]`
 
-Used by `NodalAssembler`.
+Concrete implementations:
+- `MaterialStateCache{M}`: Mutable, Vector-based (convenient for updates)
+- `ImmutableMaterialStateCache{M,NIP}`: Immutable, NTuple-based (zero allocations)
+
+Type parameter M must be a subtype of AbstractMaterialState.
 """
-struct NodeCache
-    node_dofs::Vector{Int}           # Global DOF indices for this node
-    touching_elements::Vector{Int}   # Elements touching this node
-    local_indices::Vector{Int}       # Local node indices in elements
-end
-
-"""
-    create_element_cache(mesh::AbstractMesh, kernel::AbstractKernel) -> ElementCache
-
-Create pre-allocated workspace for element assembly.
-
-# Arguments
-- `mesh`: Finite element mesh
-- `kernel`: Domain kernel defining DOF structure
-
-# Returns
-- `ElementCache` with arrays sized for largest element in mesh
-"""
-function create_element_cache(mesh::AbstractMesh, kernel::AbstractKernel)
-    # Get maximum element size from Mesh{N,T} type parameters
-    MeshType = typeof(mesh)
-    max_nnodes_elem = MeshType.parameters[1]::Int
-    TopologyType = MeshType.parameters[2]  # T from Mesh{N,T}
-    ndofs_per_node = dofs_per_node(kernel)
-    max_ndofs_elem = max_nnodes_elem * ndofs_per_node
-    ndim = dim(TopologyType())
-
-    # Pre-compute topology, basis, and integration points (zero allocations in loop!)
-    topology = TopologyType()
-    basis = Lagrange{TopologyType,1}()
-    integration_scheme = default_integration(TopologyType)
-    ips = integration_points(integration_scheme, topology)
-
-    return ElementCache(
-        zeros(max_ndofs_elem, max_ndofs_elem),  # Ke
-        zeros(max_ndofs_elem),                   # fe
-        zeros(max_nnodes_elem, ndim),            # coords
-        [zero(Vec{3,Float64}) for _ in 1:max_nnodes_elem],  # X_buffer
-        Matrix{Tensor{2,3,Float64,9}}(undef, max_nnodes_elem, max_nnodes_elem),  # K_blocks
-        zeros(max_ndofs_elem),                   # u_buffer
-        zeros(Int, max_ndofs_elem),              # dofs
-        topology,                                # Pre-computed topology
-        basis,                                   # Pre-computed basis
-        ips                                      # Pre-computed integration points
-    )
-end
-
-"""
-    create_node_cache(mesh::AbstractMesh, kernel::AbstractKernel) -> NodeCache
-
-Create pre-allocated workspace for nodal assembly.
-
-# Arguments
-- `mesh`: Finite element mesh
-- `kernel`: Domain kernel defining DOF structure
-
-# Returns
-- `NodeCache` with arrays sized for node with most touching elements
-"""
-function create_node_cache(mesh::AbstractMesh, kernel::AbstractKernel)
-    # Get maximum number of elements touching any node
-    node_to_elements = NodeToElementsMap(mesh)
-    max_touching = maximum(length(get_node_spider(node_to_elements, i))
-                          for i in 1:nnodes_total(mesh))
-    ndofs_per_node = dofs_per_node(kernel)
-
-    return NodeCache(
-        zeros(Int, ndofs_per_node),      # node_dofs
-        zeros(Int, max_touching),        # touching_elements
-        zeros(Int, max_touching)         # local_indices
-    )
-end
+abstract type AbstractMaterialStateCache{M<:AbstractMaterialState} end
