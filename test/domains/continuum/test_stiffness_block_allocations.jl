@@ -191,7 +191,7 @@ using JuliaFEM: default_integration, integration_points, compute_element_stiffne
         for k in 1:N, l in 1:N
             K_kl = zero(Tensor{2,3,Float64})
             for ip in ips
-                ξ = Vec{3}(ip.ξ)
+                ξ = ip.ξ
                 w = ip.weight
                 dN_dξ = get_basis_derivatives(topology, basis, ξ)
                 J = X[1] ⊗ dN_dξ[1]
@@ -222,7 +222,7 @@ using JuliaFEM: default_integration, integration_points, compute_element_stiffne
             for k in 1:N, l in 1:N
                 K_kl = zero(Tensor{2,3,Float64})
                 for ip in ips
-                    ξ = Vec{3}(ip.ξ)
+                    ξ = ip.ξ
                     w = ip.weight
                     dN_dξ = get_basis_derivatives(topology, basis, ξ)
                     J = X[1] ⊗ dN_dξ[1]
