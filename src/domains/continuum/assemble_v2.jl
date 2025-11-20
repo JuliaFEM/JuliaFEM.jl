@@ -496,7 +496,7 @@ function compute_element_stiffness!(
 
     for k in 1:N, l in 1:N
         for ip in ips
-            ξ = Vec{3}(ip.ξ)
+            ξ = ip.ξ
             w = ip.weight
 
             dN_dξ = get_basis_derivatives(topology, basis, ξ)
