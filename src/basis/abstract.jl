@@ -85,7 +85,7 @@ N = get_basis_functions(Triangle(), Lagrange{1}(), xi)
 
 See: [`get_basis_functions`](@ref)
 """
-function eval_basis! end
+# Note: eval_basis! stub is defined in basis_api.jl
 
 """
     eval_dbasis!(B::Type{<:AbstractBasis}, xi::Vec) -> NTuple{N, Vec{D}}
@@ -107,7 +107,7 @@ dN = get_basis_derivatives(Triangle(), Lagrange{1}(), xi)
 
 See: [`get_basis_derivatives`](@ref)
 """
-function eval_dbasis! end
+# Note: eval_dbasis! stub is defined in basis_api.jl
 
 # ============================================================================
 # NEW API (Recommended)
@@ -136,7 +136,7 @@ N = get_basis_functions(topology, basis, xi)
 
 See also: [`get_basis_derivatives`](@ref)
 """
-function get_basis_functions end
+# Note: get_basis_functions stub is defined in basis_api.jl
 
 """
     get_basis_derivatives(topology, basis, xi) -> NTuple{N, Vec{D, Float64}}
@@ -159,7 +159,7 @@ dN = get_basis_derivatives(topology, basis, xi)
 
 See also: [`get_basis_functions`](@ref)
 """
-function get_basis_derivatives end
+# Note: get_basis_derivatives stub is defined in basis_api.jl
 
 # ============================================================================
 # Parametric Lagrange Basis Type (OLD - with topology parameter)
@@ -227,10 +227,34 @@ See also: [`AbstractBasis`](@ref), [`Serendipity`](@ref), [`Nedelec`](@ref)
 """
 struct Lagrange{T<:AbstractTopology,P} <: AbstractBasis end
 
+"""
+    Serendipity{T<:AbstractTopology, P} <: AbstractBasis
+
+Serendipity basis family for quadrilateral and hexahedral elements.
+
+Serendipity elements use a reduced set of nodes compared to full tensor-product Lagrange
+elements by omitting interior nodes while maintaining the polynomial order on element edges.
+
+# Common examples:
+- `Serendipity{Quadrilateral, 2}`: 8-node quadrilateral (no center node)
+- `Serendipity{Hexahedron, 2}`: 20-node hexahedron (no interior nodes)
+
+# Comparison with Lagrange:
+- Quad8 (Serendipity): 8 nodes (4 corners + 4 edge midpoints, no center)
+- Quad9 (Lagrange): 9 nodes (4 corners + 4 edge midpoints + center)
+
+See also: [`AbstractBasis`](@ref), [`Lagrange`](@ref)
+"""
+struct Serendipity{T<:AbstractTopology,P} <: AbstractBasis end
+
 # Define interface methods for Lagrange
 # Dimension comes from topology
 Base.ndims(::Type{Lagrange{T,P}}) where {T,P} = dim(T())
 Base.ndims(::Lagrange{T,P}) where {T,P} = dim(T())
+
+# Define interface methods for Serendipity
+Base.ndims(::Type{Serendipity{T,P}}) where {T,P} = dim(T())
+Base.ndims(::Serendipity{T,P}) where {T,P} = dim(T())
 
 # Node count formulas for different topologies and polynomial degrees
 # These replace the hardcoded node counts in old Tri3, Quad4, etc. types
@@ -274,6 +298,26 @@ nnodes(::Type{Lagrange{Pyramid,3}}) = 29
 # 3D: Wedge/Prism (triangle × segment tensor product)
 nnodes(::Lagrange{Wedge,P}) where {P} = div((P + 1)^2 * (P + 2), 2)
 nnodes(::Type{Lagrange{Wedge,P}}) where {P} = div((P + 1)^2 * (P + 2), 2)
+
+"""
+    nnodes(::Serendipity{T, P}) where {T, P}
+    nnodes(::Type{Serendipity{T, P}}) where {T, P}
+
+Compute number of nodes for Serendipity basis of degree P on topology T.
+
+Serendipity elements omit interior nodes, using only edge and corner nodes:
+- Quadrilateral P=2: 8 nodes (4 corners + 4 edge midpoints)
+- Hexahedron P=2: 20 nodes (8 corners + 12 edge midpoints)
+"""
+# 2D: Quadrilateral (Serendipity)
+# P=2: 8 nodes (4 corners + 4 edge midpoints, no center)
+nnodes(::Serendipity{Quadrilateral,2}) = 8
+nnodes(::Type{Serendipity{Quadrilateral,2}}) = 8
+
+# 3D: Hexahedron (Serendipity)
+# P=2: 20 nodes (8 corners + 12 edge midpoints, no face/interior nodes)
+nnodes(::Serendipity{Hexahedron,2}) = 20
+nnodes(::Type{Serendipity{Hexahedron,2}}) = 20
 
 # Also need nnodes for the higher-order topology types themselves (Tet10, Tri6, etc.)
 # These forward to the topology's nnodes() method
