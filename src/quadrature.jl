@@ -3,15 +3,18 @@
 #
 # Gaussian-Legendre quadrature rules consolidated from FEMQuad.jl
 
+# Core API types and abstract interfaces
+include("quadrature/api.jl")
+
 # Quadrature data
 include("quadrature/quaddata.jl")
 
-# Element-specific quadrature rules
-include("quadrature/glquad.jl")  # 2D quadrilaterals
-include("quadrature/gltri.jl")   # 2D triangles
-include("quadrature/gltet.jl")   # 3D tetrahedrons
-include("quadrature/glwed.jl")   # 3D wedges
-include("quadrature/glpyr.jl")   # 3D pyramids
+# Gauss-Legendre quadrature rules by element topology
+include("quadrature/gl_tensor_product.jl")  # Segments, quadrilaterals, hexahedra (tensor products)
+include("quadrature/gl_triangles.jl")       # 2D triangular elements
+include("quadrature/gl_tetrahedra.jl")      # 3D tetrahedral elements
+include("quadrature/gl_wedges.jl")          # 3D wedge/prism elements
+include("quadrature/gl_pyramids.jl")        # 3D pyramid elements
 
 """
     get_rule(order::Int, rules::Symbol...)
