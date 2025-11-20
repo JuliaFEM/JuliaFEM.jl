@@ -184,9 +184,8 @@ function vandermonde_matrix(p::Expr, X::Vector{<:Vecish{D}}) where D
     return V
 end
 
+# Note: Function stubs (get_reference_element_coordinates, eval_basis!, eval_dbasis!) are defined in basis_api.jl
 function get_reference_element_coordinates end
-function eval_basis! end
-function eval_dbasis! end
 
 function calculate_interpolation_polynomials(p, V)
     basis = []
@@ -222,21 +221,21 @@ function calculate_interpolation_polynomial_derivatives(basis, D)
     return dbasis
 end
 
-function create_basis(topology_type_expr, polynomial_degree::Int, description, X::Vector{<:Vecish{D}}, p::Expr) where D
+function create_basis(topology_type_expr, polynomial_degree::Int, description, X::Vector{<:Vecish{D}}, p::Expr; basis_type=:Lagrange) where D
     @debug "create basis given ansatz polynomial" topology_type_expr polynomial_degree description X p
     V = vandermonde_matrix(p, X)
     basis = calculate_interpolation_polynomials(p, V)
-    return create_basis(topology_type_expr, polynomial_degree, description, X, basis)
+    return create_basis(topology_type_expr, polynomial_degree, description, X, basis; basis_type=basis_type)
 end
 
-function create_basis(topology_type_expr, polynomial_degree::Int, description, X::Vector{<:Vecish{D}}, basis::Vector) where D
+function create_basis(topology_type_expr, polynomial_degree::Int, description, X::Vector{<:Vecish{D}}, basis::Vector; basis_type=:Lagrange) where D
     @assert length(X) == length(basis)
     @debug "create basis given basis functions" topology_type_expr polynomial_degree description X basis
     dbasis = calculate_interpolation_polynomial_derivatives(basis, D)
-    return create_basis(topology_type_expr, polynomial_degree, description, Vec.(X), basis, dbasis)
+    return create_basis(topology_type_expr, polynomial_degree, description, Vec.(X), basis, dbasis; basis_type=basis_type)
 end
 
-function create_basis(topology_type_expr, polynomial_degree::Int, description, X::Vector{<:Vecish{D,T}}, basis, dbasis) where {D,T}
+function create_basis(topology_type_expr, polynomial_degree::Int, description, X::Vector{<:Vecish{D,T}}, basis, dbasis; basis_type=:Lagrange) where {D,T}
     N = length(X)
     @debug "create basis given basis functions and derivatives" topology_type_expr polynomial_degree description X basis dbasis
 
@@ -263,11 +262,11 @@ function create_basis(topology_type_expr, polynomial_degree::Int, description, X
     # Generate code for NEW API only
     code = quote
         # $description
-        function get_reference_element_coordinates(::Type{Lagrange{$topology_type_expr,$polynomial_degree}})
+        function get_reference_element_coordinates(::Type{$basis_type{$topology_type_expr,$polynomial_degree}})
             return $coord_tuple
         end
 
-        function get_reference_element_coordinates(::Lagrange{$topology_type_expr,$polynomial_degree})
+        function get_reference_element_coordinates(::$basis_type{$topology_type_expr,$polynomial_degree})
             return $coord_tuple
         end
 
@@ -276,23 +275,23 @@ function create_basis(topology_type_expr, polynomial_degree::Int, description, X
         # See: docs/book/adr-003-basis-function-api.md
         # ──────────────────────────────────────────────────────────────────────
 
-        @inline function get_basis_functions(::Type{$topology_type_expr}, ::Type{Lagrange{$topology_type_expr,$polynomial_degree}}, xi::Vec)
+        @inline function get_basis_functions(::Type{$topology_type_expr}, ::Type{$basis_type{$topology_type_expr,$polynomial_degree}}, xi::Vec)
             $unpack
             @inbounds return $basis_tuple
         end
 
-        @inline function get_basis_functions(::$topology_type_expr, ::Lagrange{$topology_type_expr,$polynomial_degree}, xi::Vec)
+        @inline function get_basis_functions(::$topology_type_expr, ::$basis_type{$topology_type_expr,$polynomial_degree}, xi::Vec)
             $unpack
             @inbounds return $basis_tuple
         end
 
         # Basis function derivatives (gradients) at a point in reference element
-        @inline function get_basis_derivatives(::Type{$topology_type_expr}, ::Type{Lagrange{$topology_type_expr,$polynomial_degree}}, xi::Vec)
+        @inline function get_basis_derivatives(::Type{$topology_type_expr}, ::Type{$basis_type{$topology_type_expr,$polynomial_degree}}, xi::Vec)
             $unpack
             @inbounds return $dbasis_tuple
         end
 
-        @inline function get_basis_derivatives(::$topology_type_expr, ::Lagrange{$topology_type_expr,$polynomial_degree}, xi::Vec)
+        @inline function get_basis_derivatives(::$topology_type_expr, ::$basis_type{$topology_type_expr,$polynomial_degree}, xi::Vec)
             $unpack
             @inbounds return $dbasis_tuple
         end
@@ -302,16 +301,17 @@ end
 
 create_basis_and_eval(args...) = eval(create_basis(args...))
 
-# Mapping from old element names to (topology_type_template, num_nodes, polynomial_degree)
+# Mapping from old element names to (topology_type_template OR basis_type, num_nodes, polynomial_degree)
 # topology_type_template is either a Symbol (for non-parametric types) or a function that takes N
+# For serendipity elements, use tuple (:Serendipity, :topology_symbol) instead
 const ELEMENT_TO_LAGRANGE = Dict{String,Tuple{Any,Int,Int}}(
     "Seg2" => (:Segment, 2, 1),
     "Seg3" => (:Segment, 3, 2),
     "Tri3" => (:Triangle, 3, 1),
     "Tri6" => (:Triangle, 6, 2),
     "Quad4" => (:Quadrilateral, 4, 1),
-    "Quad8" => (:Quadrilateral, 8, 2),
-    "Quad9" => (:Quadrilateral, 9, 2),
+    "Quad8" => ((:Serendipity, :Quadrilateral), 8, 2),  # Serendipity (8-node, no center)
+    "Quad9" => (:Quadrilateral, 9, 2),  # Full Lagrange (9-node, with center)
     "Tet4" => (N -> :(Tetrahedron{$N}), 4, 1),
     "Tet10" => (N -> :(Tetrahedron{$N}), 10, 2),
     "Hex8" => (N -> :(Hexahedron{$N}), 8, 1),
@@ -804,12 +804,22 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
             topology_type_template, num_nodes, poly_degree = ELEMENT_TO_LAGRANGE[elem.name]
 
-            # Generate the topology type expression
-            # For parametric types like Hexahedron{N}, call the function with num_nodes
-            # For simple types like Triangle, use the symbol directly
-            topology_type_expr = if isa(topology_type_template, Function)
+            # Generate the topology type expression and basis type name
+            # Handle three cases:
+            # 1. Simple symbol (e.g., :Triangle) → Lagrange{Triangle, P}
+            # 2. Function (e.g., N -> Hexahedron{N}) → Lagrange{Hexahedron{N}, P}
+            # 3. Tuple (:Serendipity, :Topology) → Serendipity{Topology, P}
+
+            basis_type_name = :Lagrange  # Default
+            topology_type_expr = if isa(topology_type_template, Tuple) && topology_type_template[1] == :Serendipity
+                # Serendipity element
+                basis_type_name = :Serendipity
+                topology_type_template[2]  # Extract topology symbol
+            elseif isa(topology_type_template, Function)
+                # Parametric topology (e.g., Hexahedron{N})
                 topology_type_template(num_nodes)
             else
+                # Simple topology symbol
                 topology_type_template
             end
 
@@ -829,7 +839,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
                 poly_degree,
                 elem.description,
                 coords,
-                ansatz_expr
+                ansatz_expr;
+                basis_type=basis_type_name
             )
 
             # Convert Expr to readable Julia code string
@@ -845,7 +856,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
             # Write to output with nice formatting
             println(output, "# " * "─"^78)
-            println(output, "# Lagrange{$(topology_type_expr), $(poly_degree)}: $(elem.description)")
+            println(output, "# $(basis_type_name){$(topology_type_expr), $(poly_degree)}: $(elem.description)")
             println(output, "# (Old name: $(elem.name), $num_nodes nodes)")
             println(output, "# " * "─"^78)
             println(output)
