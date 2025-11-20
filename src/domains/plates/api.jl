@@ -179,7 +179,8 @@ physics = Physics(dkt, PlateDisplacement(), mesh, steel)
 assemble!(physics)
 ```
 """
-function assemble! end
+# Note: assemble! function stub is defined in physics/api.jl
+# Plate formulations should implement specific methods for assemble!
 
 # Export types and functions
 export AbstractPlateFormulation, DKTFormulation
