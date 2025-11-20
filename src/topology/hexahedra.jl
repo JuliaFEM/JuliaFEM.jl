@@ -21,11 +21,51 @@ nnodes(::Hexahedron{N}) where {N} = N
 dim(::Hexahedron{N}) where {N} = 3
 
 function reference_coordinates(::Hexahedron{8})
-    return (
-        (-1.0, -1.0, -1.0), (1.0, -1.0, -1.0),
-        (1.0, 1.0, -1.0), (-1.0, 1.0, -1.0),
-        (-1.0, -1.0, 1.0), (1.0, -1.0, 1.0),
-        (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)
+    return SVector(
+        Vec{3,Float64}((-1.0, -1.0, -1.0)), Vec{3,Float64}((1.0, -1.0, -1.0)),
+        Vec{3,Float64}((1.0, 1.0, -1.0)), Vec{3,Float64}((-1.0, 1.0, -1.0)),
+        Vec{3,Float64}((-1.0, -1.0, 1.0)), Vec{3,Float64}((1.0, -1.0, 1.0)),
+        Vec{3,Float64}((1.0, 1.0, 1.0)), Vec{3,Float64}((-1.0, 1.0, 1.0))
+    )
+end
+
+function reference_coordinates(::Hexahedron{20})
+    return SVector(
+        # 8 corner nodes
+        Vec{3,Float64}((-1.0, -1.0, -1.0)), Vec{3,Float64}((1.0, -1.0, -1.0)),
+        Vec{3,Float64}((1.0, 1.0, -1.0)), Vec{3,Float64}((-1.0, 1.0, -1.0)),
+        Vec{3,Float64}((-1.0, -1.0, 1.0)), Vec{3,Float64}((1.0, -1.0, 1.0)),
+        Vec{3,Float64}((1.0, 1.0, 1.0)), Vec{3,Float64}((-1.0, 1.0, 1.0)),
+        # 12 edge midpoint nodes
+        Vec{3,Float64}((0.0, -1.0, -1.0)), Vec{3,Float64}((1.0, 0.0, -1.0)),
+        Vec{3,Float64}((0.0, 1.0, -1.0)), Vec{3,Float64}((-1.0, 0.0, -1.0)),
+        Vec{3,Float64}((0.0, -1.0, 1.0)), Vec{3,Float64}((1.0, 0.0, 1.0)),
+        Vec{3,Float64}((0.0, 1.0, 1.0)), Vec{3,Float64}((-1.0, 0.0, 1.0)),
+        Vec{3,Float64}((-1.0, -1.0, 0.0)), Vec{3,Float64}((1.0, -1.0, 0.0)),
+        Vec{3,Float64}((1.0, 1.0, 0.0)), Vec{3,Float64}((-1.0, 1.0, 0.0))
+    )
+end
+
+function reference_coordinates(::Hexahedron{27})
+    return SVector(
+        # 8 corner nodes
+        Vec{3,Float64}((-1.0, -1.0, -1.0)), Vec{3,Float64}((1.0, -1.0, -1.0)),
+        Vec{3,Float64}((1.0, 1.0, -1.0)), Vec{3,Float64}((-1.0, 1.0, -1.0)),
+        Vec{3,Float64}((-1.0, -1.0, 1.0)), Vec{3,Float64}((1.0, -1.0, 1.0)),
+        Vec{3,Float64}((1.0, 1.0, 1.0)), Vec{3,Float64}((-1.0, 1.0, 1.0)),
+        # 12 edge midpoint nodes
+        Vec{3,Float64}((0.0, -1.0, -1.0)), Vec{3,Float64}((1.0, 0.0, -1.0)),
+        Vec{3,Float64}((0.0, 1.0, -1.0)), Vec{3,Float64}((-1.0, 0.0, -1.0)),
+        Vec{3,Float64}((0.0, -1.0, 1.0)), Vec{3,Float64}((1.0, 0.0, 1.0)),
+        Vec{3,Float64}((0.0, 1.0, 1.0)), Vec{3,Float64}((-1.0, 0.0, 1.0)),
+        Vec{3,Float64}((-1.0, -1.0, 0.0)), Vec{3,Float64}((1.0, -1.0, 0.0)),
+        Vec{3,Float64}((1.0, 1.0, 0.0)), Vec{3,Float64}((-1.0, 1.0, 0.0)),
+        # 6 face center nodes
+        Vec{3,Float64}((0.0, 0.0, -1.0)), Vec{3,Float64}((0.0, 0.0, 1.0)),
+        Vec{3,Float64}((0.0, -1.0, 0.0)), Vec{3,Float64}((0.0, 1.0, 0.0)),
+        Vec{3,Float64}((-1.0, 0.0, 0.0)), Vec{3,Float64}((1.0, 0.0, 0.0)),
+        # 1 volume center node
+        Vec{3,Float64}((0.0, 0.0, 0.0))
     )
 end
 

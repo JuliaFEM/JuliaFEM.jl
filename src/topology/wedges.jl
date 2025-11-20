@@ -19,9 +19,35 @@ nnodes(::Wedge{N}) where {N} = N
 dim(::Wedge{N}) where {N} = 3
 
 function reference_coordinates(::Wedge{6})
-    return (
-        (0.0, 0.0, -1.0), (1.0, 0.0, -1.0), (0.0, 1.0, -1.0),
-        (0.0, 0.0, 1.0), (1.0, 0.0, 1.0), (0.0, 1.0, 1.0)
+    return SVector(
+        Vec{3,Float64}((0.0, 0.0, -1.0)),
+        Vec{3,Float64}((1.0, 0.0, -1.0)),
+        Vec{3,Float64}((0.0, 1.0, -1.0)),
+        Vec{3,Float64}((0.0, 0.0, 1.0)),
+        Vec{3,Float64}((1.0, 0.0, 1.0)),
+        Vec{3,Float64}((0.0, 1.0, 1.0))
+    )
+end
+
+function reference_coordinates(::Wedge{15})
+    return SVector(
+        # 6 corner nodes
+        Vec{3,Float64}((0.0, 0.0, -1.0)),
+        Vec{3,Float64}((1.0, 0.0, -1.0)),
+        Vec{3,Float64}((0.0, 1.0, -1.0)),
+        Vec{3,Float64}((0.0, 0.0, 1.0)),
+        Vec{3,Float64}((1.0, 0.0, 1.0)),
+        Vec{3,Float64}((0.0, 1.0, 1.0)),
+        # 9 edge midpoint nodes
+        Vec{3,Float64}((0.5, 0.0, -1.0)),  # Bottom triangle edges
+        Vec{3,Float64}((0.5, 0.5, -1.0)),
+        Vec{3,Float64}((0.0, 0.5, -1.0)),
+        Vec{3,Float64}((0.5, 0.0, 1.0)),   # Top triangle edges
+        Vec{3,Float64}((0.5, 0.5, 1.0)),
+        Vec{3,Float64}((0.0, 0.5, 1.0)),
+        Vec{3,Float64}((0.0, 0.0, 0.0)),   # Vertical edges
+        Vec{3,Float64}((1.0, 0.0, 0.0)),
+        Vec{3,Float64}((0.0, 1.0, 0.0))
     )
 end
 

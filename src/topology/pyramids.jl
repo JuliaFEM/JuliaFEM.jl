@@ -18,9 +18,12 @@ nnodes(::Pyramid{N}) where {N} = N
 dim(::Pyramid{N}) where {N} = 3
 
 function reference_coordinates(::Pyramid{5})
-    return (
-        (-1.0, -1.0, 0.0), (1.0, -1.0, 0.0), (1.0, 1.0, 0.0), (-1.0, 1.0, 0.0),
-        (0.0, 0.0, 1.0)
+    return SVector(
+        Vec{3,Float64}((-1.0, -1.0, 0.0)),
+        Vec{3,Float64}((1.0, -1.0, 0.0)),
+        Vec{3,Float64}((1.0, 1.0, 0.0)),
+        Vec{3,Float64}((-1.0, 1.0, 0.0)),
+        Vec{3,Float64}((0.0, 0.0, 1.0))
     )
 end
 
