@@ -152,6 +152,38 @@ ndofs = dofs_per_node(kernel)  # Returns 3
 """
 function dofs_per_node end
 
+# Default implementation: delegate to field
+"""
+    dofs_per_node(kernel::AbstractKernel) -> Int
+
+Default implementation: Extract field from kernel and delegate to field's dofs_per_node.
+
+Kernels that store a field should implement `get_field(kernel)` to enable this delegation.
+Otherwise, override this method directly.
+"""
+function dofs_per_node(kernel::AbstractKernel)
+    return dofs_per_node(get_field(kernel))
+end
+
+"""
+    get_field(kernel::AbstractKernel) -> AbstractField
+
+Extract the field from a kernel.
+
+Kernels should implement this to enable automatic DOF mapping delegation.
+Default implementation throws an error.
+
+# Example
+
+```julia
+get_field(kernel::ContinuumKernel) = kernel.field
+```
+"""
+function get_field(kernel::AbstractKernel)
+    error("get_field not implemented for $(typeof(kernel)). " *
+          "Either implement get_field(::$(typeof(kernel))) or override dofs_per_node/get_dof_mapping! directly.")
+end
+
 """
     get_dof_mapping!(
         dofs::AbstractVector{Int},
@@ -221,6 +253,53 @@ end
 """
 function get_dof_mapping! end
 
+# Default implementation: delegate to field-based DOF mapping
+"""
+    get_dof_mapping!(
+        dofs::AbstractVector{Int},
+        kernel::AbstractKernel,
+        element_id::Int,
+        mesh::AbstractMesh
+    ) -> Nothing
+
+Default implementation: Delegate to field-based DOF mapping.
+
+Extracts nodes from mesh, gets field from kernel, and calls field-based
+get_dof_mapping!. Kernels with special DOF patterns can override this.
+
+# Implementation
+
+```julia
+function get_dof_mapping!(dofs, kernel, element_id, mesh)
+    nodes = mesh.connectivity[element_id]
+    field = get_field(kernel)
+    get_dof_mapping!(dofs, field, nodes)
+    return nothing
+end
+```
+"""
+function get_dof_mapping!(
+    dofs::AbstractVector{Int},
+    kernel::AbstractKernel,
+    element_id::Int,
+    mesh::AbstractMesh
+)
+    nodes = mesh.connectivity[element_id]
+    field = get_field(kernel)
+    ndofs_per_node = dofs_per_node(field)
+
+    # Inline DOF mapping to avoid allocation from tuple conversion
+    idx = 1
+    @inbounds for node_id in nodes
+        for component in 1:ndofs_per_node
+            dofs[idx] = ndofs_per_node * (Int(node_id) - 1) + component
+            idx += 1
+        end
+    end
+
+    return nothing
+end
+
 # ============================================================================
 # OPTIONAL INTERFACE (for specialized assemblers)
 # ============================================================================
@@ -259,6 +338,209 @@ function compute_node_contribution! end
 # ============================================================================
 # HELPER FUNCTIONS (for kernel implementations)
 # ============================================================================
+
+"""
+    blocked_tensor_to_matrix_view!(
+        K_e::AbstractMatrix{Float64},
+        K_blocks::AbstractMatrix{Tensor{2,3}}
+    )
+
+Convert N×N matrix of 3×3 tensor blocks to 3N×3N Float64 matrix **in-place**.
+
+Maps block[k,l][α,β] → K_e[3(k-1)+α, 3(l-1)+β]
+
+# Arguments
+- `K_e`: Output element stiffness matrix [3N × 3N] (modified in-place)
+- `K_blocks`: Input blocked tensor matrix [N × N] of Tensor{2,3}
+
+# Zero-Allocation Guarantee
+
+Writes directly to pre-allocated `K_e`. No allocations.
+
+# Usage
+
+This is a common utility used by assemblers after computing stiffness blocks:
+
+```julia
+# Compute all blocks
+for k in 1:N, l in 1:N
+    K_blocks[k, l] = compute_block!(geometry_cache, material_cache, k, l)
+end
+
+# Convert to Float64 matrix
+blocked_tensor_to_matrix_view!(element_cache.Ke, K_blocks)
+```
+"""
+function blocked_tensor_to_matrix_view!(
+    K_e::AbstractMatrix{Float64},
+    K_blocks::AbstractMatrix{<:Tensor{2,3}}
+)
+    Nnodes = size(K_blocks, 1)
+    @inbounds for k in 1:Nnodes, l in 1:Nnodes
+        block = K_blocks[k, l]
+        k_offset = 3(k - 1)
+        l_offset = 3(l - 1)
+        for α in 1:3, β in 1:3
+            K_e[k_offset+α, l_offset+β] = block[α, β]
+        end
+    end
+end
+
+"""
+    compute_block!(
+        geometry_cache::GeometryCache,
+        material_cache::MaterialStateCache,
+        k_local::Int,
+        l_local::Int
+    ) -> Tensor{2,3,Float64,9}
+
+**Phase 2:** Compute stiffness block using **precomputed material state**.
+
+Integrates weak form over element to get stiffness block K[k,l] between
+nodes k and l. Uses precomputed tangent moduli from Phase 1 - **no material calls**!
+
+# Arguments
+- `geometry_cache`: Precomputed element geometry (gradients, detJ*w)
+- `material_cache`: Precomputed material state at all IPs (from Phase 1)
+- `k_local`, `l_local`: Local node indices
+
+# Returns
+Fully integrated 3×3 stiffness block K[k,l]
+
+# Performance
+- **Zero material calls** - all tangents precomputed in Phase 1
+- **Cache-friendly** - state_cache stays hot in L1/L2
+- **GPU-ready** - Pure integration, no branching
+- **Nodal assembly** - Compute state once, use N² times
+- **Zero allocation** - No type parameters to avoid 80 bytes overhead
+
+# Example
+```julia
+# Phase 1: Update caches
+update_geometry_cache!(geometry_cache, element_cache, kernel, elem_id, mesh)
+update_material_cache!(material_cache, geometry_cache, material, element_cache, state_old, elem_id, Δt)
+
+# Phase 2: Assemble all blocks (no material calls!)
+for k in 1:N, l in 1:N
+    K_kl = compute_block!(geometry_cache, material_cache, k, l)
+end
+```
+"""
+function compute_block(
+    geometry_cache::GeometryCache,
+    material_cache::MaterialStateCache,
+    k_local::Int,
+    l_local::Int
+)
+
+    # TODO: instead of using geometry_cache and material_cache here,
+    # pass in pre-extracted arrays to avoid field access overhead.
+    # pass in: D, dNdx, detJ_w and remove caches from arguments.
+
+    K_kl = zero(Tensor{2,3,Float64,9})
+
+    # Get NIP from cache
+    NIP = length(geometry_cache.detJ_w)
+
+    # Integrate using precomputed tangent at each IP
+    @inbounds for q in 1:NIP
+        grad_k = geometry_cache.∇N_data[q, k_local]
+        grad_l = geometry_cache.∇N_data[q, l_local]
+        detJ_w = geometry_cache.detJ_w[q]
+
+        𝔻 = material_cache.𝔻[q]
+
+        K_kl_ip = compute_block_at_point(grad_k, grad_l, 𝔻)
+        K_kl += K_kl_ip * detJ_w
+    end
+
+    return K_kl
+    # return nothing
+end
+
+"""
+    compute_block!(K_blocks, geometry_cache, material_cache, k_local, l_local)
+
+Mutating version that writes directly to K_blocks matrix.
+Avoids return value allocation by writing result in-place.
+
+This version achieves **zero allocations** by avoiding the return value overhead
+that occurs when returning Tensor across module boundaries (80 bytes/call in compute_block).
+"""
+function compute_block!(
+    K_blocks::Matrix{Tensor{2,3,Float64,9}},
+    geometry_cache::GeometryCache,
+    material_cache::MaterialStateCache,
+    k_local::Int,
+    l_local::Int
+)
+
+    # TODO: instead of using geometry_cache and material_cache here,
+    # pass in pre-extracted arrays to avoid field access overhead.
+    # pass in: D, dNdx, detJ_w and remove caches from arguments.
+
+    K_kl = zero(Tensor{2,3,Float64,9})
+
+    # Get NIP from cache
+    NIP = length(geometry_cache.detJ_w)
+
+    # Integrate using precomputed tangent at each IP
+    @inbounds for q in 1:NIP
+        grad_k = geometry_cache.∇N_data[q, k_local]
+        grad_l = geometry_cache.∇N_data[q, l_local]
+        detJ_w = geometry_cache.detJ_w[q]
+
+        𝔻 = material_cache.𝔻[q]
+
+        K_kl_ip = compute_block_at_point(grad_k, grad_l, 𝔻)
+        K_kl += K_kl_ip * detJ_w
+    end
+
+    # Write directly to matrix - avoids return value allocation
+    K_blocks[k_local, l_local] = K_kl
+    return nothing
+end
+
+"""
+    compute_all_blocks!(
+        K_blocks::AbstractMatrix{Tensor{2,3,Float64,9}},
+        geometry_cache::AbstractGeometryCache,
+        material_cache::AbstractMaterialStateCache
+    )
+
+**Phase 2:** Compute all N×N stiffness blocks using **precomputed material state**.
+
+Helper for element-based assemblers. Uses two-phase approach:
+- Phase 1 (before this): Cache updates computed geometry and material state
+- Phase 2 (this function): Assemble all blocks using precomputed state
+
+# Arguments
+- `K_blocks`: Output matrix [N×N] of 3×3 tensor blocks
+- `geometry_cache`: Precomputed element geometry (gradients, detJ*w)
+- `material_cache`: Precomputed material state at all IPs
+
+# Examples
+```julia
+# Phase 1: Update caches
+update_geometry_cache!(geometry_cache, element_cache, kernel, elem_id, mesh)
+update_material_cache!(material_cache, geometry_cache, material, element_cache, state_old, elem_id, Δt)
+
+# Phase 2: Assemble all blocks (no material calls!)
+compute_all_blocks!(K_blocks, geometry_cache, material_cache)
+```
+"""
+function compute_all_blocks!(
+    K_blocks::AbstractMatrix{<:Tensor{2,3}},
+    geometry_cache::GeometryCache,
+    material_cache::MaterialStateCache
+)
+    # N is inferred from cache size at runtime
+    N = length(geometry_cache.X)
+
+    @inbounds for k in 1:N, l in 1:N
+        K_blocks[k, l] = compute_block(geometry_cache, material_cache, k, l)
+    end
+end
 
 """
     compute_b_matrix(
