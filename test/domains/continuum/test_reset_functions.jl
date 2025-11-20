@@ -3,6 +3,7 @@
 using JuliaFEM
 using Tensors
 using LinearAlgebra
+using SparseArrays  # For nnz()
 using Test
 
 include("test_helpers.jl")
@@ -100,15 +101,20 @@ include("test_helpers.jl")
         # Populate with data by assembling
         assemble!(coo_cache, assembler, kernel, mesh)
 
-        # Verify data exists (counter should be > 0 after assembly)
-        @test coo_cache.counter[] > 0
+        # Verify data exists by extracting system (matrix should have entries)
+        K, f = extract_system(coo_cache)
+        @test nnz(K) > 0  # Assembly produced triplets
         # Note: force vector f is zero for zero displacement with no body forces
 
         # Reset and verify zeros
         JuliaFEM.reset!(coo_cache)
 
-        @test coo_cache.counter[] == 0
+        @test coo_cache.counter[] == 0  # Counter is reset
         @test all(x -> x == 0.0, coo_cache.f)
+
+        # After reset, extraction should give empty/zero matrix
+        K2, f2 = extract_system(coo_cache)
+        @test nnz(K2) == 0  # No triplets after reset
 
         # Test zero allocations (warm-up first)
         JuliaFEM.reset!(coo_cache)
