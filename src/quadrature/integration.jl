@@ -34,16 +34,16 @@ abstract type AbstractIntegration end
 Represents a single integration point in D-dimensional parametric space.
 
 # Fields
-- `ξ::NTuple{D, Float64}`: Location in parametric coordinates
+- `ξ::Vec{D, Float64}`: Location in parametric coordinates
 - `weight::Float64`: Integration weight
 
 # Examples
 ```julia
-ip = IntegrationPoint((0.0, 0.0), 1.0)  # 2D point at origin with weight 1
+ip = IntegrationPoint(Vec(0.0, 0.0), 1.0)  # 2D point at origin with weight 1
 ```
 """
 struct IntegrationPoint{D}
-    ξ::NTuple{D,Float64}
+    ξ::Vec{D,Float64}
     weight::Float64
 end
 
