@@ -216,3 +216,79 @@ function dofs_per_node end
 dofs_per_node(::Displacement{Dim}) where Dim = Dim
 dofs_per_node(::Temperature) = 1
 dofs_per_node(::DisplacementRotation{Dim}) where Dim = 2 * Dim
+
+# ============================================================================
+# DOF MAPPING - Maps nodes to global DOF indices
+# ============================================================================
+
+"""
+    get_dof_mapping!(
+        dofs::AbstractVector{Int},
+        field::AbstractField,
+        element_nodes::AbstractVector{Int}
+    ) -> Nothing
+
+Fill global DOF indices for an element **in-place** based on field type.
+
+**Node-major ordering**: All DOFs for node 1, then node 2, etc.
+
+# Arguments
+- `dofs`: Pre-allocated DOF index buffer [ndofs_elem] (output)
+- `field`: Field type (determines DOFs per node)
+- `element_nodes`: Node indices for this element
+
+# DOF Numbering Convention
+
+For a field with `n` DOFs per node, node `k` has DOFs:
+```
+[n*(k-1)+1, n*(k-1)+2, ..., n*k]
+```
+
+# Examples
+
+```julia
+# 3D displacement (3 DOFs per node)
+dofs = zeros(Int, 12)  # 4-node element × 3 DOFs
+nodes = [10, 20, 30, 40]
+get_dof_mapping!(dofs, Displacement{3}(), nodes)
+# dofs = [28, 29, 30,  58, 59, 60,  88, 89, 90,  118, 119, 120]
+#        |___________|  |___________|  |___________|  |____________|
+#          node 10        node 20        node 30         node 40
+
+# 2D displacement (2 DOFs per node)
+dofs = zeros(Int, 8)  # 4-node element × 2 DOFs
+get_dof_mapping!(dofs, Displacement{2}(), nodes)
+# dofs = [19, 20,  39, 40,  59, 60,  79, 80]
+#        |_____|   |_____|   |_____|   |_____|
+#        node 10   node 20   node 30   node 40
+
+# Temperature (1 DOF per node)
+dofs = zeros(Int, 4)  # 4-node element × 1 DOF
+get_dof_mapping!(dofs, Temperature(), nodes)
+# dofs = [10, 20, 30, 40]
+```
+
+# Performance
+
+Zero allocations - writes to pre-allocated buffer.
+
+# See Also
+- [`dofs_per_node`](@ref) - Number of DOFs per node
+"""
+function get_dof_mapping!(
+    dofs::AbstractVector{Int},
+    field::AbstractField,
+    element_nodes::AbstractVector{Int}
+)
+    ndofs_per_node = dofs_per_node(field)
+
+    idx = 1
+    @inbounds for node_id in element_nodes
+        for component in 1:ndofs_per_node
+            dofs[idx] = ndofs_per_node * (node_id - 1) + component
+            idx += 1
+        end
+    end
+
+    return nothing
+end
