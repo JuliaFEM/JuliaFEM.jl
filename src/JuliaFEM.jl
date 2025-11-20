@@ -128,6 +128,12 @@ end
 # This MUST be included before any concrete implementations.
 include("api.jl")  # Documentation-only (no type definitions)
 
+# Continuum domain abstract types
+include("domains/continuum/abstract.jl")
+
+# Continuum domain concrete types
+include("domains/continuum/types.jl")
+
 # Formulation domain API (discretization strategies)
 include("domains/continuum/formulations.jl")
 export AbstractFormulation, ContinuumFormulation
@@ -136,7 +142,7 @@ export AbstractContinuumTheory, FullThreeD, PlaneStress, PlaneStrain, Axisymmetr
 # Field domain API (field variable types and DOF counting)
 include("fields/api.jl")
 export AbstractField, Displacement, Temperature, DisplacementRotation
-export dofs_per_node
+export dofs_per_node, get_dof_mapping!, get_field
 
 # Material domain API
 include("materials/api.jl")
@@ -409,8 +415,16 @@ include("assemblers/abstract.jl")
 export AbstractAssembler, AbstractAssemblerCache, AbstractKernel
 export ElementBasedAssembler, NodalBasedAssembler
 export COOAssembler, CSCAssembler, NodalAssembler
+
+include("assemblers/element_cache.jl")
 export ElementCache, NodeCache
 export create_element_cache, create_node_cache
+
+include("assemblers/geometry_cache.jl")
+export GeometryCache, ImmutableGeometryCache
+
+include("assemblers/material_cache.jl")
+export MaterialStateCache, ImmutableMaterialStateCache
 
 include("assemblers/caches.jl")
 export COOCache, CSCCache, NodalCache
@@ -450,12 +464,14 @@ include("domains/continuum/kernel.jl")
 export ContinuumKernel
 export compute_block_at_point  # Weak form (atomic operation)
 
-# Continuum integration utilities (geometry preprocessing, integration wrappers)
-include("domains/continuum/integration.jl")
-export PreparedElement, prepare_element!, compute_block!  # Integration API
+# Continuum cache update functions (three-phase API)
+include("domains/continuum/update_geometry_cache.jl")
+include("domains/continuum/update_element_cache.jl")
+include("domains/continuum/update_material_cache.jl")
+export compute_block, compute_block!  # Integration API (compute_block! deprecated)
+export update_geometry_cache!, update_element_cache!, update_material_cache!  # Cache update functions
 
 # Continuum assembly (uses generic assemblers)
-include("domains/continuum/assemble.jl")
 include("domains/continuum/assemble_v2.jl")  # Ferrite-style (backup)
 export compute_element_stiffness  # For testing and advanced use
 
