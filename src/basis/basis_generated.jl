@@ -19,31 +19,36 @@
 # Why SVector? Enables natural vector operations:
 #   u_interp = dot(node_values, N)
 #   grad_u = sum(node_values[i] * dN[i] for i in 1:N)
+#
+# Also generates: nbasis(basis_type, topology_type) -> Int
+#   Zero-cost function returning number of basis functions (compile-time constant)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Lagrange{1} on Seg2: 2-node linear segment element
 # (legacy name: Seg2)
 
-@inline function get_basis_functions(::Seg2, ::Lagrange{1}, xi::Vec{1, T}) where T
+@inline function get_basis_functions(::Segment{2}, ::Lagrange{1}, xi::Vec{1, T}) where T
     (u,) = xi
     N1 = 1/2 - 1/2 * u
     N2 = 1/2 + 1/2 * u
     return SVector{2, T}(N1, N2)
 end
 
-@inline function get_basis_derivatives(::Seg2, ::Lagrange{1}, xi::Vec{1, T}) where T
+@inline function get_basis_derivatives(::Segment{2}, ::Lagrange{1}, xi::Vec{1, T}) where T
     (u,) = xi
     dN1 = Vec{1, T}((-1/2,))
     dN2 = Vec{1, T}((1/2,))
     return SVector{2, Vec{1, T}}(dN1, dN2)
 end
 
+@inline nbasis(::Segment{2}, ::Lagrange{1}) = 2
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Lagrange{2} on Seg3: 3-node quadratic segment element
 # (legacy name: Seg3)
 
-@inline function get_basis_functions(::Seg3, ::Lagrange{2}, xi::Vec{1, T}) where T
+@inline function get_basis_functions(::Segment{3}, ::Lagrange{2}, xi::Vec{1, T}) where T
     (u,) = xi
     N1 = -1/2 * u + 1/2 * u ^ 2
     N2 = 1/2 * u + 1/2 * u ^ 2
@@ -51,7 +56,7 @@ end
     return SVector{3, T}(N1, N2, N3)
 end
 
-@inline function get_basis_derivatives(::Seg3, ::Lagrange{2}, xi::Vec{1, T}) where T
+@inline function get_basis_derivatives(::Segment{3}, ::Lagrange{2}, xi::Vec{1, T}) where T
     (u,) = xi
     dN1 = Vec{1, T}((-1/2 + u,))
     dN2 = Vec{1, T}((1/2 + u,))
@@ -59,12 +64,14 @@ end
     return SVector{3, Vec{1, T}}(dN1, dN2, dN3)
 end
 
+@inline nbasis(::Segment{3}, ::Lagrange{2}) = 3
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Lagrange{1} on Tri3: 3-node linear triangular element
 # (legacy name: Tri3)
 
-@inline function get_basis_functions(::Tri3, ::Lagrange{1}, xi::Vec{2, T}) where T
+@inline function get_basis_functions(::Triangle{3}, ::Lagrange{1}, xi::Vec{2, T}) where T
     (u, v) = xi
     N1 = 1 - u - v
     N2 = u
@@ -72,7 +79,7 @@ end
     return SVector{3, T}(N1, N2, N3)
 end
 
-@inline function get_basis_derivatives(::Tri3, ::Lagrange{1}, xi::Vec{2, T}) where T
+@inline function get_basis_derivatives(::Triangle{3}, ::Lagrange{1}, xi::Vec{2, T}) where T
     (u, v) = xi
     dN1 = Vec{2, T}((-1, -1))
     dN2 = Vec{2, T}((1, 0))
@@ -80,12 +87,14 @@ end
     return SVector{3, Vec{2, T}}(dN1, dN2, dN3)
 end
 
+@inline nbasis(::Triangle{3}, ::Lagrange{1}) = 3
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Lagrange{2} on Tri6: 6-node quadratic triangular element
 # (legacy name: Tri6)
 
-@inline function get_basis_functions(::Tri6, ::Lagrange{2}, xi::Vec{2, T}) where T
+@inline function get_basis_functions(::Triangle{6}, ::Lagrange{2}, xi::Vec{2, T}) where T
     (u, v) = xi
     N1 = 1 - 3 * u - 3 * v + 2 * u ^ 2 + 4 * u * v + 2 * v ^ 2
     N2 = -u + 2 * u ^ 2
@@ -96,7 +105,7 @@ end
     return SVector{6, T}(N1, N2, N3, N4, N5, N6)
 end
 
-@inline function get_basis_derivatives(::Tri6, ::Lagrange{2}, xi::Vec{2, T}) where T
+@inline function get_basis_derivatives(::Triangle{6}, ::Lagrange{2}, xi::Vec{2, T}) where T
     (u, v) = xi
     dN1 = Vec{2, T}((-3 + 4 * u + 4 * v, -3 + 4 * u + 4 * v))
     dN2 = Vec{2, T}((-1 + 4 * u, 0))
@@ -107,12 +116,14 @@ end
     return SVector{6, Vec{2, T}}(dN1, dN2, dN3, dN4, dN5, dN6)
 end
 
+@inline nbasis(::Triangle{6}, ::Lagrange{2}) = 6
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Lagrange{1} on Quad4: 4-node bilinear quadrilateral element
 # (legacy name: Quad4)
 
-@inline function get_basis_functions(::Quad4, ::Lagrange{1}, xi::Vec{2, T}) where T
+@inline function get_basis_functions(::Quadrilateral{4}, ::Lagrange{1}, xi::Vec{2, T}) where T
     (u, v) = xi
     N1 = 1/4 - 1/4 * u - 1/4 * v + 1/4 * u * v
     N2 = 1/4 + 1/4 * u - 1/4 * v - 1/4 * u * v
@@ -121,7 +132,7 @@ end
     return SVector{4, T}(N1, N2, N3, N4)
 end
 
-@inline function get_basis_derivatives(::Quad4, ::Lagrange{1}, xi::Vec{2, T}) where T
+@inline function get_basis_derivatives(::Quadrilateral{4}, ::Lagrange{1}, xi::Vec{2, T}) where T
     (u, v) = xi
     dN1 = Vec{2, T}((-1/4 + 1/4 * v, -1/4 + 1/4 * u))
     dN2 = Vec{2, T}((1/4 - 1/4 * v, -1/4 - 1/4 * u))
@@ -130,12 +141,14 @@ end
     return SVector{4, Vec{2, T}}(dN1, dN2, dN3, dN4)
 end
 
+@inline nbasis(::Quadrilateral{4}, ::Lagrange{1}) = 4
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Serendipity{2} on Quad8: 8-node serendipity quadrilateral element
 # (legacy name: Quad8)
 
-@inline function get_basis_functions(::Quad8, ::Serendipity{2}, xi::Vec{2, T}) where T
+@inline function get_basis_functions(::Quadrilateral{8}, ::Serendipity{2}, xi::Vec{2, T}) where T
     (u, v) = xi
     N1 = -1/4 + 1/4 * u ^ 2 + 1/4 * u * v + 1/4 * v ^ 2 - 1/4 * u ^ 2 * v - 1/4 * u * v ^ 2
     N2 = -1/4 + 1/4 * u ^ 2 - 1/4 * u * v + 1/4 * v ^ 2 - 1/4 * u ^ 2 * v + 1/4 * u * v ^ 2
@@ -148,7 +161,7 @@ end
     return SVector{8, T}(N1, N2, N3, N4, N5, N6, N7, N8)
 end
 
-@inline function get_basis_derivatives(::Quad8, ::Serendipity{2}, xi::Vec{2, T}) where T
+@inline function get_basis_derivatives(::Quadrilateral{8}, ::Serendipity{2}, xi::Vec{2, T}) where T
     (u, v) = xi
     dN1 = Vec{2, T}((1/2 * u + 1/4 * v - 1/2 * u * v - 1/4 * v ^ 2, 1/4 * u + 1/2 * v - 1/4 * u ^ 2 - 1/2 * u * v))
     dN2 = Vec{2, T}((1/2 * u - 1/4 * v - 1/2 * u * v + 1/4 * v ^ 2, -1/4 * u + 1/2 * v - 1/4 * u ^ 2 + 1/2 * u * v))
@@ -161,12 +174,14 @@ end
     return SVector{8, Vec{2, T}}(dN1, dN2, dN3, dN4, dN5, dN6, dN7, dN8)
 end
 
+@inline nbasis(::Quadrilateral{8}, ::Serendipity{2}) = 8
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Lagrange{2} on Quad9: 9-node biquadratic quadrilateral element
 # (legacy name: Quad9)
 
-@inline function get_basis_functions(::Quad9, ::Lagrange{2}, xi::Vec{2, T}) where T
+@inline function get_basis_functions(::Quadrilateral{9}, ::Lagrange{2}, xi::Vec{2, T}) where T
     (u, v) = xi
     N1 = 1/4 * u * v - 1/4 * u ^ 2 * v - 1/4 * u * v ^ 2 + 1/4 * u ^ 2 * v ^ 2
     N2 = -1/4 * u * v - 1/4 * u ^ 2 * v + 1/4 * u * v ^ 2 + 1/4 * u ^ 2 * v ^ 2
@@ -180,7 +195,7 @@ end
     return SVector{9, T}(N1, N2, N3, N4, N5, N6, N7, N8, N9)
 end
 
-@inline function get_basis_derivatives(::Quad9, ::Lagrange{2}, xi::Vec{2, T}) where T
+@inline function get_basis_derivatives(::Quadrilateral{9}, ::Lagrange{2}, xi::Vec{2, T}) where T
     (u, v) = xi
     dN1 = Vec{2, T}((1/4 * v - 1/2 * u * v - 1/4 * v ^ 2 + 1/2 * u * v ^ 2, 1/4 * u - 1/4 * u ^ 2 - 1/2 * u * v + 1/2 * u ^ 2 * v))
     dN2 = Vec{2, T}((-1/4 * v - 1/2 * u * v + 1/4 * v ^ 2 + 1/2 * u * v ^ 2, -1/4 * u - 1/4 * u ^ 2 + 1/2 * u * v + 1/2 * u ^ 2 * v))
@@ -194,12 +209,14 @@ end
     return SVector{9, Vec{2, T}}(dN1, dN2, dN3, dN4, dN5, dN6, dN7, dN8, dN9)
 end
 
+@inline nbasis(::Quadrilateral{9}, ::Lagrange{2}) = 9
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Lagrange{1} on Tet4: 4-node linear tetrahedral element
 # (legacy name: Tet4)
 
-@inline function get_basis_functions(::Tet4, ::Lagrange{1}, xi::Vec{3, T}) where T
+@inline function get_basis_functions(::Tetrahedron{4}, ::Lagrange{1}, xi::Vec{3, T}) where T
     (u, v, w) = xi
     N1 = 1 - u - v - w
     N2 = u
@@ -208,7 +225,7 @@ end
     return SVector{4, T}(N1, N2, N3, N4)
 end
 
-@inline function get_basis_derivatives(::Tet4, ::Lagrange{1}, xi::Vec{3, T}) where T
+@inline function get_basis_derivatives(::Tetrahedron{4}, ::Lagrange{1}, xi::Vec{3, T}) where T
     (u, v, w) = xi
     dN1 = Vec{3, T}((-1, -1, -1))
     dN2 = Vec{3, T}((1, 0, 0))
@@ -217,12 +234,14 @@ end
     return SVector{4, Vec{3, T}}(dN1, dN2, dN3, dN4)
 end
 
+@inline nbasis(::Tetrahedron{4}, ::Lagrange{1}) = 4
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Lagrange{2} on Tet10: 10-node quadratic tetrahedral element
 # (legacy name: Tet10)
 
-@inline function get_basis_functions(::Tet10, ::Lagrange{2}, xi::Vec{3, T}) where T
+@inline function get_basis_functions(::Tetrahedron{10}, ::Lagrange{2}, xi::Vec{3, T}) where T
     (u, v, w) = xi
     N1 = 1 - 3 * u - 3 * v - 3 * w + 2 * u ^ 2 + 2 * v ^ 2 + 2 * w ^ 2 + 4 * u * v + 4 * u * w + 4 * v * w
     N2 = -u + 2 * u ^ 2
@@ -237,7 +256,7 @@ end
     return SVector{10, T}(N1, N2, N3, N4, N5, N6, N7, N8, N9, N10)
 end
 
-@inline function get_basis_derivatives(::Tet10, ::Lagrange{2}, xi::Vec{3, T}) where T
+@inline function get_basis_derivatives(::Tetrahedron{10}, ::Lagrange{2}, xi::Vec{3, T}) where T
     (u, v, w) = xi
     dN1 = Vec{3, T}((-3 + 4 * u + 4 * v + 4 * w, -3 + 4 * v + 4 * u + 4 * w, -3 + 4 * w + 4 * u + 4 * v))
     dN2 = Vec{3, T}((-1 + 4 * u, 0, 0))
@@ -252,12 +271,14 @@ end
     return SVector{10, Vec{3, T}}(dN1, dN2, dN3, dN4, dN5, dN6, dN7, dN8, dN9, dN10)
 end
 
+@inline nbasis(::Tetrahedron{10}, ::Lagrange{2}) = 10
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Lagrange{1} on Hex8: 8-node trilinear hexahedral element
 # (legacy name: Hex8)
 
-@inline function get_basis_functions(::Hex8, ::Lagrange{1}, xi::Vec{3, T}) where T
+@inline function get_basis_functions(::Hexahedron{8}, ::Lagrange{1}, xi::Vec{3, T}) where T
     (u, v, w) = xi
     N1 = 1/8 - 1/8 * u - 1/8 * v - 1/8 * w + 1/8 * u * v + 1/8 * u * w + 1/8 * v * w - 1/8 * u * v * w
     N2 = 1/8 + 1/8 * u - 1/8 * v - 1/8 * w - 1/8 * u * v - 1/8 * u * w + 1/8 * v * w + 1/8 * u * v * w
@@ -270,7 +291,7 @@ end
     return SVector{8, T}(N1, N2, N3, N4, N5, N6, N7, N8)
 end
 
-@inline function get_basis_derivatives(::Hex8, ::Lagrange{1}, xi::Vec{3, T}) where T
+@inline function get_basis_derivatives(::Hexahedron{8}, ::Lagrange{1}, xi::Vec{3, T}) where T
     (u, v, w) = xi
     dN1 = Vec{3, T}((-1/8 + 1/8 * v + 1/8 * w - 1/8 * v * w, -1/8 + 1/8 * u + 1/8 * w - 1/8 * u * w, -1/8 + 1/8 * u + 1/8 * v - 1/8 * u * v))
     dN2 = Vec{3, T}((1/8 - 1/8 * v - 1/8 * w + 1/8 * v * w, -1/8 - 1/8 * u + 1/8 * w + 1/8 * u * w, -1/8 - 1/8 * u + 1/8 * v + 1/8 * u * v))
@@ -283,12 +304,14 @@ end
     return SVector{8, Vec{3, T}}(dN1, dN2, dN3, dN4, dN5, dN6, dN7, dN8)
 end
 
+@inline nbasis(::Hexahedron{8}, ::Lagrange{1}) = 8
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Serendipity{2} on Hex20: 20-node serendipity hexahedral element
 # (legacy name: Hex20)
 
-@inline function get_basis_functions(::Hex20, ::Serendipity{2}, xi::Vec{3, T}) where T
+@inline function get_basis_functions(::Hexahedron{20}, ::Serendipity{2}, xi::Vec{3, T}) where T
     (u, v, w) = xi
     N1 = -1/4 + 1/8 * u + 1/8 * v + 1/8 * w + 1/12 * u * v + 1/12 * u * w + 1/12 * v * w + 1/8 * u ^ 2 + 1/8 * v ^ 2 + 1/8 * w ^ 2 - 1/8 * u ^ 2 * v - 1/8 * u * v ^ 2 - 1/8 * u ^ 2 * w - 1/8 * u * w ^ 2 - 1/8 * v ^ 2 * w - 1/8 * v * w ^ 2
     N2 = -1/4 - 1/8 * u + 1/8 * v + 1/8 * w - 1/12 * u * v - 1/12 * u * w + 1/12 * v * w + 1/8 * u ^ 2 + 1/8 * v ^ 2 + 1/8 * w ^ 2 - 1/8 * u ^ 2 * v + 1/8 * u * v ^ 2 - 1/8 * u ^ 2 * w + 1/8 * u * w ^ 2 - 1/8 * v ^ 2 * w - 1/8 * v * w ^ 2
@@ -313,7 +336,7 @@ end
     return SVector{20, T}(N1, N2, N3, N4, N5, N6, N7, N8, N9, N10, N11, N12, N13, N14, N15, N16, N17, N18, N19, N20)
 end
 
-@inline function get_basis_derivatives(::Hex20, ::Serendipity{2}, xi::Vec{3, T}) where T
+@inline function get_basis_derivatives(::Hexahedron{20}, ::Serendipity{2}, xi::Vec{3, T}) where T
     (u, v, w) = xi
     dN1 = Vec{3, T}((1/8 + 1/12 * v + 1/12 * w + 1/4 * u - 1/4 * u * v - 1/8 * v ^ 2 - 1/4 * u * w - 1/8 * w ^ 2, 1/8 + 1/12 * u + 1/12 * w + 1/4 * v - 1/8 * u ^ 2 - 1/4 * u * v - 1/4 * v * w - 1/8 * w ^ 2, 1/8 + 1/12 * u + 1/12 * v + 1/4 * w - 1/8 * u ^ 2 - 1/4 * u * w - 1/8 * v ^ 2 - 1/4 * v * w))
     dN2 = Vec{3, T}((-1/8 - 1/12 * v - 1/12 * w + 1/4 * u - 1/4 * u * v + 1/8 * v ^ 2 - 1/4 * u * w + 1/8 * w ^ 2, 1/8 - 1/12 * u + 1/12 * w + 1/4 * v - 1/8 * u ^ 2 + 1/4 * u * v - 1/4 * v * w - 1/8 * w ^ 2, 1/8 - 1/12 * u + 1/12 * v + 1/4 * w - 1/8 * u ^ 2 + 1/4 * u * w - 1/8 * v ^ 2 - 1/4 * v * w))
@@ -338,12 +361,14 @@ end
     return SVector{20, Vec{3, T}}(dN1, dN2, dN3, dN4, dN5, dN6, dN7, dN8, dN9, dN10, dN11, dN12, dN13, dN14, dN15, dN16, dN17, dN18, dN19, dN20)
 end
 
+@inline nbasis(::Hexahedron{20}, ::Serendipity{2}) = 20
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Lagrange{2} on Hex27: 27-node triquadratic hexahedral element
 # (legacy name: Hex27)
 
-@inline function get_basis_functions(::Hex27, ::Lagrange{2}, xi::Vec{3, T}) where T
+@inline function get_basis_functions(::Hexahedron{27}, ::Lagrange{2}, xi::Vec{3, T}) where T
     (u, v, w) = xi
     N1 = 1/18 * u + 1/18 * v + 1/18 * w - 1/12 * u ^ 2 * v - 1/12 * u * v ^ 2 - 1/12 * u ^ 2 * w - 1/12 * u * w ^ 2 - 1/12 * v ^ 2 * w - 1/12 * v * w ^ 2 + 1/8 * u ^ 2 * v * w + 1/8 * u * v ^ 2 * w + 1/8 * u * v * w ^ 2 + 1/8 * u ^ 2 * v ^ 2 * w ^ 2
     N2 = -1/18 * u + 1/18 * v + 1/18 * w - 1/12 * u ^ 2 * v + 1/12 * u * v ^ 2 - 1/12 * u ^ 2 * w + 1/12 * u * w ^ 2 - 1/12 * v ^ 2 * w - 1/12 * v * w ^ 2 + 1/8 * u ^ 2 * v * w - 1/8 * u * v ^ 2 * w - 1/8 * u * v * w ^ 2 + 1/8 * u ^ 2 * v ^ 2 * w ^ 2
@@ -375,7 +400,7 @@ end
     return SVector{27, T}(N1, N2, N3, N4, N5, N6, N7, N8, N9, N10, N11, N12, N13, N14, N15, N16, N17, N18, N19, N20, N21, N22, N23, N24, N25, N26, N27)
 end
 
-@inline function get_basis_derivatives(::Hex27, ::Lagrange{2}, xi::Vec{3, T}) where T
+@inline function get_basis_derivatives(::Hexahedron{27}, ::Lagrange{2}, xi::Vec{3, T}) where T
     (u, v, w) = xi
     dN1 = Vec{3, T}((1/18 - 1/6 * u * v - 1/12 * v ^ 2 - 1/6 * u * w - 1/12 * w ^ 2 + 1/4 * u * v * w + 1/8 * v ^ 2 * w + 1/8 * v * w ^ 2 + 1/4 * u * v ^ 2 * w ^ 2, 1/18 - 1/12 * u ^ 2 - 1/6 * u * v - 1/6 * v * w - 1/12 * w ^ 2 + 1/8 * u ^ 2 * w + 1/4 * u * v * w + 1/8 * u * w ^ 2 + 1/4 * u ^ 2 * v * w ^ 2, 1/18 - 1/12 * u ^ 2 - 1/6 * u * w - 1/12 * v ^ 2 - 1/6 * v * w + 1/8 * u ^ 2 * v + 1/8 * u * v ^ 2 + 1/4 * u * v * w + 1/4 * u ^ 2 * v ^ 2 * w))
     dN2 = Vec{3, T}((-1/18 - 1/6 * u * v + 1/12 * v ^ 2 - 1/6 * u * w + 1/12 * w ^ 2 + 1/4 * u * v * w - 1/8 * v ^ 2 * w - 1/8 * v * w ^ 2 + 1/4 * u * v ^ 2 * w ^ 2, 1/18 - 1/12 * u ^ 2 + 1/6 * u * v - 1/6 * v * w - 1/12 * w ^ 2 + 1/8 * u ^ 2 * w - 1/4 * u * v * w - 1/8 * u * w ^ 2 + 1/4 * u ^ 2 * v * w ^ 2, 1/18 - 1/12 * u ^ 2 + 1/6 * u * w - 1/12 * v ^ 2 - 1/6 * v * w + 1/8 * u ^ 2 * v - 1/8 * u * v ^ 2 - 1/4 * u * v * w + 1/4 * u ^ 2 * v ^ 2 * w))
@@ -407,12 +432,14 @@ end
     return SVector{27, Vec{3, T}}(dN1, dN2, dN3, dN4, dN5, dN6, dN7, dN8, dN9, dN10, dN11, dN12, dN13, dN14, dN15, dN16, dN17, dN18, dN19, dN20, dN21, dN22, dN23, dN24, dN25, dN26, dN27)
 end
 
+@inline nbasis(::Hexahedron{27}, ::Lagrange{2}) = 27
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Lagrange{1} on Pyr5: 5-node linear pyramid element
 # (legacy name: Pyr5)
 
-@inline function get_basis_functions(::Pyr5, ::Lagrange{1}, xi::Vec{3, T}) where T
+@inline function get_basis_functions(::Pyramid{5}, ::Lagrange{1}, xi::Vec{3, T}) where T
     (u, v, w) = xi
     N1 = 1/4 - 1/4 * u - 1/4 * v - 1/4 * w
     N2 = 1/4 + 1/4 * u - 1/4 * v - 1/4 * w
@@ -422,7 +449,7 @@ end
     return SVector{5, T}(N1, N2, N3, N4, N5)
 end
 
-@inline function get_basis_derivatives(::Pyr5, ::Lagrange{1}, xi::Vec{3, T}) where T
+@inline function get_basis_derivatives(::Pyramid{5}, ::Lagrange{1}, xi::Vec{3, T}) where T
     (u, v, w) = xi
     dN1 = Vec{3, T}((-1/4, -1/4, -1/4))
     dN2 = Vec{3, T}((1/4, -1/4, -1/4))
@@ -432,12 +459,14 @@ end
     return SVector{5, Vec{3, T}}(dN1, dN2, dN3, dN4, dN5)
 end
 
+@inline nbasis(::Pyramid{5}, ::Lagrange{1}) = 5
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Lagrange{1} on Wedge6: 6-node linear wedge (prism) element
 # (legacy name: Wedge6)
 
-@inline function get_basis_functions(::Wedge6, ::Lagrange{1}, xi::Vec{3, T}) where T
+@inline function get_basis_functions(::Wedge{6}, ::Lagrange{1}, xi::Vec{3, T}) where T
     (u, v, w) = xi
     N1 = 1/2 - 1/2 * u - 1/2 * v - 1/2 * w + 1/2 * u * w + 1/2 * v * w
     N2 = 1/2 * u - 1/2 * u * w
@@ -448,7 +477,7 @@ end
     return SVector{6, T}(N1, N2, N3, N4, N5, N6)
 end
 
-@inline function get_basis_derivatives(::Wedge6, ::Lagrange{1}, xi::Vec{3, T}) where T
+@inline function get_basis_derivatives(::Wedge{6}, ::Lagrange{1}, xi::Vec{3, T}) where T
     (u, v, w) = xi
     dN1 = Vec{3, T}((-1/2 + 1/2 * w, -1/2 + 1/2 * w, -1/2 + 1/2 * u + 1/2 * v))
     dN2 = Vec{3, T}((1/2 - 1/2 * w, 0, -1/2 * u))
@@ -458,4 +487,6 @@ end
     dN6 = Vec{3, T}((0, 1/2 + 1/2 * w, 1/2 * v))
     return SVector{6, Vec{3, T}}(dN1, dN2, dN3, dN4, dN5, dN6)
 end
+
+@inline nbasis(::Wedge{6}, ::Lagrange{1}) = 6
 
