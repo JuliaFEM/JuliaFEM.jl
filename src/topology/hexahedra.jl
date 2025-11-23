@@ -21,68 +21,83 @@ nnodes(::Hexahedron{N}) where {N} = N
 dim(::Hexahedron{N}) where {N} = 3
 
 function reference_coordinates(::Hexahedron{8})
-    return SVector(
-        Vec{3,Float64}((-1.0, -1.0, -1.0)), Vec{3,Float64}((1.0, -1.0, -1.0)),
-        Vec{3,Float64}((1.0, 1.0, -1.0)), Vec{3,Float64}((-1.0, 1.0, -1.0)),
-        Vec{3,Float64}((-1.0, -1.0, 1.0)), Vec{3,Float64}((1.0, -1.0, 1.0)),
-        Vec{3,Float64}((1.0, 1.0, 1.0)), Vec{3,Float64}((-1.0, 1.0, 1.0))
-    )
+    return SVector(Vec{3,Float64}.((
+        (-1.0, -1.0, -1.0), (1.0, -1.0, -1.0),
+        (1.0, 1.0, -1.0), (-1.0, 1.0, -1.0),
+        (-1.0, -1.0, 1.0), (1.0, -1.0, 1.0),
+        (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)
+    )))
 end
 
 function reference_coordinates(::Hexahedron{20})
-    return SVector(
+    return SVector(Vec{3,Float64}.((
         # 8 corner nodes
-        Vec{3,Float64}((-1.0, -1.0, -1.0)), Vec{3,Float64}((1.0, -1.0, -1.0)),
-        Vec{3,Float64}((1.0, 1.0, -1.0)), Vec{3,Float64}((-1.0, 1.0, -1.0)),
-        Vec{3,Float64}((-1.0, -1.0, 1.0)), Vec{3,Float64}((1.0, -1.0, 1.0)),
-        Vec{3,Float64}((1.0, 1.0, 1.0)), Vec{3,Float64}((-1.0, 1.0, 1.0)),
+        (-1.0, -1.0, -1.0), (1.0, -1.0, -1.0),
+        (1.0, 1.0, -1.0), (-1.0, 1.0, -1.0),
+        (-1.0, -1.0, 1.0), (1.0, -1.0, 1.0),
+        (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0),
         # 12 edge midpoint nodes
-        Vec{3,Float64}((0.0, -1.0, -1.0)), Vec{3,Float64}((1.0, 0.0, -1.0)),
-        Vec{3,Float64}((0.0, 1.0, -1.0)), Vec{3,Float64}((-1.0, 0.0, -1.0)),
-        Vec{3,Float64}((0.0, -1.0, 1.0)), Vec{3,Float64}((1.0, 0.0, 1.0)),
-        Vec{3,Float64}((0.0, 1.0, 1.0)), Vec{3,Float64}((-1.0, 0.0, 1.0)),
-        Vec{3,Float64}((-1.0, -1.0, 0.0)), Vec{3,Float64}((1.0, -1.0, 0.0)),
-        Vec{3,Float64}((1.0, 1.0, 0.0)), Vec{3,Float64}((-1.0, 1.0, 0.0))
-    )
+        (0.0, -1.0, -1.0), (1.0, 0.0, -1.0),
+        (0.0, 1.0, -1.0), (-1.0, 0.0, -1.0),
+        (0.0, -1.0, 1.0), (1.0, 0.0, 1.0),
+        (0.0, 1.0, 1.0), (-1.0, 0.0, 1.0),
+        (-1.0, -1.0, 0.0), (1.0, -1.0, 0.0),
+        (1.0, 1.0, 0.0), (-1.0, 1.0, 0.0)
+    )))
 end
 
 function reference_coordinates(::Hexahedron{27})
-    return SVector(
+    return SVector(Vec{3,Float64}.((
         # 8 corner nodes
-        Vec{3,Float64}((-1.0, -1.0, -1.0)), Vec{3,Float64}((1.0, -1.0, -1.0)),
-        Vec{3,Float64}((1.0, 1.0, -1.0)), Vec{3,Float64}((-1.0, 1.0, -1.0)),
-        Vec{3,Float64}((-1.0, -1.0, 1.0)), Vec{3,Float64}((1.0, -1.0, 1.0)),
-        Vec{3,Float64}((1.0, 1.0, 1.0)), Vec{3,Float64}((-1.0, 1.0, 1.0)),
+        (-1.0, -1.0, -1.0), (1.0, -1.0, -1.0),
+        (1.0, 1.0, -1.0), (-1.0, 1.0, -1.0),
+        (-1.0, -1.0, 1.0), (1.0, -1.0, 1.0),
+        (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0),
         # 12 edge midpoint nodes
-        Vec{3,Float64}((0.0, -1.0, -1.0)), Vec{3,Float64}((1.0, 0.0, -1.0)),
-        Vec{3,Float64}((0.0, 1.0, -1.0)), Vec{3,Float64}((-1.0, 0.0, -1.0)),
-        Vec{3,Float64}((0.0, -1.0, 1.0)), Vec{3,Float64}((1.0, 0.0, 1.0)),
-        Vec{3,Float64}((0.0, 1.0, 1.0)), Vec{3,Float64}((-1.0, 0.0, 1.0)),
-        Vec{3,Float64}((-1.0, -1.0, 0.0)), Vec{3,Float64}((1.0, -1.0, 0.0)),
-        Vec{3,Float64}((1.0, 1.0, 0.0)), Vec{3,Float64}((-1.0, 1.0, 0.0)),
+        (0.0, -1.0, -1.0), (1.0, 0.0, -1.0),
+        (0.0, 1.0, -1.0), (-1.0, 0.0, -1.0),
+        (0.0, -1.0, 1.0), (1.0, 0.0, 1.0),
+        (0.0, 1.0, 1.0), (-1.0, 0.0, 1.0),
+        (-1.0, -1.0, 0.0), (1.0, -1.0, 0.0),
+        (1.0, 1.0, 0.0), (-1.0, 1.0, 0.0),
         # 6 face center nodes
-        Vec{3,Float64}((0.0, 0.0, -1.0)), Vec{3,Float64}((0.0, 0.0, 1.0)),
-        Vec{3,Float64}((0.0, -1.0, 0.0)), Vec{3,Float64}((0.0, 1.0, 0.0)),
-        Vec{3,Float64}((-1.0, 0.0, 0.0)), Vec{3,Float64}((1.0, 0.0, 0.0)),
+        (0.0, 0.0, -1.0), (0.0, 0.0, 1.0),
+        (0.0, -1.0, 0.0), (0.0, 1.0, 0.0),
+        (-1.0, 0.0, 0.0), (1.0, 0.0, 0.0),
         # 1 volume center node
-        Vec{3,Float64}((0.0, 0.0, 0.0))
-    )
+        (0.0, 0.0, 0.0)
+    )))
 end
 
-function edges(::Hexahedron{N}) where {N}
-    return (
+function edges(::T) where {T<:Hexahedron}
+    return SVector(Edge{T}.((
         (1, 2), (2, 3), (3, 4), (4, 1),
         (5, 6), (6, 7), (7, 8), (8, 5),
         (1, 5), (2, 6), (3, 7), (4, 8)
-    )
+    )))
 end
 
-function faces(::Hexahedron{N}) where {N}
-    return (
+function faces(::T) where {T<:Hexahedron}
+    return SVector(Face{T}.((
         (1, 4, 3, 2), (5, 6, 7, 8),
         (1, 2, 6, 5), (2, 3, 7, 6),
         (3, 4, 8, 7), (4, 1, 5, 8)
+    )))
+end
+
+function vertices(::T) where {T<:Hexahedron}
+    return SVector(
+        Vertex{T}(), Vertex{T}(), Vertex{T}(), Vertex{T}(),
+        Vertex{T}(), Vertex{T}(), Vertex{T}(), Vertex{T}()
     )
 end
+
+function cells(::T) where {T<:Hexahedron}
+    return SVector(Cell{T}())
+end
+
+nvertices(::Hexahedron) = 8
+nedges(::Hexahedron) = 12
+nfaces(::Hexahedron) = 6
 
 export Hex8, Hex20, Hex27
