@@ -178,6 +178,22 @@ Concrete types inherit this implementation automatically.
 nnodes(::AbstractTopology{N}) where N = N
 
 """
+    nnodes(::Type{<:AbstractTopology{N}}) -> Int
+
+Number of nodes for a topology type (compile-time constant from type parameter).
+
+# Examples
+
+```julia
+nnodes(Triangle{3})   # 3
+nnodes(Triangle{6})   # 6
+nnodes(Quadrilateral{4})  # 4
+nnodes(Quadrilateral{9})  # 9
+```
+"""
+nnodes(::Type{<:AbstractTopology{N}}) where N = N
+
+"""
     dim(topology::AbstractTopology) -> Int
 
 Spatial dimension of the topology (1, 2, or 3).
