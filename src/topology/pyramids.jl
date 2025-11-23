@@ -18,30 +18,42 @@ nnodes(::Pyramid{N}) where {N} = N
 dim(::Pyramid{N}) where {N} = 3
 
 function reference_coordinates(::Pyramid{5})
-    return SVector(
-        Vec{3,Float64}((-1.0, -1.0, 0.0)),
-        Vec{3,Float64}((1.0, -1.0, 0.0)),
-        Vec{3,Float64}((1.0, 1.0, 0.0)),
-        Vec{3,Float64}((-1.0, 1.0, 0.0)),
-        Vec{3,Float64}((0.0, 0.0, 1.0))
-    )
+    return SVector(Vec{3,Float64}.((
+        (-1.0, -1.0, 0.0),
+        (1.0, -1.0, 0.0),
+        (1.0, 1.0, 0.0),
+        (-1.0, 1.0, 0.0),
+        (0.0, 0.0, 1.0)
+    )))
 end
 
-function edges(::Pyramid{N}) where {N}
-    return (
+function edges(::T) where {T<:Pyramid}
+    return SVector(Edge{T}.((
         (1, 2), (2, 3), (3, 4), (4, 1),  # Base edges
         (1, 5), (2, 5), (3, 5), (4, 5)   # Edges to apex
-    )
+    )))
 end
 
-function faces(::Pyramid{N}) where {N}
-    return (
+function faces(::T) where {T<:Pyramid}
+    return SVector(Face{T}.((
         (1, 4, 3, 2),  # Quad base
         (1, 2, 5),     # Triangle face 1
         (2, 3, 5),     # Triangle face 2
         (3, 4, 5),     # Triangle face 3
         (4, 1, 5)      # Triangle face 4
-    )
+    )))
 end
+
+function vertices(::T) where {T<:Pyramid}
+    return SVector(Vertex{T}(), Vertex{T}(), Vertex{T}(), Vertex{T}(), Vertex{T}())
+end
+
+function cells(::T) where {T<:Pyramid}
+    return SVector(Cell{T}())
+end
+
+nvertices(::Pyramid) = 5
+nedges(::Pyramid) = 8
+nfaces(::Pyramid) = 5
 
 export Pyr5
