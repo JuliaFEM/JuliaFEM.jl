@@ -210,11 +210,11 @@ Tuple of 3 coordinate pairs: ((ξ₁, η₁), (ξ₂, η₂), (ξ₃, η₃))
 - Node 3: (0.0, 1.0) - Along η-axis
 """
 function reference_coordinates(::Triangle{3})
-    return SVector(
-        Vec{2,Float64}((0.0, 0.0)),  # N1: Corner at origin
-        Vec{2,Float64}((1.0, 0.0)),  # N2: Corner along ξ
-        Vec{2,Float64}((0.0, 1.0))   # N3: Corner along η
-    )
+    return SVector(Vec{2,Float64}.((
+        (0.0, 0.0),  # N1: Corner at origin
+        (1.0, 0.0),  # N2: Corner along ξ
+        (0.0, 1.0)   # N3: Corner along η
+    )))
 end
 
 """
@@ -230,14 +230,14 @@ Return reference coordinates for quadratic triangle (Tri6) - 6 nodes total.
 - Node 6: Edge midpoint between N3-N1 (0.0, 0.5)
 """
 function reference_coordinates(::Triangle{6})
-    return SVector(
-        Vec{2,Float64}((0.0, 0.0)),  # N1: Corner
-        Vec{2,Float64}((1.0, 0.0)),  # N2: Corner
-        Vec{2,Float64}((0.0, 1.0)),  # N3: Corner
-        Vec{2,Float64}((0.5, 0.0)),  # N4: Midpoint of edge 1-2
-        Vec{2,Float64}((0.5, 0.5)),  # N5: Midpoint of edge 2-3
-        Vec{2,Float64}((0.0, 0.5))   # N6: Midpoint of edge 3-1
-    )
+    return SVector(Vec{2,Float64}.((
+        (0.0, 0.0),  # N1: Corner
+        (1.0, 0.0),  # N2: Corner
+        (0.0, 1.0),  # N3: Corner
+        (0.5, 0.0),  # N4: Midpoint of edge 1-2
+        (0.5, 0.5),  # N5: Midpoint of edge 2-3
+        (0.0, 0.5)   # N6: Midpoint of edge 3-1
+    )))
 end
 
 """
@@ -252,15 +252,15 @@ Return reference coordinates for quadratic triangle with centroid (Tri7).
 - Node 7: Face centroid (1/3, 1/3)
 """
 function reference_coordinates(::Triangle{7})
-    return SVector(
-        Vec{2,Float64}((0.0, 0.0)),          # N1: Corner
-        Vec{2,Float64}((1.0, 0.0)),          # N2: Corner
-        Vec{2,Float64}((0.0, 1.0)),          # N3: Corner
-        Vec{2,Float64}((0.5, 0.0)),          # N4: Midpoint edge 1-2
-        Vec{2,Float64}((0.5, 0.5)),          # N5: Midpoint edge 2-3
-        Vec{2,Float64}((0.0, 0.5)),          # N6: Midpoint edge 3-1
-        Vec{2,Float64}((1.0 / 3.0, 1.0 / 3.0))   # N7: Face centroid
-    )
+    return SVector(Vec{2,Float64}.((
+        (0.0, 0.0),          # N1: Corner
+        (1.0, 0.0),          # N2: Corner
+        (0.0, 1.0),          # N3: Corner
+        (0.5, 0.0),          # N4: Midpoint edge 1-2
+        (0.5, 0.5),          # N5: Midpoint edge 2-3
+        (0.0, 0.5),          # N6: Midpoint edge 3-1
+        (1.0 / 3.0, 1.0 / 3.0)   # N7: Face centroid
+    )))
 end
 
 """
@@ -278,18 +278,18 @@ Return reference coordinates for cubic triangle (Tri10) - 10 nodes total.
 - Node 10: Face centroid (1/3, 1/3)
 """
 function reference_coordinates(::Triangle{10})
-    return SVector(
-        Vec{2,Float64}((0.0, 0.0)),          # N1: Corner
-        Vec{2,Float64}((1.0, 0.0)),          # N2: Corner
-        Vec{2,Float64}((0.0, 1.0)),          # N3: Corner
-        Vec{2,Float64}((1.0 / 3.0, 0.0)),      # N4: Edge 1-2, 1/3
-        Vec{2,Float64}((2.0 / 3.0, 0.0)),      # N5: Edge 1-2, 2/3
-        Vec{2,Float64}((2.0 / 3.0, 1.0 / 3.0)),  # N6: Edge 2-3, 1/3
-        Vec{2,Float64}((1.0 / 3.0, 2.0 / 3.0)),  # N7: Edge 2-3, 2/3
-        Vec{2,Float64}((0.0, 2.0 / 3.0)),      # N8: Edge 3-1, 1/3
-        Vec{2,Float64}((0.0, 1.0 / 3.0)),      # N9: Edge 3-1, 2/3
-        Vec{2,Float64}((1.0 / 3.0, 1.0 / 3.0))   # N10: Face centroid
-    )
+    return SVector(Vec{2,Float64}.((
+        (0.0, 0.0),          # N1: Corner
+        (1.0, 0.0),          # N2: Corner
+        (0.0, 1.0),          # N3: Corner
+        (1.0 / 3.0, 0.0),      # N4: Edge 1-2, 1/3
+        (2.0 / 3.0, 0.0),      # N5: Edge 1-2, 2/3
+        (2.0 / 3.0, 1.0 / 3.0),  # N6: Edge 2-3, 1/3
+        (1.0 / 3.0, 2.0 / 3.0),  # N7: Edge 2-3, 2/3
+        (0.0, 2.0 / 3.0),      # N8: Edge 3-1, 1/3
+        (0.0, 1.0 / 3.0),      # N9: Edge 3-1, 2/3
+        (1.0 / 3.0, 1.0 / 3.0)   # N10: Face centroid
+    )))
 end
 
 # ============================================================================
@@ -315,31 +315,43 @@ This is TOPOLOGICAL connectivity, independent of interpolation order.
 - Direction: Counter-clockwise
 - Same for all triangle types (Tri3, Tri6, Tri7, Tri10)
 """
-function edges(::Triangle{N}) where {N}
-    return (
+function edges(::T) where {T<:Triangle}
+    return SVector(Edge{T}.((
         (1, 2),  # Edge 1: Bottom
         (2, 3),  # Edge 2: Diagonal
         (3, 1)   # Edge 3: Left
-    )
+    )))
 end
 
 """
-    faces(::Triangle{N}) where N -> NTuple{1, NTuple{3, Int}}
+    faces(::T) where T <: Triangle -> SVector{1, Face{T}}
 
-Return face connectivity for triangle.
+Return face entity for triangle.
 In 2D, the "face" is the element itself (all 3 **corner nodes**).
 
 # Returns
-1-tuple containing the triangular face: ((1, 2, 3),)
+1-element vector containing the triangular face
 
 # Note
 - Only references corner nodes
 - Single face represents entire surface
 - API consistency with 3D elements
 """
-function faces(::Triangle{N}) where {N}
-    return ((1, 2, 3),)
+function faces(::T) where {T<:Triangle}
+    return SVector(Face{T}((1, 2, 3)))
 end
+
+function vertices(::T) where {T<:Triangle}
+    return SVector(Vertex{T}(), Vertex{T}(), Vertex{T}())
+end
+
+function cells(::T) where {T<:Triangle}
+    return SVector(Cell{T}())
+end
+
+nvertices(::Triangle) = 3
+nedges(::Triangle) = 3
+nfaces(::Triangle) = 1
 
 # ============================================================================
 # EXPORTS
