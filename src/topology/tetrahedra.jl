@@ -188,12 +188,12 @@ Tuple of 4 coordinate triples: ((ξ₁, η₁, ζ₁), (ξ₂, η₂, ζ₂), (�
 - Node 4: (0.0, 0.0, 1.0) - Along ζ-axis
 """
 function reference_coordinates(::Tetrahedron{4})
-    return SVector(
-        Vec{3,Float64}((0.0, 0.0, 0.0)),  # N1: Corner at origin
-        Vec{3,Float64}((1.0, 0.0, 0.0)),  # N2: Corner along ξ
-        Vec{3,Float64}((0.0, 1.0, 0.0)),  # N3: Corner along η
-        Vec{3,Float64}((0.0, 0.0, 1.0))   # N4: Corner along ζ
-    )
+    return SVector(Vec{3,Float64}.((
+        (0.0, 0.0, 0.0),  # N1: Corner at origin
+        (1.0, 0.0, 0.0),  # N2: Corner along ξ
+        (0.0, 1.0, 0.0),  # N3: Corner along η
+        (0.0, 0.0, 1.0)   # N4: Corner along ζ
+    )))
 end
 
 """
@@ -211,80 +211,173 @@ Return reference coordinates for quadratic tetrahedron (Tet10) - 10 nodes total.
 - Node 10: Edge midpoint between N3-N4 (0.0, 0.5, 0.5)
 """
 function reference_coordinates(::Tetrahedron{10})
-    return SVector(
-        Vec{3,Float64}((0.0, 0.0, 0.0)),  # N1: Corner
-        Vec{3,Float64}((1.0, 0.0, 0.0)),  # N2: Corner
-        Vec{3,Float64}((0.0, 1.0, 0.0)),  # N3: Corner
-        Vec{3,Float64}((0.0, 0.0, 1.0)),  # N4: Corner
-        Vec{3,Float64}((0.5, 0.0, 0.0)),  # N5: Midpoint edge 1-2
-        Vec{3,Float64}((0.5, 0.5, 0.0)),  # N6: Midpoint edge 2-3
-        Vec{3,Float64}((0.0, 0.5, 0.0)),  # N7: Midpoint edge 3-1
-        Vec{3,Float64}((0.0, 0.0, 0.5)),  # N8: Midpoint edge 1-4
-        Vec{3,Float64}((0.5, 0.0, 0.5)),  # N9: Midpoint edge 2-4
-        Vec{3,Float64}((0.0, 0.5, 0.5))   # N10: Midpoint edge 3-4
-    )
+    return SVector(Vec{3,Float64}.((
+        (0.0, 0.0, 0.0),  # N1: Corner
+        (1.0, 0.0, 0.0),  # N2: Corner
+        (0.0, 1.0, 0.0),  # N3: Corner
+        (0.0, 0.0, 1.0),  # N4: Corner
+        (0.5, 0.0, 0.0),  # N5: Midpoint edge 1-2
+        (0.5, 0.5, 0.0),  # N6: Midpoint edge 2-3
+        (0.0, 0.5, 0.0),  # N7: Midpoint edge 3-1
+        (0.0, 0.0, 0.5),  # N8: Midpoint edge 1-4
+        (0.5, 0.0, 0.5),  # N9: Midpoint edge 2-4
+        (0.0, 0.5, 0.5)   # N10: Midpoint edge 3-4
+    )))
 end
 
 # ============================================================================
-# TOPOLOGICAL CONNECTIVITY (Corner Nodes Only)
+# TOPOLOGICAL CONNECTIVITY (Typed Entities)
 # ============================================================================
 
 """
-    edges(::Tetrahedron{N}) where N -> NTuple{6, NTuple{2, Int}}
+    edges(::T) where T <: Tetrahedron -> SVector{6, Edge{T}}
 
-Return edge connectivity (pairs of **corner node indices**) for tetrahedron.
-This is TOPOLOGICAL connectivity, independent of interpolation order.
+Return typed edge entities for tetrahedron.
+
+Returns an `SVector` of `Edge{T}` instances. Position in the vector IS the edge ID.
 
 # Returns
-6-tuple of edge definitions:
-- Edge 1: (1, 2) - N1 → N2
-- Edge 2: (2, 3) - N2 → N3
-- Edge 3: (3, 1) - N3 → N1
-- Edge 4: (1, 4) - N1 → N4
-- Edge 5: (2, 4) - N2 → N4
-- Edge 6: (3, 4) - N3 → N4
+6 edges, each containing the vertex indices that bound the edge:
+- Edge 1: vertices (1, 2)
+- Edge 2: vertices (2, 3)
+- Edge 3: vertices (3, 1)
+- Edge 4: vertices (1, 4)
+- Edge 5: vertices (2, 4)
+- Edge 6: vertices (3, 4)
+
+# Examples
+```julia
+edges_list = edges(Tet4())
+# edges_list[1] is Edge 1, bounded by vertices (1,2)
+# edges_list[3] is Edge 3, bounded by vertices (3,1)
+
+# Extract from DOF type
+DOF{Vec{3}, Edge{Tet4}}
+entity_list = entities(Edge{Tet4})  # Type carries all info!
+```
 
 # Note
-- Only references **corner nodes** (1, 2, 3, 4)
-- Same for all tetrahedron types (Tet4, Tet10)
+Same for all tetrahedron types (Tet4, Tet10) - topologically identical.
 """
-function edges(::Tetrahedron{N}) where {N}
-    return (
-        (1, 2),  # Edge 1
-        (2, 3),  # Edge 2
-        (3, 1),  # Edge 3
-        (1, 4),  # Edge 4
-        (2, 4),  # Edge 5
-        (3, 4)   # Edge 6
-    )
+function edges(::T) where {T<:Tetrahedron}
+    return SVector(Edge{T}.((
+        (1, 2),
+        (2, 3),
+        (3, 1),
+        (1, 4),
+        (2, 4),
+        (3, 4)
+    )))
 end
 
 """
-    faces(::Tetrahedron{N}) where N -> NTuple{4, NTuple{3, Int}}
+    faces(::T) where T <: Tetrahedron -> SVector{4, Face{T}}
 
-Return face connectivity for tetrahedron.
-Each face is triangular (3 **corner nodes**).
+Return typed face entities for tetrahedron.
+
+Returns an `SVector` of `Face{T}` instances. Position in the vector IS the face ID.
 
 # Returns
-4-tuple of triangular faces:
-- Face 1: (1, 3, 2) - Base (looking from above)
-- Face 2: (1, 2, 4)
-- Face 3: (2, 3, 4)
-- Face 4: (3, 1, 4)
+4 triangular faces, each containing the vertex indices that bound the face:
+- Face 1: vertices (1, 3, 2)
+- Face 2: vertices (1, 2, 4)
+- Face 3: vertices (2, 3, 4)
+- Face 4: vertices (3, 1, 4)
+
+# Examples
+```julia
+faces_list = faces(Tet4())
+# faces_list[1] is Face 1, bounded by vertices (1,3,2)
+# faces_list[4] is Face 4, bounded by vertices (3,1,4)
+
+# Extract from DOF type
+DOF{Vec{3}, Face{Tet4}}
+entity_list = entities(Face{Tet4})  # Type carries all info!
+```
 
 # Note
-- Only references corner nodes
-- Faces are triangular (3 nodes each)
-- Same for all tetrahedron types
+Same for all tetrahedron types (Tet4, Tet10) - topologically identical.
 """
-function faces(::Tetrahedron{N}) where {N}
-    return (
-        (1, 3, 2),  # Face 1: Base
-        (1, 2, 4),  # Face 2
-        (2, 3, 4),  # Face 3
-        (3, 1, 4)   # Face 4
-    )
+function faces(::T) where {T<:Tetrahedron}
+    return SVector(Face{T}.((
+        (1, 3, 2),
+        (1, 2, 4),
+        (2, 3, 4),
+        (3, 1, 4)
+    )))
 end
+
+"""
+    vertices(::T) where T <: Tetrahedron -> SVector{4, Vertex{T}}
+
+Return typed vertex entities for tetrahedron.
+
+Returns an `SVector` of `Vertex{T}` instances. Position in the vector IS the vertex ID.
+
+# Returns
+4 vertices (the corner nodes)
+
+# Examples
+```julia
+verts = vertices(Tet4())
+# verts[1] is Vertex 1
+# verts[2] is Vertex 2
+# etc.
+
+# Extract from DOF type (Lagrange elements)
+DOF{Float64, Vertex{Tet4}}
+entity_list = entities(Vertex{Tet4})  # Type carries all info!
+```
+"""
+function vertices(::T) where {T<:Tetrahedron}
+    return SVector(Vertex{T}(), Vertex{T}(), Vertex{T}(), Vertex{T}())
+end
+
+"""
+    cells(::T) where T <: Tetrahedron -> SVector{1, Cell{T}}
+
+Return typed cell entity for tetrahedron (the element interior itself).
+
+Returns an `SVector` with one `Cell{T}` instance (the tetrahedron volume).
+
+# Examples
+```julia
+cell_list = cells(Tet4())
+# cell_list[1] is the Cell (the tetrahedron interior)
+
+# Extract from DOF type (DG elements)
+DOF{Float64, Cell{Tet4}}
+entity_list = entities(Cell{Tet4})  # Type carries all info!
+```
+"""
+function cells(::T) where {T<:Tetrahedron}
+    return SVector(Cell{T}())
+end
+
+# ============================================================================
+# ENTITY COUNT HELPERS
+# ============================================================================
+
+"""
+    nvertices(::Tetrahedron) -> Int
+
+Return number of vertices (corner nodes) - always 4 for tetrahedra.
+"""
+nvertices(::Tetrahedron) = 4
+
+"""
+    nedges(::Tetrahedron) -> Int
+
+Return number of edges - always 6 for tetrahedra.
+"""
+nedges(::Tetrahedron) = 6
+
+"""
+    nfaces(::Tetrahedron) -> Int
+
+Return number of faces - always 4 for tetrahedra.
+"""
+nfaces(::Tetrahedron) = 4
 
 # ============================================================================
 # EXPORTS
