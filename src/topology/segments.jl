@@ -19,26 +19,38 @@ nnodes(::Segment{N}) where {N} = N
 dim(::Segment{N}) where {N} = 1
 
 function reference_coordinates(::Segment{2})
-    return SVector(
-        Vec{1,Float64}((-1.0,)),
-        Vec{1,Float64}((1.0,))
-    )
+    return SVector(Vec{1,Float64}.((
+        (-1.0,),
+        (1.0,)
+    )))
 end
 
 function reference_coordinates(::Segment{3})
-    return SVector(
-        Vec{1,Float64}((-1.0,)),
-        Vec{1,Float64}((1.0,)),
-        Vec{1,Float64}((0.0,))
-    )
+    return SVector(Vec{1,Float64}.((
+        (-1.0,),
+        (1.0,),
+        (0.0,)
+    )))
 end
 
-function edges(::Segment{N}) where {N}
-    return ((1, 2),)
+function edges(::T) where {T<:Segment}
+    return SVector(Edge{T}((1, 2)))
 end
 
-function faces(::Segment{N}) where {N}
-    return ((1,), (2,))  # Endpoints are "faces" in 1D
+function faces(::T) where {T<:Segment}
+    return SVector(Vertex{T}(), Vertex{T}())  # Endpoints are "faces" in 1D
 end
+
+function vertices(::T) where {T<:Segment}
+    return SVector(Vertex{T}(), Vertex{T}())
+end
+
+function cells(::T) where {T<:Segment}
+    return SVector(Cell{T}())
+end
+
+nvertices(::Segment) = 2
+nedges(::Segment) = 1
+nfaces(::Segment) = 2  # Two endpoints
 
 export Seg2, Seg3
