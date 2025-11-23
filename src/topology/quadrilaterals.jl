@@ -21,47 +21,62 @@ nnodes(::Quadrilateral{N}) where {N} = N
 dim(::Quadrilateral{N}) where {N} = 2
 
 function reference_coordinates(::Quadrilateral{4})
-    return SVector(
-        Vec{2,Float64}((-1.0, -1.0)),
-        Vec{2,Float64}((1.0, -1.0)),
-        Vec{2,Float64}((1.0, 1.0)),
-        Vec{2,Float64}((-1.0, 1.0))
-    )
+    return SVector(Vec{2,Float64}.((
+        (-1.0, -1.0),
+        (1.0, -1.0),
+        (1.0, 1.0),
+        (-1.0, 1.0)
+    )))
 end
 
 function reference_coordinates(::Quadrilateral{8})
-    return SVector(
-        Vec{2,Float64}((-1.0, -1.0)),  # N1: Corner
-        Vec{2,Float64}((1.0, -1.0)),   # N2: Corner
-        Vec{2,Float64}((1.0, 1.0)),    # N3: Corner
-        Vec{2,Float64}((-1.0, 1.0)),   # N4: Corner
-        Vec{2,Float64}((0.0, -1.0)),   # N5: Edge midpoint
-        Vec{2,Float64}((1.0, 0.0)),    # N6: Edge midpoint
-        Vec{2,Float64}((0.0, 1.0)),    # N7: Edge midpoint
-        Vec{2,Float64}((-1.0, 0.0))    # N8: Edge midpoint
-    )
+    return SVector(Vec{2,Float64}.((
+        (-1.0, -1.0),  # N1: Corner
+        (1.0, -1.0),   # N2: Corner
+        (1.0, 1.0),    # N3: Corner
+        (-1.0, 1.0),   # N4: Corner
+        (0.0, -1.0),   # N5: Edge midpoint
+        (1.0, 0.0),    # N6: Edge midpoint
+        (0.0, 1.0),    # N7: Edge midpoint
+        (-1.0, 0.0)    # N8: Edge midpoint
+    )))
 end
 
 function reference_coordinates(::Quadrilateral{9})
-    return SVector(
-        Vec{2,Float64}((-1.0, -1.0)),  # N1: Corner
-        Vec{2,Float64}((1.0, -1.0)),   # N2: Corner
-        Vec{2,Float64}((1.0, 1.0)),    # N3: Corner
-        Vec{2,Float64}((-1.0, 1.0)),   # N4: Corner
-        Vec{2,Float64}((0.0, -1.0)),   # N5: Edge midpoint
-        Vec{2,Float64}((1.0, 0.0)),    # N6: Edge midpoint
-        Vec{2,Float64}((0.0, 1.0)),    # N7: Edge midpoint
-        Vec{2,Float64}((-1.0, 0.0)),   # N8: Edge midpoint
-        Vec{2,Float64}((0.0, 0.0))     # N9: Center node
-    )
+    return SVector(Vec{2,Float64}.((
+        (-1.0, -1.0),  # N1: Corner
+        (1.0, -1.0),   # N2: Corner
+        (1.0, 1.0),    # N3: Corner
+        (-1.0, 1.0),   # N4: Corner
+        (0.0, -1.0),   # N5: Edge midpoint
+        (1.0, 0.0),    # N6: Edge midpoint
+        (0.0, 1.0),    # N7: Edge midpoint
+        (-1.0, 0.0),   # N8: Edge midpoint
+        (0.0, 0.0)     # N9: Center node
+    )))
 end
 
-function edges(::Quadrilateral{N}) where {N}
-    return ((1, 2), (2, 3), (3, 4), (4, 1))
+function edges(::T) where {T<:Quadrilateral}
+    return SVector(Edge{T}.((
+        (1, 2), (2, 3),
+        (3, 4), (4, 1)
+    )))
 end
 
-function faces(::Quadrilateral{N}) where {N}
-    return ((1, 2, 3, 4),)
+function faces(::T) where {T<:Quadrilateral}
+    return SVector(Face{T}((1, 2, 3, 4)))
 end
+
+function vertices(::T) where {T<:Quadrilateral}
+    return SVector(Vertex{T}(), Vertex{T}(), Vertex{T}(), Vertex{T}())
+end
+
+function cells(::T) where {T<:Quadrilateral}
+    return SVector(Cell{T}())
+end
+
+nvertices(::Quadrilateral) = 4
+nedges(::Quadrilateral) = 4
+nfaces(::Quadrilateral) = 1
 
 export Quad4, Quad8, Quad9
