@@ -96,10 +96,29 @@ using Tensors
     mesh = Mesh{8,Hexahedron{8}}(nodes, connectivity_uint32, element_sets)
 
     # ========================================================================
-    # 2. Material and Physics
+    # 2. Create Elements with NEW DOF System
     # ========================================================================
 
-    println("\n[2] Setting up physics...")
+    println("\n[2] Creating elements with new DOF system...")
+
+    # Define element type: Hexahedron + Lagrange basis + 3D displacement DOFs at vertices
+    # Using new format with field types
+    S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
+    ElemType = Element{Hexahedron{8}, Lagrange{1}, S}
+    elements, dof_mgr = create_elements!(mesh, ElemType)
+
+    println("  Element count: $(length(elements))")
+    println("  Total DOFs: $(dof_mgr.total_dofs)")
+    println("  Expected DOFs: $ndofs (3 per node)")
+
+    @test length(elements) == nelems
+    @test dof_mgr.total_dofs == ndofs
+
+    # ========================================================================
+    # 3. Material and Physics
+    # ========================================================================
+
+    println("\n[3] Setting up physics...")
 
     # Steel properties
     E = 210e9  # Pa (210 GPa)
@@ -141,16 +160,9 @@ using Tensors
     # 
     # Solve for F:
     # F = (δ × 3 × E × I) / L³
-    # F = (10.0 × 3 × 210e9 × (1/12)) / 1024³
-    # F = (10.0 × 3 × 210e9 / 12) / 1073741824
-    # F = (525e9) / 1073741824
-    # F = 488758.553206175... N
-    #
-    # Calculate exactly:
     δ_desired = 10.0  # m
     I_x = (Ly * Lx^3) / 12  # Moment of inertia about X-axis
     F_total = -((δ_desired * 3 * E * I_x) / Lz^3)  # Negative for -Y direction
-
 
     n_loaded = length(loaded_nodes)
     force_per_node = Vec{3}((0.0, F_total / n_loaded, 0.0))  # Y-component for bending!
@@ -158,104 +170,129 @@ using Tensors
     println("  Total force: $(F_total/1e3) kN (in -Y direction for BENDING)")
     println("  Force per node: $(F_total/n_loaded/1e3) kN")
 
-    # Create kernel (explicit API)
+    # ========================================================================
+    # 4. Assembly with COOAssembler API
+    # ========================================================================
+
+    println("\n[4] Assembling system...")
+
+    # Create kernel
+    material = LinearElastic(E=E, ν=ν)
     kernel = ContinuumKernel(
         ContinuumFormulation{FullThreeD}(),
         material,
         Displacement{3}()
     )
 
-    # Create boundary conditions
-    bc_dirichlet = DirichletBC()
-
-    # Apply Dirichlet BC: fix all DOFs at Z=0
-    for node in fixed_nodes
-        push!(bc_dirichlet.node_ids, node)
-        push!(bc_dirichlet.components, [1, 2, 3])
-        push!(bc_dirichlet.values, 0.0)
-    end
-
-    # Create Neumann BC
-    bc_neumann = NeumannBC()
-    for node in loaded_nodes
-        push!(bc_neumann.surface_ids, node)
-        push!(bc_neumann.values, force_per_node)
-    end
-
-    # ========================================================================
-    # 3. Assembly and Solution (EXPLICIT API)
-    # ========================================================================
-
-    println("\n[3] Assembling system (explicit API)...")
-
-    # Choose assembler explicitly (COOAssembler for now, CSCAssembler for 4.1x faster)
+    # Create assembler and cache
     assembler = COOAssembler()
+    cache = COOCache(mesh, kernel)
 
+    println("  Created cache and assembler")
+
+    # Assemble stiffness matrix and force vector
     t_assembly = @elapsed begin
-        # Create cache (reusable!)
-        cache = create_cache(assembler, mesh, kernel)
-
-        # Assemble global system
         assemble!(cache, assembler, kernel, mesh)
-
-        # Extract K and f
-        K, f = extract_system(cache)
-
-        # Apply boundary conditions explicitly
-        apply_neumann_bcs!(f, kernel, mesh, bc_neumann)
-        apply_dirichlet_bcs!(K, f, kernel, mesh, bc_dirichlet)
     end
+
+    # Extract system matrices
+    K, f = extract_system(cache)
 
     println("  Assembly time: $(round(t_assembly*1000, digits=2)) ms")
     println("  Matrix size: $(size(K))")
     println("  Matrix nnz: $(nnz(K))")
+    
+    # ========================================================================
+    # 5. Apply Forces (using DOF manager API)
+    # ========================================================================
+    
+    println("\n[5] Applying forces...")
+    
+    # Apply forces at loaded nodes using DOF manager
+    for node_id in loaded_nodes
+        node_dofs = get_node_dofs(dof_mgr, node_id)
+        @assert length(node_dofs) == 3 "Expected 3 DOFs per node"
+        f[node_dofs[1]] += force_per_node[1]  # X component
+        f[node_dofs[2]] += force_per_node[2]  # Y component  
+        f[node_dofs[3]] += force_per_node[3]  # Z component
+    end
+    
+    println("  Applied forces to $(length(loaded_nodes)) nodes")
     println("  Force norm: $(norm(f))")
 
-    # Debug: Check force vector
-    println("\n  Debug: Force vector analysis")
-    println("    Non-zero force components: $(count(!iszero, f))")
-    println("    Max force magnitude: $(maximum(abs, f))")
-    println("    Force sum: $(sum(f))")
-
-    # Debug: Check which DOFs have forces
-    force_dofs = findall(!iszero, f)
-    if length(force_dofs) <= 20
-        println("    Force DOFs: $force_dofs")
-        for dof in force_dofs
-            println("      DOF $dof: $(f[dof]) N")
-        end
+    # ========================================================================
+    # 6. Apply Boundary Conditions (constraint elimination)
+    # ========================================================================
+    
+    println("\n[6] Applying boundary conditions...")
+    
+    # Identify fixed DOFs
+    fixed_dofs = Int[]
+    for node_id in fixed_nodes
+        node_dofs = get_node_dofs(dof_mgr, node_id)
+        append!(fixed_dofs, node_dofs)
     end
+    sort!(fixed_dofs)
+    
+    println("  Fixed DOFs: $(length(fixed_dofs)) (from $(length(fixed_nodes)) nodes)")
+    
+    # Identify free DOFs (complement of fixed DOFs)
+    all_dofs = 1:ndofs
+    free_dofs = setdiff(all_dofs, fixed_dofs)
+    
+    println("  Free DOFs: $(length(free_dofs))")
+    
+    # Extract reduced system (K_ff * u_f = f_f)
+    # This is the PROPER way: eliminate constraints, don't manipulate matrix
+    K_free = K[free_dofs, free_dofs]
+    f_free = f[free_dofs]
+    
+    println("  Reduced system size: $(size(K_free))")
+    
+    # ========================================================================
+    # 7. Solve Reduced System
+    # ========================================================================
 
-    # Debug: Check stiffness
-    K_diag_min = minimum(abs(K[i, i]) for i in 1:size(K, 1) if K[i, i] != 0)
-    K_diag_max = maximum(abs(K[i, i]) for i in 1:size(K, 1))
-    println("    Stiffness diagonal range: [$K_diag_min, $K_diag_max]")
+    println("\n[7] Solving reduced system...")
+
+    # Debug: Check reduced system
+    println("  Reduced force norm: $(norm(f_free))")
+    println("  Reduced stiffness nnz: $(nnz(K_free))")
+    
+    K_diag_min = minimum(abs(K_free[i, i]) for i in 1:size(K_free, 1) if K_free[i, i] != 0)
+    K_diag_max = maximum(abs(K_free[i, i]) for i in 1:size(K_free, 1))
+    println("  Stiffness diagonal range: [$K_diag_min, $K_diag_max]")
 
     # Check matrix properties
-    @test size(K) == (ndofs, ndofs)
-    @test !iszero(K)
-
-    println("\n[4] Solving system...")
+    @test size(K_free, 1) == length(free_dofs)
+    @test !iszero(K_free)
 
     t_solve = @elapsed begin
-        u = K \ f
+        u_free = K_free \ f_free
     end
 
     println("  Solve time: $(round(t_solve*1000, digits=2)) ms")
-    println("  Solution norm: $(norm(u))")
+    println("  Solution norm: $(norm(u_free))")
+    
+    # Reconstruct full displacement vector (fixed DOFs = 0)
+    u = zeros(ndofs)
+    u[free_dofs] = u_free
+    
+    println("  Full solution norm: $(norm(u))")
 
     # ========================================================================
-    # 4. Extract Results and Check
+    # 8. Extract Results and Check
     # ========================================================================
 
-    println("\n[5] Checking results...")
+    println("\n[8] Checking results...")
 
     # Extract tip displacements (Z=Lz nodes)
     tip_displacements = Vec{3,Float64}[]
     for node_id in loaded_nodes
-        ux = u[3*(node_id-1)+1]
-        uy = u[3*(node_id-1)+2]
-        uz = u[3*(node_id-1)+3]
+        node_dofs = get_node_dofs(dof_mgr, node_id)
+        ux = u[node_dofs[1]]
+        uy = u[node_dofs[2]]
+        uz = u[node_dofs[3]]
         push!(tip_displacements, Vec{3}((ux, uy, uz)))
     end
 
@@ -269,10 +306,10 @@ using Tensors
     println("    Z: $(u_tip_avg[3]*1000) mm")
 
     # ========================================================================
-    # 5. Analytical Comparison (Euler-Bernoulli Beam Theory)
+    # 9. Analytical Comparison (Euler-Bernoulli Beam Theory)
     # ========================================================================
 
-    println("\n[6] Analytical comparison...")
+    println("\n[9] Analytical comparison...")
 
     # For cantilever beam with end load (BENDING):
     # δ = (F * L³) / (3 * E * I)
@@ -291,10 +328,10 @@ using Tensors
     println("  Ratio (FEM/Analytical): $(abs(uy_tip)/δ_analytical)")
 
     # ========================================================================
-    # 6. Regression Acceptance Criteria
+    # 10. Regression Acceptance Criteria
     # ========================================================================
 
-    println("\n[7] Acceptance criteria...")
+    println("\n[10] Acceptance criteria...")
 
     # Criterion 1: Solution exists
     @test !any(isnan, u)
@@ -334,7 +371,7 @@ using Tensors
     println("  ✓ Result matches baseline (within 0.1%)")
 
     # ========================================================================
-    # 7. Summary Statistics
+    # 11. Summary Statistics
     # ========================================================================
 
     println("\n" * "="^70)
