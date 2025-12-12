@@ -91,43 +91,9 @@ using LinearAlgebra
 # Load abstract types
 include("abstract_material.jl")
 
-"""
-    PlasticityState <: AbstractMaterialState
-
-State variables for perfect plasticity model.
-
-# Fields
-- `ε_p::SymmetricTensor{2,3,Float64,6}` - Plastic strain tensor
-- `α::SymmetricTensor{2,3,Float64,6}` - Backstress (kinematic hardening)
-- `κ::Float64` - Equivalent plastic strain (scalar)
-
-# Notes
-Immutable for thread safety. Updates create new state.
-"""
-struct PlasticityState <: AbstractMaterialState
-    ε_p::SymmetricTensor{2,3,Float64,6}  # Plastic strain
-    α::SymmetricTensor{2,3,Float64,6}    # Backstress
-    κ::Float64                            # Equivalent plastic strain
-
-    function PlasticityState(ε_p::SymmetricTensor{2,3,Float64,6},
-        α::SymmetricTensor{2,3,Float64,6},
-        κ::Float64)
-        κ ≥ 0.0 || throw(ArgumentError("Equivalent plastic strain must be non-negative, got κ = $κ"))
-        new(ε_p, α, κ)
-    end
-end
-
-"""
-    PlasticityState()
-
-Initialize state with zero plastic strain and backstress.
-"""
-PlasticityState() = PlasticityState(zero(SymmetricTensor{2,3}),
-    zero(SymmetricTensor{2,3}),
-    0.0)
-
-# Zero constructor for Base.zero compatibility
-Base.zero(::Type{PlasticityState}) = PlasticityState()
+# PlasticityState struct removed - now using compositional NamedTuple
+# State is represented as: (ε_p=SymmetricTensor{2,3}, α=SymmetricTensor{2,3}, κ=Float64)
+# This compositional design is inferred automatically from material traits
 
 """
     PerfectPlasticity <: AbstractPlasticMaterial
@@ -217,8 +183,12 @@ PerfectPlasticity(; E::Real, ν::Real, σ_y::Real, H::Real) =
 # Trait declaration: PerfectPlasticity has strain-dependent tangent and state
 material_behavior(::PerfectPlasticity) = StatefulStrainDependent()
 
-# State type trait: PerfectPlasticity uses PlasticityState
-state_type(::Type{PerfectPlasticity}) = PlasticityState
+# New trait system: Physics and state variable requirements
+# PerfectPlasticity supports 3D elasticity with J2 plasticity
+supported_physics(::PerfectPlasticity) = (Elasticity{3}(),)
+
+# PerfectPlasticity requires three state variables (compositional design)
+required_state_variables(::PerfectPlasticity) = (PlasticStrain, Backstress, EquivalentPlasticStrain)
 
 """
     compute_stress(material::PerfectPlasticity, 
@@ -242,20 +212,20 @@ Compute stress and consistent tangent using radial return mapping.
 # Arguments
 - `material::PerfectPlasticity` - Material parameters
 - `ε::SymmetricTensor{2,3}` - Total strain tensor
-- `state_old::Union{Nothing,PlasticityState}` - Previous state (nothing = initial)
+- `state_old::NamedTuple` - Previous state (empty = initial): (ε_p, α, κ)
 - `Δt::Float64` - Time increment (unused for rate-independent plasticity)
 
 # Returns
 - `σ::SymmetricTensor{2,3}` - Cauchy stress tensor
 - `𝔻::SymmetricTensor{4,3}` - Consistent tangent modulus
-- `state_new::PlasticityState` - Updated state
+- `state_new::NamedTuple` - Updated state: (ε_p, α, κ)
 
 # Performance
 ~200-500 ns per evaluation (elastic), ~300-600 ns (plastic)
 """
 function compute_stress(material::PerfectPlasticity,
     ε::SymmetricTensor{2,3},
-    state_old::Union{Nothing,PlasticityState}=nothing,
+    state_old::NamedTuple=NamedTuple(),
     Δt::Float64=0.0)
     # Extract material parameters
     μ = material.μ
@@ -263,15 +233,10 @@ function compute_stress(material::PerfectPlasticity,
     σ_y = material.σ_y
     H = material.H
 
-    # Initialize state if needed
-    if state_old === nothing
-        state_old = PlasticityState()
-    end
-
-    # Extract old state
-    ε_p_old = state_old.ε_p
-    α_old = state_old.α
-    κ_old = state_old.κ
+    # Extract old state (with defaults for initial/empty state)
+    ε_p_old = get(state_old, :ε_p, zero(SymmetricTensor{2,3}))
+    α_old = get(state_old, :α, zero(SymmetricTensor{2,3}))
+    κ_old = get(state_old, :κ, 0.0)
 
     # Elastic strain
     ε_e = ε - ε_p_old
@@ -295,7 +260,7 @@ function compute_stress(material::PerfectPlasticity,
     if f_trial ≤ 0.0
         # ==================== ELASTIC ====================
         σ = σ_trial
-        state_new = state_old  # No state change
+        state_new = (ε_p=ε_p_old, α=α_old, κ=κ_old)  # No state change
 
         # Elastic tangent
         𝔻 = λ * I ⊗ I + 2μ * symmetric_identity_tensor()
@@ -335,8 +300,8 @@ function compute_stress(material::PerfectPlasticity,
         # Update equivalent plastic strain
         κ_new = κ_old + Δλ
 
-        # New state
-        state_new = PlasticityState(ε_p_new, α_new, κ_new)
+        # New state (compositional NamedTuple)
+        state_new = (ε_p=ε_p_new, α=α_new, κ=κ_new)
 
         # Consistent tangent (elastoplastic)
         # For kinematic hardening: 𝔻^ep = 𝔻^e - (4μ²/(2μ + 2H/3)) · (n ⊗ n)
