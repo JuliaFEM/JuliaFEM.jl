@@ -57,22 +57,22 @@ function reference_coordinates(::Quadrilateral{9})
 end
 
 function edges(::T) where {T<:Quadrilateral}
-    return SVector(Edge{T}.((
+    return SVector(Edge.((
         (1, 2), (2, 3),
         (3, 4), (4, 1)
     )))
 end
 
 function faces(::T) where {T<:Quadrilateral}
-    return SVector(Face{T}((1, 2, 3, 4)))
+    return SVector(Face((1, 2, 3, 4)))
 end
 
 function vertices(::T) where {T<:Quadrilateral}
-    return SVector(Vertex{T}(), Vertex{T}(), Vertex{T}(), Vertex{T}())
+    return SVector(Vertex(), Vertex(), Vertex(), Vertex())
 end
 
 function cells(::T) where {T<:Quadrilateral}
-    return SVector(Cell{T}())
+    return SVector(Cell())
 end
 
 nvertices(::Quadrilateral) = 4

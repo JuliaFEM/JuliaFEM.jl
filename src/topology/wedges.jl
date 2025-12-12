@@ -52,7 +52,7 @@ function reference_coordinates(::Wedge{15})
 end
 
 function edges(::T) where {T<:Wedge}
-    return SVector(Edge{T}.((
+    return SVector(Edge.((
         (1, 2), (2, 3), (3, 1),  # Bottom triangle
         (4, 5), (5, 6), (6, 4),  # Top triangle
         (1, 4), (2, 5), (3, 6)   # Vertical edges
@@ -60,7 +60,7 @@ function edges(::T) where {T<:Wedge}
 end
 
 function faces(::T) where {T<:Wedge}
-    return SVector(Face{T}.((
+    return SVector(Face.((
         (1, 3, 2),       # Bottom triangle
         (4, 5, 6),       # Top triangle
         (1, 2, 5, 4),    # Quad face 1
@@ -71,13 +71,13 @@ end
 
 function vertices(::T) where {T<:Wedge}
     return SVector(
-        Vertex{T}(), Vertex{T}(), Vertex{T}(),
-        Vertex{T}(), Vertex{T}(), Vertex{T}()
+        Vertex(), Vertex(), Vertex(),
+        Vertex(), Vertex(), Vertex()
     )
 end
 
 function cells(::T) where {T<:Wedge}
-    return SVector(Cell{T}())
+    return SVector(Cell())
 end
 
 nvertices(::Wedge) = 6

@@ -70,7 +70,7 @@ function reference_coordinates(::Hexahedron{27})
 end
 
 function edges(::T) where {T<:Hexahedron}
-    return SVector(Edge{T}.((
+    return SVector(Edge.((
         (1, 2), (2, 3), (3, 4), (4, 1),
         (5, 6), (6, 7), (7, 8), (8, 5),
         (1, 5), (2, 6), (3, 7), (4, 8)
@@ -78,7 +78,7 @@ function edges(::T) where {T<:Hexahedron}
 end
 
 function faces(::T) where {T<:Hexahedron}
-    return SVector(Face{T}.((
+    return SVector(Face.((
         (1, 4, 3, 2), (5, 6, 7, 8),
         (1, 2, 6, 5), (2, 3, 7, 6),
         (3, 4, 8, 7), (4, 1, 5, 8)
@@ -87,13 +87,13 @@ end
 
 function vertices(::T) where {T<:Hexahedron}
     return SVector(
-        Vertex{T}(), Vertex{T}(), Vertex{T}(), Vertex{T}(),
-        Vertex{T}(), Vertex{T}(), Vertex{T}(), Vertex{T}()
+        Vertex(), Vertex(), Vertex(), Vertex(),
+        Vertex(), Vertex(), Vertex(), Vertex()
     )
 end
 
 function cells(::T) where {T<:Hexahedron}
-    return SVector(Cell{T}())
+    return SVector(Cell())
 end
 
 nvertices(::Hexahedron) = 8

@@ -34,19 +34,19 @@ function reference_coordinates(::Segment{3})
 end
 
 function edges(::T) where {T<:Segment}
-    return SVector(Edge{T}((1, 2)))
+    return SVector(Edge((1, 2)))
 end
 
 function faces(::T) where {T<:Segment}
-    return SVector(Vertex{T}(), Vertex{T}())  # Endpoints are "faces" in 1D
+    return SVector(Vertex(), Vertex())  # Endpoints are "faces" in 1D
 end
 
 function vertices(::T) where {T<:Segment}
-    return SVector(Vertex{T}(), Vertex{T}())
+    return SVector(Vertex(), Vertex())
 end
 
 function cells(::T) where {T<:Segment}
-    return SVector(Cell{T}())
+    return SVector(Cell())
 end
 
 nvertices(::Segment) = 2

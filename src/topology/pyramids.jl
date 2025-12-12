@@ -28,14 +28,14 @@ function reference_coordinates(::Pyramid{5})
 end
 
 function edges(::T) where {T<:Pyramid}
-    return SVector(Edge{T}.((
+    return SVector(Edge.((
         (1, 2), (2, 3), (3, 4), (4, 1),  # Base edges
         (1, 5), (2, 5), (3, 5), (4, 5)   # Edges to apex
     )))
 end
 
 function faces(::T) where {T<:Pyramid}
-    return SVector(Face{T}.((
+    return SVector(Face.((
         (1, 4, 3, 2),  # Quad base
         (1, 2, 5),     # Triangle face 1
         (2, 3, 5),     # Triangle face 2
@@ -45,11 +45,11 @@ function faces(::T) where {T<:Pyramid}
 end
 
 function vertices(::T) where {T<:Pyramid}
-    return SVector(Vertex{T}(), Vertex{T}(), Vertex{T}(), Vertex{T}(), Vertex{T}())
+    return SVector(Vertex(), Vertex(), Vertex(), Vertex(), Vertex())
 end
 
 function cells(::T) where {T<:Pyramid}
-    return SVector(Cell{T}())
+    return SVector(Cell())
 end
 
 nvertices(::Pyramid) = 5
