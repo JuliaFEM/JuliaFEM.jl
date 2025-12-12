@@ -45,7 +45,7 @@ For each integration point:
 3. Compute physical gradients ∇N = J^{-T} ⋅ ∇_ξ N
 4. Store detJ * weight for integration
 """
-function update_geometry_cache!(
+@inline function update_geometry_cache!(
     geometry_cache::GeometryCache,
     element_cache::ElementCache,
     kernel::AbstractKernel,
@@ -61,7 +61,9 @@ function update_geometry_cache!(
     nnodes = length(conn)
 
     # Extract node coordinates (mesh.nodes already contains Vec{3})
-    for (i, node) in enumerate(conn)
+    # Use indexed loop instead of enumerate to avoid iterator allocation
+    @inbounds for i in 1:nnodes
+        node = conn[i]
         geometry_cache.X[i] = mesh.nodes[node]
     end
 
@@ -71,7 +73,7 @@ function update_geometry_cache!(
 
     @inbounds for ip_idx in 1:nips
         ip = ips[ip_idx]
-        ξ = ip.ξ
+        ξ = ip.coords
 
         # Reference gradients
         dN_dξ = get_basis_derivatives(element_cache.topology, element_cache.basis, ξ)
