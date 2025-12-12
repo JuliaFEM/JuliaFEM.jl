@@ -218,6 +218,47 @@ dofs_per_node(::Temperature) = 1
 dofs_per_node(::DisplacementRotation{Dim}) where Dim = 2 * Dim
 
 # ============================================================================
+# QUANTITY TYPE TRAIT
+# ============================================================================
+
+"""
+    quantity_type(::Type{<:AbstractField}) → Type
+
+Extract underlying quantity type from field type.
+
+The quantity type is the actual data type used to represent the field values:
+- `Displacement{Dim}` → `Vec{Dim}` (vector quantity)
+- `Temperature` → `Float64` (scalar quantity)
+- `DisplacementRotation{Dim}` → `Vec{2*Dim}` (vector quantity with 2*Dim components)
+
+# Examples
+
+```julia
+quantity_type(Displacement{3})          # Vec{3}
+quantity_type(Displacement{2})          # Vec{2}
+quantity_type(Temperature)              # Float64
+quantity_type(DisplacementRotation{3})   # Vec{6}
+quantity_type(DisplacementRotation{2})   # Vec{4}
+```
+
+# Implementation
+
+Each field type must implement this trait. The quantity type is used for:
+- DOF size computation
+- Type inference in generated functions
+- Field-to-physics mapping
+
+# See Also
+- [`dofs_per_node`](@ref) - Number of DOFs per node
+"""
+function quantity_type end
+
+# Concrete implementations
+quantity_type(::Type{Displacement{Dim}}) where Dim = Vec{Dim}
+quantity_type(::Type{Temperature}) = Float64
+quantity_type(::Type{DisplacementRotation{Dim}}) where Dim = Vec{2*Dim}
+
+# ============================================================================
 # DOF MAPPING - Maps nodes to global DOF indices
 # ============================================================================
 
@@ -275,15 +316,18 @@ Zero allocations - writes to pre-allocated buffer.
 # See Also
 - [`dofs_per_node`](@ref) - Number of DOFs per node
 """
-function get_dof_mapping!(
+@inline function get_dof_mapping!(
     dofs::AbstractVector{Int},
     field::AbstractField,
     element_nodes::AbstractVector{Int}
 )
     ndofs_per_node = dofs_per_node(field)
 
+    # Use indexed loop to avoid iterator allocation
+    nnodes = length(element_nodes)
     idx = 1
-    @inbounds for node_id in element_nodes
+    @inbounds for i in 1:nnodes
+        node_id = element_nodes[i]
         for component in 1:ndofs_per_node
             dofs[idx] = ndofs_per_node * (node_id - 1) + component
             idx += 1
