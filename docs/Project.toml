@@ -1,3 +1,7 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+JuliaFEM = "f80590ac-b429-510a-8a99-e7c46989f22d"
 Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
+
+[sources]
+JuliaFEM = {path = ".."}
