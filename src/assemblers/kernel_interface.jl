@@ -93,7 +93,7 @@ function compute_element_stiffness!(
 
     # Loop over integration points
     for ip in integration_points(integration)
-        ξ = ip.ξ
+        ξ = ip.coords
         w = ip.weight
 
         # Compute B-matrix (strain-displacement)
@@ -278,7 +278,7 @@ function get_dof_mapping!(dofs, kernel, element_id, mesh)
 end
 ```
 """
-function get_dof_mapping!(
+@inline function get_dof_mapping!(
     dofs::AbstractVector{Int},
     kernel::AbstractKernel,
     element_id::Int,
@@ -288,11 +288,14 @@ function get_dof_mapping!(
     field = get_field(kernel)
     ndofs_per_node = dofs_per_node(field)
 
-    # Inline DOF mapping to avoid allocation from tuple conversion
+    # Inline DOF mapping to avoid allocation from tuple iteration
+    # Use indexed access instead of iteration to avoid tuple iterator allocation
+    nnodes = length(nodes)
     idx = 1
-    @inbounds for node_id in nodes
+    @inbounds for i in 1:nnodes
+        node_id = Int(nodes[i])
         for component in 1:ndofs_per_node
-            dofs[idx] = ndofs_per_node * (Int(node_id) - 1) + component
+            dofs[idx] = ndofs_per_node * (node_id - 1) + component
             idx += 1
         end
     end
@@ -302,39 +305,6 @@ end
 
 # ============================================================================
 # OPTIONAL INTERFACE (for specialized assemblers)
-# ============================================================================
-
-"""
-    compute_node_contribution!(
-        node_cache::NodeCache,
-        kernel::AbstractKernel,
-        node_id::Int,
-        mesh::AbstractMesh,
-        node_to_elements::NodeToElementsMap
-    ) -> Nothing
-
-Compute nodal contributions from all touching elements **in-place**.
-
-Used by nodal-based assemblers. Not all kernels need to implement this -
-default implementation falls back to element-based computation.
-
-# Arguments
-- `node_cache`: Pre-allocated node workspace
-- `kernel`: Domain kernel
-- `node_id`: Node index in mesh
-- `mesh`: Finite element mesh
-- `node_to_elements`: Inverse connectivity map
-
-# Default Implementation
-
-Default behavior: for each element touching this node, compute full element
-stiffness, extract only rows/columns for this node.
-
-Specialized implementations can optimize by computing only node contributions
-directly (e.g., for explicit dynamics).
-"""
-function compute_node_contribution! end
-
 # ============================================================================
 # HELPER FUNCTIONS (for kernel implementations)
 # ============================================================================
@@ -364,7 +334,7 @@ This is a common utility used by assemblers after computing stiffness blocks:
 ```julia
 # Compute all blocks
 for k in 1:N, l in 1:N
-    K_blocks[k, l] = compute_block!(geometry_cache, material_cache, k, l)
+    K_blocks[k, l] = compute_block!(geometry_cache, material_workspace, k, l)
 end
 
 # Convert to Float64 matrix
@@ -389,19 +359,19 @@ end
 """
     compute_block!(
         geometry_cache::GeometryCache,
-        material_cache::MaterialStateCache,
+        material_workspace::AssemblyMaterialWorkspace,
         k_local::Int,
         l_local::Int
     ) -> Tensor{2,3,Float64,9}
 
-**Phase 2:** Compute stiffness block using **precomputed material state**.
+**Phase 2:** Compute stiffness block using **precomputed material workspace**.
 
 Integrates weak form over element to get stiffness block K[k,l] between
 nodes k and l. Uses precomputed tangent moduli from Phase 1 - **no material calls**!
 
 # Arguments
 - `geometry_cache`: Precomputed element geometry (gradients, detJ*w)
-- `material_cache`: Precomputed material state at all IPs (from Phase 1)
+- `material_workspace`: Precomputed material workspace at all IPs (from Phase 1)
 - `k_local`, `l_local`: Local node indices
 
 # Returns
@@ -409,7 +379,7 @@ Fully integrated 3×3 stiffness block K[k,l]
 
 # Performance
 - **Zero material calls** - all tangents precomputed in Phase 1
-- **Cache-friendly** - state_cache stays hot in L1/L2
+- **Cache-friendly** - material_workspace stays hot in L1/L2
 - **GPU-ready** - Pure integration, no branching
 - **Nodal assembly** - Compute state once, use N² times
 - **Zero allocation** - No type parameters to avoid 80 bytes overhead
@@ -418,7 +388,7 @@ Fully integrated 3×3 stiffness block K[k,l]
 ```julia
 # Phase 1: Update caches
 update_geometry_cache!(geometry_cache, element_cache, kernel, elem_id, mesh)
-update_material_cache!(material_cache, geometry_cache, material, element_cache, state_old, elem_id, Δt)
+update_material_cache!(material_workspace, geometry_cache, material, element_cache, state_old, elem_id, Δt)
 
 # Phase 2: Assemble all blocks (no material calls!)
 for k in 1:N, l in 1:N
@@ -532,7 +502,10 @@ update_geometry_cache!(geometry_cache, element_cache, kernel, elem_id, mesh)
 update_material_cache!(material_cache, geometry_cache, material, element_cache, state_old, elem_id, Δt)
 
 # Phase 2: Assemble all blocks (no material calls!)
-compute_all_blocks!(K_blocks, geometry_cache.∇N_data, geometry_cache.detJ_w, material_cache.𝔻)
+nips = length(material_workspace.states)
+# Zero-allocation extraction using dispatch (type-stable)
+𝔻_vec = get_tangent_vector(material_workspace)
+compute_all_blocks!(K_blocks, geometry_cache.∇N_data, geometry_cache.detJ_w, 𝔻_vec)
 ```
 """
 function compute_all_blocks!(
@@ -549,6 +522,7 @@ function compute_all_blocks!(
     end
 end
 
+# FIXME: remove these, we don't calculate matrix B and jacobian here anymore and B matrix in general
 """
     compute_b_matrix(
         basis::AbstractBasis,
@@ -579,7 +553,7 @@ assembly level (element level can allocate transiently).
 ```julia
 # Inside compute_element_stiffness!
 for ip in integration_points(integration)
-    B = compute_b_matrix(basis, cache.coords, ip.ξ)  # OK to allocate here
+    B = compute_b_matrix(basis, cache.coords, ip.coords)  # OK to allocate here
     # Use B to accumulate Ke...
 end
 ```
