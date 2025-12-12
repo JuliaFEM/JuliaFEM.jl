@@ -123,8 +123,8 @@ States are immutable structs for thread safety. Updates create new instances.
 
 # Usage
 State types are used in:
-- `MaterialStateCache{M<:Union{Nothing,AbstractMaterialState}}` - Cache storage
-- `Matrix{M<:AbstractMaterialState}` - Global state storage [nips, nelems]
+- `AssemblyMaterialWorkspace{M<:AbstractMaterialState}` - Per-element workspace during assembly
+- `GlobalMaterialCache{StateType}` - Persistent state storage for time-stepping [nips, nelems]
 - Material `compute_stress` functions for state evolution
 
 # Examples
@@ -145,7 +145,8 @@ state = PlasticityState(zero(SymmetricTensor{2,3}), zero(SymmetricTensor{2,3}), 
 
 # See Also
 - [`AbstractPlasticMaterial`](@ref) - Materials that use state
-- [`MaterialStateCache`](@ref) - Cache structure for state storage
+- [`AssemblyMaterialWorkspace`](@ref) - Per-element workspace during assembly
+- [`GlobalMaterialCache`](@ref) - Persistent state storage for time-stepping
 - [`compute_stress`](@ref) - Material constitutive function
 """
 abstract type AbstractMaterialState end
@@ -156,14 +157,14 @@ abstract type AbstractMaterialState end
 Empty material state for stateless materials (e.g., LinearElastic).
 
 Stateless materials don't need internal state variables, but the type system
-requires a concrete `M <: AbstractMaterialState` for `MaterialStateCache{M}`.
+requires a concrete `M <: AbstractMaterialState` for `AssemblyMaterialWorkspace{M}`.
 `EmptyState` serves as a placeholder that carries no data.
 
 # Usage
 ```julia
 # LinearElastic uses EmptyState
 material = LinearElastic(E=210.0e9, ν=0.3)
-cache = MaterialStateCache{EmptyState}(...)
+workspace = AssemblyMaterialWorkspace{EmptyState}(...)
 ```
 """
 struct EmptyState <: AbstractMaterialState end
