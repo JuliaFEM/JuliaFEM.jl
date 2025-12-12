@@ -2,204 +2,90 @@
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 """
-Physics type definitions.
+Physics category types for material trait dispatch.
 
-This file defines the concrete `Physics` struct and boundary condition storage types.
-Abstract interface defined in `src/physics/abstract.jl` and `src/physics/api.jl`.
+Defines abstract physics categories used for:
+- Material trait functions (required_field_type)
+- Material cache generation
+- Physics-based dispatch
+
+These are lower-level type tags, not complete FEM problems.
 """
 
-# ============================================================================
-# HELPER TYPES
-# ============================================================================
-
 """
-    Constraint
+    Elasticity{Dim} <: AbstractPhysics
 
-Internal constraint for constrained optimization (contact, incompressibility, etc.).
+Elasticity physics in Dim dimensions (2D or 3D).
 
-Placeholder for future constraint handling.
-"""
-struct Constraint end
-
-# ============================================================================
-# BOUNDARY CONDITION STORAGE
-# ============================================================================
-
-"""
-    DirichletBC
-
-Essential boundary conditions (prescribed displacements, temperatures, etc.).
-
-# Fields
-- `node_ids::Vector{Int}` - Node IDs with prescribed values
-- `components::Vector{Vector{Int}}` - Which DOF components per node
-- `values::Vector{Float64}` - Prescribed values
-"""
-mutable struct DirichletBC
-    node_ids::Vector{Int}
-    components::Vector{Vector{Int}}
-    values::Vector{Float64}
-
-    DirichletBC() = new(Int[], Vector{Int}[], Float64[])
-end
-
-"""
-    NeumannBC
-
-Natural boundary conditions (surface tractions, heat flux, etc.).
-
-# Fields
-- `surface_ids::Vector{Int}` - Surface/edge element IDs
-- `values::Vector{Vec{3,Float64}}` - Traction vectors per surface
-"""
-mutable struct NeumannBC
-    surface_ids::Vector{Int}
-    values::Vector{Vec{3,Float64}}
-
-    NeumannBC() = new(Int[], Vec{3,Float64}[])
-end
-
-# ============================================================================
-# PHYSICS STRUCT
-# ============================================================================
-
-"""
-    Physics{Formulation<:AbstractFormulation, Field<:AbstractField, Mesh<:AbstractMesh, Material<:AbstractMaterial} <: AbstractPhysics
-
-Concrete physics implementation coupling mesh, material, field, and formulation.
-
-# Type Parameters (dispatch-optimized order)
-- `Formulation`: How we discretize (e.g., ContinuumFormulation{FullThreeD})
-- `Field`: What we solve (e.g., Displacement{3}, Temperature)
-- `Mesh`: Mesh type (e.g., Mesh{Hex8}, Mesh{Tet10})
-- `Material`: Material type (e.g., LinearElastic, NeoHookean)
-
-# Fields
-- `name::String`: Problem name
-- `mesh::Mesh`: Reference to mesh (topology owner - NOT copied!)
-- `element_set::Symbol`: Which elements in mesh this physics applies to
-- `field::Field`: Field instance
-- `formulation::Formulation`: Formulation instance
-- `material::Material`: Material properties
-- `constraints::Vector{Constraint}`: Optional internal constraints
-- `bc_dirichlet::DirichletBC`: Essential boundary conditions
-- `bc_neumann::NeumannBC`: Natural boundary conditions
-
-# Design Philosophy
-
-**Physics references Mesh (does not own it)**. This enables:
-- Multiple physics sharing one mesh (multiphysics)
-- Memory efficiency (no mesh duplication)
-- Natural domain decomposition
-
-**Type parameter order** optimized for dispatch:
+Used for trait-based dispatch to determine required fields:
 ```julia
-# Specialized methods for formulation × field combinations
-assemble!(::Physics{ContinuumFormulation{FullThreeD}, Displacement{3}, M, Mat})
-assemble!(::Physics{BeamFormulation{Timoshenko}, DisplacementRotation{3}, M, Mat})
-
-# Generic fallback
-assemble!(::Physics{Fm, F, M, Mat}) where {Fm,F,M,Mat}
-```
-
-# Example
-
-```julia
-mesh = Mesh{Hex8}(nodes, connectivity)
-material = LinearElastic(E=210e9, ν=0.3)
-
-physics = Physics(
-    name = "cantilever",
-    mesh = mesh,
-    element_set = :all,
-    field = Displacement{3}(),
-    formulation = ContinuumFormulation{FullThreeD}(),
-    material = material
-)
-
-add_dirichlet!(physics, [1,2,3], [1,2,3], 0.0)
-sol = solve!(physics)
+required_field_type(Elasticity{3}())  # → Displacement{3}
 ```
 """
-struct Physics{Formulation<:AbstractFormulation,Field<:AbstractField,Mesh<:AbstractMesh,Material<:AbstractMaterial} <: AbstractPhysics
-    name::String
-    mesh::Mesh
-    element_set::Symbol
-    field::Field
-    formulation::Formulation
-    material::Material
-    constraints::Vector{Constraint}
-    bc_dirichlet::DirichletBC
-    bc_neumann::NeumannBC
-
-    # Inner constructor with type parameter validation
-    function Physics{Formulation,Field,Mesh,Material}(
-        name::String,
-        mesh::Mesh,
-        element_set::Symbol,
-        field::Field,
-        formulation::Formulation,
-        material::Material,
-        constraints::Vector{Constraint},
-        bc_dirichlet::DirichletBC,
-        bc_neumann::NeumannBC
-    ) where {Formulation<:AbstractFormulation,Field<:AbstractField,Mesh<:AbstractMesh,Material<:AbstractMaterial}
-        new{Formulation,Field,Mesh,Material}(
-            name, mesh, element_set, field, formulation, material,
-            constraints, bc_dirichlet, bc_neumann
-        )
-    end
-end
-
-# ============================================================================
-# PHYSICS CONSTRUCTOR
-# ============================================================================
+struct Elasticity{Dim} <: AbstractPhysics end
 
 """
-    Physics(; name, mesh, element_set, field, formulation, material, constraints=Constraint[])
+    Thermal{Dim} <: AbstractPhysics
 
-Create a physics problem with automatic type inference.
+Thermal physics (heat transfer) in Dim dimensions (2D or 3D).
 
-# Keyword Arguments
-- `name::String`: Problem name
-- `mesh`: Mesh instance (topology owner)
-- `element_set::Symbol`: Which elements in mesh to use (e.g., :all, :solid)
-- `field`: Field instance (e.g., Displacement{3}(), Temperature())
-- `formulation`: Formulation instance (e.g., ContinuumFormulation{FullThreeD}())
-- `material`: Material instance (e.g., LinearElastic(E=210e9, ν=0.3))
-- `constraints`: Optional constraints (default: empty)
-
-# Returns
-`Physics{Fm,F,M,Mat}` with fully inferred type parameters
-
-# Example
-
+Used for trait-based dispatch:
 ```julia
-physics = Physics(
-    name = "cantilever",
-    mesh = Mesh{Hex8}(nodes, connectivity),
-    element_set = :all,
-    field = Displacement{3}(),
-    formulation = ContinuumFormulation{FullThreeD}(),
-    material = LinearElastic(E=210e9, ν=0.3)
-)
-# Type: Physics{ContinuumFormulation{FullThreeD}, Displacement{3}, Mesh{Hex8}, LinearElastic}
+required_field_type(Thermal{2}())  # → Temperature (2D plane heat)
+required_field_type(Thermal{3}())  # → Temperature (3D heat)
+required_field_type(Thermal{2}())  # → Temperature (rotational symmetric 2D)
 ```
 """
-function Physics(;
-    name::String,
-    mesh::M,
-    element_set::Symbol,
-    field::F,
-    formulation::Fm,
-    material::Mat,
-    constraints::Vector{Constraint}=Constraint[]
-) where {M<:AbstractMesh,Mat<:AbstractMaterial,F<:AbstractField,Fm<:AbstractFormulation}
-    bc_dirichlet = DirichletBC()
-    bc_neumann = NeumannBC()
+struct Thermal{Dim} <: AbstractPhysics end
 
-    return Physics{Fm,F,M,Mat}(
-        name, mesh, element_set, field, formulation, material,
-        constraints, bc_dirichlet, bc_neumann
-    )
+# Note: Fluid physics type will be added when Velocity field type is implemented
+# """
+#     Fluid{Dim} <: AbstractPhysics
+#
+# Fluid physics in Dim dimensions.
+#
+# Used for trait-based dispatch:
+# ```julia
+# required_field_type(Fluid{3}())  # → Velocity{3}
+# ```
+# """
+# struct Fluid{Dim} <: AbstractPhysics end
+
+# ============================================================================
+# TRAIT FUNCTIONS
+# ============================================================================
+
+"""
+    required_field_type(physics::AbstractPhysics)
+
+Returns the field type required by the given physics.
+
+Used for compile-time inference of material cache structure and
+field requirements.
+
+# Examples
+```julia
+required_field_type(Elasticity{3}())  # → Displacement{3}
+required_field_type(Thermal{2}())     # → Temperature (2D)
+required_field_type(Thermal{3}())     # → Temperature (3D)
+```
+
+Materials can declare their physics requirements:
+```julia
+struct ThermoElasticMaterial <: AbstractMaterial
+    # ...
 end
+
+# Material supports both elasticity and thermal physics
+supported_physics(::ThermoElasticMaterial) = (Elasticity{3}(), Thermal{3}())
+
+# System maps this to required field types:
+# Elasticity{3} → Displacement{3}
+# Thermal → Temperature
+```
+"""
+function required_field_type end
+
+required_field_type(::Elasticity{Dim}) where Dim = Displacement{Dim}
+required_field_type(::Thermal{Dim}) where Dim = Temperature
+# required_field_type(::Fluid{Dim}) where Dim = Velocity{Dim}  # Add when Velocity field exists
