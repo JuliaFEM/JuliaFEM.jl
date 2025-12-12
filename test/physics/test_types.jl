@@ -1,100 +1,66 @@
 # This file is a part of JuliaFEM.
 # License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
-"""
-Unit tests for Physics types.
-
-Tests the Physics struct and boundary condition storage types.
-"""
-
 using Test
 using JuliaFEM
-using Tensors
 
-@testset "Physics Types" begin
-    @testset "DirichletBC construction" begin
-        bc = DirichletBC()
-        @test isempty(bc.node_ids)
-        @test isempty(bc.components)
-        @test isempty(bc.values)
+@testset "Physics Category Types" begin
+    @testset "Elasticity{Dim}" begin
+        # Type construction
+        e2d = Elasticity{2}()
+        e3d = Elasticity{3}()
+
+        @test e2d isa Elasticity{2}
+        @test e3d isa Elasticity{3}
+        @test e2d isa AbstractPhysics
+        @test e3d isa AbstractPhysics
+
+        # Type stability
+        @test typeof(e2d) == Elasticity{2}
+        @test typeof(e3d) == Elasticity{3}
     end
 
-    @testset "NeumannBC construction" begin
-        bc = NeumannBC()
-        @test isempty(bc.surface_ids)
-        @test isempty(bc.values)
+    @testset "Thermal{Dim}" begin
+        # Type construction
+        thermal_2d = Thermal{2}()
+        thermal_3d = Thermal{3}()
+
+        @test thermal_2d isa Thermal{2}
+        @test thermal_3d isa Thermal{3}
+        @test thermal_2d isa AbstractPhysics
+        @test thermal_3d isa AbstractPhysics
+
+        # Type stability
+        @test typeof(thermal_2d) == Thermal{2}
+        @test typeof(thermal_3d) == Thermal{3}
     end
 
-    @testset "Constraint construction" begin
-        c = Constraint()
-        @test c isa Constraint
+    @testset "required_field_type trait" begin
+        # Elasticity requires Displacement field
+        @test required_field_type(Elasticity{2}()) == Displacement{2}
+        @test required_field_type(Elasticity{3}()) == Displacement{3}
+
+        # Thermal requires Temperature field (dimension-independent)
+        @test required_field_type(Thermal{2}()) == Temperature
+        @test required_field_type(Thermal{3}()) == Temperature
+
+        # Type stability
+        @inferred required_field_type(Elasticity{3}())
+        @inferred required_field_type(Thermal{2}())
+        @inferred required_field_type(Thermal{3}())
     end
 
-    @testset "Physics construction with minimal mesh" begin
-        # Create minimal 1-element Hex8 mesh
-        nodes = Vec{3,Float64}[
-            Vec{3}((0.0, 0.0, 0.0)),
-            Vec{3}((1.0, 0.0, 0.0)),
-            Vec{3}((1.0, 1.0, 0.0)),
-            Vec{3}((0.0, 1.0, 0.0)),
-            Vec{3}((0.0, 0.0, 1.0)),
-            Vec{3}((1.0, 0.0, 1.0)),
-            Vec{3}((1.0, 1.0, 1.0)),
-            Vec{3}((0.0, 1.0, 1.0))
-        ]
-        connectivity = [NTuple{8,UInt32}((1, 2, 3, 4, 5, 6, 7, 8))]
-        element_sets = Dict{Symbol,Set{UInt32}}(:all => Set(UInt32(1)))
-        mesh = Mesh{8,Hexahedron{8}}(nodes, connectivity, element_sets)
+    @testset "Physics type dispatch" begin
+        # Different dimensions dispatch to different field types
+        function get_field_dim(physics::Elasticity{Dim}) where Dim
+            return Dim
+        end
 
-        # Create material
-        material = LinearElastic(E=210e9, ν=0.3)
+        @test get_field_dim(Elasticity{2}()) == 2
+        @test get_field_dim(Elasticity{3}()) == 3
 
-        # Create physics
-        physics = Physics(
-            name="test",
-            mesh=mesh,
-            element_set=:all,
-            field=Displacement{3}(),
-            formulation=ContinuumFormulation{FullThreeD}(),
-            material=material
-        )
-
-        @test physics isa Physics
-        @test physics.name == "test"
-        @test physics.mesh === mesh  # Same reference, not copy
-        @test physics.element_set == :all
-        @test physics.field isa Displacement{3}
-        @test physics.formulation isa ContinuumFormulation{FullThreeD}
-        @test physics.material === material
-        @test isempty(physics.constraints)
-        @test physics.bc_dirichlet isa DirichletBC
-        @test physics.bc_neumann isa NeumannBC
-    end
-
-    @testset "Physics type parameters" begin
-        # Create minimal mesh
-        nodes = Vec{3,Float64}[Vec{3}((0.0, 0.0, 0.0)), Vec{3}((1.0, 0.0, 0.0))]
-        connectivity = [NTuple{2,UInt32}((1, 2))]
-        element_sets = Dict{Symbol,Set{UInt32}}(:all => Set(UInt32(1)))
-        mesh = Mesh{2,Segment{2}}(nodes, connectivity, element_sets)
-
-        material = LinearElastic(E=210e9, ν=0.3)
-
-        physics = Physics(
-            name="test",
-            mesh=mesh,
-            element_set=:all,
-            field=Displacement{3}(),
-            formulation=ContinuumFormulation{FullThreeD}(),
-            material=material
-        )
-
-        # Check type parameters are correctly inferred
-        @test physics isa Physics{
-            ContinuumFormulation{FullThreeD},
-            Displacement{3},
-            Mesh{2,Segment{2}},
-            LinearElastic
-        }
+        # Thermal dimension parameter
+        @test required_field_type(Thermal{2}()) isa Type{Temperature}
+        @test required_field_type(Thermal{3}()) isa Type{Temperature}
     end
 end
