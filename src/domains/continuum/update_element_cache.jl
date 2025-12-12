@@ -39,7 +39,7 @@ No allocations - writes to pre-allocated element_cache.u_buffer and element_cach
 For linear analysis (u_global = nothing), u_buffer is filled with zero Vec{3}.
 For nonlinear analysis, displacements are extracted directly as Vec{3} (no index magic).
 """
-function update_element_cache!(
+@inline function update_element_cache!(
     element_cache::ElementCache,
     kernel::AbstractKernel,
     elem_id::Int,
@@ -52,12 +52,14 @@ function update_element_cache!(
 
     # Extract element displacements
     if u_global !== nothing
-        for (i, node) in enumerate(conn)
+        # Use indexed loop instead of enumerate to avoid iterator allocation
+        @inbounds for i in 1:nnodes_elem
+            node = conn[i]
             element_cache.u_buffer[i] = u_global[node]
         end
     else
         # Zero displacement for linear analysis
-        for i in 1:nnodes_elem
+        @inbounds for i in 1:nnodes_elem
             element_cache.u_buffer[i] = zero(Vec{3,Float64})
         end
     end
@@ -65,8 +67,9 @@ function update_element_cache!(
     # Get DOF mapping
     ndofs_per_node = dofs_per_node(kernel)
     ndofs_elem = nnodes_elem * ndofs_per_node
-    dofs = @view element_cache.dofs[1:ndofs_elem]
-    get_dof_mapping!(dofs, kernel, elem_id, mesh)
+    # Pass full array - get_dof_mapping! writes sequentially from index 1
+    # Avoid @view allocation by passing array directly (get_dof_mapping! respects array bounds)
+    @inbounds get_dof_mapping!(element_cache.dofs, kernel, elem_id, mesh)
 
     return nothing
 end
