@@ -74,6 +74,13 @@ material_behavior(::LinearElastic) = StatelessConstantTangent()
 # State type trait: LinearElastic is stateless (uses EmptyState)
 state_type(::Type{LinearElastic}) = EmptyState
 
+# New trait system: Physics and state variable requirements
+# LinearElastic supports 3D elasticity only
+supported_physics(::LinearElastic) = (Elasticity{3}(),)
+
+# LinearElastic is stateless - no internal state variables
+required_state_variables(::LinearElastic) = ()
+
 """
     λ(material::LinearElastic) -> Float64
 
@@ -142,7 +149,7 @@ steel = LinearElastic(E=200e9, ν=0.3)
 function compute_stress(
     material::LinearElastic,
     ε::SymmetricTensor{2,3,T},
-    state_old::Nothing,
+    state_old::Union{Nothing,NamedTuple},
     Δt::Float64
 ) where T
 
@@ -160,7 +167,7 @@ function compute_stress(
     𝕀ˢʸᵐ = one(SymmetricTensor{4,3,T,36})  # Symmetric 4th order identity
     𝔻 = λ_val * (I ⊗ I) + 2μ_val * 𝕀ˢʸᵐ
 
-    return σ, 𝔻, nothing  # No state change (stateless material)
+    return σ, 𝔻, NamedTuple()  # No state change (stateless material)
 end
 
 """
