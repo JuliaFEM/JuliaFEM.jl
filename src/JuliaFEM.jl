@@ -79,9 +79,9 @@ Comprehensive guides in `docs/book/`:
 - `nodal_assembly_concept.md` - GPU-friendly assembly
 - `multigpu_nodal_assembly.md` - Multi-GPU architecture (in progress)
 
-# Legacy API Support
+# Problem API
 
-The old `Problem` API is maintained for backward compatibility:
+The `Problem` type provides element-based assembly:
 
 ```julia
 problem = Problem(Elasticity, "body", 3)
@@ -98,9 +98,7 @@ GitHub: github.com/JuliaFEM/JuliaFEM.jl
 """
 module JuliaFEM
 
-# Import Base functions FIRST before defining any methods
-# Only import what we actually use - removed unused: similar, first, last, vec, 
-# +, -, *, /, isempty, empty!, push!
+# Import Base functions for extension
 import Base: getindex, setindex!, convert, length, size, isapprox,
    ==, haskey, copy, read, append!
 
@@ -109,13 +107,7 @@ using Logging  # For mesh readers
 using Tensors  # For basis functions (Vec type)
 using StaticArrays: SVector  # Static coordinate storage for topology nodes
 
-# Removed for minimal dependency approach:
-# - Calculus: Symbolic basis generation (basis/create_basis.jl, basis/subs.jl commented out)
-# - ForwardDiff: Only used in tutorial notebooks for plasticity
-# - HDF5/LightXML: I/O functionality (io.jl, AsterReader already commented out)
-# - Arpack: Modal analysis (solvers_modal.jl commented out)
-
-# No-op timing macro (TimerOutputs removed for minimal deps)
+# No-op timing macro
 macro timeit(args...)
    return esc(args[end])
 end
@@ -145,9 +137,14 @@ include("fields/api.jl")
 export AbstractField, Displacement, Temperature, DisplacementRotation
 export dofs_per_node, get_dof_mapping!, get_field
 
+# Local field evaluation (field quantities at a point)
+include("fields/local_field.jl")
+export LocalField
+
 # Material domain API
 include("materials/api.jl")
 export AbstractMaterial, AbstractElasticMaterial, AbstractPlasticMaterial
+export AbstractMaterialState, EmptyState
 export compute_stress, elasticity_tensor
 # Material behavior traits (for generic integration)
 export MaterialBehavior, StatelessConstantTangent, StatelessStrainDependent, StatefulStrainDependent
@@ -180,13 +177,15 @@ export constitutive_matrix_plate, get_thickness
 # Physics domain API (abstract type, interface functions, and concrete implementations)
 include("physics/abstract.jl")       # AbstractPhysics abstract type
 include("physics/api.jl")            # Interface functions (assemble!, solve!, etc.)
-include("physics/types.jl")          # Physics struct, DirichletBC, NeumannBC, Constraint
-include("physics/boundary_conditions.jl")  # BC method implementations
+include("physics/types.jl")          # Physics category types (Elasticity, Thermal, etc.)
+# include("physics/boundary_conditions.jl")  # BC method implementations (for old Physics struct - not needed)
 export AbstractPhysics, assemble!, solve!, add_dirichlet!, add_neumann!
-export Physics, Constraint, DirichletBC, NeumannBC
+export Elasticity, Thermal, required_field_type
 
-# Export additional assembly functions
-export assemble_v2!
+# Physics utilities (strain extraction from displacement gradients)
+include("physics/strain.jl")
+export extract_strain, extract_strain_rate
+
 export AbstractTopology
 
 # import FEMSparse  # Consolidated into src/sparse/
@@ -203,8 +202,10 @@ export AbstractTopology
 include("topology/api.jl")
 export AbstractTopology, nnodes, dim, reference_coordinates, edges, faces
 
-# Topology implementations (concrete types)
-include("topology/topology.jl")       # Helper functions (interface in api.jl)
+# Export topological entity types
+export TopologicalEntity, Vertex, Edge, Face, Cell
+export entities, nentities, vertices, cells
+export nvertices, nedges, nfaces
 
 # Consolidated topology files (one per shape family)
 include("topology/segments.jl")       # Segment (1D)
@@ -246,7 +247,7 @@ export Wedge6, Wedge15              # → Wedge
 # QUADRATURE: Integration schemes and quadrature rules
 # ============================================================================
 include("quadrature/api.jl")          # Core API types and interfaces (NEW)
-include("quadrature/integration.jl")  # Abstract integration interface, IntegrationPoint
+# integration.jl removed - OLD AbstractIntegration API no longer needed
 
 # Gauss-Legendre quadrature point tables (must be loaded before gauss.jl)
 include("quadrature/quaddata.jl")     # Quadrature data constants
@@ -257,11 +258,9 @@ include("quadrature/gl_pyramids.jl")      # Pyramid quadrature points
 include("quadrature/gl_tensor_product.jl") # Segment, Quadrilateral, Hexahedron quadrature points
 
 include("quadrature/gauss.jl")        # Gauss-Legendre quadrature
-include("quadrature/gauss_points.jl") # Compile-time integration points (zero-allocation)
+# gauss_points.jl removed - OLD compile-time integration point API no longer needed
 
-export AbstractIntegration, IntegrationPoint, integration_points, npoints
-export Gauss
-export get_gauss_points!  # Zero-allocation integration point API
+export IntegrationPoint, integration_points, npoints
 export get_quadrature_points  # Export quadrature point tables
 # New quadrature API
 export AbstractQuadratureRule, GaussLegendre, GaussLobatto, QuadraturePoint
@@ -308,9 +307,40 @@ include("basis/nurbs.jl")
 # include("basis/math.jl")  # Uses AbstractBasis{dim} throughout (jacobian, grad, interpolate, etc.)
 # TODO: Rewrite math functions for new AbstractBasis
 
+# ============================================================================
+# DOF SYSTEM: Unified field specification system
+# ============================================================================
+include("dofs/dofs.jl")
+
+# Modern unified field system (multi-field is fundamental!)
+export AbstractDOF, DOFSet, @DOFSet
+export element_id, n_element_dofs, element_dofs, basis_type, dof_type  # Element accessors
+export local_dof_count, global_dof_indices, local_to_global_map, field_dof_range  # Coupled assembly
+export field_ndofs, field_names, field_count, is_single_field
+export quantity_type, entity_type, single_field
+export ndofs, dof_size  # dof_size needed by fields.jl
+export extract_element_dofs, extract_element_dofs_structured  # DOF extraction from global vector
+export interpolate_fields, interpolate_field, interpolate_field_value  # Field interpolation at quadrature points
+export interpolate_local_fields  # LocalField interpolation with rates
+
+# DOF manager and element creation
+export DOFManager, get_element_ids, create_elements!
+export get_node_dofs, allocate_dofs!
+export register_fields!, count_field_dofs, count_entities  # NEW: Multi-field registration
+export ElementDescription
+
+# DOF connectivity (inverse mapping for DOF-based assembly)
+export DOFElementConnection, DOFConnectivity, DOFConnectivityGPU
+export build_dof_connectivity, build_dof_connectivity_gpu
+export connection_count, is_empty
+export elem_id, local_dof_idx
+
+# Legacy DOF type (DOF type for field variables)
+export DOF  # Old entity-based DOF{Quantity, Entity}
+
 # Consolidate FEMBase.jl into src/ (Phase 1 continued)
 # Order matters: fields → types → sparse → elements → integrate → problems → assembly
-include("fields/fields.jl")          # Field system (DCTI, DVTI, etc.)
+include("fields/fields.jl")          # LEGACY field system (DCTI, DVTI - to be removed)
 include("legacy/core_types.jl")      # Node, IP, IntegrationPoint (LEGACY - Dict-based)
 
 # Compatibility shim: Create FEMBase module for vendor packages EARLY
@@ -320,29 +350,30 @@ include("legacy/core_types.jl")      # Node, IP, IntegrationPoint (LEGACY - Dict
 
 include("sparse/sparse.jl")          # SparseMatrixCOO, SparseVectorCOO
 include("elements/elements.jl")      # Element type and interface
+include("elements/extract_element_dofs.jl")  # DOF extraction from global vector
+include("elements/interpolate.jl")           # Field interpolation at quadrature points
 include("elements/elements_lagrange.jl")  # OLD - uses AbstractBasis{0} (Poi1)
-# include("elements/integrate.jl")     # OLD - references NSeg, Poi1, etc.
-include("legacy/assembly_problems.jl")      # Problem types (LEGACY)
-include("assembly/framework.jl")      # Assembly framework
+
+include("legacy/assembly_problems.jl")      # Problem types
 include("solvers/solvers_base.jl")   # Base solver types
-include("legacy/analysis.jl")               # Analysis and AbstractResultsWriter (LEGACY)
-include("legacy/deprecated_fembase.jl")     # Deprecated/legacy methods from FEMBase (LEGACY)
+include("legacy/analysis.jl")               # Analysis and AbstractResultsWriter
+include("legacy/deprecated_fembase.jl")     # Deprecated/legacy methods from FEMBase
 
 # GPU Physics (new architecture - pure GPU, all BCs in device code)
 # Note: CUDA is loaded by the demo script, not here
 # The gpu_physics_elasticity.jl module should be included directly by demos
 
-# Mesh readers (consolidated from AbaqusReader.jl and AsterReader.jl)
+# Mesh readers (consolidated readers/ → io/)
 # AbaqusReader - ABAQUS .inp file format
-include("readers/keyword_register.jl")
-include("readers/parse_mesh.jl")
-include("readers/parse_model.jl")
-include("readers/create_surface_elements.jl")
-include("readers/abaqus_download.jl")
+include("io/keyword_register.jl")
+include("io/parse_mesh.jl")
+include("io/parse_model.jl")
+include("io/create_surface_elements.jl")
+include("io/abaqus_download.jl")
 
 # AsterReader - Code Aster .med file format (requires HDF5)
-# include("readers/read_aster_mesh.jl")
-# include("readers/read_aster_results.jl")
+# include("io/read_aster_mesh.jl")
+# include("io/read_aster_results.jl")
 
 # Graph algorithms (RCM bandwidth minimization from GraphOrdering.jl)
 include("mesh/graph_ordering.jl")
@@ -360,7 +391,7 @@ include("mesh/graph_ordering.jl")
 # export Elasticity
 # include("materials_plasticity.jl")  # Requires ForwardDiff for automatic differentiation
 # export plastic_von_mises
-include("legacy/problems_dirichlet.jl")  # LEGACY
+include("legacy/problems_dirichlet.jl") 
 export Dirichlet
 
 export assemble!, postprocess!
@@ -389,43 +420,68 @@ export assemble!, postprocess!
 include("materials/abstract_material.jl")
 # Note: abstract_material.jl redefines AbstractMaterial (already in api.jl)
 # TODO: Remove duplicate from abstract_material.jl
+
+# Material state variables and traits (new compositional design)
+include("materials/state_variables.jl")
+export AbstractStateVariable
+export PlasticStrain, Backstress, EquivalentPlasticStrain, DamageVariable
+export state_variable_type, default_symbol
+
+include("materials/traits.jl")
+include("materials/field_traits.jl")
+export supported_physics, required_field_types, required_state_variables
+export required_material_fields, material_field_type, create_zero_field
+export get_state_variable_types, get_state_variable_symbols, is_stateful
+
+# Material cache for state variable storage (global, compositional)
+include("materials/material_cache.jl")
+export GlobalMaterialCache
+export create_global_material_cache
+export get_state, get_old_state, set_state!
+export update_cache!, reset_cache!
+export get_state_variable, set_state_variable
+
 include("materials/linear_elastic.jl")
 export LinearElastic
 
 include("materials/neo_hookean.jl")
 export NeoHookean
 
+include("materials/perfect_plasticity.jl")
+export PerfectPlasticity
+
+# NOTE: state_bridge.jl removed - materials now use compositional NamedTuple directly
+# No more conversion between monolithic structs and compositional states needed!
+
 # ============================================================================
 # LEVEL 4: ASSEMBLY FRAMEWORK (Generic assembly strategies)
 # ============================================================================
 
-# Legacy assembly structures (element and nodal) - MUST come first for NodeToElementsMap
-include("assembly/element_structures.jl")
-export ElementAssemblyData, ElementContribution
-export scatter_to_global!, compute_residual!, apply_dirichlet_bc!
-export matrix_vector_product, get_dof_indices
-
-include("assembly/nodal_structures.jl")
-export NodeToElementsMap, get_node_spider
+# 
+# Old files: element_structures.jl, nodal_structures.jl, framework.jl
+# These were NOT used anywhere in the codebase
 
 # Generic assemblers (domain-agnostic)
 include("assemblers/abstract.jl")
 export AbstractAssembler, AbstractAssemblerCache, AbstractKernel
-export ElementBasedAssembler, NodalBasedAssembler
-export COOAssembler, CSCAssembler, NodalAssembler
+export ElementBasedAssembler
+export COOAssembler, CSCAssembler
 
 include("assemblers/element_cache.jl")
-export ElementCache, NodeCache
-export create_element_cache, create_node_cache
+export ElementCache
+export create_element_cache
 
 include("assemblers/geometry_cache.jl")
 export GeometryCache, ImmutableGeometryCache
 
 include("assemblers/material_cache.jl")
-export MaterialStateCache, ImmutableMaterialStateCache
+export AssemblyMaterialWorkspace, ImmutableMaterialStateCache
+export create_material_cache, create_assembly_workspace
+export get_stress, get_tangent, get_field, set_fields!
+export get_tangent_vector, get_stress_vector  # Zero-allocation field extraction
 
 include("assemblers/caches.jl")
-export COOCache, CSCCache, NodalCache
+export COOCache, CSCCache
 export reset!, extract_system, build_sparsity_pattern
 
 include("assemblers/kernel_interface.jl")
@@ -438,8 +494,12 @@ export assemble!, create_cache
 include("assemblers/element_based_csc.jl")
 # assemble!, create_cache already exported
 
-include("assemblers/nodal_based.jl")
-# assemble!, create_cache already exported (placeholders)
+# Microkernel architecture for multi-field DOF-by-DOF assembly
+# (Included after assemblers since it depends on AbstractKernel, GeometryCache, AssemblyMaterialWorkspace)
+include("physics/microkernels.jl")   # evaluate() interface, traits
+include("physics/formulations.jl")   # Helper utilities for Element{K,P,S}
+export evaluate, requires_basis_values, requires_basis_gradients, requires_basis_second_derivatives
+export field_type_for_dispatch, ThermoelasticityFields
 
 # ============================================================================
 # LEVEL 5: PHYSICAL DOMAINS (Domain-specific assembly kernels)
@@ -450,8 +510,8 @@ include("assemblers/nodal_based.jl")
 # ============================================================================
 
 # Boundary conditions (generic - work with any kernel/domain)
-include("domains/common/boundary_conditions.jl")
-export apply_neumann_bcs!, apply_dirichlet_bcs!  # Explicit BC application
+# include("domains/common/boundary_conditions.jl")  # Uses old Physics struct - not needed for now
+# export apply_neumann_bcs!, apply_dirichlet_bcs!  # Explicit BC application
 
 # ============================================================================
 # CONTINUUM MECHANICS DOMAIN
@@ -470,7 +530,6 @@ export compute_block, compute_block!  # Integration API (compute_block! deprecat
 export update_geometry_cache!, update_element_cache!, update_material_cache!  # Cache update functions
 
 # Continuum assembly (uses generic assemblers)
-include("domains/continuum/assemble_v2.jl")  # Ferrite-style (backup)
 export compute_element_stiffness  # For testing and advanced use
 
 # Backend abstraction (CPU/GPU selection)
@@ -487,7 +546,7 @@ export compute_element_stiffness  # For testing and advanced use
 # Extension automatically loads when user does 'using CUDA'
 # No need to manually include anymore!
 
-include("legacy/solvers.jl")  # LEGACY
+include("legacy/solvers.jl") 
 export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
    get_unknown_field_name, get_formulation_type, get_problems,
    get_field_problems, get_boundary_problems,
@@ -499,10 +558,11 @@ export AbstractSolver, Solver, Nonlinear, NonlinearSolver, Linear, LinearSolver,
 
 # Re-export Analysis and related types from FEMBase (needed by tests)
 export Analysis, AbstractAnalysis, add_problems!, run!
-include("legacy/problems_contact.jl")  # LEGACY
-include("legacy/problems_contact_3d.jl")  # LEGACY
-#include("legacy/problems_contact_3d_autodiff.jl")  # LEGACY
-export Contact
+# Commented out during Element{K,P,S} redesign (uses old Element API)
+# include("legacy/problems_contact.jl") 
+# include("legacy/problems_contact_3d.jl") 
+#include("legacy/problems_contact_3d_autodiff.jl") 
+# export Contact
 
 module Preprocess
 end
@@ -513,8 +573,18 @@ using SparseArrays, LinearAlgebra
 include("mesh/mesh.jl")
 export Mesh, topology_type, nnodes_per_element, nelements, nnodes_total
 
+# DOF manager requires Mesh type - include after Mesh is defined
+include("dofs/dof_manager.jl")
+
+# DOF connectivity (inverse mapping: DOF → Elements) - needs Element and DOFManager
+include("dofs/dof_connectivity.jl")
+
+# DOF-based assembler (needs DOF connectivity)
+include("assemblers/dof_based_coo.jl")
+export DOFBasedCOOAssembler, DOFBasedCOOCache
+
 # Now that Mesh is defined, include plate elements that depend on it
-include("domains/plates/dkt.jl")
+# include("domains/plates/dkt.jl")  # Uses old Physics struct - experimental, not in main test suite
 export get_elements_for_node, connectivity_matrix, get_node
 export find_nearest_nodes, find_nearest_node
 export get_element_set, get_elements_in_set
@@ -564,7 +634,7 @@ end
 #    calculate_area, calculate_center_of_mass, calculate_second_moment_of_mass,
 #    extract
 
-include("legacy/deprecations.jl")  # LEGACY
+include("legacy/deprecations.jl") 
 
 export SparseMatrixCOO, SparseVectorCOO, optimize!, resize_sparse
 export DCTI, DVTI, DCTV, DVTV, CCTI, CVTI, CCTV, CVTV, Increment
