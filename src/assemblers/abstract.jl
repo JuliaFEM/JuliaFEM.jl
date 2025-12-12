@@ -155,6 +155,35 @@ K, f = extract_system(cache)
 struct NodeBasedCOOAssembler <: NodalBasedAssembler end
 
 """
+    DOFBasedCOOAssembler <: NodalBasedAssembler
+
+DOF-by-DOF (row-by-row) assembly using COO format with scalar entry computation.
+
+**Strategy**: Loop over DOFs (matrix rows), compute scalar entries for touching elements,
+scatter to COO triplets. Finest granularity possible - computes ONE matrix entry at a time.
+
+**Performance**: 
+- CPU single-thread: ~2-3× slower than element-based (finest granularity)
+- CPU multi-thread: ~Same as node-based (parallelization over rows)
+- GPU: ~Same as node-based (one thread per DOF)
+- Matrix-free K*v: ~5-10× faster (no matrix storage)
+
+**Best for**: Matrix-free Krylov solvers, very large problems (> 1M DOFs).
+
+**Status**: ✅ Implemented
+
+# Usage
+
+```julia
+assembler = DOFBasedCOOAssembler()
+cache = create_cache(assembler, mesh, kernel)
+assemble!(cache, assembler, kernel, mesh)  # DOF-wise traversal!
+K, f = extract_system(cache)
+```
+"""
+struct DOFBasedCOOAssembler <: NodalBasedAssembler end
+
+"""
     NodalAssembler <: NodalBasedAssembler
 
 Generic node-by-node assembly (future: CSC, GPU variants).
@@ -221,18 +250,24 @@ Sizes (N, NIP) can be inferred from field dimensions at runtime.
 abstract type AbstractGeometryCache end
 
 """
-    AbstractMaterialStateCache{M<:AbstractMaterialState}
+    AbstractMaterialStateCache{FieldType, StateType}
 
-Abstract base type for material state caches.
+Abstract base type for assembly material workspaces.
 
-All material cache implementations must:
-- Store stress σ, tangent 𝔻, and internal state at all integration points
-- Support indexing: `cache.σ[q]`, `cache.𝔻[q]`, `cache.states[q]`
+All assembly material workspace implementations must:
+- Store material fields and temporary state at all integration points
+- Support field access via `workspace.fields[q]` and state via `workspace.states[q]`
+
+**Purpose:** Per-element temporary workspace during assembly (not persistent storage).
+
+# Type Parameters
+- `FieldType`: NamedTuple type for material fields (e.g., `(σ=..., 𝔻=...)` for mechanics)
+- `StateType`: NamedTuple type for state (e.g., `(ε_p=..., α=..., κ=...)` for plasticity)
 
 Concrete implementations:
-- `MaterialStateCache{M}`: Mutable, Vector-based (convenient for updates)
-- `ImmutableMaterialStateCache{M,NIP}`: Immutable, NTuple-based (zero allocations)
+- `AssemblyMaterialWorkspace{FieldType, StateType}`: Mutable, Vector-based (compositional, per-element workspace)
 
-Type parameter M must be a subtype of AbstractMaterialState.
+# See Also
+- `GlobalMaterialCache`: Persistent state storage for time-stepping (all elements)
 """
-abstract type AbstractMaterialStateCache{M<:AbstractMaterialState} end
+abstract type AbstractMaterialStateCache{FieldType, StateType} end
