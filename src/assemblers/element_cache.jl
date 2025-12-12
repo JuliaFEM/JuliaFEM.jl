@@ -42,24 +42,6 @@ struct ElementCache{T<:AbstractTopology,B<:AbstractBasis,IPS}
 end
 
 """
-    NodeCache
-
-Workspace for node-level computations (nodal assembly).
-
-Contains pre-allocated arrays for node DOF contributions and element connectivity.
-
-# Fields
-- `node_dofs::Vector{Int}`: Global DOF indices for this node
-- `touching_elements::Vector{Int}`: Elements touching this node
-- `local_indices::Vector{Int}`: Local node indices in elements
-"""
-struct NodeCache
-    node_dofs::Vector{Int}           # Global DOF indices for this node
-    touching_elements::Vector{Int}   # Elements touching this node
-    local_indices::Vector{Int}       # Local node indices in elements
-end
-
-"""
     reset!(cache::ElementCache)
 
 Reset element cache to zero values.
@@ -121,8 +103,7 @@ function create_element_cache(mesh::AbstractMesh, kernel::AbstractKernel)
     # Pre-compute topology, basis, and integration points
     topology = TopologyType()
     basis = Lagrange{1}()  # New API: basis order only (topology passed separately)
-    integration_scheme = default_integration(TopologyType)
-    ips = integration_points(integration_scheme, topology)
+    ips = integration_points(topology)  # New API: auto-selects quadrature order
 
     return ElementCache(
         zeros(max_ndofs_elem, max_ndofs_elem),  # Ke (legacy)
@@ -137,43 +118,3 @@ function create_element_cache(mesh::AbstractMesh, kernel::AbstractKernel)
     )
 end
 
-"""
-    create_node_cache(mesh::AbstractMesh, kernel::AbstractKernel) -> NodeCache
-
-Create pre-allocated node workspace.
-
-# Arguments
-- `mesh`: Mesh containing node-to-element connectivity
-- `kernel`: Kernel defining DOFs per node
-
-# Returns
-- `NodeCache` with buffers sized for node with most connections
-
-# Purpose
-During nodal assembly, each node needs:
-- `node_dofs`: DOF indices for this node
-- `touching_elements`: Element IDs connected to this node
-- `local_indices`: Local node index within each element
-
-# Example
-```julia
-mesh = Mesh{4,Tet4}(nodes, elements)
-kernel = ContinuumKernel()  # 3 DOFs per node (ux, uy, uz)
-cache = create_node_cache(mesh, kernel)
-# cache.node_dofs has length 3
-# cache.touching_elements sized for node with most element connections
-```
-"""
-function create_node_cache(mesh::AbstractMesh, kernel::AbstractKernel)
-    # Get maximum number of elements touching any node
-    node_to_elements = NodeToElementsMap(mesh)
-    max_touching = maximum(length(get_node_spider(node_to_elements, i))
-                           for i in 1:nnodes_total(mesh))
-    ndofs_per_node = dofs_per_node(kernel)
-
-    return NodeCache(
-        zeros(Int, ndofs_per_node),      # node_dofs
-        zeros(Int, max_touching),        # touching_elements
-        zeros(Int, max_touching)         # local_indices
-    )
-end
