@@ -113,7 +113,6 @@ include("physics.jl")  # Concrete implementations
 
 # Topology (geometry abstractions)
 include("topology/api.jl")
-include("topology/topology.jl")  # Helpers
 ```
 
 # Type Hierarchy Overview
