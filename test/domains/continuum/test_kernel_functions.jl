@@ -61,7 +61,7 @@
             # Manual integration using compute_block_at_point
             K_manual = zero(Tensor{2,3,Float64})
             for q in 1:NIP
-                𝔻 = material_cache.𝔻[q]
+                𝔻 = JuliaFEM.get_tangent(material_cache, q)
                 grad_k_test = geometry_cache.∇N_data[q, 1]
                 grad_l_test = geometry_cache.∇N_data[q, 2]
                 detJ_w = geometry_cache.detJ_w[q]
@@ -76,7 +76,7 @@
                 K_blocks,
                 geometry_cache.∇N_data,
                 geometry_cache.detJ_w,
-                material_cache.𝔻,
+                [JuliaFEM.get_tangent(material_cache, q) for q in 1:length(material_cache.states)],
                 1, 2
             )
             K_auto = K_blocks[1, 2]
