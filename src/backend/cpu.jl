@@ -142,7 +142,7 @@ function compute_element_stiffness(element::Element{N,NIP,F,B}, time::Float64) w
 
     # Integrate over element
     for ip in ips
-        ξ = ip.ξ
+        ξ = ip.coords
         w = ip.weight
 
         # NEW API: Basis function derivatives (shape function gradients in reference coords)
