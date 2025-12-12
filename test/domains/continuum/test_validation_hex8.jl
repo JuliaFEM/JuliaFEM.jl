@@ -173,9 +173,8 @@ using Tensors
         8 => Vec(0.0, 1.0, 1.0),
     )
 
-    # Create element
+    # Create mesh with unit cube (conn unused - just for reference)
     conn = (1, 2, 3, 4, 5, 6, 7, 8)
-    element = Element(Hexahedron{8}, conn)
 
     # Material properties (E=96, ν=1/3)
     E = 96.0
