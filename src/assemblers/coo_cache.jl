@@ -21,6 +21,8 @@ Good for problems where sparsity pattern changes (e.g., contact, topology optimi
 """
 
 using SparseArrays
+using Tensors
+using ..JuliaFEM: AssemblyMaterialWorkspace
 
 """
     COOCache <: AbstractAssemblerCache
@@ -37,7 +39,7 @@ After assembly, triplets are converted to sparse matrix using `sparse(I, J, V)`.
 - `f::Vector{Float64}`: Global force vector
 - `element_cache::ElementCache`: Per-element workspace
 - `geometry_cache::GeometryCache`: Geometry workspace
-- `material_cache::MaterialStateCache`: Material state workspace
+- `material_workspace::AssemblyMaterialWorkspace`: Assembly material workspace (per-element temporary)
 - `counter::Ref{Int}`: Current position in triplet arrays
 - `capacity::Int`: Maximum triplet capacity
 - `ndofs::Int`: Total number of DOFs
@@ -51,17 +53,18 @@ assemble!(cache, assembler, kernel, mesh)  # No allocations
 K, f = extract_system(cache)  # Build sparse matrix
 ```
 """
-mutable struct COOCache{EC<:ElementCache,MC<:MaterialStateCache} <: AbstractAssemblerCache
+mutable struct COOCache{EC<:ElementCache,MC<:AbstractMaterialStateCache,FieldType<:NamedTuple,StateType<:NamedTuple} <: AbstractAssemblerCache
     I::Vector{Int}                      # Row indices
     J::Vector{Int}                      # Column indices
     V::Vector{Float64}                  # Values
     f::Vector{Float64}                  # Force vector
     element_cache::EC                   # Element workspace (concrete type!)
     geometry_cache::GeometryCache       # Geometry workspace
-    material_cache::MC                  # Material state workspace (concrete type!)
-    counter::Ref{Int}                   # Current triplet count
+    material_workspace::MC              # Assembly material workspace (concrete type!)
+    counter::Int                        # Current triplet count (Int instead of Ref{Int} for zero-allocation access)
     capacity::Int                       # Maximum triplet capacity
     ndofs::Int                          # Total number of DOFs
+    𝔻_vec_buffer::Vector{SymmetricTensor{4,3,Float64,36}}  # Pre-allocated buffer for tangent vector (zero-allocation extraction)
 end
 
 """
@@ -105,10 +108,26 @@ function COOCache(mesh::AbstractMesh, kernel::AbstractKernel)
     # Get max integration points for geometry and material caches
     max_nips = length(element_cache.ips)
     geometry_cache = create_geometry_cache(nnodes_elem, max_nips)
-    material_cache = create_material_cache(kernel.material, max_nips)
+    material_workspace = create_material_cache(kernel.material, max_nips)
+    
+    # Infer FieldType and StateType from material_workspace for type stability
+    # material_workspace is AssemblyMaterialWorkspace{FieldType, StateType}
+    WorkspaceType = typeof(material_workspace)
+    if WorkspaceType <: AssemblyMaterialWorkspace
+        FieldType = WorkspaceType.parameters[1]
+        StateType = WorkspaceType.parameters[2]
+    else
+        # Fallback for other material cache types (shouldn't happen in practice)
+        FieldType = NamedTuple
+        StateType = NamedTuple
+    end
+    
+    # Pre-allocate buffer for tangent vector extraction (zero-allocation)
+    𝔻_vec_buffer = Vector{SymmetricTensor{4,3,Float64,36}}(undef, max_nips)
 
-    return COOCache(I, J, V, f, element_cache, geometry_cache, material_cache,
-        Ref(0), estimated_triplets, ndofs)
+    return COOCache{typeof(element_cache), typeof(material_workspace), FieldType, StateType}(
+        I, J, V, f, element_cache, geometry_cache, material_workspace,
+        0, estimated_triplets, ndofs, 𝔻_vec_buffer)  # Use Int instead of Ref(0) for zero-allocation
 end
 
 """
@@ -121,14 +140,14 @@ Zeros out triplet arrays and force vector, resets counter.
 """
 function reset!(cache::COOCache)
     # Only zero up to current counter position (faster than fill!)
-    current = cache.counter[]
+    current = cache.counter  # Direct access (Int, not Ref{Int})
     if current > 0
         @views cache.I[1:current] .= 0
         @views cache.J[1:current] .= 0
         @views cache.V[1:current] .= 0
     end
     fill!(cache.f, 0.0)
-    cache.counter[] = 0
+    cache.counter = 0  # Direct assignment (Int, not Ref{Int})
     return nothing
 end
 
@@ -148,7 +167,7 @@ once per assembly.
 - `f`: Force vector (reference, no copy)
 """
 function extract_system(cache::COOCache)
-    n = cache.counter[]
+    n = cache.counter  # Direct access (Int, not Ref{Int})
     I = @view cache.I[1:n]
     J = @view cache.J[1:n]
     V = @view cache.V[1:n]
