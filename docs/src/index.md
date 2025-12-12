@@ -1,35 +1,63 @@
-# JuliaFEM.jl documentation
+# JuliaFEM.jl
 
-```@contents
-Pages = ["index.md", "api.md"]
-```
+JuliaFEM.jl is an open-source finite element method (FEM) framework written in Julia, designed for reliable, scalable, and distributed finite element analysis.
 
-The JuliaFEM project develops open-source software for reliable, scalable,
-distributed Finite Element Method.
+## Overview
 
-The JuliaFEM software library is a framework that allows for the distributed
-processing of large Finite Element Models across clusters of computers using
-simple programming models. It is designed to scale up from single servers to
-thousands of machines, each offering local computation and storage. The basic
-design principle is: everything is nonlinear. All physics models are nonlinear
-from which the linearization are made as a special cases. 
+JuliaFEM.jl provides a modern, type-safe API for finite element analysis with support for:
 
-## Installing and testing package
+- **Multiple element types**: Triangles, quadrilaterals, tetrahedra, hexahedra, and more
+- **Various physics**: Linear and nonlinear elasticity, heat transfer, and more
+- **GPU acceleration**: CUDA support for high-performance computing
+- **Distributed computing**: Multi-GPU and MPI support for large-scale problems
 
-Installing package goes same way like other packages in julia, i.e.
+## Key Features
+
+- **Type-safe element system**: Elements are parameterized by topology, basis functions, and DOF specifications
+- **Modern physics API**: Clean separation between mesh, material, field, and formulation
+- **Flexible material models**: Linear elastic, Neo-Hookean, perfect plasticity, and more
+- **Efficient assembly**: COO and CSC sparse matrix formats with GPU support
+
+## Installation
+
+Install JuliaFEM.jl using Julia's package manager:
+
 ```julia
-julia> Pkg.add("JuliaFEM")
+using Pkg
+Pkg.add("JuliaFEM")
 ```
 
-Testing package can be done using `Pkg.test`, i.e.
+## Quick Start
+
 ```julia
-julia> Pkg.test("JuliaFEM")
+using JuliaFEM
+
+# Create a mesh
+mesh = create_unit_cube_mesh(Hex8, 10, 10, 10)
+
+# Define a physics problem
+physics = Physics(
+    name = "elasticity",
+    mesh = mesh,
+    element_set = :all,
+    field = Displacement{3}(),
+    formulation = ContinuumFormulation{FullThreeD}(),
+    material = LinearElastic(; E=200e9, ν=0.3)
+)
+
+# Assemble and solve
+assemble!(physics)
+solve!(physics)
 ```
+
+## Documentation
+
+- [API Reference](@ref) - Complete API documentation
 
 ## Contributing
 
-Have a new great idea and want to share it with the open source community?
-From [here](https://github.com/JuliaLang/julia/blob/master/CONTRIBUTING.md)
-and [here](https://juliadocs.github.io/Documenter.jl/stable/man/contributing/)
-you can look for coding style. [Here](https://docs.julialang.org/en/stable/manual/packages/#Making-changes-to-an-existing-package-1) is explained how to contribute to
-open source project, in general.
+Contributions are welcome! Please see the [GitHub repository](https://github.com/JuliaFEM/JuliaFEM.jl) for guidelines.
+
+## License
+
+JuliaFEM.jl is licensed under the MIT License.
