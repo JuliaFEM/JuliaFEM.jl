@@ -215,7 +215,7 @@ function compute_deformation_gradient(
 
     # Get integration point
     ip = element.integration_points[ip_index]
-    ξ = Vec(ip.ξ)
+    ξ = Vec(ip.coords)
 
     # Get basis function derivatives w.r.t. parametric coordinates
     # Using new API: get_basis_derivatives returns tuple of Vec
