@@ -12,6 +12,7 @@ Accumulates all element contributions, builds sparse matrix at end.
 """
 
 using SparseArrays
+using ..JuliaFEM: GlobalMaterialCache, get_tangent, get_tangent_vector, extract_tangent!
 
 # Include scatter implementations
 include("scatter_to_triplets.jl")
@@ -26,35 +27,40 @@ include("scatter_blocks_to_force.jl")
     assemble_element!(
         element_cache::ElementCache,
         geometry_cache::GeometryCache,
-        material_cache::MaterialStateCache,
+        material_workspace::AssemblyMaterialWorkspace,
         kernel::AbstractKernel,
         elem_id::Int,
         mesh::AbstractMesh,
         N::Int,
         u_global::Union{Nothing,Vector{Vec{3,Float64}}},
-        state_old::Union{Nothing,Matrix{<:AbstractMaterialState}},
+        global_cache::GlobalMaterialCache,
         Δt::Float64
     ) -> Nothing
 
-Assemble a single element (inline function for benchmarking).
+Assemble a single element using GlobalMaterialCache (NEW API).
+
+**New API:** Uses `GlobalMaterialCache` for persistent state storage.
+State is read from and written to `global_cache` automatically.
 
 This function encapsulates all operations performed on a single element:
 1. Reset caches
 2. Update element cache (extract displacements, DOF mapping)
 3. Update geometry cache (extract coordinates, compute gradients, detJ*w)
-4. Update material cache (compute stress, tangent, internal state)
+4. Update material workspace (compute stress, tangent, internal state)
+   - Reads old state from `global_cache`
+   - Writes new state to `global_cache`
 5. Compute element stiffness blocks
 
 # Arguments
 - `element_cache`: Element cache to update
 - `geometry_cache`: Geometry cache to update
-- `material_cache`: Material cache to update
+- `material_workspace`: Assembly material workspace to update (per-element temporary)
 - `kernel`: Domain kernel
 - `elem_id`: Current element ID
 - `mesh`: Finite element mesh
 - `N`: Number of nodes per element (compile-time constant)
 - `u_global`: Global displacement field (nothing for linear analysis)
-- `state_old`: Global material state (nothing for stateless materials)
+- `global_cache`: Global material cache (persistent state storage)
 - `Δt`: Time increment
 
 # Zero-Allocation Guarantee
@@ -64,19 +70,20 @@ All operations are in-place mutations of pre-allocated caches.
 function assemble_element!(
     element_cache::ElementCache,
     geometry_cache::GeometryCache,
-    material_cache::MaterialStateCache,
+    material_workspace::AssemblyMaterialWorkspace{FieldType, StateType},
     kernel::AbstractKernel,
     elem_id::Int,
     mesh::AbstractMesh,
     N::Int,
     u_global::Union{Nothing,Vector{Vec{3,Float64}}},
-    state_old::Union{Nothing,Matrix{<:AbstractMaterialState}},
-    Δt::Float64
-)
+    global_cache::GlobalMaterialCache,
+    Δt::Float64,
+    𝔻_vec_buffer::Vector{SymmetricTensor{4,3,Float64,36}}
+) where {FieldType<:NamedTuple, StateType<:NamedTuple}
     # Reset caches for new element
     reset!(element_cache)
     reset!(geometry_cache)
-    reset!(material_cache)
+    reset!(material_workspace)
 
     # PHASE 1: Update element cache (extract displacements, DOF mapping)
     update_element_cache!(element_cache, kernel, elem_id, mesh, u_global)
@@ -84,21 +91,198 @@ function assemble_element!(
     # PHASE 2: Update geometry cache (extract coordinates, compute gradients, detJ*w)
     update_geometry_cache!(geometry_cache, element_cache, kernel, elem_id, mesh)
 
-    # PHASE 3: Update material cache (compute stress, tangent, internal state)
-    update_material_cache!(material_cache, geometry_cache, kernel.material, element_cache, state_old, elem_id, Δt)
+    # PHASE 3: Update material workspace (compute stress, tangent, internal state)
+    # Uses GlobalMaterialCache - reads old state, writes new state
+    update_material_cache!(material_workspace, geometry_cache, kernel.material, element_cache, global_cache, elem_id, Δt)
 
     # PHASE 4: Compute element stiffness blocks
     # Assemble only upper triangle (k ≤ l) since stiffness matrix is symmetric
     # This halves computation and memory usage
+    # Extract tangent vector ONCE before loop for zero-allocation access
+    # CRITICAL FIX: Use extract_tangent! with pre-allocated buffer (zero-allocation)
+    fields = getfield(material_workspace, 1)  # Direct field access - zero allocation, type-stable
+    extract_tangent!(𝔻_vec_buffer, fields, FieldType)  # Type-stable extraction using compile-time field index
+    𝔻_vec = 𝔻_vec_buffer  # Use buffer directly (zero allocation)
     @inbounds for k in 1:N, l in k:N  # Only l ≥ k (upper triangle)
         compute_block!(
             element_cache.K_blocks,
             geometry_cache.∇N_data,
             geometry_cache.detJ_w,
-            material_cache.𝔻,
+            𝔻_vec,
             k, l
         )
     end
+
+    return nothing
+end
+
+"""
+    assemble_element!(
+        element_cache::ElementCache,
+        geometry_cache::GeometryCache,
+        material_workspace::AssemblyMaterialWorkspace,
+        kernel::AbstractKernel,
+        elem_id::Int,
+        mesh::AbstractMesh,
+        N::Int,
+        u_global::Union{Nothing,Vector{Vec{3,Float64}}},
+        state_old::Union{Nothing,Matrix{<:AbstractMaterialState}},
+        Δt::Float64
+    ) -> Nothing
+
+Assemble a single element (LEGACY API - Matrix{<:AbstractMaterialState}).
+
+**Legacy API:** Uses `Matrix{<:AbstractMaterialState}` for state storage.
+For new code, prefer `GlobalMaterialCache` overload.
+
+This function encapsulates all operations performed on a single element:
+1. Reset caches
+2. Update element cache (extract displacements, DOF mapping)
+3. Update geometry cache (extract coordinates, compute gradients, detJ*w)
+4. Update material workspace (compute stress, tangent, internal state)
+5. Compute element stiffness blocks
+
+# Arguments
+- `element_cache`: Element cache to update
+- `geometry_cache`: Geometry cache to update
+- `material_workspace`: Assembly material workspace to update (per-element temporary)
+- `kernel`: Domain kernel
+- `elem_id`: Current element ID
+- `mesh`: Finite element mesh
+- `N`: Number of nodes per element (compile-time constant)
+- `u_global`: Global displacement field (nothing for linear analysis)
+- `state_old`: Global material state (nothing for stateless materials) - LEGACY
+- `Δt`: Time increment
+
+# Zero-Allocation Guarantee
+This function should have ZERO allocations when called in a loop.
+All operations are in-place mutations of pre-allocated caches.
+"""
+function assemble_element!(
+    element_cache::ElementCache,
+    geometry_cache::GeometryCache,
+    material_workspace::AssemblyMaterialWorkspace{FieldType, StateType},
+    kernel::AbstractKernel,
+    elem_id::Int,
+    mesh::AbstractMesh,
+    N::Int,
+    u_global::Union{Nothing,Vector{Vec{3,Float64}}},
+    state_old::Union{Nothing,Matrix{<:AbstractMaterialState}},
+    Δt::Float64,
+    𝔻_vec_buffer::Vector{SymmetricTensor{4,3,Float64,36}}
+) where {FieldType<:NamedTuple, StateType<:NamedTuple}
+    # Reset caches for new element
+    reset!(element_cache)
+    reset!(geometry_cache)
+    reset!(material_workspace)
+
+    # PHASE 1: Update element cache (extract displacements, DOF mapping)
+    update_element_cache!(element_cache, kernel, elem_id, mesh, u_global)
+
+    # PHASE 2: Update geometry cache (extract coordinates, compute gradients, detJ*w)
+    update_geometry_cache!(geometry_cache, element_cache, kernel, elem_id, mesh)
+
+    # PHASE 3: Update material workspace (compute stress, tangent, internal state)
+    update_material_cache!(material_workspace, geometry_cache, kernel.material, element_cache, state_old, elem_id, Δt)
+
+    # PHASE 4: Compute element stiffness blocks
+    # Assemble only upper triangle (k ≤ l) since stiffness matrix is symmetric
+    # This halves computation and memory usage
+    # Extract tangent vector ONCE before loop for zero-allocation access
+    # CRITICAL FIX: Use extract_tangent! with pre-allocated buffer (zero-allocation)
+    fields = getfield(material_workspace, 1)  # Direct field access - zero allocation, type-stable
+    extract_tangent!(𝔻_vec_buffer, fields, FieldType)  # Type-stable extraction using compile-time field index
+    𝔻_vec = 𝔻_vec_buffer  # Use buffer directly (zero allocation)
+    @inbounds for k in 1:N, l in k:N  # Only l ≥ k (upper triangle)
+        compute_block!(
+            element_cache.K_blocks,
+            geometry_cache.∇N_data,
+            geometry_cache.detJ_w,
+            𝔻_vec,
+            k, l
+        )
+    end
+
+    return nothing
+end
+
+"""
+    assemble!(
+        cache::COOCache,
+        assembler::COOAssembler,
+        kernel::AbstractKernel,
+        mesh::AbstractMesh,
+        u_global::Union{Nothing,Vector{Vec{3,Float64}}},
+        global_cache::GlobalMaterialCache,
+        Δt::Float64
+    ) -> Nothing
+
+Assemble stiffness matrix and force vector using GlobalMaterialCache (NEW API).
+
+**New API:** Uses `GlobalMaterialCache` for persistent state storage.
+State is automatically read from and written to `global_cache` during assembly.
+
+# Arguments
+- `cache`: Pre-allocated COO cache
+- `assembler`: COO assembler
+- `kernel`: Domain kernel (continuum, plate, beam, etc.)
+- `mesh`: Finite element mesh
+- `u_global`: Global displacement field [nnodes] as Vec{3} (nothing for linear analysis)
+- `global_cache`: Global material cache (persistent state storage)
+- `Δt`: Time increment (for rate-dependent materials)
+
+# Side Effects
+- Mutates `cache.I`, `cache.J`, `cache.V` (triplets)
+- Mutates `cache.f` (force vector)
+- Writes new state to `global_cache` via `set_state!()`
+
+# Zero-Allocation Guarantee
+No allocations during assembly loop. All arrays pre-allocated in cache.
+Only allocation: `sparse(I, J, V)` in `extract_system(cache)` (called once).
+"""
+function assemble!(
+    cache::COOCache,
+    assembler::COOAssembler,
+    kernel::AbstractKernel,
+    mesh::AbstractMesh,
+    u_global::Union{Nothing,Vector{Vec{3,Float64}}},
+    global_cache::GlobalMaterialCache,
+    Δt::Float64
+)
+    # Extract compile-time constants from mesh type parameters
+    # Mesh{N,T} where N = nodes per element, T = topology type
+    MeshType = typeof(mesh)
+    N = MeshType.parameters[1]::Int  # Compile-time constant for loop unrolling
+
+    # Reset cache for new assembly
+    reset!(cache)
+
+    nelems = nelements(mesh)
+    element_cache = cache.element_cache
+    geometry_cache = cache.geometry_cache
+    material_workspace = cache.material_workspace
+
+    # Extract counter ONCE before loop to avoid Ref{Int} indirection overhead
+    counter = 0
+
+    # Loop over elements
+    𝔻_vec_buffer = cache.𝔻_vec_buffer  # Cache buffer reference for zero-allocation access
+    for elem_id in 1:nelems
+        # Assemble single element (all phases) - uses GlobalMaterialCache
+        assemble_element!(element_cache, geometry_cache, material_workspace,
+            kernel, elem_id, mesh, N, u_global, global_cache, Δt, 𝔻_vec_buffer)
+
+        # Scatter blocks directly to triplets using direct version (zero dispatch!)
+        counter = scatter_blocks_to_triplets_symmetric_direct!(
+            cache.I, cache.J, cache.V, counter, cache.capacity,
+            element_cache.K_blocks, element_cache.dofs, N)
+
+        # Scatter blocked force to global force vector
+        scatter_blocks_to_force!(cache.f, element_cache.f_blocks, element_cache.dofs, N)
+    end
+
+    # Write counter back ONCE after loop
+    cache.counter = counter  # Direct assignment (Int, not Ref{Int})
 
     return nothing
 end
@@ -114,21 +298,26 @@ end
         Δt::Float64 = 0.0
     ) -> Nothing
 
+Assemble stiffness matrix and force vector (LEGACY API - Matrix{<:AbstractMaterialState}).
+
+**Legacy API:** Uses `Matrix{<:AbstractMaterialState}` for state storage.
+For new code, prefer `GlobalMaterialCache` overload.
+
 Assemble global system using COO format with **three-phase approach**.
 
 # Three-Phase Algorithm
 
 1. Reset cache (zero arrays, reset counter)
 2. Loop over elements:
-   a. Reset caches: `reset!(geometry_cache)`, `reset!(element_cache)`, `reset!(material_cache)`
+   a. Reset caches: `reset!(geometry_cache)`, `reset!(element_cache)`, `reset!(material_workspace)`
    b. **Phase 1a (Geometry):** Extract node coordinates
       - `update_geometry_cache!(geometry_cache, kernel, elem_id, mesh)`
    c. **Phase 1b (Element):** Extract displacements and DOF mapping
       - `update_element_cache!(element_cache, kernel, elem_id, mesh, u_global)`
    d. **Phase 2 (Material):** Compute material state at all IPs
-      - `update_material_cache!(material_cache, geometry_cache, material, element_cache, state_old, elem_id, Δt)`
+      - `update_material_cache!(material_workspace, geometry_cache, material, element_cache, state_old, elem_id, Δt)`
    e. **Phase 3 (Stiffness):** Compute element stiffness using precomputed state
-      - `compute_element_stiffness!(element_cache, geometry_cache, material_cache, N, NIP)`
+      - `compute_element_stiffness!(element_cache, geometry_cache, material_workspace, N, NIP)`
    f. Scatter Ke to triplets: accumulate (i,j,value) to (I,J,V)
    g. Scatter fe to global force vector: `f[dofs] += fe`
 3. Use `extract_system(cache)` to build sparse matrix from triplets
@@ -201,7 +390,7 @@ function assemble!(
     nelems = nelements(mesh)
     element_cache = cache.element_cache
     geometry_cache = cache.geometry_cache
-    material_cache = cache.material_cache
+    material_workspace = cache.material_workspace
 
     # N (nodes per element) and NIP (integration points) are now compile-time constants
     # extracted from type parameters for aggressive loop unrolling
@@ -211,10 +400,11 @@ function assemble!(
     counter = 0
 
     # Loop over elements
+    𝔻_vec_buffer = cache.𝔻_vec_buffer  # Cache buffer reference for zero-allocation access
     for elem_id in 1:nelems
         # Assemble single element (all phases)
-        assemble_element!(element_cache, geometry_cache, material_cache,
-            kernel, elem_id, mesh, N, u_global, state_old, Δt)
+        assemble_element!(element_cache, geometry_cache, material_workspace,
+            kernel, elem_id, mesh, N, u_global, state_old, Δt, 𝔻_vec_buffer)
 
         # Scatter blocks directly to triplets using direct version (zero dispatch!)
         # Pass counter as Int (not Ref{Int}) to eliminate indirection
@@ -228,7 +418,7 @@ function assemble!(
 
     # Write counter back ONCE after loop
     # NOTE: counter MUST be written back so extract_system() knows how many triplets to extract
-    cache.counter[] = counter
+    cache.counter = counter  # Direct assignment (Int, not Ref{Int})
 
     return nothing
 end
