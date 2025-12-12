@@ -133,7 +133,7 @@ sum(dN_dx)  # ≈ Vec(0.0, 0.0)
 # Usage in Assembly
 ```julia
 for ip in integration_points(Gauss{2}(), Triangle())
-    xi = Vec(ip.ξ)
+    xi = Vec(ip.coords)
     
     # Basis evaluation
     N = get_basis_functions(Triangle(), Lagrange{Triangle, 1}(), xi)
