@@ -1,23 +1,7 @@
 """
 Finite Strain Plasticity with Multiplicative Decomposition
 
-Implements J2 plasticity in the finite deformation regime using:
-- Multiplicative decomposition: F = F^e · F^p
-- Hyperelastic stress response (Neo-Hookean)
-- Exponential map integration of plastic flow
-- Consistent algorithmic tangent
-
-Theory:
-- Simo & Hughes (1998), "Computational Inelasticity", Chapter 9
-- Simo (1992), "Algorithms for static and dynamic multiplicative plasticity"
-
-Key differences from small strain:
-1. F = F^e · F^p (multiplicative, not additive)
-2. Stress in intermediate configuration
-3. Exponential map for F^p update
-4. Pull-back/push-forward operations
-
-Performance: ~500-800 ns per evaluation (10-15× LinearElastic overhead)
+Implements J2 plasticity in the finite deformation regime using multiplicative decomposition F = F^e · F^p.
 """
 
 using Tensors
@@ -28,14 +12,10 @@ using LinearAlgebra
 
 State variables for finite strain plasticity.
 
-Fields:
-- `F_p::Tensor{2,3,Float64,9}`: Plastic deformation gradient (intermediate config)
-- `α_bar::SymmetricTensor{2,3,Float64,6}`: Backstress in intermediate config
-- `κ::Float64`: Equivalent plastic strain (≥ 0)
-
-Invariants:
-- det(F_p) = 1 (plastic incompressibility)
-- α_bar symmetric (Mandel stress space)
+# Fields
+- `F_p::Tensor{2,3,Float64,9}` - Plastic deformation gradient
+- `α_bar::SymmetricTensor{2,3,Float64,6}` - Backstress
+- `κ::Float64` - Equivalent plastic strain (≥ 0)
 """
 struct FiniteStrainPlasticityState
     F_p::Tensor{2,3,Float64,9}
@@ -58,22 +38,11 @@ end
 
 J2 plasticity with finite deformations using multiplicative decomposition.
 
-Fields:
-- `E::Float64`: Young's modulus (Pa, > 0)
-- `ν::Float64`: Poisson's ratio (0 < ν < 0.5)
-- `σ_y::Float64`: Yield stress (Pa, > 0)
-- `H::Float64`: Hardening modulus (Pa, ≥ 0)
-- `μ::Float64`: Shear modulus (Pa, computed)
-- `λ::Float64`: First Lamé parameter (Pa, computed)
-
-Constructor:
-    FiniteStrainPlasticity(; E, ν, σ_y, H)
-
-Validates:
-- E > 0
-- 0 < ν < 0.5 (physical bounds)
-- σ_y > 0
-- H ≥ 0
+# Fields
+- `E::Float64` - Young's modulus [Pa]
+- `ν::Float64` - Poisson's ratio [-]
+- `σ_y::Float64` - Yield stress [Pa]
+- `H::Float64` - Hardening modulus [Pa]
 """
 struct FiniteStrainPlasticity <: AbstractPlasticMaterial
     E::Float64
@@ -98,35 +67,11 @@ struct FiniteStrainPlasticity <: AbstractPlasticMaterial
 end
 
 """
-    compute_stress(material::FiniteStrainPlasticity, F, state_old, Δt)
+    compute_stress(material::FiniteStrainPlasticity, F, state_old, Δt) -> (σ, 𝔸, state_new)
 
 Compute Cauchy stress, spatial tangent, and updated state for finite strain plasticity.
 
-Uses multiplicative decomposition F = F^e · F^p with:
-1. Elastic trial in intermediate configuration
-2. Radial return mapping on Mandel stress
-3. Exponential map update of F^p
-4. Push-forward to spatial configuration
-
-Arguments:
-- `material::FiniteStrainPlasticity`: Material parameters
-- `F::Tensor{2,3}`: Deformation gradient (current config)
-- `state_old::Union{Nothing,FiniteStrainPlasticityState}`: Previous state (nothing = initial)
-- `Δt::Float64`: Time step (unused, for interface)
-
-Returns:
-- `σ::SymmetricTensor{2,3}`: Cauchy stress (spatial config)
-- `𝔸::SymmetricTensor{4,3}`: Spatial tangent modulus
-- `state_new::FiniteStrainPlasticityState`: Updated state
-
-Algorithm:
-1. Compute F_e^trial = F · inv(F_p^old)
-2. Pull-back to intermediate config: Mandel stress τ_trial
-3. Check yield: f = ||dev(τ_trial - α_bar)|| - √(2/3) σ_y
-4. If plastic: radial return on τ, exponential map for F_p
-5. Push-forward to spatial config: σ = (1/J) F_e · τ · F_e^T
-
-Performance: ~500-800 ns (10-15× LinearElastic)
+Uses multiplicative decomposition F = F^e · F^p with radial return mapping.
 """
 function compute_stress(
     material::FiniteStrainPlasticity,
@@ -284,8 +229,6 @@ end
     symmetric_identity_tensor()
 
 Fourth-order symmetric identity tensor: 𝕀 = ½(δᵢₖδⱼₗ + δᵢₗδⱼₖ)
-
-Used in constructing tangent moduli.
 """
 @inline function symmetric_identity_tensor()
     return SymmetricTensor{4,3}((i, j, k, l) ->
