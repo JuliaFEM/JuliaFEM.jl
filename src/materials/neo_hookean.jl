@@ -1,26 +1,5 @@
 """
 Neo-Hookean hyperelastic material model using Tensors.jl and automatic differentiation.
-
-This module implements the simplest hyperelastic material model derived from
-strain energy density. Uses ForwardDiff.jl for automatic computation of stress
-and tangent modulus from the strain energy function.
-
-Theory:
-    ψ(C) = μ/2·(I₁ - 3) - μ·ln(J) + λ/2·ln²(J)
-    
-Where:
-    C = FᵀF              Right Cauchy-Green tensor
-    I₁ = tr(C)           First invariant
-    J = √det(C)          Volume ratio (Jacobian)
-    μ, λ                 Lamé parameters
-
-Second Piola-Kirchhoff stress (energy conjugate to Green-Lagrange strain):
-    S = 2·∂ψ/∂C = μ(I - C⁻¹) + λ·ln(J)·C⁻¹
-
-Material tangent (Total Lagrangian formulation):
-    𝔻 = 4·∂²ψ/∂C²
-
-Key feature: Automatic differentiation eliminates manual derivative errors!
 """
 
 using Tensors
@@ -35,33 +14,9 @@ include("abstract_material.jl")
 
 Neo-Hookean hyperelastic material model.
 
-Uses compressible Neo-Hookean strain energy with automatic differentiation
-for stress and tangent computation.
-
 # Fields
 - `μ::Float64` - Shear modulus [Pa]
 - `λ::Float64` - Lamé parameter [Pa] (controls compressibility)
-
-# Properties
-- Stateless material (no history dependence)
-- Geometrically nonlinear (finite strain)
-- Uses Total Lagrangian formulation (2nd PK stress)
-- Automatic differentiation for derivatives
-
-# Type Hierarchy
-`NeoHookean <: AbstractElasticMaterial <: AbstractMaterial`
-
-# Construction
-```julia
-# From Lamé parameters (direct)
-rubber = NeoHookean(μ=1e6, λ=1e9)
-
-# From engineering constants (convenience)
-rubber = NeoHookean(E=3e6, ν=0.45)
-```
-
-# Notes
-For nearly incompressible materials (ν → 0.5), use large λ relative to μ.
 """
 struct NeoHookean <: AbstractElasticMaterial
     μ::Float64  # Shear modulus [Pa]
@@ -78,11 +33,6 @@ end
     NeoHookean(; μ, λ)
 
 Convenience constructor with keyword arguments (Lamé parameters).
-
-# Example
-```julia
-rubber = NeoHookean(μ=1e6, λ=1e9)
-```
 """
 function NeoHookean(; μ::Real=NaN, λ::Real=NaN, E_mod::Real=NaN, nu::Real=NaN)
     # Check which set of parameters was provided
@@ -109,25 +59,7 @@ material_behavior(::NeoHookean) = StatelessStrainDependent()
 """
     strain_energy(material::NeoHookean, C::SymmetricTensor{2,3}) -> Float64
 
-Compute strain energy density for Neo-Hookean model.
-
-# Formula
-    ψ = μ/2·(I₁ - 3) - μ·ln(J) + λ/2·ln²(J)
-
-Where:
-- I₁ = tr(C) - First invariant
-- J = √det(C) - Volume ratio (Jacobian determinant of deformation)
-
-# Arguments
-- `material::NeoHookean` - Material parameters
-- `C::SymmetricTensor{2,3}` - Right Cauchy-Green tensor (C = FᵀF)
-
-# Returns
-Strain energy density ψ [J/m³]
-
-# Notes
-This function is used internally for automatic differentiation.
-Direct evaluation is rarely needed by users.
+Compute strain energy density: ψ = μ/2·(I₁ - 3) - μ·ln(J) + λ/2·ln²(J)
 """
 function strain_energy(material::NeoHookean, C::SymmetricTensor{2,3})
     μ, λ = material.μ, material.λ
@@ -150,60 +82,7 @@ end
 
 Compute stress and tangent modulus for Neo-Hookean material using automatic differentiation.
 
-# Arguments
-- `material::NeoHookean` - Material parameters
-- `E::SymmetricTensor{2,3,T}` - Green-Lagrange strain tensor
-  - E = ½(FᵀF - I) = ½(C - I)
-- `state_old::Nothing` - Material state (unused for stateless material)
-- `Δt::Float64` - Time increment (unused for rate-independent material)
-
-# Returns
-- `S::SymmetricTensor{2,3,T}` - 2nd Piola-Kirchhoff stress tensor [Pa]
-- `𝔻::SymmetricTensor{4,3,T}` - Material tangent (∂S/∂E) [Pa]
-- `state_new::Nothing` - Updated state (always `nothing` for stateless)
-
-# Theory
-Uses automatic differentiation (ForwardDiff.jl) to compute:
-
-**Stress:**
-    S = 2·∂ψ/∂C
-
-**Tangent:**
-    𝔻 = 4·∂²ψ/∂C²
-
-Where ψ(C) is the strain energy density function.
-
-# Conversion to Cauchy Stress
-For post-processing, convert 2nd PK stress to Cauchy stress:
-```julia
-σ = (1/J) * F ⊡ S ⊡ F'  # Cauchy stress
-```
-where J = det(F) and F = I + ∇u is the deformation gradient.
-
-# Example
-```julia
-rubber = NeoHookean(E=3e6, ν=0.45)
-
-# Large deformation: 50% extension in x-direction
-F = diagm([1.5, 1/√1.5, 1/√1.5])  # Incompressible
-E = ½(F'*F - I)  # Green-Lagrange strain
-
-S, 𝔻, _ = compute_stress(rubber, E, nothing, 0.0)
-
-# Convert to Cauchy stress
-J = det(F)
-σ = (1/J) * F * S * F'
-```
-
-# Performance
-- Allocations: 0 bytes (verified)
-- Typical execution time: ~1 μs (AD overhead)
-- Type-stable return type
-
-# Notes
-Automatic differentiation adds ~50× overhead compared to LinearElastic,
-but eliminates derivative errors and enables rapid prototyping of new
-hyperelastic models.
+Uses automatic differentiation to compute S = 2·∂ψ/∂C and 𝔻 = 4·∂²ψ/∂C².
 """
 function compute_stress(
     material::NeoHookean,
@@ -237,20 +116,6 @@ end
     compute_stress(material::NeoHookean, E::SymmetricTensor{2,3,T}) -> (S, 𝔻, nothing)
 
 Simplified interface without state management for stateless material.
-
-# Arguments
-- `material::NeoHookean` - Material parameters
-- `E::SymmetricTensor{2,3,T}` - Green-Lagrange strain tensor
-
-# Returns
-Same as full interface: (S, 𝔻, nothing)
-
-# Example
-```julia
-rubber = NeoHookean(E=3e6, ν=0.45)
-E = SymmetricTensor{2,3}((0.1, 0.0, 0.0, 0.0, 0.0, 0.0))
-S, 𝔻, _ = compute_stress(rubber, E)  # Simplified call
-```
 """
 compute_stress(material::NeoHookean, E::SymmetricTensor{2,3,T}) where T =
     compute_stress(material, E, nothing, 0.0)
