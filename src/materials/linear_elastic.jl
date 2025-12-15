@@ -1,27 +1,5 @@
 """
 Linear elastic (Hookean) material model using Tensors.jl.
-
-This module implements isotropic linear elasticity with:
-- Zero allocations (stack-allocated symmetric tensors)
-- Type-stable implementation
-- Clean mathematical notation matching theory
-
-Theory:
-    σ = λ·tr(ε)·I + 2μ·ε    (Hooke's law)
-    
-Where:
-    λ = E·ν/((1+ν)(1-2ν))   First Lamé parameter
-    μ = E/(2(1+ν))           Shear modulus (second Lamé parameter)
-    E                         Young's modulus [Pa]
-    ν                         Poisson's ratio [-]
-
-Material tangent:
-    𝔻 = λ·I⊗I + 2μ·𝕀ˢʸᵐ
-    
-Where:
-    I        Second-order identity tensor
-    𝕀ˢʸᵐ     Symmetric fourth-order identity tensor
-    ⊗        Tensor (outer) product
 """
 
 using Tensors
@@ -37,12 +15,6 @@ Linear elastic (Hookean) material model.
 # Fields
 - `E::Float64` - Young's modulus [Pa]
 - `ν::Float64` - Poisson's ratio [-], must satisfy -1 < ν < 0.5
-
-# Properties
-Stateless material: stress depends only on current strain, no history.
-
-# Type Hierarchy
-`LinearElastic <: AbstractElasticMaterial <: AbstractMaterial`
 """
 struct LinearElastic <: AbstractElasticMaterial
     E::Float64   # Young's modulus [Pa]
@@ -60,11 +32,6 @@ end
     LinearElastic(; E, ν)
 
 Convenience constructor with keyword arguments.
-
-# Example
-```julia
-steel = LinearElastic(E=200e9, ν=0.3)
-```
 """
 LinearElastic(; E, ν) = LinearElastic(Float64(E), Float64(ν))
 
@@ -84,28 +51,14 @@ required_state_variables(::LinearElastic) = ()
 """
     λ(material::LinearElastic) -> Float64
 
-Compute first Lamé parameter from Young's modulus and Poisson's ratio.
-
-# Formula
-    λ = E·ν/((1+ν)(1-2ν))
-
-# Returns
-First Lamé parameter [Pa]
+Compute first Lamé parameter: λ = E·ν/((1+ν)(1-2ν))
 """
 @inline λ(mat::LinearElastic) = mat.E * mat.ν / ((1 + mat.ν) * (1 - 2mat.ν))
 
 """
     μ(material::LinearElastic) -> Float64
 
-Compute shear modulus (second Lamé parameter) from Young's modulus and Poisson's ratio.
-
-# Formula
-    μ = E/(2(1+ν))
-
-Also known as the shear modulus or second Lamé parameter.
-
-# Returns
-Shear modulus [Pa]
+Compute shear modulus: μ = E/(2(1+ν))
 """
 @inline μ(mat::LinearElastic) = mat.E / (2(1 + mat.ν))
 
@@ -114,37 +67,8 @@ Shear modulus [Pa]
 
 Compute stress and tangent modulus from strain for linear elastic material.
 
-# Arguments
-- `material::LinearElastic` - Material parameters
-- `ε::SymmetricTensor{2,3,T}` - Strain tensor (small strain assumption)
-- `state_old::Nothing` - Material state (unused for stateless material)
-- `Δt::Float64` - Time increment (unused for rate-independent material)
-
-# Returns
-- `σ::SymmetricTensor{2,3,T}` - Cauchy stress tensor [Pa]
-- `𝔻::SymmetricTensor{4,3,T}` - Tangent modulus (∂σ/∂ε) [Pa]
-- `state_new::Nothing` - Updated material state (always `nothing` for stateless)
-
-# Theory
-Hooke's law in tensor form:
-    σ = λ·tr(ε)·I + 2μ·ε
-
-Tangent modulus (constant for linear elasticity):
-    𝔻 = λ·I⊗I + 2μ·𝕀ˢʸᵐ
-
-# Example
-```julia
-steel = LinearElastic(E=200e9, ν=0.3)
-ε = SymmetricTensor{2,3}((0.001, 0.0, 0.0, 0.0, 0.0, 0.0))  # Uniaxial extension
-σ, 𝔻, _ = compute_stress(steel, ε, nothing, 0.0)
-
-# Result: σ11 ≈ 220 MPa, σ22 = σ33 ≈ -66 MPa (Poisson effect)
-```
-
-# Performance
-- Zero allocations (stack-allocated tensors)
-- Type-stable return type
-- Typical execution time: ~20 ns on modern CPU
+Hooke's law: σ = λ·tr(ε)·I + 2μ·ε
+Tangent: 𝔻 = λ·I⊗I + 2μ·𝕀ˢʸᵐ
 """
 function compute_stress(
     material::LinearElastic,
@@ -174,20 +98,6 @@ end
     compute_stress(material::LinearElastic, ε::SymmetricTensor{2,3,T}) -> (σ, 𝔻, nothing)
 
 Simplified interface without state management for stateless material.
-
-# Arguments
-- `material::LinearElastic` - Material parameters
-- `ε::SymmetricTensor{2,3,T}` - Strain tensor
-
-# Returns
-Same as full interface: (σ, 𝔻, nothing)
-
-# Example
-```julia
-steel = LinearElastic(E=200e9, ν=0.3)
-ε = SymmetricTensor{2,3}((0.001, 0.0, 0.0, 0.0, 0.0, 0.0))
-σ, 𝔻, _ = compute_stress(steel, ε)  # Simplified call
-```
 """
 compute_stress(material::LinearElastic, ε::SymmetricTensor{2,3,T}) where T =
     compute_stress(material, ε, nothing, 0.0)
@@ -195,32 +105,7 @@ compute_stress(material::LinearElastic, ε::SymmetricTensor{2,3,T}) where T =
 """
     elasticity_tensor(material::LinearElastic) -> Tensor{4,3,Float64}
 
-Return 4th-order elasticity tensor C_{ijkl} for assembly.
-
-# Formula
-Linear isotropic elasticity:
-    C_{ijkl} = λ δ_{ij} δ_{kl} + μ (δ_{ik} δ_{jl} + δ_{il} δ_{jk})
-
-Where:
-- λ = E·ν/((1+ν)(1-2ν)) - First Lamé parameter
-- μ = E/(2(1+ν)) - Shear modulus
-- δ_{ij} = Kronecker delta
-
-# Returns
-- `C::Tensor{4,3,Float64}` - Fourth-order elasticity tensor [Pa]
-
-# Usage in Assembly
-```julia
-material = LinearElastic(E=210e9, ν=0.3)
-C = elasticity_tensor(material)
-
-# Use in stiffness computation:
-# K_ij^{αβ} = ∫ (∂N_i/∂x_γ) C_{αβγδ} (∂N_j/∂x_δ) dV
-```
-
-# Implementation Note
-Returns SymmetricTensor{4,3} encoding the full material symmetry.
-The tensor has minor and major symmetries: C_{ijkl} = C_{jikl} = C_{ijlk} = C_{klij}
+Return 4th-order elasticity tensor: C_{ijkl} = λ δ_{ij} δ_{kl} + μ (δ_{ik} δ_{jl} + δ_{il} δ_{jk})
 """
 @generated function elasticity_tensor(material::LinearElastic)
     # Generate tensor construction at compile time for zero allocations
