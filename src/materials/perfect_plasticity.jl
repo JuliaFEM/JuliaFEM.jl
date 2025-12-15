@@ -1,88 +1,7 @@
 """
 Perfect Plasticity Material (J2 Plasticity with Kinematic Hardening)
 
-Classical von Mises plasticity with:
-- Small strain formulation
-- Associative flow rule (normality)
-- Radial return mapping algorithm
-- Kinematic hardening (backstress evolution)
-
-Reference:
-- Simo & Hughes (1998) - "Computational Inelasticity"
-- De Souza Neto et al. (2008) - "Computational Methods for Plasticity"
-
-Theory
-======
-
-Yield Function (von Mises):
-    f = √(3/2)||dev(σ - α)|| - σ_y
-
-Where:
-    σ - Cauchy stress tensor
-    α - Backstress (kinematic hardening)
-    σ_y - Yield stress
-    dev(·) - Deviatoric part
-
-Elastic Domain:
-    f ≤ 0  →  Elastic behavior
-    f > 0  →  Plastic loading (return to surface)
-
-Flow Rule (Associative):
-    dε^p = dλ · ∂f/∂σ = dλ · n
-
-Where:
-    n = √(3/2) · dev(σ - α) / ||dev(σ - α)||  (flow direction)
-    dλ - Plastic multiplier
-
-Hardening Law (Kinematic):
-    dα = (2/3) H · dε^p
-
-Where:
-    H - Hardening modulus
-
-Consistency Condition:
-    f = 0  during plastic loading
-    df = 0 (stress remains on yield surface)
-
-Algorithm
-=========
-
-Radial Return Mapping (closest point projection):
-
-1. Elastic Predictor:
-   σ_trial = σ_n + 𝔻 : Δε
-
-2. Check Yield:
-   f_trial = √(3/2)||dev(σ_trial - α_n)|| - σ_y
-
-3a. If f_trial ≤ 0:  ELASTIC
-    σ_{n+1} = σ_trial
-    α_{n+1} = α_n
-    ε^p_{n+1} = ε^p_n
-
-3b. If f_trial > 0:  PLASTIC
-    Solve for plastic multiplier Δλ:
-        f(σ_trial - 2μΔλ·n - (2/3)HΔλ·n, α_n + (2/3)HΔλ·n) = 0
-    
-    Update state:
-        n = dev(σ_trial - α_n) / ||dev(σ_trial - α_n)||
-        Δλ = (f_trial) / (3μ + H)
-        σ_{n+1} = σ_trial - 2μΔλ·n
-        α_{n+1} = α_n + (2/3)HΔλ·n
-        ε^p_{n+1} = ε^p_n + Δλ·n
-
-4. Consistent Tangent:
-   𝔻^ep = 𝔻 - (4μ²/(3μ+H)) · (n ⊗ n)
-
-Performance
-===========
-
-Expected: ~10-20× slower than LinearElastic due to:
-- State updates (memory writes)
-- Conditional logic (elastic vs plastic)
-- Tensor deviatoric decomposition
-
-But still fast: ~200-500 ns per evaluation
+Classical von Mises plasticity with radial return mapping algorithm.
 """
 
 using Tensors
@@ -105,32 +24,6 @@ J2 (von Mises) plasticity with kinematic hardening.
 - `ν::Float64` - Poisson's ratio [-]
 - `σ_y::Float64` - Yield stress [Pa]
 - `H::Float64` - Hardening modulus [Pa]
-
-# Derived Properties
-- `μ = E/(2(1+ν))` - Shear modulus
-- `λ = Eν/((1+ν)(1-2ν))` - Lamé parameter
-
-# Type Hierarchy
-`PerfectPlasticity <: AbstractPlasticMaterial <: AbstractMaterial`
-
-# Construction
-```julia
-# Basic construction
-steel = PerfectPlasticity(E=200e9, ν=0.3, σ_y=250e6, H=1e9)
-
-# Perfect plasticity (no hardening)
-steel_perfect = PerfectPlasticity(E=200e9, ν=0.3, σ_y=250e6, H=0.0)
-```
-
-# Theory
-Classical J2 plasticity:
-- von Mises yield criterion
-- Associative flow rule (normality)
-- Kinematic hardening (backstress evolution)
-- Radial return mapping
-
-# Performance
-~200-500 ns per evaluation (10-20× slower than LinearElastic)
 """
 struct PerfectPlasticity <: AbstractPlasticMaterial
     E::Float64   # Young's modulus [Pa]
@@ -161,21 +54,6 @@ end
     PerfectPlasticity(; E, ν, σ_y, H)
 
 Keyword constructor for perfect plasticity material.
-
-# Arguments
-- `E::Real` - Young's modulus [Pa]
-- `ν::Real` - Poisson's ratio [-], must satisfy -1 < ν < 0.5
-- `σ_y::Real` - Yield stress [Pa]
-- `H::Real` - Hardening modulus [Pa] (H=0 for perfect plasticity)
-
-# Example
-```julia
-# Linear hardening
-steel = PerfectPlasticity(E=200e9, ν=0.3, σ_y=250e6, H=1e9)
-
-# Perfect plasticity (no hardening)
-steel_perfect = PerfectPlasticity(E=200e9, ν=0.3, σ_y=250e6, H=0.0)
-```
 """
 PerfectPlasticity(; E::Real, ν::Real, σ_y::Real, H::Real) =
     PerfectPlasticity(Float64(E), Float64(ν), Float64(σ_y), Float64(H))
@@ -191,37 +69,9 @@ supported_physics(::PerfectPlasticity) = (Elasticity{3}(),)
 required_state_variables(::PerfectPlasticity) = (PlasticStrain, Backstress, EquivalentPlasticStrain)
 
 """
-    compute_stress(material::PerfectPlasticity, 
-                   ε::SymmetricTensor{2,3},
-                   state_old::Union{Nothing,PlasticityState}=nothing,
-                   Δt::Float64=0.0)
+    compute_stress(material::PerfectPlasticity, ε, state_old, Δt) -> (σ, 𝔻, state_new)
 
 Compute stress and consistent tangent using radial return mapping.
-
-# Algorithm
-1. Elastic predictor: σ_trial = 𝔻 : (ε - ε^p_old)
-2. Check yield: f = √(3/2)||dev(σ_trial - α)|| - σ_y
-3. Plastic corrector (if f > 0):
-   - Compute flow direction: n = dev(σ_trial - α) / ||dev(σ_trial - α)||
-   - Solve for plastic multiplier: Δλ = f / (3μ + H)
-   - Update stress: σ = σ_trial - 2μΔλ·n
-   - Update backstress: α_new = α + (2/3)HΔλ·n
-   - Update plastic strain: ε^p_new = ε^p + Δλ·n
-4. Consistent tangent: 𝔻^ep = 𝔻 - (4μ²/(3μ+H))·(n⊗n)
-
-# Arguments
-- `material::PerfectPlasticity` - Material parameters
-- `ε::SymmetricTensor{2,3}` - Total strain tensor
-- `state_old::NamedTuple` - Previous state (empty = initial): (ε_p, α, κ)
-- `Δt::Float64` - Time increment (unused for rate-independent plasticity)
-
-# Returns
-- `σ::SymmetricTensor{2,3}` - Cauchy stress tensor
-- `𝔻::SymmetricTensor{4,3}` - Consistent tangent modulus
-- `state_new::NamedTuple` - Updated state: (ε_p, α, κ)
-
-# Performance
-~200-500 ns per evaluation (elastic), ~300-600 ns (plastic)
 """
 function compute_stress(material::PerfectPlasticity,
     ε::SymmetricTensor{2,3},
@@ -318,11 +168,6 @@ end
     symmetric_identity_tensor()
 
 Fourth-order symmetric identity tensor: 𝕀 = ½(δᵢₖδⱼₗ + δᵢₗδⱼₖ)
-
-Used in constructing elastic tangent: 𝔻 = λ·I⊗I + 2μ·𝕀
-
-# Returns
-`SymmetricTensor{4,3,Float64}` - Symmetric identity tensor
 """
 @inline function symmetric_identity_tensor()
     # Construct 4th order identity with major and minor symmetry
