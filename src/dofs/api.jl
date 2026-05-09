@@ -1,60 +1,57 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 """
 DOF Type - Type-Level Field Specification
 
-`DOF{T, E}` is an **abstract type** used purely for type-level field specifications.
+`DOF{T, E}` is an abstract type used purely for type-level field specifications.
 
 # Philosophy
 
 DOF types are NEVER instantiated - they exist purely at the type level to specify
-field structure in a clean, readable way:
-
-```julia
-# Beautiful multi-field specification using DOFSet:
-@DOFSet{
-    u::DOF{Displacement{3}, Vertex},
-    p::DOF{Pressure, Cell}
-}
-```
+field structure in a clean, readable way.
 
 # Usage
 
-**Multi-field specification (preferred):**
-```julia
-S = @NamedTuple{
-    T::Tuple{Float64, Vertex},
-    u::Tuple{Vec{3,Float64}, Vertex},
-    p::Tuple{Float64, Cell}
-}
+Field specifications are written with the `@DOFSet` macro and `DOF{Quantity, Entity}`
+type syntax:
 
-# Or equivalently using DOF type syntax:
-(T = DOF{Float64, Vertex}, u = DOF{Vec{3,Float64}, Vertex}, p = DOF{Float64, Cell})
+```julia
+S = @DOFSet{u::DOF{Displacement{3}, Vertex},
+            p::DOF{Pressure, Cell}}
 ```
 
-**Single-field specification:**
-```julia
-S = @NamedTuple{u::Tuple{Vec{3,Float64}, Vertex}}
+Single-field specifications use the same form:
 
-# Or using DOF type:
-(u = DOF{Vec{3,Float64}, Vertex},)
+```julia
+S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
 ```
 
 # Connection to Assembly
 
 The DOF specification `S` is a type parameter in Element:
+
 ```julia
 Element{Tetrahedron{4}, Lagrange{1}, S}
 ```
 
 The assembler uses `S` to:
-1. Compute total DOF count: `ndofs(S, Tetrahedron{4})`
-2. Extract field information: `fieldnames(S)`, `fieldtypes(S)`
-3. Count DOFs per field: `field_ndofs(field_type, topology)`
-4. Access element DOFs: `element.dof_indices.u`, `element.dof_indices.p`, etc.
 
-All type-level, compile-time resolved! No runtime overhead.
+1. Compute total DOF count: `ndofs(S, Tetrahedron{4})`.
+2. Extract field information: `fieldnames(S)`, `fieldtypes(S)`.
+3. Count DOFs per field: `field_ndofs(field_type, topology)`.
+4. Access element DOFs via `element_dofs(elem, :u)` (the `dof_indices`
+   field itself is a flat `NTuple` for zero-allocation assembly).
+
+All type-level, compile-time resolved; no runtime overhead.
+
+# Compatibility
+
+`DOFSet` is currently implemented as `NamedTuple`, so a plain
+`@NamedTuple{u::DOF{...}, ...}` literal also works as long as each field
+type is a `DOF{Quantity, Entity}`. The bare `Tuple{Quantity, Entity}` form
+that older drafts used is no longer accepted by the DOFHandler; new code
+should use `@DOFSet` with `DOF{T,E}`.
 """
 
 # ============================================================================
@@ -116,7 +113,7 @@ abstract type AbstractDOF end
 
 Type alias for multi-field DOF specifications.
 
-**Current implementation**: NamedTuple (but this is an implementation detail!)
+Current implementation: NamedTuple (but this is an implementation detail!)
 
 Use `@DOFSet` macro to create multi-field specifications:
 ```julia
@@ -195,16 +192,13 @@ end
 """
     abstract type DOF{T, E<:TopologicalEntity} <: AbstractDOF
 
-Abstract type for type-level field specifications. NEVER instantiated!
+Abstract type for type-level field specifications. NEVER instantiated.
 
-Used purely for clean syntax when specifying fields:
-```julia
-(u = DOF{Vec{3,Float64}, Vertex}, p = DOF{Float64, Cell})
-```
+Used purely for clean syntax inside `@DOFSet`:
 
-This is equivalent to the NamedTuple type:
 ```julia
-@NamedTuple{u::Tuple{Vec{3,Float64}, Vertex}, p::Tuple{Float64, Cell}}
+S = @DOFSet{u::DOF{Vec{3,Float64}, Vertex},
+            p::DOF{Float64, Cell}}
 ```
 
 # Type Parameters
