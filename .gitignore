@@ -16,6 +16,7 @@ docs/src/packages
 *.jld
 *.mem
 *.cov
+coverage/
 test/*.h5
 test/*.xmf
 .env
