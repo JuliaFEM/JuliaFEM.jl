@@ -1,5 +1,5 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 """
 DOF System - Type-Level Field Specifications
@@ -8,7 +8,7 @@ Main entry point for the DOF system.
 
 # Philosophy (November 2025)
 
-**Multi-field is fundamental! Single-field is just a special case with one key.**
+Multi-field is fundamental! Single-field is just a special case with one key.
 
 Field specifications are `DOFSet` types (currently implemented as NamedTuples), used purely at the type level:
 
@@ -23,7 +23,7 @@ S = @DOFSet{T::DOF{Temperature, Vertex}, u::DOF{Displacement{3}, Vertex}}
 Element{Tetrahedron{4}, Lagrange{1}, S}
 ```
 
-**Note**: `@NamedTuple` also works (since `DOFSet = NamedTuple`), but `@DOFSet` is preferred for future compatibility.
+Note: `@NamedTuple` also works (since `DOFSet = NamedTuple`), but `@DOFSet` is preferred for future compatibility.
 
 # Module Structure
 - `api.jl`: DOF{T,E} abstract type + dof_size() utility
@@ -37,4 +37,4 @@ include("api.jl")
 include("fields.jl")
 
 # Note: dof_connectivity.jl is included later in JuliaFEM.jl after Element is defined
-# Note: dof_manager.jl is included later in JuliaFEM.jl after Mesh is defined
+# Note: dof_handler.jl is included later in JuliaFEM.jl after Mesh is defined
