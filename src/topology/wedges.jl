@@ -1,5 +1,5 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 """
     Wedge{N} <: AbstractTopology{N}
@@ -15,7 +15,6 @@ struct Wedge{N} <: AbstractTopology{N} end
 const Wedge6 = Wedge{6}
 const Wedge15 = Wedge{15}
 
-nnodes(::Wedge{N}) where {N} = N
 dim(::Wedge{N}) where {N} = 3
 
 function reference_coordinates(::Wedge{6})
@@ -84,4 +83,3 @@ nvertices(::Wedge) = 6
 nedges(::Wedge) = 9
 nfaces(::Wedge) = 5
 
-export Wedge6, Wedge15
