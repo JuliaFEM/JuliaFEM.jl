@@ -1,5 +1,5 @@
 # This file is part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 """
 Strain computation utilities for finite element analysis.
@@ -23,6 +23,9 @@ Small strain: ε = ½(∇u + ∇u^T) where ∇u = ∑ᵢ uᵢ ⊗ (dNᵢ/dx)
 
 # Returns
 - `ε::SymmetricTensor{2,3}`: Small strain tensor
+
+See also [`extract_strain`](@ref), which starts from an already assembled
+displacement-gradient tensor `∇u`.
 
 # Example
 ```julia
