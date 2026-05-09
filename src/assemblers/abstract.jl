@@ -14,10 +14,11 @@ independent of WHAT is being assembled (handled by domain kernels).
 Base type for all assembly strategies.
 
 Assembly strategies define:
-- Traversal pattern (element-based vs nodal-based)
-- Sparse matrix format (COO, CSC)
+- Traversal pattern (element-based vs DOF/nodal-based)
+- Sparse output format (currently COO triplets converted to CSC at the end)
 - Memory access patterns
-- Backend (CPU, GPU)
+- Backend (single-threaded CPU today; KernelAbstractions GPU mirror for the
+  DOF-based assembler)
 
 All assemblers use pre-allocated cache structures for zero-allocation assembly.
 """
@@ -49,21 +50,16 @@ matrices, and scatter to global system. This is the classical FEM approach.
 
 Concrete types:
 - `COOAssembler`: Accumulate triplets, build sparse matrix at end
-- `CSCAssembler`: Pre-built CSC structure, in-place assembly
 """
 abstract type ElementBasedAssembler <: AbstractAssembler end
 
 """
     NodalBasedAssembler <: AbstractAssembler
 
-Assembly strategy that traverses nodes.
-
-Nodal-based assemblers loop over nodes, then gather contributions from
-all elements touching that node. This pattern is GPU-friendly (one thread
-per node) and has better cache locality for nodal DOFs.
-
-Concrete types:
-- `NodalAssembler`: Node-by-node assembly with node-to-elements map
+Assembly strategy that traverses nodes / DOFs rather than elements.
+The only concrete subtype today is `DOFBasedCOOAssembler`, which walks
+one DOF row at a time. Future GPU-friendly node-major variants would
+sit here as well.
 """
 abstract type NodalBasedAssembler <: AbstractAssembler end
 
@@ -74,14 +70,16 @@ abstract type NodalBasedAssembler <: AbstractAssembler end
 
 Classical element-by-element assembly using COO (coordinate) format.
 
-**Strategy**: Accumulate triplets `(i, j, value)` in vectors, build sparse
-matrix at end using `sparse(I, J, V, m, n)`.
+Strategy: accumulate triplets `(i, j, value)` in vectors, build the sparse
+matrix at the end with `sparse(I, J, V, m, n)`.
 
-**Performance**: Baseline (1.0x), moderate memory usage.
+Performance: straightforward and debuggable, with moderate memory usage.
 
-**Best for**: Prototyping, debugging, simple problems.
+Best for: prototyping, debugging, simple problems.
 
-**Limitations**: Slower than CSC for repeated assembly (nonlinear problems).
+Limitations: specialized to the element-based continuum COO path; for
+large matrix-free solves prefer `DOFBasedCOOAssembler` and the
+matrix-free operators.
 
 # Usage
 
@@ -95,118 +93,39 @@ K, f = extract_system(cache)
 struct COOAssembler <: ElementBasedAssembler end
 
 """
-    CSCAssembler <: ElementBasedAssembler
-
-Optimized assembly using pre-built CSC (compressed sparse column) structure.
-
-**Strategy**: Build sparsity pattern once, reuse structure across assembly
-calls. Use two-pointer merge algorithm to insert element contributions
-directly into CSC arrays.
-
-**Performance**: 4.1x faster than COO, 16.6x less memory.
-
-**Best for**: Production code, nonlinear problems (repeated assembly).
-
-**Algorithm**: Inspired by Ferrite.jl but adapted for JuliaFEM architecture.
-
-# Usage
-
-```julia
-assembler = CSCAssembler()
-cache = create_cache(assembler, mesh, kernel)  # Pre-builds sparsity pattern
-
-# Nonlinear loop
-for iteration in 1:max_iter
-    assemble!(cache, assembler, kernel, mesh)  # Zero allocations!
-    K, f = extract_system(cache)
-    # ... solve, update ...
-end
-```
-"""
-struct CSCAssembler <: ElementBasedAssembler end
-
-"""
-    NodeBasedCOOAssembler <: NodalBasedAssembler
-
-Node-by-node assembly using COO format with block integration.
-
-**Strategy**: Loop over nodes, compute 3×3 stiffness blocks for touching elements,
-scatter to COO triplets. Uses `PreparedElement` and `compute_block!` from
-continuum kernel for efficient block-based integration.
-
-**Performance**: 
-- CPU single-thread: ~1.5-2× slower than element-based (more kernel calls)
-- CPU multi-thread: ~1.5-2× faster (better parallelization)
-- GPU: ~10-50× faster (massive parallelism, no atomics)
-
-**Best for**: GPU acceleration, contact mechanics, matrix-free methods.
-
-**Status**: ✅ Implemented
-
-# Usage
-
-```julia
-assembler = NodeBasedCOOAssembler()
-cache = create_cache(assembler, mesh, kernel)
-assemble!(cache, assembler, kernel, mesh)  # Nodal traversal!
-K, f = extract_system(cache)
-```
-"""
-struct NodeBasedCOOAssembler <: NodalBasedAssembler end
-
-"""
     DOFBasedCOOAssembler <: NodalBasedAssembler
 
 DOF-by-DOF (row-by-row) assembly using COO format with scalar entry computation.
 
-**Strategy**: Loop over DOFs (matrix rows), compute scalar entries for touching elements,
-scatter to COO triplets. Finest granularity possible - computes ONE matrix entry at a time.
+Strategy: loop over DOFs (matrix rows), compute scalar entries for
+touching elements, and scatter to COO triplets. The finest granularity
+possible: one matrix entry at a time.
 
-**Performance**: 
-- CPU single-thread: ~2-3× slower than element-based (finest granularity)
-- CPU multi-thread: ~Same as node-based (parallelization over rows)
-- GPU: ~Same as node-based (one thread per DOF)
-- Matrix-free K*v: ~5-10× faster (no matrix storage)
+Performance:
 
-**Best for**: Matrix-free Krylov solvers, very large problems (> 1M DOFs).
+- CPU single-thread: roughly 2 - 3x slower than element-based.
+- CPU multi-thread: planned row-parallel extension; the current CPU
+  implementation is single-threaded.
+- GPU: use `dof_based_coo_ka.jl`, which mirrors the same row-wise data
+  layout through KernelAbstractions.
+- Matrix-free `K*v`: roughly 5 - 10x faster (no matrix storage).
 
-**Status**: ✅ Implemented
+Best for: matrix-free Krylov solvers and very large problems (> ~1M DOFs).
+
+Status: serial CPU and KernelAbstractions GPU mirror implemented;
+multi-thread row-parallel CPU is planned.
 
 # Usage
 
 ```julia
-assembler = DOFBasedCOOAssembler()
-cache = create_cache(assembler, mesh, kernel)
+elements    = create_elements!(mesh, kernel, dof_handler)  # Vector{Element}
+assembler   = DOFBasedCOOAssembler()
+cache       = create_cache(assembler, elements, dof_handler, mesh, kernel)
 assemble!(cache, assembler, kernel, mesh)  # DOF-wise traversal!
-K, f = extract_system(cache)
+K, f        = extract_system(cache)
 ```
 """
 struct DOFBasedCOOAssembler <: NodalBasedAssembler end
-
-"""
-    NodalAssembler <: NodalBasedAssembler
-
-Generic node-by-node assembly (future: CSC, GPU variants).
-
-**Strategy**: For each node, gather contributions from all touching elements.
-Natural for GPU parallelization (one thread per node).
-
-**Performance**: Expected 2-10x speedup on GPU for large problems (> 100k nodes).
-
-**Best for**: GPU acceleration, very large problems.
-
-**Status**: Placeholder for future GPU-optimized implementations.
-
-# Usage
-
-```julia
-assembler = NodalAssembler()
-cache = create_cache(assembler, mesh, kernel)
-assemble!(cache, assembler, kernel, mesh)
-K, f = extract_system(cache)
-```
-"""
-struct NodalAssembler <: NodalBasedAssembler end
 
 # Kernel interface (domain-specific)
 
@@ -218,12 +137,21 @@ Base type for domain-specific assembly kernels.
 Kernels define WHAT to assemble (element stiffness, force vector) for
 a specific physics domain (continuum, plate, beam, etc.).
 
-Required interface:
-- `compute_element_stiffness!(cache, kernel, element_id, ...)`: Compute Ke, fe
-- `dofs_per_node(kernel)`: Number of DOFs per node
-- `get_dof_mapping!(dofs, kernel, element_id, mesh)`: Fill DOF indices
+Two contracts coexist, depending on the assembler:
 
-See `src/assemblers/kernel_interface.jl` for detailed interface specification.
+- Element-based path (`ElementBasedAssembler`): kernels populate per-element
+  block scratch (`element_cache.K_blocks`, `element_cache.f_blocks`) via
+  `update_geometry_cache!`, `update_material_cache!`, and per-block
+  helpers such as `compute_block!`. The assembler then scatters those
+  blocks into the global COO triplet store.
+- DOF-based / matrix-free path (`NodalBasedAssembler`): kernels implement
+  the microkernel contract in `src/assemblers/microkernel.jl`
+  (`qpoint_buffer_eltype`, `update_qpoint_buffer!`, `evaluate_entry`,
+  optionally `evaluate_mass_entry`, plus `reference_fields`).
+
+In addition every kernel must answer `dofs_per_node(kernel)` (typically
+inherited from `get_field(kernel)`) and provide `get_dof_mapping!` (the
+default in this file works for any kernel that exposes a `get_field`).
 """
 abstract type AbstractKernel end
 
@@ -241,33 +169,119 @@ All geometry cache implementations must:
 - Support indexing: `cache.X[i]`, `cache.∇N_data[q, k]`, `cache.detJ_w[q]`
 
 Concrete implementations:
-- `GeometryCache`: Mutable, Vector-based (convenient for updates)
-- `ImmutableGeometryCache{N,NIP}`: Immutable, NTuple-based (zero allocations, still parametric)
-
-Note: Type parameters removed from GeometryCache to avoid 80 bytes allocation in hot loops.
-Sizes (N, NIP) can be inferred from field dimensions at runtime.
+- `GeometryCache`: parametric on storage backing; same struct serves the
+  heap-owned legacy form and the SoA `view`-backed form used by the
+  DOF-based assembler.
 """
 abstract type AbstractGeometryCache end
 
 """
-    AbstractMaterialStateCache{FieldType, StateType}
+    AbstractAssemblyMaterialWorkspace{FieldType, StateType}
 
-Abstract base type for assembly material workspaces.
+Abstract base type for per-element assembly material workspaces.
 
 All assembly material workspace implementations must:
 - Store material fields and temporary state at all integration points
 - Support field access via `workspace.fields[q]` and state via `workspace.states[q]`
 
-**Purpose:** Per-element temporary workspace during assembly (not persistent storage).
+Purpose: per-element temporary workspace during assembly (not persistent storage).
+The persistent state used for time-stepping lives in `GlobalMaterialCache`.
 
 # Type Parameters
 - `FieldType`: NamedTuple type for material fields (e.g., `(σ=..., 𝔻=...)` for mechanics)
 - `StateType`: NamedTuple type for state (e.g., `(ε_p=..., α=..., κ=...)` for plasticity)
 
+Both type parameters are concrete `NamedTuple` types derived from
+`required_material_fields(material)` and `required_state_variables(material)`.
+
 Concrete implementations:
-- `AssemblyMaterialWorkspace{FieldType, StateType}`: Mutable, Vector-based (compositional, per-element workspace)
+- `AssemblyMaterialWorkspace{FieldType, StateType}`: Mutable, Vector-based (per-element workspace)
 
 # See Also
 - `GlobalMaterialCache`: Persistent state storage for time-stepping (all elements)
 """
-abstract type AbstractMaterialStateCache{FieldType, StateType} end
+abstract type AbstractAssemblyMaterialWorkspace{FieldType, StateType} end
+
+# Backwards-compatible alias for the previous name. The old name was
+# misleading because the parameter `StateType` is the per-IP `NamedTuple`
+# from the trait system, not anything related to a (now-removed)
+# `AbstractMaterialState` type.
+const AbstractMaterialStateCache = AbstractAssemblyMaterialWorkspace
+
+# ============================================================================
+# KERNEL DEFAULTS — `get_field`, `dofs_per_node`, `get_dof_mapping!`
+# ============================================================================
+#
+# Every concrete `AbstractKernel` participates in DOF distribution through
+# three calls. Most single-field kernels only need to expose the underlying
+# `AbstractField` they wrap; the defaults below derive everything else.
+# Multi-field kernels (e.g. `MixedUPKernel`, thermo-elastic) override
+# `dofs_per_node` and `get_dof_mapping!` directly and override `get_field`
+# with an error to make accidental single-field assumptions fail loudly.
+
+"""
+    get_field(kernel::AbstractKernel) -> AbstractField
+
+Extract the (single) field from a kernel.
+
+Single-field kernels implement this so the defaults for `dofs_per_node`
+and `get_dof_mapping!` work without further intervention. Multi-field
+kernels override `dofs_per_node` / `get_dof_mapping!` directly and
+typically override `get_field` to throw.
+"""
+function get_field(kernel::AbstractKernel)
+    error("get_field not implemented for $(typeof(kernel)). " *
+          "Either implement get_field(::$(typeof(kernel))) or override " *
+          "dofs_per_node / get_dof_mapping! directly.")
+end
+
+"""
+    dofs_per_node(kernel::AbstractKernel) -> Int
+
+Default kernel-level DOFs per node: delegate to `get_field(kernel)`.
+Multi-field kernels override directly.
+"""
+@inline function dofs_per_node(kernel::AbstractKernel)
+    return dofs_per_node(get_field(kernel))
+end
+
+"""
+    operator_is_posdef(kernel::AbstractKernel) -> Bool
+
+Trait answering whether the matrix-free stiffness operator built around
+`kernel` is symmetric positive-definite. The default is `true` (single-field
+elliptic problems such as continuum displacement, heat). Mixed / saddle-point
+kernels (`MixedUPKernel`, `StokesMixedKernel`, `HellingerReissnerKernel`,
+`HuWashizuKernel`) override this to `false` so Krylov stacks (CG, etc.) do
+not pick the SPD branch.
+"""
+@inline operator_is_posdef(::AbstractKernel) = true
+
+"""
+    get_dof_mapping!(dofs, kernel::AbstractKernel, element_id, mesh) -> Nothing
+
+Fill `dofs` with the global DOF indices for `element_id`, in node-major
+order, using `dofs_per_node(kernel)` and the kernel's underlying field.
+
+Zero-allocation. Multi-field kernels override.
+"""
+@inline function get_dof_mapping!(
+    dofs::AbstractVector{Int},
+    kernel::AbstractKernel,
+    element_id::Int,
+    mesh::AbstractMesh,
+)
+    nodes = mesh.connectivity[element_id]
+    ndofs_per_node = dofs_per_node(get_field(kernel))
+
+    nnodes = length(nodes)
+    idx = 1
+    @inbounds for i in 1:nnodes
+        node_id = Int(nodes[i])
+        for component in 1:ndofs_per_node
+            dofs[idx] = ndofs_per_node * (node_id - 1) + component
+            idx += 1
+        end
+    end
+    return nothing
+end
