@@ -11,6 +11,70 @@ on:
       - main
 
 jobs:
+  # Fast path: matrix-free / DOF-based assembler bundles only (~400 tests).
+  # Uses `test/runtests.jl` topic filtering via `Pkg.test(test_args=...)`.
+  test-assemblers:
+    name: Julia ${{ matrix.version }} - assemblers topic (fast)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+
+      - name: Layer contract (src architecture)
+        run: julia scripts/check_layer_contract.jl
+
+      - uses: julia-actions/cache@v2
+
+      - uses: julia-actions/julia-buildpkg@v1
+
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          test_args: assemblers
+          coverage: false
+
+  mpi-partitioned-matvec-smoke:
+    name: MPI partitioned matvec + CG smoke (3 ranks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+
+      - uses: julia-actions/cache@v2
+
+      # MPI is a weak dependency: the default package environment does not install it.
+      # Use a throwaway env with `Pkg.develop` + `Pkg.add("MPI")` so `using MPI` loads
+      # `JuliaFEMMPIExt` when running the smoke driver under mpiexec.
+      - name: mpiexec smoke scripts (matvec + CG)
+        working-directory: ${{ github.workspace }}
+        run: |
+          export MPI_SMOKE_ENV="$(mktemp -d)"
+          julia -e '
+            using Pkg
+            envdir = ENV["MPI_SMOKE_ENV"]
+            root = pwd()
+            Pkg.activate(envdir)
+            Pkg.develop(path=root)
+            Pkg.add("MPI")
+            Pkg.instantiate()
+            using MPI
+            mpidir = joinpath(root, "test", "mpi")
+            for script_name in ("partitioned_matvec_smoke.jl", "partitioned_matvec_cg.jl")
+              script = joinpath(mpidir, script_name)
+              run(`$(MPI.mpiexec()) -n 3 $(Base.julia_cmd()) --project=$envdir --startup-file=no $script`)
+            end
+          '
+
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -30,6 +94,9 @@ jobs:
         with:
           version: ${{ matrix.version }}
           
+      - name: Layer contract (src architecture)
+        run: julia scripts/check_layer_contract.jl
+
       - uses: julia-actions/cache@v2
       
       - uses: julia-actions/julia-buildpkg@v1
