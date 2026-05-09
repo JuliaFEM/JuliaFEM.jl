@@ -104,7 +104,7 @@ If this fails, there's a fundamental error in shape functions, Jacobian, or inte
 # TEST STRUCTURE
 # ==============
 # @testset "Hex8 Unit Cube - Analytical Validation"
-#   - Compute stiffness using NEW API
+#   - Compute stiffness using the COO assembler
 #   - Compare with expected matrix (from symbolic computation)
 #   - Verify matrix properties (symmetry, positive definiteness)
 #   - Test rigid body modes (zero energy for translations/rotations)
@@ -153,7 +153,7 @@ using Tensors
     ]
 
     println("\n" * "="^70)
-    println("Hex8 Unit Cube Validation - NEW API")
+    println("Hex8 Unit Cube Validation")
     println("="^70)
     println("Reference: Felippa's AFEM Chapter 17")
     println("Material: E=96, ν=1/3 (λ=72, μ=36)")
@@ -205,7 +205,7 @@ using Tensors
         Displacement{3}()
     )
 
-    # Assemble stiffness matrix using NEW API
+    # Assemble stiffness matrix
     assembler = COOAssembler()
     cache = create_cache(assembler, mesh, kernel)
     assemble!(cache, assembler, kernel, mesh)
@@ -261,7 +261,7 @@ using Tensors
 
     println("\n" * "="^70)
     println("ALL TESTS PASSED! ✅")
-    println("NEW API Hex8 assembly produces correct stiffness matrix")
+    println("Hex8 assembly produces correct stiffness matrix")
     println("="^70 * "\n")
 end
 
