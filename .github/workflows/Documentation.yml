@@ -7,6 +7,14 @@ on:
       - main
     tags: '*'
   pull_request:
+    paths:
+      - "docs/**"
+      - "src/**"
+      - "scripts/**"
+      - "test/docs/**"
+      - "Project.toml"
+      - "Manifest.toml"
+      - ".github/workflows/Documentation.yml"
 
 jobs:
   build:
@@ -26,7 +34,10 @@ jobs:
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
             Pkg.instantiate()'
-            
+
+      - name: Verify documentation quickstart snippet
+        run: julia --project=. scripts/verify_docs_quickstart.jl
+
       - name: Build documentation
         run: julia --project=docs docs/make.jl
         env:
