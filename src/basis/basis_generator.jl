@@ -1,5 +1,5 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 # ==============================================================================
 # BASIS GENERATOR (symbolic) — tooling only, not loaded at runtime
@@ -532,7 +532,7 @@ end
 function write_generated_file(elements)
     output = IOBuffer()
     println(output, "# This file is a part of JuliaFEM.")
-    println(output, "# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE")
+    println(output, "# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md")
     println(output)
     println(output, "# ============================================================================")
     println(output, "# AUTO-GENERATED BASIS FUNCTIONS (All Families)")
