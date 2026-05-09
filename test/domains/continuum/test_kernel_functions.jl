@@ -50,13 +50,15 @@
             geometry_cache = JuliaFEM.create_geometry_cache(N, NIP)
             element_cache = JuliaFEM.create_element_cache(mesh, kernel)
             material_cache = JuliaFEM.create_material_cache(kernel.material, NIP)
+            global_cache = JuliaFEM.create_global_material_cache(kernel.material;
+                n_ips = NIP, n_elems = 1)
 
             # Update caches
             elem_id = 1
-            JuliaFEM.update_geometry_cache!(geometry_cache, element_cache, kernel, elem_id, mesh)
+            JuliaFEM.update_geometry_cache!(geometry_cache, element_cache, elem_id, mesh)
             JuliaFEM.update_element_cache!(element_cache, kernel, elem_id, mesh, nothing)
             JuliaFEM.update_material_cache!(material_cache, geometry_cache, kernel.material,
-                element_cache, nothing, elem_id, 0.0)
+                element_cache, global_cache, elem_id, 0.0)
 
             # Manual integration using compute_block_at_point
             K_manual = zero(Tensor{2,3,Float64})
