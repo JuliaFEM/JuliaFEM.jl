@@ -45,7 +45,7 @@ src/
 ├── mesh/             # Mesh{N, Topo}, structured / unstructured / refine / ordering
 ├── io/               # Gmsh-oriented I/O (legacy mesh readers live under legacy/)
 ├── sparse/           # SparseMatrixCOO / SparseVectorCOO scratch helpers
-├── legacy/           # Pre-2.0 API in `module Legacy`; load with JULIAFEM_ENABLE_LEGACY=1
+├── legacy/           # Legacy API in `module Legacy` (optional; not the default 0.x surface); load with JULIAFEM_ENABLE_LEGACY=1
 ├── exports.jl        # Grouped public API exports
 └── JuliaFEM.jl       # Module entry point
 ```
