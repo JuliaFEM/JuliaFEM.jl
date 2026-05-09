@@ -10,64 +10,38 @@ Extracts node coordinates and computes physical gradients and Jacobian data.
 using Tensors
 
 """
-    update_geometry_cache!(
-        geometry_cache::GeometryCache,
-        element_cache::ElementCache,
-        kernel::AbstractKernel,
-        elem_id::Int,
-        mesh::AbstractMesh
-    )
+    update_geometry_cache!(geometry_cache, element_cache, elem_id, mesh) -> Nothing
 
-Update geometry cache for current element.
+Update `geometry_cache` for the element `elem_id` of `mesh`. The cache
+fields written are:
 
-Computes:
-- Node coordinates → geometry_cache.X
-- Physical gradients ∇N at each integration point → geometry_cache.∇N_data
-- Jacobian determinant × weight (detJ * w) at each IP → geometry_cache.detJ_w
+- `geometry_cache.X` — node coordinates (one entry per element node)
+- `geometry_cache.N_data[ip, k]` — basis values
+- `geometry_cache.∇N_data[ip, k]` — physical gradients `∇N`
+- `geometry_cache.detJ_w[ip]` — `det(J) * w` for integration
 
-# Arguments
-- `geometry_cache`: Geometry cache to update
-- `element_cache`: Element cache (provides topology, basis, integration points)
-- `kernel`: Domain kernel
-- `elem_id`: Current element ID
-- `mesh`: Finite element mesh
-
-# Side Effects
-Mutates geometry_cache.X, geometry_cache.∇N_data, geometry_cache.detJ_w
-
-# Zero-Allocation Guarantee
-No allocations - writes to pre-allocated geometry_cache arrays.
-
-# Implementation Notes
-For each integration point:
-1. Get reference gradients ∇_ξ N from basis
-2. Compute Jacobian J = X ⊗ ∇_ξ N
-3. Compute physical gradients ∇N = J^{-T} ⋅ ∇_ξ N
-4. Store detJ * weight for integration
+The function is allocation-free; it reads topology, basis, and the
+integration points from `element_cache` and writes back into the
+pre-allocated `geometry_cache` arrays. For each integration point the
+Jacobian `J = X ⊗ ∇_ξ N` is built on the fly, then physical gradients
+are obtained via `J^{-T} · ∇_ξ N`.
 """
 @inline function update_geometry_cache!(
     geometry_cache::GeometryCache,
-    element_cache::ElementCache,
-    kernel::AbstractKernel,
+    element_cache::ContinuumElementCache,
     elem_id::Int,
-    mesh::AbstractMesh
+    mesh::AbstractMesh,
 )
-
-    # FIXME: drop kernel argument if unused
-    # FIXME: drop element_cache argument and explicitly pass topology, basis, ips
-
-    # Get element connectivity
     conn = mesh.connectivity[elem_id]
     nnodes = length(conn)
 
-    # Extract node coordinates (mesh.nodes already contains Vec{3})
-    # Use indexed loop instead of enumerate to avoid iterator allocation
+    # Extract node coordinates (mesh.nodes already contains Vec{3}).
+    # Indexed loop avoids the iterator allocation that `enumerate` introduces.
     @inbounds for i in 1:nnodes
         node = conn[i]
         geometry_cache.X[i] = mesh.nodes[node]
     end
 
-    # Compute physical gradients and detJ*w at each integration point
     ips = element_cache.ips
     nips = length(ips)
 
@@ -75,10 +49,10 @@ For each integration point:
         ip = ips[ip_idx]
         ξ = ip.coords
 
-        # Reference gradients
-        dN_dξ = get_basis_derivatives(element_cache.topology, element_cache.basis, ξ)
+        N_vals = get_basis_functions(  element_cache.topology, element_cache.basis, ξ)
+        dN_dξ  = get_basis_derivatives(element_cache.topology, element_cache.basis, ξ)
 
-        # Jacobian: J = X ⊗ ∇_ξ N
+        # Jacobian J = X ⊗ ∇_ξ N
         J = geometry_cache.X[1] ⊗ dN_dξ[1]
         for i in 2:nnodes
             J += geometry_cache.X[i] ⊗ dN_dξ[i]
@@ -86,12 +60,11 @@ For each integration point:
 
         J_inv_T = transpose(inv(J))
 
-        # Physical gradients for all nodes: ∇N = J^{-T} ⋅ ∇_ξ N
         for k in 1:nnodes
+            geometry_cache.N_data[ip_idx, k]  = N_vals[k]
             geometry_cache.∇N_data[ip_idx, k] = J_inv_T ⋅ dN_dξ[k]
         end
 
-        # Store detJ * weight
         geometry_cache.detJ_w[ip_idx] = det(J) * ip.weight
     end
 
