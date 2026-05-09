@@ -27,29 +27,15 @@ struct Elasticity{Dim} <: AbstractPhysics end
 """
     Thermal{Dim} <: AbstractPhysics
 
-Thermal physics (heat transfer) in Dim dimensions (2D or 3D).
+Thermal physics (heat transfer) in `Dim` dimensions (2 or 3).
 
 Used for trait-based dispatch:
 ```julia
 required_field_type(Thermal{2}())  # → Temperature (2D plane heat)
 required_field_type(Thermal{3}())  # → Temperature (3D heat)
-required_field_type(Thermal{2}())  # → Temperature (rotational symmetric 2D)
 ```
 """
 struct Thermal{Dim} <: AbstractPhysics end
-
-# Note: Fluid physics type will be added when Velocity field type is implemented
-# """
-#     Fluid{Dim} <: AbstractPhysics
-#
-# Fluid physics in Dim dimensions.
-#
-# Used for trait-based dispatch:
-# ```julia
-# required_field_type(Fluid{3}())  # → Velocity{3}
-# ```
-# """
-# struct Fluid{Dim} <: AbstractPhysics end
 
 # ============================================================================
 # TRAIT FUNCTIONS
