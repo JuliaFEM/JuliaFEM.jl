@@ -1,23 +1,16 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE
-
-"""
-DOF System Test Suite
-
-Runs all tests for the DOF (Degree of Freedom) system.
-
-Usage:
-    julia --project=. test/dofs/runtests.jl
-"""
-
 using Test
 using JuliaFEM
-using Tensors
 
-# All DOF types and functions are in flat JuliaFEM namespace
-
-@testset "DOF System Tests" begin
-    @testset "Field Type Unification" begin
-        include("test_field_unification.jl")
-    end
+@testset "DOF system" begin
+    # End-to-end multi-field exercise: DOFSet -> Element template ->
+    # DOFHandler -> DOFConnectivity -> field_dof_range / element_dofs.
+    include("test_global_field_ranges.jl")
+    include("test_multifield_dof_system.jl")
+    include("test_hex8_face_dofs.jl")
+    include("test_tet4_facet_maps.jl")
+    include("test_wedge6_facet_maps.jl")
+    include("test_pyr5_facet_maps.jl")
+    include("test_tet10_facet_maps.jl")
+    include("test_hex20_facet_maps.jl")
+    include("test_multicomponent_facet_dofs.jl")
 end
