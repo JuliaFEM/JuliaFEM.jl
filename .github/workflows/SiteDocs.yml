@@ -1,0 +1,63 @@
+name: Website API and doc lint
+
+permissions:
+  actions: write
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - "juliafem.github.io/**"
+      - "src/**"
+      - "Project.toml"
+      - "scripts/check_curated_doc_vocabulary.jl"
+      - ".github/workflows/SiteDocs.yml"
+  pull_request:
+    paths:
+      - "juliafem.github.io/**"
+      - "src/**"
+      - "Project.toml"
+      - "scripts/check_curated_doc_vocabulary.jl"
+      - ".github/workflows/SiteDocs.yml"
+
+jobs:
+  site-docs:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: juliafem.github.io
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.10"
+
+      - uses: julia-actions/cache@v2
+        with:
+          cache-name: juliafem-site-docs
+
+      - name: Resolve and instantiate website Julia project
+        run: julia --project=. -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'
+
+      - name: Regenerate API Markdown for Quarto
+        run: julia --project=. scripts/build_docs.jl api
+
+      - name: Regenerate quadrature defaults snippet (user guide)
+        working-directory: ${{ github.workspace }}
+        run: julia --project=. juliafem.github.io/scripts/generate_quadrature_defaults_snippet.jl
+
+      - name: Verify quadrature snippet matches repository
+        working-directory: ${{ github.workspace }}
+        run: git diff --exit-code juliafem.github.io/docs/user-guide/_quadrature_defaults_snippet.md
+
+      - name: Check curated website vocabulary
+        working-directory: ${{ github.workspace }}
+        run: julia --project=. scripts/check_curated_doc_vocabulary.jl
+
+      - name: Lint curated website Markdown
+        working-directory: juliafem.github.io
+        run: julia scripts/check_website_docs.jl
