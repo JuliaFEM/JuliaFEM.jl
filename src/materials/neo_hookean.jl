@@ -6,9 +6,6 @@ using Tensors
 # Note: Tensors.jl provides hessian() function for automatic differentiation
 # No need for ForwardDiff.jl dependency!
 
-# Load abstract types
-include("abstract_material.jl")
-
 """
     NeoHookean <: AbstractElasticMaterial
 
@@ -53,8 +50,9 @@ function NeoHookean(; μ::Real=NaN, λ::Real=NaN, E_mod::Real=NaN, nu::Real=NaN)
     end
 end
 
-# Trait declaration: NeoHookean has strain-dependent tangent modulus
 material_behavior(::NeoHookean) = StatelessStrainDependent()
+supported_physics(::NeoHookean) = (Elasticity{3}(),)
+required_state_variables(::NeoHookean) = ()
 
 """
     strain_energy(material::NeoHookean, C::SymmetricTensor{2,3}) -> Float64
@@ -88,9 +86,24 @@ function compute_stress(
     material::NeoHookean,
     E::SymmetricTensor{2,3,T},
     state_old::Nothing,
-    Δt::Float64
-) where T
+    Δt::Float64,
+) where {T}
+    return _compute_stress_neo_hookean(material, E)
+end
 
+function compute_stress(
+    material::NeoHookean,
+    E::SymmetricTensor{2,3,T},
+    state_old::NamedTuple,
+    Δt::Float64,
+) where {T}
+    return _compute_stress_neo_hookean(material, E)
+end
+
+function _compute_stress_neo_hookean(
+    material::NeoHookean,
+    E::SymmetricTensor{2,3,T},
+) where {T}
     # Right Cauchy-Green tensor: C = 2E + I
     I = one(E)
     C = 2E + I
@@ -117,5 +130,5 @@ end
 
 Simplified interface without state management for stateless material.
 """
-compute_stress(material::NeoHookean, E::SymmetricTensor{2,3,T}) where T =
+compute_stress(material::NeoHookean, E::SymmetricTensor{2,3,T}) where {T} =
     compute_stress(material, E, nothing, 0.0)
