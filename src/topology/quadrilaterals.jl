@@ -1,5 +1,5 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 """
     Quadrilateral{N} <: AbstractTopology{N}
@@ -17,7 +17,6 @@ const Quad4 = Quadrilateral{4}
 const Quad8 = Quadrilateral{8}
 const Quad9 = Quadrilateral{9}
 
-nnodes(::Quadrilateral{N}) where {N} = N
 dim(::Quadrilateral{N}) where {N} = 2
 
 function reference_coordinates(::Quadrilateral{4})
@@ -79,4 +78,3 @@ nvertices(::Quadrilateral) = 4
 nedges(::Quadrilateral) = 4
 nfaces(::Quadrilateral) = 1
 
-export Quad4, Quad8, Quad9
