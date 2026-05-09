@@ -66,6 +66,10 @@ when rendering the website) rather than chasing false positives in the library.
   `.github/prompts/commit.prompt.md`. With
   `git config core.hooksPath .githooks`, the pre-commit hook allows at
   most **two** staged files per commit.
+- Match **commit message depth** to the patch: a short summary suffices for
+  small edits; **large files, large diffs, or several concerns in one commit**
+  should add **grouped bullets** (major API or behavior, wiring, migrations,
+  caveats) so history stays readable without re-walking every hunk.
 
 ## Documentation pull requests
 
