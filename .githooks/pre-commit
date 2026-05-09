@@ -1,0 +1,32 @@
+#!/bin/bash
+# Pre-commit hook: prefer small commits; allow at most two staged paths.
+# Enable with: git config core.hooksPath .githooks
+
+staged_files=$(git diff --cached --name-only)
+file_count=$(echo "$staged_files" | grep -v '^$' | wc -l | tr -d ' ')
+
+if [ "$file_count" -gt 2 ]; then
+    echo "❌ COMMIT PROTOCOL VIOLATION: Attempting to commit $file_count files (maximum 2)"
+    echo ""
+    echo "Prefer tiny commits; combining more than two paths needs splitting or a hook bypass."
+    echo ""
+    echo "Staged files:"
+    echo "$staged_files"
+    echo ""
+    echo "See .github/prompts/commit.prompt.md"
+    exit 1
+fi
+
+if [ "$file_count" -eq 2 ]; then
+    echo "✅ Committing two files:"
+    echo "$staged_files"
+    exit 0
+fi
+
+if [ "$file_count" -eq 1 ]; then
+    echo "✅ Committing single file: $(echo "$staged_files" | head -1)"
+    exit 0
+fi
+
+echo "⚠️  No files staged for commit"
+exit 1
