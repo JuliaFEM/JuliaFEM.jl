@@ -1,5 +1,5 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 # Note: AbstractRefineStrategy is defined in mesh/api.jl
 
@@ -37,16 +37,16 @@ end
 LongestEdgeBisection() = LongestEdgeBisection(1)
 
 """
-    refine(mesh::Mesh{Hex8}, strategy::LongestEdgeBisection) -> Mesh{Hex8}
+    refine(mesh::Mesh{8, Hex8}, strategy::LongestEdgeBisection) -> Mesh{8, Hex8}
 
 Refine a Hex8 mesh using the longest edge bisection strategy.
 
 # Arguments
-- `mesh::Mesh{Hex8}`: Input mesh to refine
+- `mesh::Mesh{8, Hex8}`: Input mesh to refine
 - `strategy::LongestEdgeBisection`: Refinement strategy with number of levels
 
 # Returns
-- `Mesh{Hex8}`: Refined mesh
+- `Mesh{8, Hex8}`: Refined mesh
 
 # Algorithm
 For each refinement level:
@@ -63,7 +63,7 @@ println("Original: ", nelements(mesh), " elements")
 println("Refined:  ", nelements(refined), " elements")
 ```
 """
-function refine(mesh::Mesh{Hex8}, strategy::LongestEdgeBisection)
+function refine(mesh::Mesh{8, Hex8}, strategy::LongestEdgeBisection)
     current_mesh = mesh
 
     for level in 1:strategy.levels
@@ -74,7 +74,7 @@ function refine(mesh::Mesh{Hex8}, strategy::LongestEdgeBisection)
 end
 
 """
-    _refine_once_hex8(mesh::Mesh{Hex8}) -> Mesh{Hex8}
+    _refine_once_hex8(mesh::Mesh{8, Hex8}) -> Mesh{8, Hex8}
 
 Internal function: Perform one refinement iteration on Hex8 mesh.
 
@@ -99,7 +99,7 @@ Hex8 node numbering (reference):
 Bottom face: 1-2-3-4 (z = -1)
 Top face:    5-6-7-8 (z = +1)
 """
-function _refine_once_hex8(mesh::Mesh{Hex8})
+function _refine_once_hex8(mesh::Mesh{8, Hex8})
     old_nodes = copy(mesh.nodes)
     new_connectivity = NTuple{8,UInt32}[]
 
@@ -171,7 +171,7 @@ function _refine_once_hex8(mesh::Mesh{Hex8})
     end
 
     # Create new mesh
-    return Mesh{Hex8}(old_nodes, new_connectivity, new_element_sets, mesh.node_sets)
+    return Mesh{Hex8}(old_nodes, new_connectivity; element_sets=new_element_sets, node_sets=mesh.node_sets)
 end
 
 """
