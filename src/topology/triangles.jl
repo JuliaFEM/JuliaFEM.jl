@@ -19,7 +19,6 @@ const Tri6 = Triangle{6}
 const Tri7 = Triangle{7}
 const Tri10 = Triangle{10}
 
-nnodes(::Triangle{N}) where {N} = N
 dim(::Triangle{N}) where {N} = 2
 
 function reference_coordinates(::Triangle{3})
@@ -92,4 +91,3 @@ nvertices(::Triangle) = 3
 nedges(::Triangle) = 3
 nfaces(::Triangle) = 1
 
-export Tri3, Tri6, Tri7, Tri10
