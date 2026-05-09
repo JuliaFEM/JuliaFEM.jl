@@ -207,7 +207,8 @@ Editor-local Cursor rules under `.cursor/` are not part of the git tree.
   why). Never `git add .` or `git add -A` unless the user asks; stage paths
   deliberately. Read the **full** staged diff (no `head`/`tail`). Message
   format: Conventional Commits **subject**, blank line, **1–3 sentence**
-  summary, then optional **bullet** details. **Propose** paths + full message
+  summary, then bullets **scaled to the patch** (small change → few or none;
+  large / multi-concern → grouped, substantive bullets). **Propose** paths + full message
   and wait for **explicit approval** before each `git commit`. See
   `.github/prompts/commit.prompt.md` for the full protocol.
 - Never commit without an explicit user command to start committing. Do not
