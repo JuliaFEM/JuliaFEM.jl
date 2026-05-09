@@ -10,5 +10,8 @@ function assemble!(problem::Problem, element::Element, time=0.0)
 end
 
 module Abaqus
-using JuliaFEM: create_surface_elements
+# Vestigial sub-module wrapper kept for downstream code that did
+# `using JuliaFEM.Abaqus: create_surface_elements`. The real definition
+# now lives in `JuliaFEM.Legacy.create_surface_elements`.
+import ..create_surface_elements
 end
