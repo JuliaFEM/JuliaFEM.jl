@@ -71,6 +71,36 @@ when rendering the website) rather than chasing false positives in the library.
   should add **grouped bullets** (major API or behavior, wiring, migrations,
   caveats) so history stays readable without re-walking every hunk.
 
+## SPDX file headers
+
+SPDX tags belong at the top of new files when the rest of the tree uses them,
+but they must always sit inside comment syntax that matches the file type.
+Never paste raw `SPDX-*` lines into prose formats where they would render as
+visible text or break the format.
+
+- Julia (`.jl`), shell, Python, and other `#` line-comment languages:
+
+  ```text
+  # SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+  # SPDX-License-Identifier: MIT
+  ```
+
+- TOML, INI-style configs, and similar `#` comment formats: same `#` lines as above.
+
+- Markdown, Quarto (`.md`, `.qmd`), and other HTML-friendly prose: wrap the tags
+  in an HTML comment so renderers hide them:
+
+  ```markdown
+  <!--
+  SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+  SPDX-License-Identifier: MIT
+  -->
+  ```
+
+Formats that genuinely lack comments (for example strict JSON) cannot carry an
+in-file SPDX block; keep licensing in repository-level files or omit an in-file
+tag rather than emitting invalid syntax.
+
 ## Documentation pull requests
 
 When you change **user-facing prose** (Quarto `juliafem.github.io/docs/`, examples
