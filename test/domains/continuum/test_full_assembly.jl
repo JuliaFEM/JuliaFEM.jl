@@ -8,15 +8,14 @@
     assembler = COOAssembler()
     cache = COOCache(mesh, kernel)
 
-    # Test data
-    # u_global as nothing (zero displacement) or Vector{Vec{3,Float64}} for nonzero
+    # u_global = nothing means zero displacement; Vector{Vec{3,Float64}} for
+    # nonzero deformation. Material state lives on cache.global_material_cache.
     u_global = nothing
-    state_old = create_material_state(kernel, mesh)
     Δt = 0.01
 
     @testset "Correctness" begin
         # Assemble stiffness matrix and force vector
-        assemble!(cache, assembler, kernel, mesh, u_global, state_old, Δt)
+        assemble!(cache, assembler, kernel, mesh, u_global, Δt)
 
         # Verify output sizes
         @test length(cache.I) > 0
@@ -49,14 +48,13 @@
         JuliaFEM.reset!(cache)
 
         # Warm-up call
-        assemble!(cache, assembler, kernel, mesh, u_global, state_old, Δt)
+        assemble!(cache, assembler, kernel, mesh, u_global, Δt)
 
         # Reset for actual test
         JuliaFEM.reset!(cache)
 
-        # Test allocations
-        # Note: This tests the inner loop allocations, not the COO storage growth
-        allocs = @allocated assemble!(cache, assembler, kernel, mesh, u_global, state_old, Δt)
+        # Note: This tests the inner loop allocations, not the COO storage growth.
+        allocs = @allocated assemble!(cache, assembler, kernel, mesh, u_global, Δt)
 
         # We expect some allocations for COO storage growth (push! to vectors)
         # but the computation loop itself should be zero-allocation
@@ -92,10 +90,9 @@
         mesh2 = Mesh{8,Hex8}(X, connectivity)
         cache2 = COOCache(mesh2, kernel)
         u_global2 = nothing  # Zero displacement
-        state_old2 = create_material_state(kernel, mesh2)
 
         # Assemble
-        assemble!(cache2, assembler, kernel, mesh2, u_global2, state_old2, Δt)
+        assemble!(cache2, assembler, kernel, mesh2, u_global2, Δt)
 
         # Verify we get contributions from both elements
         @test length(cache2.I) > 24 * 24  # More than single element
