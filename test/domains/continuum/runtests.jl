@@ -50,6 +50,7 @@ include("test_helpers.jl")
 
     @testset "Cache Update Functions (Three-Phase API)" begin
         include("test_cache_updates.jl")
+        include("test_material_cache_branches.jl")
     end
 
     @testset "Kernel Functions" begin
@@ -59,6 +60,35 @@ include("test_helpers.jl")
 
     @testset "Full Assembly Workflow" begin
         include("test_full_assembly.jl")
+    end
+
+    @testset "Continuum brick direct solve" begin
+        include("test_continuum_brick_solve.jl")
+    end
+
+    @testset "Material element lab (single Hex8 coupon)" begin
+        include("test_material_element_lab.jl")
+    end
+
+    @testset "Mixed u–p (MixedUPKernel)" begin
+        include("test_mixed_up_kernel.jl")
+        include("test_mixed_up_incompressible_solve.jl")
+        include("test_approx_schur_diag_preconditioner.jl")
+    end
+
+    @testset "Stokes mixed (StokesMixedKernel)" begin
+        include("test_stokes_mixed_kernel.jl")
+        include("test_stokes_mixed_incompressible_solve.jl")
+    end
+
+    @testset "Hellinger–Reissner (HellingerReissnerKernel)" begin
+        include("test_hellinger_reissner_kernel.jl")
+        include("test_hellinger_reissner_matvec_penalty.jl")
+    end
+
+    @testset "Hu–Washizu (HuWashizuKernel)" begin
+        include("test_hu_washizu_kernel.jl")
+        include("test_hu_washizu_matvec_penalty.jl")
     end
 end
 
