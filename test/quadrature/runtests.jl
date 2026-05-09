@@ -1,18 +1,8 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 using Test
 using JuliaFEM
-using StaticArrays: SVector
-using Tensors: Vec
+using Tensors
 
-@testset "Quadrature Module" begin
-    include("test_api.jl")
-    include("test_triangles.jl")
-    include("test_tetrahedra.jl")
-    include("test_tensor_products.jl")
-    include("test_wedges.jl")
-    include("test_pyramids.jl")
-    include("test_accuracy.jl")
-    include("test_legacy_api.jl")
-end
+include("test_quadrature_rules.jl")
