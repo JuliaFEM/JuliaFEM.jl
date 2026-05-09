@@ -1,147 +1,132 @@
 # API Reference
 
-Complete API documentation for JuliaFEM.jl.
+This page lists the public API of `JuliaFEM`. Symbols are grouped by
+topic; the underlying source lives in `src/<topic>/`. The reference is
+generated from docstrings and only documents symbols that are exported
+and have a docstring attached.
 
 ```@meta
 DocTestSetup = quote
     using JuliaFEM
 end
+CurrentModule = JuliaFEM
 ```
 
-## Core Types
+## Topology
 
-### Elements
-
-```@docs
-Element
-topology_type
-basis_type
-dof_type
-element_id
-element_dofs
-n_element_dofs
+```@autodocs
+Modules = [JuliaFEM]
+Pages   = [
+    "topology/api.jl",
+    "topology/segments.jl",
+    "topology/triangles.jl",
+    "topology/quadrilaterals.jl",
+    "topology/tetrahedra.jl",
+    "topology/hexahedra.jl",
+    "topology/pyramids.jl",
+    "topology/wedges.jl",
+]
+Order   = [:type, :function]
 ```
 
-### Physics
+## Basis functions
 
-```@docs
-Physics
-AbstractPhysics
-DirichletBC
-NeumannBC
-Constraint
-assemble!
-solve!
-add_dirichlet!
-add_neumann!
+```@autodocs
+Modules = [JuliaFEM]
+Pages   = ["basis/api.jl", "basis/basis_generated.jl"]
+Order   = [:type, :function]
 ```
 
-### Fields
+## Quadrature
 
-```@docs
-AbstractField
-Displacement
-Temperature
-DisplacementRotation
+```@autodocs
+Modules = [JuliaFEM]
+Pages   = ["quadrature/api.jl", "quadrature/gauss.jl"]
+Order   = [:type, :function]
 ```
 
-### Formulations
+## Mesh
 
-```@docs
-AbstractFormulation
-ContinuumFormulation
-AbstractContinuumTheory
-FullThreeD
-PlaneStress
-PlaneStrain
-Axisymmetric
+```@autodocs
+Modules = [JuliaFEM]
+Pages   = [
+    "mesh/api.jl",
+    "mesh/mesh.jl",
+    "mesh/structured.jl",
+    "mesh/refine.jl",
+]
+Order   = [:type, :function]
 ```
 
-### Materials
+## DOFs and elements
 
-```@docs
-AbstractMaterial
-AbstractElasticMaterial
-AbstractPlasticMaterial
-LinearElastic
-NeoHookean
-compute_stress
-elasticity_tensor
+```@autodocs
+Modules = [JuliaFEM]
+Pages   = [
+    "dofs/api.jl",
+    "dofs/fields.jl",
+    "dofs/dofs.jl",
+    "dofs/dof_handler.jl",
+    "dofs/dof_connectivity.jl",
+    "elements/elements.jl",
+    "elements/extract_element_dofs.jl",
+    "elements/interpolate.jl",
+]
+Order   = [:type, :function, :macro]
 ```
 
-### Mesh
+## Materials
 
-```@docs
-AbstractMesh
-Mesh
-nnodes_total
-nelements
-get_node
-connectivity_matrix
-get_element_set
-get_node_set
+```@autodocs
+Modules = [JuliaFEM]
+Pages   = [
+    "materials/api.jl",
+    "materials/state_variables.jl",
+    "materials/traits.jl",
+    "materials/linear_elastic.jl",
+    "materials/neo_hookean.jl",
+    "materials/perfect_plasticity.jl",
+    "materials/heat_conductivity.jl",
+]
+Order   = [:type, :function]
 ```
 
-### Topology
+## Assemblers
 
-```@docs
-AbstractTopology
-Segment
-Triangle
-Quadrilateral
-Tetrahedron
-Hexahedron
-Pyramid
-Wedge
-Seg2
-Seg3
-Tri3
-Tri6
-Tri7
-Quad4
-Quad8
-Quad9
-Tet4
-Tet10
-Hex8
-Hex20
-Hex27
-Pyr5
-Wedge6
-Wedge15
+```@autodocs
+Modules = [JuliaFEM]
+Pages   = [
+    "assemblers/abstract.jl",
+    "assemblers/caches/coo_cache.jl",
+    "assemblers/caches/element_cache.jl",
+    "assemblers/caches/geometry_cache.jl",
+    "assemblers/caches/material_cache.jl",
+    "assemblers/element_based/element_based_coo.jl",
+    "assemblers/element_based/scatter_blocks_to_force.jl",
+    "assemblers/element_based/scatter_blocks_to_triplets_symmetric_direct.jl",
+    "assemblers/microkernel.jl",
+    "assemblers/dof_based/dof_based_coo.jl",
+    "assemblers/dof_based/dof_based_coo_ka.jl",
+    "assemblers/matrix_free/operator.jl",
+    "assemblers/matrix_free/dirichlet.jl",
+    "assemblers/matrix_free/mpc.jl",
+    "assemblers/matrix_free/preconditioners.jl",
+    "assemblers/matrix_free/eigensolve.jl",
+    "assemblers/matrix_free/loads.jl",
+]
+Order   = [:type, :function]
 ```
 
-### Basis Functions
+## Physics kernels
 
-```@docs
-AbstractBasis
-Lagrange
-Serendipity
-get_basis_functions
-get_basis_derivatives
-eval_basis!
-eval_dbasis!
-```
-
-### DOF System
-
-```@docs
-AbstractDOF
-DOFSet
-@DOFSet
-DOFManager
-register_fields!
-create_elements!
-```
-
-### Solvers
-
-```@docs
-Solver
-Linear
-Analysis
-add_problems!
-run!
+```@autodocs
+Modules = [JuliaFEM]
+Pages   = [
+    "domains/continuum/kernel.jl",
+    "domains/heat/kernel.jl",
+    "domains/thermo_elastic/kernel.jl",
+]
+Order   = [:type, :function]
 ```
 
 ## Index
