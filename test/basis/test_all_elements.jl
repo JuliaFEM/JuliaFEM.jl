@@ -2,16 +2,7 @@
 using Test
 using StaticArrays, Tensors
 
-include("../../src/topology/api.jl")
-include("../../src/topology/segments.jl")
-include("../../src/topology/triangles.jl")
-include("../../src/topology/quadrilaterals.jl")
-include("../../src/topology/tetrahedra.jl")
-include("../../src/topology/hexahedra.jl")
-include("../../src/topology/pyramids.jl")
-include("../../src/topology/wedges.jl")
-include("../../src/basis/api.jl")
-include("../../src/basis/basis_generated.jl")
+using JuliaFEM
 
 @testset "All Element Types - Partition of Unity" begin
     # 1D elements
