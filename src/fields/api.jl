@@ -28,17 +28,26 @@ Field defines what physical quantity is being computed:
 # Interface Requirements
 
 All field types must implement:
-- `dofs_per_node(field)` - Number of DOFs per node
+
+- `dofs_per_node(field)` - Number of scalar components of the field. The name
+  is historical: for vertex-located fields this equals the DOF count per node,
+  but for face/edge/cell-located fields (e.g. `RT0FaceFlux`, `Nedelec1Edge`,
+  `Pressure` on `Cell`) it returns the number of components per primary
+  entity, which need not be a node. The entity location is carried by the
+  `DOF{Quantity, Entity}` spec, not by the field type itself.
+- `quantity_type(::Type{<:AbstractField})` - Underlying scalar / `Vec` /
+  `Tensor` type used to represent values.
 
 # Concrete Types
 - `Displacement{Dim}` - Displacement field (Dim components)
 - `Temperature` - Temperature field (1 component)
 - `DisplacementRotation{Dim}` - Combined displacement + rotation (2*Dim components)
+- `RT0FaceFlux` / `Nedelec1Edge` - scalar tags for face / edge facet DOFs
 
 # Design Philosophy
 
 Field type determines:
-- DOF count per node
+- Component count of the quantity (and therefore DOF count per primary entity)
 - Solution vector structure
 - Boundary condition interpretation
 - Assembly dispatch (different fields may need different assembly strategies)
@@ -60,7 +69,9 @@ dofs_per_node(field)  # 6 (ux, uy, uz, θx, θy, θz)
 ```
 
 # See Also
-- [`dofs_per_node`](@ref)
+- [`dofs_per_node`](@ref), [`quantity_type`](@ref)
+- `DOF{Q, E}` in `src/dofs/api.jl` for how field types compose with
+  topological entities.
 """
 abstract type AbstractField end
 
@@ -84,23 +95,9 @@ Displacement field with Dim components per node.
 
 # Usage
 
-```julia
-# 3D elasticity
-physics = Physics(
-    formulation=ContinuumFormulation{FullThreeD}(),
-    field=Displacement{3}(),
-    mesh=mesh,
-    material=steel
-)
-
-# 2D plane stress
-physics = Physics(
-    formulation=ContinuumFormulation{PlaneStress}(),
-    field=Displacement{2}(),
-    mesh=mesh,
-    material=aluminum
-)
-```
+`Displacement{Dim}` is consumed as a type tag by `ContinuumKernel` /
+`AssemblyMaterialWorkspace` / `local_dof_layout`. See `test/runtests.jl`
+under `Continuum Domain` for end-to-end use.
 """
 struct Displacement{Dim} <: AbstractField end
 
@@ -116,19 +113,56 @@ Used for heat transfer problems.
 
 # Usage
 
-```julia
-physics = Physics(
-    formulation=ContinuumFormulation{FullThreeD}(),
-    field=Temperature(),
-    mesh=mesh,
-    material=thermal_material
-)
-```
-
-# See Also
-- Heat transfer problems in docs/
+`Temperature` is consumed as a type tag by `HeatKernel` and
+`local_dof_layout`. See `test/runtests.jl` under `Heat Domain` for
+end-to-end use.
 """
 struct Temperature <: AbstractField end
+
+"""
+    MoistureContent <: AbstractField
+
+Scalar moisture-related field (humidity, saturation, or pore-water fraction) at
+vertices for diffusion solves paired with [`MoistureDiffusivity`](@ref).
+"""
+struct MoistureContent <: AbstractField end
+
+"""
+    PressurePotential <: AbstractField
+
+Scalar hydraulic **pressure head** (or pore-pressure potential) at vertices for
+primal Darcy flow; same numerical layout as [`Temperature`](@ref) — one DOF
+per node — but carried under [`DarcyPotentialKernel`](@ref) with
+[`HydraulicConductivity`](@ref).
+"""
+struct PressurePotential <: AbstractField end
+
+"""
+    RT0FaceFlux <: AbstractField
+
+Type tag for one scalar unknown per mesh face used as the coefficient of a
+lowest-order Raviart–Thomas-type (`RT₀`) vector space. This is not a Cartesian
+flux component. See `DarcyMixedRT0P0Kernel` in `src/domains/darcy/mixed_rt0.jl`
+for Tet4 mixed Darcy; hex and other topologies are still open.
+
+Prefer `DOF{RT0FaceFlux, Face}` over `DOF{Float64, Face}` when the unknown should
+dispatch as H(div)-facet data. See [`Hex8FacetMaps`](@ref).
+"""
+struct RT0FaceFlux <: AbstractField end
+
+"""
+    Nedelec1Edge <: AbstractField
+
+Type tag for one scalar unknown per mesh edge (circulation DOF) in a lowest-order
+Nédélec edge element on hexes. Reference bases, covariant Piola transforms, and
+weak forms are not implemented yet.
+
+Prefer `DOF{Nedelec1Edge, Edge}` over raw `DOF{Float64, Edge}` for dispatch.
+See [`Hex8FacetMaps`](@ref) field `elem_edge_orientation` for a first edge sign hint;
+full H(curl) conformity still needs Piola maps and may require extra flips when
+two elements agree on that hint across a shared edge.
+"""
+struct Nedelec1Edge <: AbstractField end
 
 """
     DisplacementRotation{Dim} <: AbstractField
@@ -146,23 +180,10 @@ DOFs per node: 2*Dim (Dim displacements + Dim rotations)
 
 # Usage
 
-```julia
-# 3D beam (Timoshenko theory)
-physics = Physics(
-    formulation=BeamFormulation{Timoshenko}(),
-    field=DisplacementRotation{3}(),
-    mesh=beam_mesh,
-    material=steel
-)
-
-# 3D shell (Reissner-Mindlin theory)
-physics = Physics(
-    formulation=ShellFormulation{ReissnerMindlin}(),
-    field=DisplacementRotation{3}(),
-    mesh=shell_mesh,
-    material=composite
-)
-```
+`DisplacementRotation` is currently a type tag for the field structure of
+beam and shell elements. Concrete beam and shell formulations are not
+implemented in the default 0.x build; the active analytic surface lives in
+`ContinuumKernel` / `HeatKernel` under `src/domains/`.
 
 # DOF Layout
 
@@ -215,6 +236,10 @@ function dofs_per_node end
 # Concrete implementations
 dofs_per_node(::Displacement{Dim}) where Dim = Dim
 dofs_per_node(::Temperature) = 1
+dofs_per_node(::MoistureContent) = 1
+dofs_per_node(::PressurePotential) = 1
+dofs_per_node(::RT0FaceFlux) = 1
+dofs_per_node(::Nedelec1Edge) = 1
 dofs_per_node(::DisplacementRotation{Dim}) where Dim = 2 * Dim
 
 # ============================================================================
@@ -256,6 +281,10 @@ function quantity_type end
 # Concrete implementations
 quantity_type(::Type{Displacement{Dim}}) where Dim = Vec{Dim}
 quantity_type(::Type{Temperature}) = Float64
+quantity_type(::Type{MoistureContent}) = Float64
+quantity_type(::Type{PressurePotential}) = Float64
+quantity_type(::Type{RT0FaceFlux}) = Float64
+quantity_type(::Type{Nedelec1Edge}) = Float64
 quantity_type(::Type{DisplacementRotation{Dim}}) where Dim = Vec{2*Dim}
 
 # ============================================================================
@@ -269,9 +298,9 @@ quantity_type(::Type{DisplacementRotation{Dim}}) where Dim = Vec{2*Dim}
         element_nodes::AbstractVector{Int}
     ) -> Nothing
 
-Fill global DOF indices for an element **in-place** based on field type.
+Fill global DOF indices for an element in-place based on field type.
 
-**Node-major ordering**: All DOFs for node 1, then node 2, etc.
+Node-major ordering: All DOFs for node 1, then node 2, etc.
 
 # Arguments
 - `dofs`: Pre-allocated DOF index buffer [ndofs_elem] (output)
