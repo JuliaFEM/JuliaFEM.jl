@@ -20,6 +20,7 @@ coverage/
 test/*.h5
 test/*.xmf
 .env
+.cursor/
 .vscode
 trash
 .trash/
