@@ -1,147 +1,91 @@
----
-title: "JuliaFEM Scripts"
-description: "Development and code generation scripts for JuliaFEM"
-date: 2025-11-09
-author: "Jukka Aho"
-categories: ["development", "tools", "automation"]
-keywords: ["scripts", "code generation", "automation", "development tools"]
-audience: "contributors"
-level: "intermediate"
-type: "technical documentation"
----
+# scripts/
 
-# JuliaFEM Scripts
+Standalone helper scripts that are not part of the package code and not
+exercised by the test suite. They are run manually during development.
 
-This directory contains development and code generation scripts for JuliaFEM.
+## Current scripts
 
-## Basis Function Generation
+### `coverage.jl`
 
-### `generate_lagrange_basis.jl`
-
-**Purpose:** Pre-generate all Lagrange basis functions for standard finite elements.
-
-**Why Pre-generate?**
-
-- **Fast loading:** No symbolic math at package load time (100+ ms → 0 ms)
-- **Full precompilation:** Remove `__precompile__(false)` restriction
-- **Readable code:** Generated code is easy to debug and understand
-- **Version control:** Changes to mathematics show up in git diffs
-- **Reproducible:** Same input always produces same output
-
-**When to Run:**
-
-- Adding new element types (Seg2, Tri3, Hex20, etc.)
-- Fixing bugs in generation logic
-- Changing polynomial ansatz strategy
-- After modifying `src/basis/lagrange_generator.jl`
-
-**Usage:**
+Runs the test suite under `--code-coverage=user`, summarises the
+resulting `.cov` files, and writes `coverage/lcov.info` for editor
+gutters and Codecov-style tooling.
 
 ```bash
-cd /path/to/JuliaFEM.jl
-julia --project=. scripts/generate_lagrange_basis.jl
+# Full pass (re-runs the test suite, ~50 - 60 s).
+julia scripts/coverage.jl
+
+# Re-summarise the .cov files left behind by a previous run, no tests.
+julia scripts/coverage.jl --summary-only
+
+# Run the legacy mode in addition (JULIAFEM_ENABLE_LEGACY=1).
+julia scripts/coverage.jl --legacy
+
+# CI-style threshold gate (exit non-zero when below 95 %).
+julia scripts/coverage.jl --threshold 95
+
+# Show more files in the per-file breakdown.
+julia scripts/coverage.jl --top 60
 ```
 
-**Output:**
+The reporter prints two headline numbers:
 
-- `src/basis/lagrange_generated.jl` (commit this file!)
+- `Total coverage (all src/)` — covers everything under `src/`,
+  including the `src/legacy/` tree that is gated behind
+  `JULIAFEM_ENABLE_LEGACY=1`. Default test runs never load the legacy
+  module, so its lines always weigh in as 0/N.
+- `Live coverage (excl legacy)` — drops `src/legacy/` from the
+  denominator. This is the more meaningful number for the active
+  codebase.
 
-**Theory:**
-See `docs/book/lagrange_basis_functions.md` for mathematical foundation.
+Coverage tooling lives in its own environment at
+`scripts/coverage/Project.toml` (only `Coverage.jl`) so the package's
+runtime and test deps stay clean. The first run instantiates that env
+on demand.
 
-**Architecture:**
+### `check_layer_contract.jl`
 
-```text
-src/basis/lagrange_generator.jl
-    │
-    │ (symbolic engine - uses symbolic differentiation)
-    │
-    ↓
-scripts/generate_lagrange_basis.jl
-    │
-    │ (orchestration - defines all element types)
-    │
-    ↓
-src/basis/lagrange_generated.jl
-    │
-    │ (clean Julia code - no eval, fully precompilable)
-    │
-    ↓
-src/JuliaFEM.jl includes generated file
-```
-
-**Generated Elements:**
-
-| Dimension | Linear | Quadratic | Higher |
-|-----------|--------|-----------|--------|
-| 1D        | Seg2   | Seg3      | -      |
-| 2D Tri    | Tri3   | Tri6      | -      |
-| 2D Quad   | Quad4  | Quad8, Quad9 | -   |
-| 3D Tet    | Tet4   | Tet10     | -      |
-| 3D Hex    | Hex8   | Hex20, Hex27 | -   |
-| 3D Pyramid| Pyr5   | -         | -      |
-| 3D Wedge  | Wedge6 | Wedge15   | -      |
-
-**Total:** 15 element types covering all standard Lagrange families.
-
-**Performance Impact:**
-
-- **Before:** 150+ ms at package load (symbolic math for each element)
-- **After:** < 1 ms (just include pre-generated file)
-- **Speedup:** ~150× faster package loading
-
-**Workflow:**
-
-1. Edit element catalog in `scripts/generate_lagrange_basis.jl`
-2. Run generation script
-3. Review `src/basis/lagrange_generated.jl`
-4. Run tests: `julia --project=. -e 'using Pkg; Pkg.test()'`
-5. Commit both files: `git add scripts/ src/basis/lagrange_generated.jl`
-
-**Example**: Adding Hex64 (Triquartic)
-
-```julia
-# In scripts/generate_lagrange_basis.jl, add to element catalog:
-push!(elements, (
-    name = "Hex64",
-    description = "64-node triquartic hexahedral element",
-    coordinates = [
-        # ... 64 nodes (corners + edges + faces + volume)
-    ],
-    ansatz = [
-        :(1), :(ξ), :(η), :(ζ),  # ... up to ξ³η³ζ³
-    ]
-))
-```
-
-Then regenerate:
+Static audit for the dependency directions described in
+`docs/src/developer/architecture_layers.md`. Fails if forbidden patterns
+appear under `src/domains/` (layer C) or under layer A directories
+(`topology`, `quadrature`, `geometry`, `basis`, `sparse`). Uses only Base;
+CI runs this on every job.
 
 ```bash
-julia --project=. scripts/generate_lagrange_basis.jl
+julia scripts/check_layer_contract.jl
 ```
 
-The new `Hex64` type will be automatically available in JuliaFEM!
+### `check_namespace_collisions.jl`
 
----
+Walks the loaded `JuliaFEM` module and reports symbol-name collisions
+with the standard library and other commonly-used packages. Useful when
+adding new exports or before merging large refactors.
 
-## Future Scripts (Planned)
+```bash
+julia --project=. scripts/check_namespace_collisions.jl
+```
 
-### `benchmark_suite.jl`
+### `fix_vendor_element_types.py`
 
-Run comprehensive performance benchmarks.
+One-off cleanup script (Python) for normalising element-type names
+inherited from older vendor packages. Kept for reference; not expected
+to be re-run.
 
-### `validate_against_reference.jl`
+## Related machinery elsewhere
 
-Compare JuliaFEM results to Code Aster/ABAQUS.
+The Lagrange basis generator that some older notes refer to as
+`scripts/generate_lagrange_basis.jl` is now an in-tree file under
+`src/basis/`:
 
-### `generate_element_matrices.jl`
+- `src/basis/basis_generator.jl` performs the symbolic generation and
+  emits `src/basis/basis_generated.jl`.
+- Run it directly with `julia --project=. src/basis/basis_generator.jl`
+  whenever a basis description in `src/basis/basis_descriptions.jl`
+  changes.
 
-Pre-compute stiffness matrices for simple elements.
+MPI regression drivers live under `test/mpi/` (`partitioned_matvec_smoke.jl`,
+`partitioned_matvec_cg.jl`). They expect a throwaway project with `MPI.jl`
+installed; the exact `julia -e '…'` incantation matches
+`.github/workflows/CI.yml` (job `mpi-partitioned-matvec-smoke`).
 
----
-
-**See also:**
-
-- `docs/book/lagrange_basis_functions.md` - Mathematical theory
-- `src/basis/lagrange_generator.jl` - Symbolic generation engine
-- `llm/VISION_2.0.md` - Overall project architecture
+See `src/basis/README.md` for the complete design and extension guide.
