@@ -1,204 +1,131 @@
-# DOF System
+# src/dofs/
 
-Type-level field specifications for finite elements.
+Type-stable degree-of-freedom infrastructure: the field specification
+language (`DOF{Q, E}`, `@DOFSet`), the global DOF numbering
+(`DOFHandler`), and the inverse DOF connectivity used by the matrix-free
+assembler.
 
----
+The previous `Dict`-based `DOFManager`/`register_fields!`/`count_field_dofs`
+API has been removed. `DOFManager` is now an alias for `DOFHandler` for
+backward compatibility.
 
-## Philosophy
+Contract and vocabulary: `AGENTS.md` (repository root). Executable examples:
+`test/dofs/test_multifield_dof_system.jl` and the DOF topic tests under
+`test/dofs/runtests.jl`.
 
-**Multi-field is fundamental. Single-field is just a special case with one key.**
+## Files
 
-Field specifications are `DOFSet` types (currently implemented as NamedTuples), used purely at the type level:
+- `api.jl`             — `DOF{Quantity, Entity}` abstract type, `dof_size`
+  for the supported quantity types (`Float64`, `Vec{D}`, `Tensor{2,D}`),
+  and the entity types (`Vertex`, `Edge`, `Face`, `Cell`).
+- `fields.jl`          — the `@DOFSet` macro (NamedTuple of `DOF{Q, E}`)
+  and field accessors (`field_names`, `field_count`, `field_ndofs`,
+  `field_dof_range`, `is_single_field`).
+- `dof_handler.jl`     — `DOFHandler{Mesh, S, NF}`. One flat
+  `Vector{Int}` per field stores the starting global DOF for each
+  entity ID; `total_dofs` is computed once. `create_elements!(mesh, ET)`
+  walks the mesh, assigns DOFs, builds the element vector and the
+  inverse DOF connectivity in one pass.
+- `dof_connectivity.jl` — `DOFConnectivity`. Maps each DOF to the
+  elements and local-DOF positions that contribute to its row, which is
+  what the DOF-based assembler iterates over.
 
-```julia
-# Clean syntax using abstract DOF{T,E} types:
-(T = DOF{Float64, Vertex}, u = DOF{Vec{3,Float64}, Vertex})
+## DOF specification
 
-# Using DOFSet macro (preferred):
-S = @DOFSet{T::DOF{Temperature, Vertex}, u::DOF{Displacement{3}, Vertex}}
-
-# Used in Element type parameter:
-Element{Tetrahedron{4}, Lagrange{1}, S}
-```
-
-**Note**: `DOFSet` is currently an alias for `NamedTuple`, but using `DOFSet` ensures your code will continue to work if we change the internal representation in the future. You can also use `@NamedTuple` directly, but `@DOFSet` is the preferred interface.
-
----
-
-## Core Concept: DOF{T,E}
-
-`DOF{T, E}` is an **abstract type** for type-level specifications (never instantiated):
-
-```julia
-abstract type DOF{T, E<:TopologicalEntity} end
-```
-
-**Type Parameters:**
-
-- `T`: Quantity type (Float64, Vec{D}, Tensor{2,D}, etc.)
-- `E`: Topological entity (Vertex, Edge, Face, Cell)
-
-**Examples:**
+`DOF{Quantity, Entity}` is purely a type-level marker; instances are
+never created. `Quantity` carries the per-entity DOF size via
+`dof_size`, and `Entity` selects the topological entity that owns it.
 
 ```julia
-DOF{Float64, Vertex}              # Scalar at vertices
-DOF{Vec{3,Float64}, Vertex}       # 3D vector at vertices
-DOF{Tensor{2,3,Float64}, Cell}    # 3×3 tensor at cells
-```
-
----
-
-## Field Specifications with @DOFSet
-
-Use the `@DOFSet` macro for multi-field specifications:
-
-```julia
-# Multi-field specification with DOF syntax (preferred)
-S = @DOFSet{
-    T::DOF{Temperature, Vertex},
-    u::DOF{Displacement{3}, Vertex},
-    p::DOF{Pressure, Cell}
-}
-
-# Returns: DOFSet type (currently NamedTuple, but this is an implementation detail)
-```
-
-**Always use `@DOFSet`, even for single-field elements:**
-
-```julia
-# Single-field - always wrap in @DOFSet
+# Single field
 S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
-Element{Tetrahedron{4}, Lagrange{1}, S}
+
+# Multi-field (e.g. thermo-mechanical)
+S = @DOFSet{T::DOF{Temperature, Vertex},
+            u::DOF{Displacement{3}, Vertex}}
+
+# `S` is a NamedTuple type with field types `DOF{Q, E}`.
 ```
 
-This simplifies generated code by having a single, consistent syntax for all cases.
+`@DOFSet` is the preferred entry point. `DOFSet` is currently a type
+alias for `NamedTuple`, but using `@DOFSet` insulates calling code from
+that implementation detail.
 
----
+## Building elements and the handler
 
-## Element Integration
-
-Field specification `S` is the third type parameter in Element:
+`create_elements!` is the only call most user code needs:
 
 ```julia
-struct Element{K<:AbstractTopology, P<:AbstractBasis, S<:DOFSet, N}
-    id::UInt
-    dof_indices::NTuple{N,UInt64}  # Flat tuple of global DOF indices
-end
+ET = Element{Hex8, Lagrange{1}, S}
+elements, handler = create_elements!(mesh, ET)
+# elements::Vector{Element{Hex8, Lagrange{1}, S, 24}}
+# handler.dof_connectivity is already built.
 ```
 
-**Type Parameters:**
-- `K`: Topology (Triangle{3}, Tetrahedron{4}, ...)
-- `P`: Basis (Lagrange{1}, Lagrange{2}, ...)
-- `S`: Field specification (`DOF{T,E}` for single-field, `DOFSet` for multi-field)
-- `N::Int`: Total DOF count (automatically inferred from S and K)
+`DOFHandler` exposes:
 
-**Example with single field:**
+- `field_starts::NTuple{NF, Vector{Int}}` — per-field starting DOF for
+  each entity ID.
+- `total_dofs::Int`.
+- `dof_connectivity::DOFConnectivity` for the matrix-free path.
 
-```julia
-# Most common case - use DOF{T,E} directly
-S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
-elem = Element{Tetrahedron{4}, Lagrange{1}, S}(
-    UInt(1),
-    (dof=(1,2,3,4,5,6,7,8,9,10,11,12),)  # Single field, default name :dof
-)
-```
+The compile-time DOF layout for the element template is generated by
+`local_dof_layout(::Type{Element{K, P, S, N}})` (in `src/elements/`).
 
-**Example with multiple fields:**
+## Element-level DOF utilities
 
-```julia
-S = @DOFSet{
-    T::DOF{Temperature, Vertex},
-    u::DOF{Displacement{3}, Vertex}
-}
+These helpers operate on a single `Element` instance and are used inside
+assembly hot paths:
 
-elem = Element{Tetrahedron{4}, Lagrange{1}, S}(
-    UInt(1),
-    (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)  # Flat tuple: T DOFs first, then u DOFs
-)
-```
+- `element_dofs(elem)`               — flat `NTuple{N, UInt64}`.
+- `n_element_dofs(elem)`             — `N`.
+- `local_to_global_map(elem)`        — same as above, for clarity.
+- `field_dof_range(elem, :field)`    — `UnitRange` of local indices for
+  one field block (compile-time constant).
+- `extract_element_dofs(elem, u)`    — flat `NamedTuple` of scalars
+  grouped by field.
+- `extract_element_dofs_structured(elem, u)` — values reinterpreted into
+  the field's quantity type (e.g. `Vec{3}` per node).
+- `interpolate_field`,
+  `interpolate_fields`,
+  `interpolate_field_value`,
+  `interpolate_local_fields` — point-evaluation utilities at quadrature
+  points.
 
----
+## Multiple DOFs per Edge or Face
 
-## DOF Counting
+The topological facet id from [`AbstractFacetConnectivityMaps`](@ref) still
+identifies one **mesh edge** or **mesh face**. If the field quantity has
+`dof_size(Q) > 1` (for example `DOF{Vec{2,Float64}, Edge}`), that entity owns
+several consecutive global DOFs starting at `field_starts[field][entity_gid]`.
+`local_dof_layout` and `_make_element_dofs` treat them as separate components
+on the same local entity index; assembly kernels that replicate a scalar facet
+measure per unknown should match `component(layout_i) == component(layout_j)`
+when filling diagonal blocks.
 
-All DOF information is computed at compile time:
+Hp-refinement, NURBS/IGA, or hierarchic enrichment imply either distinct
+`Element{K, P, S, N}` templates per patch (so `N` and layout stay compile-time
+constants) or precomputed facet tables built once when the mesh changes — not
+dynamic `Dict` lookups inside element quadrature loops.
 
-```julia
-# Components per quantity type:
-dof_size(Float64) = 1
-dof_size(Vec{3}) = 3
-dof_size(Tensor{2,3}) = 9
+Variable numbers of DOFs on different mesh edges (non-uniform `p` along edges)
+need matching counts on shared edges for conformity. A natural numbering stores
+one contiguous band per global edge with widths given by a CSR offset vector;
+see `edge_dof_csr_offsets` on [`AbstractFacetConnectivityMaps`](@ref) in
+`src/mesh/hex8_facet_maps.jl`. Wiring that into `DOFHandler` and
+`local_dof_layout` is future work when hp facet spaces are added.
 
-# DOFs per field:
-field_ndofs(DOF{Temperature, Vertex}, Tetrahedron{4})  # 1 × 4 = 4
-field_ndofs(DOF{Displacement{3}, Vertex}, Tetrahedron{4})   # 3 × 4 = 12
+## Heterogeneous element types
 
-# Total DOFs for element:
-ndofs(S, Tetrahedron{4})  # Sum over all fields
-```
+`create_elements!` can be called repeatedly on the same mesh with
+different `Element{K, P, S}` types (for example a thermal `S1` and a
+mechanical `S2`); the handler keeps DOFs of identically-named fields
+shared between the element types.
 
----
+## Related code
 
-## Examples
-
-### Single-Field Elements
-
-```julia
-# Heat conduction:
-S = @Fields begin
-    T: Float64, Vertex
-end
-Element{Triangle{3}, Lagrange{1}, S}  # 3 DOFs
-
-# 3D Elasticity:
-S = @Fields begin
-    u: Vec{3,Float64}, Vertex
-end
-Element{Tetrahedron{4}, Lagrange{1}, S}  # 12 DOFs
-```
-
-### Multi-Field Elements
-
-```julia
-# Thermo-mechanical:
-S = @Fields begin
-    T: Float64, Vertex
-    u: Vec{3,Float64}, Vertex
-end
-Element{Tetrahedron{4}, Lagrange{1}, S}  # 4 + 12 = 16 DOFs
-
-# Thermo-hydro-mechanical:
-S = @Fields begin
-    T: Float64, Vertex     # Temperature at vertices
-    p: Float64, Vertex     # Pressure at vertices
-    u: Vec{3,Float64}, Vertex   # Displacement at vertices
-end
-Element{Tetrahedron{4}, Lagrange{1}, S}  # 4 + 4 + 12 = 20 DOFs
-```
-
----
-
-## Key Benefits
-
-1. **Type-level computation** - All DOF information resolved at compile time
-2. **Named field access** - `elem.dof_indices.T` self-documenting
-3. **Multi-field natural** - No special cases, just more keys in NamedTuple
-4. **Zero overhead** - No runtime type checks, no Dict lookups
-5. **Extensible** - Add new fields without changing Element struct
-
----
-
-## Module Structure
-
-- **`api.jl`** - DOF{T,E} abstract type + dof_size() utility
-- **`fields.jl`** - FieldSpec, @Fields macro, ndofs(), field queries
-- **`dof_manager.jl`** - Global DOF numbering and element creation
-- **`dofs.jl`** - Main entry point
-
----
-
-## Related Modules
-
-- `/src/topology/` - TopologicalEntity types (Vertex, Edge, Face, Cell)
-- `/src/basis/` - Basis functions (Lagrange, etc.)
-- `/src/elements/` - Element implementation
+- `src/topology/`        — `Vertex`, `Edge`, `Face`, `Cell`.
+- `src/elements/`        — `Element{K, P, S, N}` and `local_dof_layout`.
+- `src/assemblers/`      — `DOFBasedCOOAssembler` is the primary consumer
+  of `DOFConnectivity`.
+- `test/dofs/`           — public test suite.
