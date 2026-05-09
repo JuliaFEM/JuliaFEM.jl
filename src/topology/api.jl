@@ -19,7 +19,7 @@ See `src/topology/README.md` for complete documentation.
 
 Abstract type for element topology (geometric shape and node ordering).
 
-Topology defines the **shape** of an element in reference space: coordinates,
+Topology defines the shape of an element in reference space: coordinates,
 edge/face connectivity, and spatial dimension.
 
 # Type Parameter
