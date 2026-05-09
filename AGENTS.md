@@ -221,6 +221,8 @@ Editor-local Cursor rules under `.cursor/` are not part of the git tree.
 - Run the full test suite before declaring done.
 `julia --project=. -e 'using Pkg; Pkg.test()'`. All bundled topic tests must pass
 with no errors (the exact test count grows with the tree under `test/`).
+- SPDX tags at file tops must use comment syntax for that file type (for example
+  `# …` in `.jl`, HTML comments in Markdown); see `docs/CONTRIBUTING.md`.
 
 ---
 
