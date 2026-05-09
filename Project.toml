@@ -4,10 +4,12 @@ version = "0.5.2"
 author = ["Jukka Aho <ahojukka5@gmail.com>", "Tero Frondelius <tero.frondelius@gmail.com>", "Olli Väinölä"]
 
 [deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearOperators = "5c8ed15e-5a4c-59e4-a42b-c7e8811fb125"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
@@ -15,18 +17,15 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 
-[weakdeps]
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
-
-[extensions]
-JuliaFEMCUDAExt = ["CUDA"]
-
 [compat]
+Adapt = "4.5.2"
 BenchmarkTools = "1.6.3"
 Gmsh = "0.3.1"
 IterativeSolvers = "0.9.4"
 JuliaFormatter = "2.2.0"
+KernelAbstractions = "0.9.41"
 LinearOperators = "2.11.0"
+MPI = "0.20"
 StaticArrays = "1.9.15"
 Tensors = "≥ 1.0.0"
 julia = "1.9"
@@ -38,13 +37,22 @@ Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
 HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
+InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 LightXML = "9c8b4983-aa76-5018-a973-4c85ecc9e179"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
+MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 
 [targets]
-test = ["Test", "Statistics", "Gmsh", "BenchmarkTools"]
+test = ["Test", "Statistics", "Gmsh", "BenchmarkTools", "InteractiveUtils", "Random", "MPI"]
+
+[weakdeps]
+MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+
+[extensions]
+JuliaFEMMPIExt = ["MPI"]
