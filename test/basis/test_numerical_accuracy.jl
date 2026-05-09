@@ -3,16 +3,7 @@
 using Test
 using StaticArrays, Tensors
 
-include("../../src/topology/api.jl")
-include("../../src/topology/segments.jl")
-include("../../src/topology/triangles.jl")
-include("../../src/topology/quadrilaterals.jl")
-include("../../src/topology/tetrahedra.jl")
-include("../../src/topology/hexahedra.jl")
-include("../../src/topology/pyramids.jl")
-include("../../src/topology/wedges.jl")
-include("../../src/basis/api.jl")
-include("../../src/basis/basis_generated.jl")
+using JuliaFEM
 
 @testset "Numerical Accuracy - Clean Fractions" begin
     @testset "Hex27 corner nodes - 1/18 coefficients" begin
