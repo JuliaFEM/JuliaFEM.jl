@@ -1,130 +1,40 @@
----
-title: "JuliaFEM Documentation"
-description: "Three-tier documentation structure for users, contributors, and researchers"
-date: 2025-11-09
-author: "Jukka Aho"
-categories: ["documentation", "guide"]
-keywords: ["juliafem", "finite element", "documentation", "manual"]
-type: "index"
----
+# docs/
 
-Welcome! JuliaFEM documentation is organized into **three manuals** for three different audiences:
+Sources for the JuliaFEM.jl documentation site, plus a small set of
+kept-on-purpose historical material.
 
----
+## Layout
 
-## 📘 [User Manual](user/) - "Just Get It Done"
+- `src/`: Documenter-built documentation source.
+  - `index.md`: landing page and a current-API quick start.
+  - `developer/`: maintainer-facing notes (for example architecture layers).
+  - `repository_layout.md`: where to place new files in the repository.
+  - `api.md`: auto-extracted API reference.
+  - `figs/`: diagrams referenced from the docs.
+- `make.jl`: Documenter build script. From the repository root:
+  `julia --project=docs -e 'using Pkg; Pkg.instantiate()'` once, then
+  `julia --project=docs docs/make.jl`. This uses **`docs/Project.toml`** (includes
+  **Documenter**); the main package environment does not need Documenter for normal
+  `Pkg.test()`.
+- `Project.toml`, `Manifest.toml`: build environment for the docs.
+- `NEWS.md`: short changelog for 0.x releases; keep bullets factual.
+- `CONTRIBUTING.md`: short contributor quick-start. The full
+  contributor-facing description of architecture, invariants and
+  workflow lives in the repository root `AGENTS.md`.
+- `repository_layout.md`: pointer to `src/repository_layout.md` (full layout guide).
+- `tutorials/`: Jupyter notebooks from 2015-2016. They predate the
+  current API and are kept only as a historical record. They are not
+  built into the documentation site and are not exercised by CI.
+- `logo/`: JuliaFEM logo assets.
+- `build/`: generated output of `make.jl` (gitignored).
+- `deploy.jl`: deployment helper.
 
-**For:** End users, engineers, students who want to run simulations.
+## What does not live here
 
-**Style:** Simple, practical, step-by-step.
-
-**Contents:**
-
-- Quick start and installation
-- Tutorials and examples
-- API reference
-- Troubleshooting
-
-**Philosophy:** Show me how to solve my problem, skip the lectures.
-
-👉 **[Start Here](user/README.md)** if you want to run simulations.
-
----
-
-## 🔧 [Contributor Manual](contributor/) - "Show Me the Code"
-
-**For:** Developers, contributors, advanced users who want to extend JuliaFEM.
-
-**Style:** Technical, detailed, design rationale.
-
-**Contents:**
-
-- Testing philosophy
-- Code style and architecture
-- Performance guidelines
-- How to add elements
-- CI/CD and git workflow
-
-**Philosophy:** Explain HOW the code works and WHY we made these choices.
-
-👉 **[Start Here](contributor/README.md)** if you want to contribute code.
-
----
-
-## 📖 [The JuliaFEM Book](book/) - "Let Me Show You How I Think"
-
-**For:** Advanced researchers, theory nerds, those who want to understand deeply. And Jukka.
-
-**Style:** Comprehensive, educational, opinionated, personal.
-
-**Contents:**
-
-- Mathematical foundations (Lagrange basis, contact mechanics, etc.)
-- Design philosophy and technical vision
-- Strategic mistakes and lessons learned (2015-2019)
-- Research directions (nodal assembly, matrix-free, etc.)
-- Personal reflections on the journey
-
-**Philosophy:** Mix theory, software design, and personal experience. Teach FEM through implementation.
-
-👉 **[Start Here](book/README.md)** if you love deep dives and want to understand the "why" behind everything.
-
----
-
-## Quick Navigation
-
-### I want to...
-
-- **Solve a heat transfer problem** → [User Manual](user/)
-- **Add a new element type** → [Contributor Manual](contributor/)
-- **Understand Lagrange basis functions** → [Book: Lagrange Basis](book/lagrange_basis_functions.md)
-- **Learn about testing** → [Contributor: Testing Philosophy](contributor/testing_philosophy.md)
-- **See benchmark results** → [Book: Benchmarks](book/benchmarks/)
-- **Understand the design philosophy** → [Book: Philosophy](book/)
-- **Report a bug** → GitHub Issues
-- **Ask a question** → GitHub Discussions
-
----
-
-## Documentation Philosophy
-
-### Why Three Manuals?
-
-Different readers have different needs:
-
-1. **Users** don't care about implementation details - they just want working code.
-2. **Contributors** need technical depth but not necessarily all the theory.
-3. **Researchers** (and Jukka) want to understand everything from first principles.
-
-Mixing these audiences in one manual makes it too complex for users and too shallow for researchers.
-
-### Design Principles
-
-- **User Manual:** Optimize for time-to-first-result
-- **Contributor Manual:** Optimize for correctness and maintainability
-- **Book:** Optimize for understanding and education
-
-### Cross-References
-
-Manuals link to each other when appropriate:
-
-- User manual links to theory when deeper understanding helps
-- Contributor manual links to book for design rationale
-- Book links to code examples and practical guides
-
----
-
-## Contributing to Documentation
-
-Documentation improvements are always welcome!
-
-- **User docs:** Fix errors, add examples, improve clarity
-- **Contributor docs:** Update for new features, clarify architecture
-- **Book:** Add theory, share insights, document research
-
-See [Contributor Manual](contributor/) for guidelines.
-
----
-
-**License:** MIT (same as code)  
-**Questions?** Open an issue or discussion on GitHub
+- Session logs, design notes, vision documents, planning checklists and
+  AI-assistant working files belong under `llm/` (gitignored), not in
+  `docs/`. See [`src/repository_layout.md`](src/repository_layout.md)
+  for the full decision tree (or the pointer [`repository_layout.md`](repository_layout.md)).
+- Per-module developer notes live next to the code as `src/<topic>/README.md`.
+- The authoritative current architecture summary for any agent or new
+  contributor is `AGENTS.md` in the repository root.
