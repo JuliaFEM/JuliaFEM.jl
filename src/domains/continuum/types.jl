@@ -16,90 +16,34 @@ Must be included after abstract.jl.
 """
     FullThreeD <: AbstractContinuumTheory
 
-Full 3D analysis with no simplifications.
-
-**DOMAIN-AGNOSTIC**: Can be used by ANY physics domain!
-
-# Usage Across Domains
-
-```julia
-# Continuum mechanics (solid mechanics)
-physics_solid = Physics(
-    formulation = FullThreeD(),
-    field = Displacement{3}(),
-    ...
-)
-
-# Heat transfer (SAME formulation!)
-physics_heat = Physics(
-    formulation = FullThreeD(),
-    field = Temperature(),
-    ...
-)
-
-# Poisson equation (SAME formulation!)
-physics_poisson = Physics(
-    formulation = FullThreeD(),
-    field = Potential(),
-    ...
-)
-```
-
-# Details
-- All six stress/flux components in continuum context
-- No geometric simplifications
-- Most accurate but most expensive
+Full 3D analysis with no simplifications. All six stress / flux components
+are carried; no geometric simplifications. Domain-agnostic — used by both
+`ContinuumKernel` (solid mechanics) and `HeatKernel` (heat conduction).
 """
 struct FullThreeD <: AbstractContinuumTheory end
 
 """
     PlaneStress <: AbstractContinuumTheory
 
-2D plane stress assumption (out-of-plane stress = 0).
-
-Applicable to thin plates and membranes where thickness << in-plane dimensions.
+2D plane stress assumption (out-of-plane stress = 0). Applicable to thin
+plates and membranes where thickness ≪ in-plane dimensions.
 """
 struct PlaneStress <: AbstractContinuumTheory end
 
 """
     PlaneStrain <: AbstractContinuumTheory
 
-2D plane strain assumption (out-of-plane strain = 0).
-
-Applicable to thick sections with no variation in z-direction.
+2D plane strain assumption (out-of-plane strain = 0). Applicable to thick
+sections with no variation in z-direction.
 """
 struct PlaneStrain <: AbstractContinuumTheory end
 
 """
     Axisymmetric <: AbstractContinuumTheory
 
-Axisymmetric analysis (rotation around z-axis).
-
-**DOMAIN-AGNOSTIC**: Can be used by ANY physics domain with axial symmetry!
-
-# Usage Across Domains
-
-```julia
-# Continuum mechanics (pressure vessel)
-physics_vessel = Physics(
-    formulation = Axisymmetric(),
-    field = Displacement{2}(),  # (r, z) displacements
-    ...
-)
-
-# Heat transfer in cylinder (SAME formulation!)
-physics_heat = Physics(
-    formulation = Axisymmetric(),
-    field = Temperature(),  # T(r, z)
-    ...
-)
-```
-
-# Details
-- Geometry and loading symmetric about z-axis
-- No circumferential variations (∂/∂θ = 0)
-- 2D mesh in (r, z) plane represents 3D geometry
-- Examples: Pressure vessels, pipes, rotating disks, cylinders
+Axisymmetric analysis (rotation around z-axis). Geometry and loading are
+symmetric about the z-axis with no circumferential variation. The 2D mesh
+in (r, z) represents the full 3D geometry. Domain-agnostic.
 """
 struct Axisymmetric <: AbstractContinuumTheory end
 
@@ -108,89 +52,23 @@ struct Axisymmetric <: AbstractContinuumTheory end
 # ============================================================================
 
 """
-    ContinuumFormulation{Theory} <: AbstractFormulation
+    ContinuumFormulation{Theory<:AbstractContinuumTheory} <: AbstractFormulation
 
-Standard continuum mechanics formulation with theory variant.
-
-This is the fundamental FEM formulation for solid mechanics, heat transfer,
-and other continuum physics problems.
-
-# Type Parameter
-- `Theory <: AbstractContinuumTheory` - Dimensionality/simplification theory
+Standard continuum mechanics formulation, parameterised by theory variant.
+Used as a type tag inside `ContinuumKernel{Theory, Material, Field}`.
 
 # Examples
 
 ```julia
-# 3D elasticity
-physics = Physics(
-    formulation = ContinuumFormulation{FullThreeD}(),
-    field = Displacement{3}(),
-    mesh = mesh,
-    material = steel
-)
-
-# 2D plane stress (thin plate)
-physics_2d = Physics(
-    formulation = ContinuumFormulation{PlaneStress}(),
-    field = Displacement{2}(),
-    mesh = mesh_2d,
-    material = aluminum
-)
-
-# 2D plane strain (thick section)
-physics_2d = Physics(
-    formulation = ContinuumFormulation{PlaneStrain}(),
-    field = Displacement{2}(),
-    mesh = mesh_2d,
-    material = concrete
-)
-
-# Axisymmetric (cylinder)
-physics_axisym = Physics(
-    formulation = ContinuumFormulation{Axisymmetric}(),
-    field = Displacement{2}(),  # (r, z) displacements
-    mesh = mesh_2d,
-    material = steel
-)
+ContinuumFormulation{FullThreeD}()
+ContinuumFormulation{PlaneStress}()
+ContinuumFormulation{PlaneStrain}()
+ContinuumFormulation{Axisymmetric}()
 ```
 
-# Assembly Dispatch
-
-Assembly methods specialize on theory × field combinations:
-
-```julia
-# 3D solid mechanics
-function assemble!(physics::Physics{ContinuumFormulation{FullThreeD}, Displacement{3}, M, Mat})
-    # Standard 3D displacement-based assembly
-    # Full 6×6 strain-displacement matrix (Bε)
-    # 6×6 constitutive matrix (Dε)
-end
-
-# 2D plane stress
-function assemble!(physics::Physics{ContinuumFormulation{PlaneStress}, Displacement{2}, M, Mat})
-    # 2D assembly with plane stress assumptions
-    # 3×3 reduced strain-displacement matrix
-    # 3×3 plane stress constitutive matrix
-end
-
-# Heat transfer (same formulation, different field!)
-function assemble!(physics::Physics{ContinuumFormulation{FullThreeD}, Temperature, M, Mat})
-    # Thermal assembly (scalar field)
-    # Thermal conductivity matrix
-end
-```
-
-# Implementation Location
-
-Concrete assembly implementations are in:
-- `src/assembly/continuum_3d.jl` - 3D continuum mechanics
-- `src/assembly/continuum_2d.jl` - 2D plane stress/strain
-- `src/assembly/axisymmetric.jl` - Axisymmetric problems
-
-# See Also
-- [`AbstractContinuumTheory`](@ref) - Theory variants
-- Field types: src/fields/api.jl (Displacement, Temperature)
-- Physics coupling: src/physics/api.jl (AbstractPhysics)
-- Assembly: src/assembly/continuum_*.jl
+The actual assembly contract is defined by `AbstractKernel` (see
+`src/assemblers/abstract.jl` for the kernel defaults and
+`src/assemblers/microkernel.jl` for the DOF-based microkernel trait);
+concrete continuum kernels live in `src/domains/continuum/kernel.jl`.
 """
 struct ContinuumFormulation{Theory<:AbstractContinuumTheory} <: AbstractFormulation end
