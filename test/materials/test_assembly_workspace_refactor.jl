@@ -90,6 +90,13 @@ using BenchmarkTools
         @test σ_vec[1] isa SymmetricTensor{2,3,Float64,6}
         @test 𝔻_vec[1] isa SymmetricTensor{4,3,Float64,36}
 
+        σ_buf = Vector{SymmetricTensor{2,3,Float64,6}}(undef, 8)
+        𝔻_buf = Vector{SymmetricTensor{4,3,Float64,36}}(undef, 8)
+        @test JuliaFEM.get_stress_vector(workspace, σ_buf) === σ_buf
+        @test JuliaFEM.get_tangent_vector(workspace, 𝔻_buf) === 𝔻_buf
+        @test σ_buf == σ_vec
+        @test 𝔻_buf == 𝔻_vec
+
         # Check state structure (empty for stateless)
         state = workspace.states[1]
         @test state isa NamedTuple
@@ -121,11 +128,9 @@ using BenchmarkTools
         @test σ_get == σ
         @test 𝔻_get == 𝔻
 
-        # Generic field accessor
-        σ_generic = get_field(workspace, :σ, 1)
-        𝔻_generic = get_field(workspace, :𝔻, 1)
-        @test σ_generic == σ
-        @test 𝔻_generic == 𝔻
+        # Direct AoS access at the integration point
+        @test workspace.fields[1].σ == σ
+        @test workspace.fields[1].𝔻 == 𝔻
 
         println("  ✓ Field access working")
     end
@@ -198,10 +203,13 @@ using BenchmarkTools
             _ = JuliaFEM.get_tangent(workspace, q)
         end
 
-        # Test direct field access allocations - must be zero
-        # Use helper functions for unified access (zero-allocation via dispatch)
-        σ_vec = JuliaFEM.get_stress_vector(workspace)
-        𝔻_vec = JuliaFEM.get_tangent_vector(workspace)
+        # Test direct field access allocations - must be zero.
+        # Extract vectors into pre-allocated buffers once, then index them
+        # inside the hot loop.
+        σ_vec = Vector{SymmetricTensor{2,3,Float64,6}}(undef, 8)
+        𝔻_vec = Vector{SymmetricTensor{4,3,Float64,36}}(undef, 8)
+        JuliaFEM.get_stress_vector(workspace, σ_vec)
+        JuliaFEM.get_tangent_vector(workspace, 𝔻_vec)
         
         function test_direct_access(σ_vec, 𝔻_vec, nips)
             @inbounds for q in 1:nips
@@ -216,11 +224,10 @@ using BenchmarkTools
         end
         @test allocs_field == 0
 
-        # Test accessor allocations - use vector extraction for zero-cost access
-        # CRITICAL: Extract vectors ONCE outside the hot loop, then use them
-        # This is the actual assembly pattern: extract once, use many times
-        σ_vec = JuliaFEM.get_stress_vector(workspace)
-        𝔻_vec = JuliaFEM.get_tangent_vector(workspace)
+        # Test accessor allocations - use vector extraction for zero-cost access.
+        # This is the assembly pattern: extract once, use many times.
+        JuliaFEM.get_stress_vector(workspace, σ_vec)
+        JuliaFEM.get_tangent_vector(workspace, 𝔻_vec)
         
         function test_accessors(σ_vec, 𝔻_vec, nips)
             @inbounds for q in 1:nips
@@ -277,6 +284,10 @@ using BenchmarkTools
         𝔻_vec = JuliaFEM.get_tangent_vector(workspace)
         @test length(σ_vec) == 8
         @test length(𝔻_vec) == 8
+
+        σ_buf = Vector{SymmetricTensor{2,3,Float64,6}}(undef, 8)
+        @test JuliaFEM.get_stress_vector(workspace, σ_buf) === σ_buf
+        @test σ_buf == σ_vec
 
         # Check state structure (should have state variables)
         state = workspace.states[1]
