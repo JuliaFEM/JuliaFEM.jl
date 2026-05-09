@@ -29,11 +29,11 @@ Field quantities evaluated at a single point (typically an integration point).
 Quasi-static is treated as a special case of dynamic where `rate = 0`.
 The `gradient_rate` is always computed from increments: `(∇u_new - ∇u_old)/Δt`
 
-**Dynamic simulations:**
+Dynamic simulations:
 - `rate` = actual time derivative (velocity `u̇`, temperature rate `Ṫ`)
 - `gradient_rate` = computed from increment for accuracy
 
-**Quasi-static simulations:**
+Quasi-static simulations:
 - `rate` = `0` (no dynamic effects)
 - `gradient_rate` = computed from increment (needed for rate-dependent materials)
 
