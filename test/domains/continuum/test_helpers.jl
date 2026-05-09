@@ -51,18 +51,3 @@ function create_test_kernel()
     return kernel
 end
 
-"""
-    create_material_state(kernel::AbstractKernel, mesh::AbstractMesh)
-
-Create initial material state for all elements (for stateless materials, returns nothing).
-"""
-function create_material_state(kernel::AbstractKernel, mesh::AbstractMesh)
-    # For stateless materials (LinearElastic, NeoHookean), state is nothing
-    if !needs_state(kernel.material)
-        return nothing
-    end
-
-    # For stateful materials, initialize state per element
-    # This would need to be implemented for plasticity tests
-    error("Stateful material state initialization not yet implemented")
-end
