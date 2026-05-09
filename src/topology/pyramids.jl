@@ -1,5 +1,5 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 """
     Pyramid{N} <: AbstractTopology{N}
@@ -8,13 +8,13 @@ Pyramidal topology with N nodes.
 
 # Node Count Variants
 - `Pyramid{5}` (alias `Pyr5`): Linear pyramid (P1)
-- `Pyramid{13}` (alias `Pyr13`): Quadratic pyramid (P2)
+
+Higher-order pyramid variants (e.g. quadratic Pyramid{13}) are not implemented yet.
 """
 struct Pyramid{N} <: AbstractTopology{N} end
 
 const Pyr5 = Pyramid{5}
 
-nnodes(::Pyramid{N}) where {N} = N
 dim(::Pyramid{N}) where {N} = 3
 
 function reference_coordinates(::Pyramid{5})
@@ -56,4 +56,3 @@ nvertices(::Pyramid) = 5
 nedges(::Pyramid) = 8
 nfaces(::Pyramid) = 5
 
-export Pyr5
