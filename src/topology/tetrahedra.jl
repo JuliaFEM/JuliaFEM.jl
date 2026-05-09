@@ -1,5 +1,5 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 """
     Tetrahedron{N} <: AbstractTopology{N}
@@ -15,7 +15,6 @@ struct Tetrahedron{N} <: AbstractTopology{N} end
 const Tet4 = Tetrahedron{4}
 const Tet10 = Tetrahedron{10}
 
-nnodes(::Tetrahedron{N}) where {N} = N
 dim(::Tetrahedron{N}) where {N} = 3
 
 function reference_coordinates(::Tetrahedron{4})
@@ -74,4 +73,3 @@ nvertices(::Tetrahedron) = 4
 nedges(::Tetrahedron) = 6
 nfaces(::Tetrahedron) = 4
 
-export Tet4, Tet10
