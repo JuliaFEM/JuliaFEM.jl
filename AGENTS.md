@@ -35,8 +35,8 @@ It is being rebuilt from first principles around four ideas:
    allocation sites in the optimized LLVM IR.
 
 The long-term vision (parallelism, GPU, Newton–Krylov, multiphysics,
-billions of DOF) is documented in [`llm/vision/vision_2.0.md`](llm/vision/vision_2.0.md)
-(the filename is historical; it is not a shipped “JuliaFEM 2.0” product line).
+billions of DOF) is documented in [`llm/vision/vision_2.0.md`](llm/vision/vision_2.0.md).
+The filename is historical only; version numbering here is 0.x toward a stable 1.0, and that note captures stretch goals beyond the first stable release rather than a separate product line.
 
 ---
 
@@ -269,7 +269,7 @@ The goal is professional engineering documentation, not marketing copy.
   `test/assemblers/test_dof_based_zero_alloc.jl`
 - Top-level architecture overview: `src/README.md`. Per-module
   details: the `README.md` files inside `src/<topic>/`.
-- Vision and roadmap: `llm/vision/vision_2.0.md`.
+- Vision and roadmap: `llm/vision/vision_2.0.md` (historical filename; not a release label).
 
 ### Documentation doors (which prose to open first)
 
