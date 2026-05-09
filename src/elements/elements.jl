@@ -1,5 +1,50 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/FEMBase.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+
+# ============================================================================
+# Compile-time helpers for ndofs / field_dof_range / local_dof_layout
+# ============================================================================
+# These are referenced from `@generated` functions defined later. In Julia
+# 1.12+, generated bodies must see their helpers already bound at code-
+# generation time, so the helpers live at the top of this file.
+
+function _dof_per_entity(@nospecialize(Q))
+    # `dof_size` is the single source of truth for the number of scalar
+    # components per entity. New quantity types must add a `dof_size`
+    # method (see `src/dofs/api.jl`); we deliberately do not swallow
+    # errors here so that a missing method surfaces as a real
+    # `MethodError` rather than a silent fall-through.
+    return dof_size(Q)
+end
+
+function _count_entities_compiletime(@nospecialize(K), @nospecialize(E))
+    # Must match runtime `count_entities(topology, entity_type)`.
+    # `K` is a TYPE (e.g. `Tet4`), not an instance.
+    if E === Vertex
+        return nnodes(K)
+    elseif E === Edge
+        return nedges(K)
+    elseif E === Face
+        return nfaces(K)
+    elseif E === Cell
+        return 1
+    else
+        error("Unknown entity type $E")
+    end
+end
+
+function _compile_time_ndofs(@nospecialize(field_type), @nospecialize(topology_type))
+    # Field specs are `DOF{Quantity, Entity}`. The bare `Tuple{Q, E}`
+    # form that older drafts used is no longer accepted by the
+    # DOFHandler, so we don't support it here either.
+    if field_type isa DataType && field_type <: DOF && length(field_type.parameters) == 2
+        E = field_type.parameters[2]
+        Q = quantity_type(field_type)
+        return _dof_per_entity(Q) * _count_entities_compiletime(topology_type, E)
+    else
+        error("Cannot compute ndofs for field type $field_type (expected DOF{Quantity, Entity})")
+    end
+end
 
 # ============================================================================
 # Type-Level DOF Count Computation
@@ -8,49 +53,26 @@
 """
     ndofs(::Type{K}, ::Type{S}) → Int
 
-Compute total number of DOFs for field spec S on topology K.
+Total number of DOFs for DOFSet `S` on topology `K`. Single source of truth:
+delegates to `_compile_time_ndofs`, which is also used by
+`field_dof_range` and `local_dof_layout`.
 
 # Example
 ```julia
 S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
 ndofs(Tetrahedron{4}, S)  # → 12 (4 nodes × 3 components)
+
+S2 = @DOFSet{u::DOF{Displacement{3}, Vertex}, p::DOF{Float64, Cell}}
+ndofs(Tetrahedron{4}, S2) # → 13
 ```
 """
 @generated function ndofs(::Type{K}, ::Type{S}) where {K, S}
     field_names = fieldnames(S)
     total = 0
-    
     for fname in field_names
-        field_spec = fieldtype(S, fname)  # Tuple{Displacement{3}, Vertex}
-        field_type = field_spec.parameters[1]  # Displacement{3}
-        entity_type = field_spec.parameters[2]  # Vertex
-        
-        # Extract quantity type via trait
-        Q = quantity_type(field_spec)  # Vec{3}
-        
-        # Count entities
-        n_entities = if entity_type === Vertex
-            nnodes(K())
-        elseif entity_type === Edge
-            nedges(K())
-        elseif entity_type === Face
-            nfaces(K())
-        else
-            error("Unsupported entity type: $entity_type")
-        end
-        
-        # Count components per entity
-        n_components = if Q === Float64
-            1
-        elseif Q isa UnionAll && Q.body <: Tensor && Q.body.parameters[1] == 1
-            Q.body.parameters[2]
-        else
-            error("Unsupported quantity type: $Q")
-        end
-        
-        total += n_entities * n_components
+        field_spec = fieldtype(S, fname)
+        total += _compile_time_ndofs(field_spec, K)
     end
-    
     return total
 end
 
@@ -191,70 +213,10 @@ Used for coupled assembly. See `src/elements/README.md`.
 end
 
 # ============================================================================
-# Compile-Time Helper Functions for @generated field_dof_range
-# ============================================================================
-
-# Helper: Compute ndofs at compile time
-function _compile_time_ndofs(@nospecialize(field_type), @nospecialize(topology_type))
-    # Handle DOF{FieldType, EntityType} format (new format)
-    if field_type isa DataType && field_type <: DOF && length(field_type.parameters) == 2
-        FieldType = field_type.parameters[1]  # e.g., Displacement{3}
-        E = field_type.parameters[2]          # e.g., Vertex
-        
-        # Extract quantity type via trait (handles Displacement{3} → Vec{3})
-        Q = quantity_type(field_type)
-        
-        # Number of DOFs = dof_per_entity * number_of_entities
-        return _dof_per_entity(Q) * _count_entities_compiletime(topology_type, E)
-    # Handle Tuple{FieldType, E} format (legacy format)
-    elseif field_type isa DataType && field_type <: Tuple && length(field_type.parameters) == 2
-        FieldType = field_type.parameters[1]  # Could be Displacement{3} or Vec{3}
-        E = field_type.parameters[2]
-        
-        # Extract quantity type via trait (handles both field types and quantity types)
-        Q = quantity_type(field_type)
-        
-        # Number of DOFs = dof_per_entity * number_of_entities
-        return _dof_per_entity(Q) * _count_entities_compiletime(topology_type, E)
-    else
-        error("Cannot compute ndofs for field type $field_type (expected DOF{...} or Tuple{...})")
-    end
-end
-
-function _dof_per_entity(@nospecialize(Q))
-    # Use dof_size which handles all quantity types properly (Displacement{3}, Vec{3}, Float64, UnionAll, etc.)
-    # This is the most robust approach
-    try
-        return dof_size(Q)
-    catch e
-        # Fallback for specific cases if dof_size fails
-        if Q === Float64
-            return 1
-        else
-            error("Cannot determine dof_size for quantity type $Q: $e")
-        end
-    end
-end
-
-function _count_entities_compiletime(@nospecialize(K), @nospecialize(E))
-    # This must match count_entities(topology, entity_type) at runtime
-    # K is a TYPE (e.g., Tet4), not an instance
-    if E === Vertex
-        return nnodes(K)  # nnodes accepts Type
-    elseif E === Edge
-        return nedges(K)  # nedges accepts Type
-    elseif E === Face
-        return nfaces(K)  # nfaces accepts Type
-    elseif E === Cell
-        return 1  # One cell per element
-    else
-        error("Unknown entity type $E")
-    end
-end
-
-# ============================================================================
 # Local DOF Range Computation (COMPILE-TIME via @generated)
 # ============================================================================
+# Helpers `_compile_time_ndofs`, `_dof_per_entity`, `_count_entities_compiletime`
+# are defined at the top of this file.
 
 """
     field_dof_range(elem::Element, field::Symbol) → UnitRange{Int}
@@ -300,17 +262,6 @@ See `src/elements/README.md` for usage examples.
         return :(return 1:$n)
     end
 end
-
-# ============================================================================
-# Local-to-Global Mapping (Type-Stable Tuple Version)
-# ============================================================================
-
-# ============================================================================
-# Type Extraction (previously defined above)
-# ============================================================================
-
-# These were defined earlier but are here for reference
-# topology_type, basis_type, dof_type already defined above
 
 # ============================================================================
 # Element Queries
@@ -360,6 +311,116 @@ Get number of nodes from topology.
 """
 nnodes(::Element{K,P,S,N}) where {K,P,S,N} = nnodes(K)
 nnodes(::Type{Element{K,P,S,N}}) where {K,P,S,N} = nnodes(K)
+
+# ============================================================================
+# Compile-time DOF layout table (used by DOF-based assembler)
+# ============================================================================
+
+"""
+    DOFLayoutEntry
+
+Compile-time descriptor for one local DOF of an element. Used by the
+DOF-based assembler to replace runtime `div`/`mod` decoding with pure
+tuple lookups.
+
+# Fields
+- `field_idx::Int8`: index of the field inside the element's DOFSet (1-based)
+- `entity_local::Int16`: local entity id within the element
+  (1..`nnodes(K)` for `Vertex`, 1 for `Cell`, 1..`nedges(K)` for `Edge`,
+  1..`nfaces(K)` for `Face`)
+- `component::Int8`: component index inside the field's quantity
+  (1 for a scalar, 1..3 for a Vec{3}, …)
+"""
+struct DOFLayoutEntry
+    field_idx::Int8
+    entity_local::Int16
+    component::Int8
+end
+
+@inline field_idx(e::DOFLayoutEntry)    = Int(e.field_idx)
+@inline entity_local(e::DOFLayoutEntry) = Int(e.entity_local)
+@inline component(e::DOFLayoutEntry)    = Int(e.component)
+
+"""
+    local_dof_layout(::Type{Element{K,P,S,N}}) → NTuple{N, DOFLayoutEntry}
+
+Compile-time DOF layout for an element template. The returned `NTuple`
+has one entry per local DOF, in element-DOF order, describing which
+field, which entity, and which component that DOF represents.
+
+This is the central "Element-as-template" mechanism for the DOF-based
+assembler: instead of decoding `local_i → (node, component)` with runtime
+`div`/`mod`, the assembler indexes into this compile-time tuple, which
+the compiler may unroll completely.
+
+# Example
+For `Element{Tet4, Lagrange{1}, @DOFSet{u::DOF{Vec{3}, Vertex}}, 12}`:
+```
+local_dof_layout(ET) ==
+    (DOFLayoutEntry(1, 1, 1),  # u_x at vertex 1
+     DOFLayoutEntry(1, 1, 2),  # u_y at vertex 1
+     DOFLayoutEntry(1, 1, 3),  # u_z at vertex 1
+     DOFLayoutEntry(1, 2, 1), …, DOFLayoutEntry(1, 4, 3))
+```
+
+For multi-field `(u::DOF{Vec{3},Vertex}, p::DOF{Float64,Cell})`:
+```
+local_dof_layout(ET) ==
+    (DOFLayoutEntry(1, 1, 1), …, DOFLayoutEntry(1, N, 3),  # all u
+     DOFLayoutEntry(2, 1, 1))                              # p
+```
+"""
+@generated function local_dof_layout(::Type{Element{K, P, S, N}}) where {K, P, S, N}
+    if !(S <: NamedTuple)
+        return :(error("local_dof_layout: S=$($S) is not a DOFSet (NamedTuple)"))
+    end
+
+    field_names = fieldnames(S)
+    entries = Expr[]
+
+    for (fidx, fname) in enumerate(field_names)
+        FT = fieldtype(S, fname)
+        if !(FT <: DOF)
+            return :(error("local_dof_layout: field :$($fname) of type $($FT) is not a DOF{Q,E}"))
+        end
+        Q_resolved = quantity_type(FT)
+        E = FT.parameters[2]
+        dpe = dof_size(Q_resolved)
+
+        if E === Vertex
+            n_entities = nnodes(K)
+            for k in 1:n_entities, c in 1:dpe
+                push!(entries, :(DOFLayoutEntry(Int8($fidx), Int16($k), Int8($c))))
+            end
+        elseif E === Cell
+            for c in 1:dpe
+                push!(entries, :(DOFLayoutEntry(Int8($fidx), Int16(1), Int8($c))))
+            end
+        elseif E === Edge
+            n_ent = nedges(K)
+            for k in 1:n_ent, c in 1:dpe
+                push!(entries, :(DOFLayoutEntry(Int8($fidx), Int16($k), Int8($c))))
+            end
+        elseif E === Face
+            n_ent = nfaces(K)
+            for k in 1:n_ent, c in 1:dpe
+                push!(entries, :(DOFLayoutEntry(Int8($fidx), Int16($k), Int8($c))))
+            end
+        else
+            return :(error("local_dof_layout: entity type $($E) not yet supported"))
+        end
+    end
+
+    if length(entries) != N
+        return :(error("local_dof_layout: template Element{$($K),$($P),$($S),$($N)} expected " *
+                       "$($N) DOFs, but layout yields $($(length(entries)))"))
+    end
+
+    return Expr(:tuple, entries...)
+end
+
+# Forwarding overload from instance
+@inline local_dof_layout(::Element{K,P,S,N}) where {K,P,S,N} = local_dof_layout(Element{K,P,S,N})
 
 # ============================================================================
 # Display
