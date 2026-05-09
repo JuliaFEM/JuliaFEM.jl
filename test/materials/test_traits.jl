@@ -82,6 +82,68 @@ using Tensors
         # materials compose them to declare requirements
     end
 
+    @testset "material_behavior trait inventory (one example per kind)" begin
+        # StatelessConstantTangent
+        @test material_behavior(LinearElastic(E = 210e9, ν = 0.3)) isa StatelessConstantTangent
+        @test material_behavior(HeatConductivity(k = 200.0)) isa StatelessConstantTangent
+        @test material_behavior(HydraulicConductivity(K = 1e-5)) isa StatelessConstantTangent
+        @test material_behavior(MoistureDiffusivity(D_w = 1e-9)) isa StatelessConstantTangent
+        @test material_behavior(ElementWiseScalarDiffusion([1.0])) isa StatelessConstantTangent
+        E = 210e9
+        ν = 0.3
+        G = E / (2(1 + ν))
+        @test material_behavior(
+            OrthotropicLinearElastic(
+                E1 = E,
+                E2 = E,
+                E3 = E,
+                G12 = G,
+                G23 = G,
+                G31 = G,
+                ν12 = ν,
+                ν23 = ν,
+                ν31 = ν,
+            ),
+        ) isa StatelessConstantTangent
+
+        # StatelessStrainDependent
+        @test material_behavior(NeoHookean(E_mod = 1e6, nu = 0.45)) isa StatelessStrainDependent
+        @test material_behavior(MooneyRivlin(C10 = 80e3, C01 = 20e3, κ_bulk = 1e9)) isa StatelessStrainDependent
+        @test material_behavior(Yeoh3(C10 = 1e5, κ_bulk = 1e9)) isa StatelessStrainDependent
+        @test material_behavior(Gent(μ = 1e5, Jm = 100.0, κ_bulk = 1e9)) isa StatelessStrainDependent
+
+        # StatefulStrainDependent
+        @test material_behavior(
+            PerfectPlasticity(E = 210e9, ν = 0.3, σ_y = 250e6, H = 1e9),
+        ) isa StatefulStrainDependent
+        @test material_behavior(
+            J2LinearIsotropicPlasticity(E = 210e9, ν = 0.3, σ_y0 = 250e6, H_iso = 1e9),
+        ) isa StatefulStrainDependent
+        @test material_behavior(
+            StVenantKirchhoffJ2Plasticity(E = 210e9, ν = 0.3, σ_y = 250e6, H = 0.0),
+        ) isa StatefulStrainDependent
+        @test material_behavior(
+            ScalarDamageLinearElastic(E = 210e9, ν = 0.3, r = 10.0),
+        ) isa StatefulStrainDependent
+        @test material_behavior(
+            ChabocheJ2Plasticity(
+                E = 210e9,
+                ν = 0.3,
+                σ_y = 300e6,
+                C1 = 1e9,
+                γ1 = 100.0,
+                C2 = 1e9,
+                γ2 = 100.0,
+            ),
+        ) isa StatefulStrainDependent
+        @test material_behavior(
+            NortonCreepElastic(E = 210e9, ν = 0.3, A = 1e-20, n = 3.0),
+        ) isa StatefulStrainDependent
+        @test material_behavior(
+            LinearElasticWithEigenstrain(E = 210e9, ν = 0.3),
+        ) isa StatefulStrainDependent
+    end
+
     @testset "Physics to field type derivation" begin
         mat = LinearElastic(E=210e9, ν=0.3)
 
