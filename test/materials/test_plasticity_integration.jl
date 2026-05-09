@@ -1,5 +1,5 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 using Test
 using JuliaFEM
@@ -133,6 +133,15 @@ using Tensors
         # Stress should be elastic prediction
         @test norm(σ) > 0.0
         @test norm(σ) < mat.σ_y  # Below yield
+    end
+
+    @testset "J2 yield surface after radial return (‖dev(σ−α)‖_vm ≈ σᵧ)" begin
+        mat = PerfectPlasticity(E = 210e9, ν = 0.3, σ_y = 250e6, H = 2.1e9)
+        ε = SymmetricTensor{2,3}((0.02, -0.005, 0.0, 0.0, 0.0, 0.0))
+        σ, _, st = compute_stress(mat, ε, NamedTuple(), 0.0)
+        s = dev(σ - st.α)
+        seq = sqrt(3 / 2 * (s ⊡ s))
+        @test seq ≈ mat.σ_y rtol = 1e-5 atol = 1.0
     end
 
     @testset "Plastic response (above yield)" begin
