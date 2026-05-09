@@ -42,9 +42,6 @@ Returns tuple of state variable types required by this material.
 """
 function required_state_variables end
 
-# Type-level dispatch for required_state_variables (for @generated functions)
-required_state_variables(::Type{T}) where {T<:AbstractMaterial} = required_state_variables(T())
-
 # ============================================================================
 # MATERIAL-SPECIFIC TRAIT IMPLEMENTATIONS
 # ============================================================================
