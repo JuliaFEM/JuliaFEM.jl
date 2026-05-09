@@ -11,6 +11,83 @@ For motivation and a similar three-layer pattern in another project, see
 [OpenPFC package architecture](https://github.com/VTT-ProperTune/OpenPFC/blob/master/docs/concepts/architecture.md)
 (kernel → runtime → frontend, with an include audit on the kernel tree).
 
+## Performance tiers (orthogonal to folder names)
+
+Structural layers (below) say what may depend on what. Performance tiers
+say how strict the implementation inside those folders should be. They
+overlap: the same directory can contain setup code (tier 3) that fills
+caches later consumed by tier 1 routines.
+
+Colloquially:
+
+- Tier 1 — kernel numeric: behaviour we want indistinguishable from
+  hand-written C once LLVM optimizes. No heap allocations in inner loops,
+  no reliance on exceptions on the hot path (no `try` / `catch` around
+  tight loops; invariant violations should be caught at boundaries).
+  Prefer plain buffers (`Vector`, `Matrix`, `StaticArrays`, structs of
+  concrete bits-types), trait-driven dispatch resolved at compile time,
+  and fixed-shape temporaries. `Dict`, `Set`, growable `push!` to abstract
+  containers, and deliberate type instability do not belong here.
+- Tier 2 — warmed drivers: orchestration that may allocate during setup
+  (`create_cache`, mesh connectivity build, one-off reallocations), but
+  must reach a steady state where the paths users call repeatedly (for
+  example `assemble!`, `apply_K!`, time-step inner solves on fixed
+  topology) stay tier 1 in practice: zero GC allocations and stable
+  inference on those paths after warmup. Still avoid exceptions inside
+  those inner loops.
+- Tier 3 — UI / IO / preprocessing / postprocessing: file parsers,
+  format conversion, exploratory scripting, legacy Dict-based APIs,
+  logging-heavy diagnostics. Allocation and “Python-speed” flexibility
+  are acceptable. Push parsing results into tier 2 structures before
+  entering assembly.
+
+### Where allocations are allowed vs where maximum performance is required
+
+The table is the project policy: **setup** means “runs once or rarely when
+the user builds a mesh, handler, or cache”; **steady hot path** means code
+that runs per element, per quadrature point, per matvec, or inside nested
+assembly loops after caches exist.
+
+“Maximum performance” means: **zero GC allocations** on that path (after any
+requested warmup), **concrete inferred types**, no `Dict` / `Set` / untyped
+containers in those loops, and **no exception-based control flow** inside
+them. This matches the language in `AGENTS.md` invariant 1.
+
+| `src/` area | Setup / one-shot (allocations & flexibility) | Steady hot path (maximum performance) |
+|-------------|----------------------------------------------|-------------------------------------|
+| `topology/`, `quadrature/`, `geometry/`, `basis/`, `sparse/` | Keep allocation light; anything expensive belongs in tier 3 callers | Required: tier 1 |
+| `materials/` | Global workspaces and cache constructors may allocate | Required tier 1 for laws invoked inside quadrature loops (`compute_stress`, tangent updates, …) |
+| `elements/`, `fields/` (value types), `dofs/dofs.jl`, `physics/` (tags) | Compile-time / type-level work | Required tier 1 for `local_dof_layout`, extraction, field sizing hooks used from assembly |
+| `domains/` (kernels, cache updaters, plate `dkt_basis` under domains) | — | Required tier 1 for integration bodies |
+| `mesh/api.jl` | Only abstract/type tags | Not a runtime hot path |
+| `mesh/mesh.jl`, `mesh/structured.jl`, `mesh/refine.jl` | Allocations normal while constructing or refining | Not tier 1 unless you later add per-IP mesh queries; assembly consumes a fixed mesh |
+| `dofs/dof_handler.jl`, `dofs/dof_connectivity.jl` | Building tables and connectivity allocates | Must not become part of per-IP work |
+| `assemblers/` (caches, `element_based/`, `dof_based/`, `matrix_free/`, KA port) | `create_cache`, resize, device mirror setup may allocate | Required tier 2 steady state: `assemble!`, `apply_K!`, `apply_M!`, matvec, scatter — zero GC after warmup (see `test/assemblers/test_dof_based_zero_alloc.jl`) |
+| `io/` | — | Tier 3: parsing, `println`, flexible structures are OK |
+| `legacy/` | — | Tier 3 by default |
+
+Folders split by role:
+
+- `assemblers/abstract.jl`, `microkernel.jl`: contracts and trait hooks are
+  tier 1 at every site they inline into; surrounding prose can ignore perf.
+- `domains/plates/` etc.: basis snippets pulled into quadrature loops are
+  tier 1; any future “plate preprocessor” should stay tier 3.
+
+Out of scope for tier 1 unless explicitly tested: `scripts/`, most of
+`test/` (harness code), and interactive notebooks.
+
+Summary labels:
+
+| Label | Meaning |
+|-------|---------|
+| Tier 1 only on hot path | Maximum performance whenever code runs inside quadrature / tight assembly / material point evaluation. |
+| Tier 2 steady path | Allocations OK until caches and topology are fixed; thereafter same bar as tier 1 on `assemble!` / operator apply. |
+| Tier 3 | Allocations, `Dict`, and slower patterns allowed; keep this boundary outside nested assembly loops. |
+
+New features should decide which tier their steady-state work lives in before
+choosing data structures: tier 1–2 hot paths stay free of `Dict` / `Set` and
+similar; reserve them for tier 3 entry points.
+
 ## Logical layers
 
 JuliaFEM is organised into four logical layers. Names are chosen to stay
