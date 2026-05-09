@@ -62,6 +62,26 @@ Default symbol: `:d`
 """
 struct DamageVariable <: AbstractStateVariable end
 
+"""
+Equivalent-strain history for scalar damage (`κ_d`).
+"""
+struct DamageEquivalentStrain <: AbstractStateVariable end
+
+"""
+Prescribed eigenstrain tensor `ε_e` (e.g. drying shrinkage updated in a staggered solve).
+"""
+struct Eigenstrain <: AbstractStateVariable end
+
+"""
+Accumulated creep strain tensor `ε_c` (Norton–Bailey-type laws).
+"""
+struct CreepStrain <: AbstractStateVariable end
+
+"""
+`N`-th Armstrong–Frederick backstress slot (`α₁`, `α₂`, …).
+"""
+struct ChabocheAlpha{N} <: AbstractStateVariable end
+
 # ============================================================================
 # STATE VARIABLE TRAITS
 # ============================================================================
@@ -77,6 +97,10 @@ state_variable_type(::Type{PlasticStrain}) = SymmetricTensor{2,3,Float64,6}
 state_variable_type(::Type{Backstress}) = SymmetricTensor{2,3,Float64,6}
 state_variable_type(::Type{EquivalentPlasticStrain}) = Float64
 state_variable_type(::Type{DamageVariable}) = Float64
+state_variable_type(::Type{DamageEquivalentStrain}) = Float64
+state_variable_type(::Type{Eigenstrain}) = SymmetricTensor{2,3,Float64,6}
+state_variable_type(::Type{CreepStrain}) = SymmetricTensor{2,3,Float64,6}
+state_variable_type(::Type{ChabocheAlpha{N}}) where N = SymmetricTensor{2,3,Float64,6}
 
 """
     default_symbol(::Type{<:AbstractStateVariable})
@@ -89,3 +113,7 @@ default_symbol(::Type{PlasticStrain}) = :ε_p
 default_symbol(::Type{Backstress}) = :α
 default_symbol(::Type{EquivalentPlasticStrain}) = :κ
 default_symbol(::Type{DamageVariable}) = :d
+default_symbol(::Type{DamageEquivalentStrain}) = :κ_d
+default_symbol(::Type{Eigenstrain}) = :ε_e
+default_symbol(::Type{CreepStrain}) = :ε_c
+default_symbol(::Type{ChabocheAlpha{N}}) where N = Symbol("α", N)
