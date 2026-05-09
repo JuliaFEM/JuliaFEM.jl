@@ -1,5 +1,5 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 """
     Hexahedron{N} <: AbstractTopology{N}
@@ -17,7 +17,6 @@ const Hex8 = Hexahedron{8}
 const Hex20 = Hexahedron{20}
 const Hex27 = Hexahedron{27}
 
-nnodes(::Hexahedron{N}) where {N} = N
 dim(::Hexahedron{N}) where {N} = 3
 
 function reference_coordinates(::Hexahedron{8})
@@ -100,4 +99,3 @@ nvertices(::Hexahedron) = 8
 nedges(::Hexahedron) = 12
 nfaces(::Hexahedron) = 6
 
-export Hex8, Hex20, Hex27
