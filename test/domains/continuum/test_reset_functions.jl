@@ -24,7 +24,7 @@ include("test_helpers.jl")
     @testset "reset!(GeometryCache)" begin
         # Populate with data first
         elem_id = 1
-        JuliaFEM.update_geometry_cache!(geometry_cache, element_cache, kernel, elem_id, mesh)
+        JuliaFEM.update_geometry_cache!(geometry_cache, element_cache, elem_id, mesh)
 
         # Verify data exists
         @test any(x -> norm(x) > 0, geometry_cache.X)
@@ -71,13 +71,14 @@ include("test_helpers.jl")
         # Populate with data first (need geometry cache)
         elem_id = 1
         u_global = nothing
-        state_old = create_material_state(kernel, mesh)
         Δt = 0.01
+        global_cache = JuliaFEM.create_global_material_cache(kernel.material;
+                                                            n_ips=NIP, n_elems=1)
 
-        JuliaFEM.update_geometry_cache!(geometry_cache, element_cache, kernel, elem_id, mesh)
+        JuliaFEM.update_geometry_cache!(geometry_cache, element_cache, elem_id, mesh)
         JuliaFEM.update_element_cache!(element_cache, kernel, elem_id, mesh, u_global)
         JuliaFEM.update_material_cache!(material_cache, geometry_cache, kernel.material,
-            element_cache, state_old, elem_id, Δt)
+            element_cache, global_cache, elem_id, Δt)
 
         # Verify data exists (tangent should be non-zero for linear elastic)
         @test any(q -> norm(JuliaFEM.get_tangent(material_cache, q)) > 0, 1:NIP)
