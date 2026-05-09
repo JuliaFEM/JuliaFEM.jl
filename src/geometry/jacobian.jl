@@ -1,5 +1,5 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 """
     compute_jacobian(X, dN_dξ) -> Tensor{2, D}
@@ -33,7 +33,7 @@ X = (Vec{2}(0.0, 0.0), Vec{2}(2.0, 0.0), Vec{2}(0.0, 1.5))
 
 # Get basis derivatives at integration point
 xi = Vec{2}(1/3, 1/3)  # Center of reference triangle
-dN_dξ = get_basis_derivatives(Triangle(), Lagrange{Triangle, 1}(), xi)
+dN_dξ = get_basis_derivatives(Triangle{3}(), Lagrange{1}(), xi)
 # Returns: (Vec(-1.0, -1.0), Vec(1.0, 0.0), Vec(0.0, 1.0))
 
 # Compute Jacobian
@@ -57,7 +57,7 @@ X = (
 
 # Get basis derivatives
 xi = Vec{3}(0.25, 0.25, 0.25)  # Inside tetrahedron
-dN_dξ = get_basis_derivatives(Tetrahedron(), Lagrange{Tetrahedron, 1}(), xi)
+dN_dξ = get_basis_derivatives(Tetrahedron{4}(), Lagrange{1}(), xi)
 
 # Compute Jacobian
 J = compute_jacobian(X, dN_dξ)
@@ -75,7 +75,7 @@ tuples or `StaticVector`s of `Vec` types from Tensors.jl.
 # See Also
 - [`physical_derivatives`](@ref): Transform derivatives to physical coordinates
 - [`get_basis_derivatives`](@ref): Compute shape function derivatives
-- [`Tensor`](@ref): Tensors.jl tensor type
+- `Tensor` types from **Tensors.jl** (third-party package; not a `JuliaFEM` doc ref)
 """
 function compute_jacobian(X::NTuple{N,Vec{D}}, dN_dξ::NTuple{N,Vec{D}}) where {N,D}
     # J = ∑ᵢ (dNᵢ/dξ) ⊗ Xᵢ
@@ -132,19 +132,17 @@ sum(dN_dx)  # ≈ Vec(0.0, 0.0)
 
 # Usage in Assembly
 ```julia
-for ip in integration_points(Gauss{2}(), Triangle())
+tri = Tri3()  # concrete reference topology instance
+for ip in integration_points(tri)
     xi = Vec(ip.coords)
-    
-    # Basis evaluation
+
     N = get_basis_functions(Triangle(), Lagrange{Triangle, 1}(), xi)
     dN_dξ = get_basis_derivatives(Triangle(), Lagrange{Triangle, 1}(), xi)
-    
-    # Jacobian transformation
+
     J = compute_jacobian(X, dN_dξ)
     detJ = det(J)
     dN_dx = physical_derivatives(J, dN_dξ)
-    
-    # Use dN_dx for strain computation, stiffness assembly, etc.
+
     ε = compute_strain(u_elem, dN_dx)
     # ...
 end
