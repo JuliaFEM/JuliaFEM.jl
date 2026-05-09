@@ -1,5 +1,5 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
 
 # Minimal simplify for subs (from SymDiff.jl by Jukka Aho)
 simplify_local(f::Union{Number,Symbol}) = f
