@@ -176,7 +176,11 @@ These are non-negotiable. Tests and code analysis enforce them.
    `test/assemblers/test_dof_based_zero_alloc.jl` asserts
    `@allocated assemble!(...) == 0` and `0` GC allocation sites in the
    optimized LLVM IR. Don't introduce `Dict`, `Vector{Any}`, untyped
-   closures, or `Vector` literals inside loops.
+   closures, or `Vector` literals inside loops. For the intended split
+   between tier 1 numeric kernels (always C-speed, no heap churn in
+   loops), tier 2 warmed assembly drivers (setup may allocate), and tier 3
+   IO/UI convenience code where flexible containers are acceptable, see
+   `docs/src/developer/architecture_layers.md` (section Performance tiers).
 2. Type stability everywhere on the hot path.
    `Base.promote_op(assemble!, ...) === Nothing` and the inferred
    types must be concrete. Use `NamedTuple` (typed), `NTuple`, and
