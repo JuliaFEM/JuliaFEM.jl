@@ -7,9 +7,6 @@ Classical von Mises plasticity with radial return mapping algorithm.
 using Tensors
 using LinearAlgebra
 
-# Load abstract types
-include("abstract_material.jl")
-
 # PlasticityState struct removed - now using compositional NamedTuple
 # State is represented as: (ε_p=SymmetricTensor{2,3}, α=SymmetricTensor{2,3}, κ=Float64)
 # This compositional design is inferred automatically from material traits
@@ -162,15 +159,4 @@ function compute_stress(material::PerfectPlasticity,
     end
 
     return σ, 𝔻, state_new
-end
-
-"""
-    symmetric_identity_tensor()
-
-Fourth-order symmetric identity tensor: 𝕀 = ½(δᵢₖδⱼₗ + δᵢₗδⱼₖ)
-"""
-@inline function symmetric_identity_tensor()
-    # Construct 4th order identity with major and minor symmetry
-    return SymmetricTensor{4,3}((i, j, k, l) ->
-        (i == k && j == l ? 0.5 : 0.0) + (i == l && j == k ? 0.5 : 0.0))
 end
