@@ -10,7 +10,7 @@
 Create a structured box mesh with Hex8 elements.
 
 # Arguments
-- `::Type{Hex8}`: Element topology type (only Hex8 supported currently)
+- `::Type{Hex8}`: Structured brick topology only (no structured `Tet4` box mesh in this entry point)
 
 # Keyword Arguments
 - `xmin`, `xmax`: Domain bounds in X direction (default: 0.0, 1.0)
@@ -162,7 +162,7 @@ function create_structured_box_mesh(
     node_sets[:zmin] = zmin_nodes
     node_sets[:zmax] = zmax_nodes
 
-    return Mesh{Hex8}(nodes, connectivity, element_sets, node_sets)
+    return Mesh{Hex8}(nodes, connectivity; element_sets=element_sets, node_sets=node_sets)
 end
 
 """
