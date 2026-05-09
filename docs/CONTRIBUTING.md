@@ -1,99 +1,147 @@
----
-title: "Contributing to JuliaFEM"
-description: "Quick start guide for new contributors"
-date: 2025-11-09
-author: "Jukka Aho"
-categories: ["development", "contributing", "getting started"]
-keywords: ["juliafem", "contributing", "pull requests", "development"]
-audience: "contributors"
-level: "beginner"
-type: "guide"
----
+# Contributing to JuliaFEM.jl
 
-Thank you for considering contributing to JuliaFEM! 🎉
+Thank you for considering a contribution. Please read `AGENTS.md` in the
+repository root before opening a pull request; it describes the current
+architecture, the non-negotiable invariants (zero-allocation hot paths,
+type stability, mirrored test/src layout) and the documentation style.
 
-## Quick Links
+## Quick start
 
-- **[Contributor Manual](contributor/README.md)** - Start here for technical details
-- **[Coding Standards](contributor/coding_standards.md)** - **REQUIRED** reading for all contributors
-- **[Testing Philosophy](contributor/testing_philosophy.md)** - How we test and why
-
-## Quick Start
-
-1. **Fork the repository** on GitHub
-
-2. **Clone your fork:**
-
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/JuliaFEM.jl.git
-   cd JuliaFEM.jl
-   ```
-
-3. **Create a branch:**
-
-   ```bash
-   git checkout -b fix-issue-123
-   ```
-
-4. **Read the [Coding Standards](contributor/coding_standards.md)** - Critical rules like:
-   - ✅ Use `u, v, w` for reference coordinates
-   - ❌ Never use Greek letters (ξ, η, ζ) in code
-   - ✅ Type-stable code required
-   - ✅ Zero allocations in hot paths
-
-5. **Make your changes** following the standards
-
-6. **Run tests:**
+1. Fork and clone the repository.
+2. Create a topic branch from `main`.
+3. Make your change, keeping it small enough to review.
+4. Run the full test suite from the repository root:
 
    ```bash
    julia --project=. -e 'using Pkg; Pkg.test()'
    ```
 
-7. **Commit with good messages:**
+5. Respect the layer dependency contract in
+   `docs/src/developer/architecture_layers.md`. CI runs
+   `julia scripts/check_layer_contract.jl`; run it locally before pushing if
+   you touch `src/domains/` or foundation directories (`topology`,
+   `quadrature`, `geometry`, `basis`, `sparse`).
 
-   ```text
-   feat(topology): Add Pyr5 pyramid element
-   
-   - Implement 5-node pyramid reference element
-   - Zero-allocation tuple interface
-   - Tests for reference coordinates
-   
-   Closes #123
-   ```
+6. Open a pull request with a clear description of the change and any
+   relevant benchmark or test output.
 
-8. **Push and create Pull Request**
+## Time to first success
 
-## Code of Conduct
+From a clean clone of JuliaFEM.jl, expect roughly this order:
 
-- Be respectful and constructive
-- Focus on the code, not the person
-- Welcome newcomers and help them learn
-- Ask questions before making assumptions
+1. `julia --project=. -e 'using Pkg; Pkg.instantiate()'` — resolve dependencies.
+2. `julia --project=. -e 'using Pkg; Pkg.test()'` — full bundled suite (same
+   command CI uses for the package tests).
+3. Optional checks from the repository root:
+   - `julia scripts/check_layer_contract.jl` — static layer dependency audit
+     (same as CI).
+4. Optional documentation smoke tests from the repository root:
+   - `julia --project=. scripts/verify_docs_quickstart.jl` — keeps the
+     Documenter minimal elasticity snippet aligned with the mesh in
+     `docs/src/snippets/minimal_elasticity_quickstart.jl`.
+   - `cd juliafem.github.io && julia scripts/check_website_docs.jl` — curated
+     site Markdown links and patterns.
+5. Package API HTML (when editing `docs/src/`):  
+   `julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'`  
+   then `julia --project=docs docs/make.jl` from the repository root.
 
-## What We Look For
+If any of these fail before you touch application code, fix the environment
+(Julia version versus `[compat]`, stale `Manifest.toml`, or missing Quarto
+when rendering the website) rather than chasing false positives in the library.
 
-✅ **Type-stable code** - Performance depends on it  
-✅ **Tests included** - New features need tests  
-✅ **Documentation** - Docstrings for exported functions  
-✅ **Clean commits** - Logical, well-described changes  
-✅ **Follows standards** - Read [coding_standards.md](contributor/coding_standards.md)  
+## Coding rules worth highlighting
 
-❌ **Type-unstable code** - Will be rejected  
-❌ **No tests** - Cannot merge without tests  
-❌ **Greek letters in code** - Use u, v, w instead  
-❌ **Breaking changes** - Discuss in issue first  
+- Use ASCII identifiers in code (`u`, `v`, `w` for reference coordinates,
+  not `xi`, `eta`, `zeta` or Greek letters). Greek may appear in
+  comments and docstrings where it aids reading.
+- Hot paths must remain zero-allocation. The regression for this lives
+  in `test/assemblers/test_dof_based_zero_alloc.jl`. New code that
+  touches the assembly path should not add `Dict`, `Vector{Any}`,
+  untyped closures or growable buffers inside loops.
+- Tests for `src/<topic>/<feature>.jl` go to
+  `test/<topic>/test_<feature>.jl`.
+- Prefer one file per commit; two paths is fine when they are one story
+  (e.g. implementation + its test). Never `git add .` or `git add -A`
+  unless you mean it. The full protocol is in
+  `.github/prompts/commit.prompt.md`. With
+  `git config core.hooksPath .githooks`, the pre-commit hook allows at
+  most **two** staged files per commit.
 
-## Getting Help
+## Documentation pull requests
 
-- **Questions?** Open a GitHub Discussion
-- **Bug report?** Open an issue with reproducible example
-- **Feature idea?** Open an issue to discuss before implementing
-- **Stuck?** Ask in the issue or PR - we're happy to help!
+When you change **user-facing prose** (Quarto `juliafem.github.io/docs/`, examples
+index, book landing pages) or **docstrings** that feed the site API page:
 
-## License
+1. From `juliafem.github.io/`, run  
+   `julia scripts/check_website_docs.jl`  
+   (denylist + relative Markdown / `book/index.qmd` chapter targets).
+2. If you edited **JuliaFEM docstrings** or `docs/api/` sources used by the site
+   builder, run  
+   `julia --project=. scripts/build_docs.jl api`  
+   from `juliafem.github.io/` and commit the regenerated `api/` output if your
+   project tracks it.
+3. Add or adjust **`juliafem.github.io/docs/documentation-map.md`** when you
+   introduce a new top-level guide readers should trust.
+4. For package-only Documenter (`docs/make.jl`), use the **`docs/`** environment:  
+   `julia --project=docs -e 'using Pkg; Pkg.instantiate()'` then  
+   `julia --project=docs docs/make.jl` from the repository root (see `docs/README.md`).
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+## Documentation style
 
----
+When writing READMEs, docstrings, design notes or session logs:
 
-**Ready to contribute?** → Start with [Contributor Manual](contributor/README.md) and [Coding Standards](contributor/coding_standards.md)
+- No emoji.
+- No markdown bold for emphasis. Plain prose carries enough weight.
+- Prefer short, technical sentences and precise code references over
+  marketing copy.
+
+## Where things go
+
+[`src/repository_layout.md`](src/repository_layout.md) is the
+authoritative file organisation guide and contains a decision tree for
+any new file. A short pointer lives at [`repository_layout.md`](repository_layout.md).
+In particular, local session logs and scratch notes often live under a
+gitignored `llm/` tree, not under `docs/` or `test/`.
+
+## Website and Quarto CI
+
+The **`juliafem.github.io/`** tree is a Quarto site checked by
+**`.github/workflows/SiteDocs.yml`**. Visual tokens and navbar/logo rules live in
+**`juliafem.github.io/docs/contributor-guide/design_system.md`**. After changing
+site Markdown or book landing links, run from `juliafem.github.io`:
+
+```bash
+julia --project=. scripts/build_docs.jl api
+julia scripts/check_website_docs.jl
+```
+
+A full local site build is `quarto render` from `juliafem.github.io/`. It fails
+if two inputs share the same HTML stem (for example paired Literate `*.md` and
+`*.qmd`, or Documenter `api/index.md` next to `api/index.qmd`); `build_docs.jl`
+removes those duplicates after regenerating API and examples.
+
+If you change `default_quadrature` or quadrature tables under `src/quadrature/`,
+regenerate the user-guide table snippet from the **repository root** and commit
+the updated file:
+
+```bash
+julia --project=. juliafem.github.io/scripts/generate_quadrature_defaults_snippet.jl
+git diff juliafem.github.io/docs/user-guide/_quadrature_defaults_snippet.md
+```
+
+**`SiteDocs.yml`** runs that generator and fails the job when the snippet is out
+of date (`git diff --exit-code` on the snippet path). The same workflow runs
+**`scripts/check_curated_doc_vocabulary.jl`**, which fails if obsolete API
+strings appear under **`juliafem.github.io/docs/user-guide/`** (for example
+`register_fields!`).
+
+`check_website_docs.jl` enforces a small denylist of obsolete example patterns,
+scans relative `*.md` / `*.qmd` links under `docs/`, `examples/`, `showcase/`, and
+`articles/`, and verifies that **chapter links in `book/index.qmd`** resolve to
+real `.qmd` files.
+
+## Getting help
+
+- Open a GitHub issue with a minimal reproducible example for bugs.
+- Open a GitHub discussion or issue for design questions before doing
+  large pieces of work.

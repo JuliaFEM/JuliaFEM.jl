@@ -1,128 +1,118 @@
-# JuliaFEM.jl - an open source solver for both industrial and academia usage
+# JuliaFEM.jl
 
 [![logo](https://raw.githubusercontent.com/JuliaFEM/JuliaFEM.jl/master/docs/logo/JuliaFEMLogo_256x256.png)](https://github.com/JuliaFEM/JuliaFEM.jl)
 
 [![DOI](https://zenodo.org/badge/35573493.svg)](https://zenodo.org/badge/latestdoi/35573493)
 [![License](https://img.shields.io/github/license/JuliaFEM/JuliaFEM.jl.svg)](https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md)
-[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/JuliaFEM/JuliaFEM.jl)
-[![Build Status](https://travis-ci.org/JuliaFEM/JuliaFEM.jl.svg?branch=master)](https://travis-ci.org/JuliaFEM/JuliaFEM.jl)
-[![Coverage Status](https://coveralls.io/repos/github/JuliaFEM/JuliaFEM.jl/badge.svg?branch=master)](https://coveralls.io/github/JuliaFEM/JuliaFEM.jl?branch=master)
-[![Stable documentation](https://img.shields.io/badge/docs-stable-blue.svg)](https://juliafem.github.io/JuliaFEM.jl/stable)
-[![Latest documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://juliafem.github.io/JuliaFEM.jl/latest)
-[![Issues](https://img.shields.io/github/issues/JuliaFEM/JuliaFEM.jl.svg)](https://github.com/JuliaFEM/JuliaFEM.jl/issues)
 
-The JuliaFEM project develops open-source software for reliable, scalable,
-distributed Finite Element Method.
+JuliaFEM.jl is an open-source finite element framework written in Julia.
+The package is still **0.x**; the repository is in the middle of a deliberate
+architectural reset toward a **stable 1.0** with a type-stable, zero-allocation,
+GPU-friendly assembly pipeline. Many older READMEs and tutorials still describe
+the previous API; when in doubt, trust the code and [`AGENTS.md`](AGENTS.md).
+Contributions (bug reports, docs, tests, and features) are welcome.
 
-The JuliaFEM software library is a framework that allows for the distributed
-processing of large Finite Element Models across clusters of computers using
-simple programming models. It is designed to scale up from single servers to
-thousands of machines, each offering local computation and storage. The basic
-design principle is: everything is nonlinear. All physics models are nonlinear
-from which the linearization are made as a special cases.
+## Status
 
-At the moment, users can perform the following analyses with JuliaFEM: elasticity,
-thermal, eigenvalue, contact mechanics, and quasi-static solutions. Typical examples
-in industrial applications include non-linear solid mechanics, contact mechanics,
-finite strains, and fluid structure interaction problems. For visualization,
-JuliaFEM uses ParaView which prefers XDMF file format using XML to store light
-data and HDF to store large data-sets, which is more or less the open-source standard.
+Current focus areas:
 
-## Vision
+- `Element{K, P, S, N}` template with compile-time DOF layout.
+- `DOFHandler` and `DOFBasedCOOAssembler` (zero-allocation hot paths).
+- Microkernel-style physics in `src/domains/{continuum, heat, thermo_elastic}/`.
+- Matrix-free `apply_K!`, `apply_M!`, Dirichlet, multipoint constraints,
+  IC(0) / Jacobi / block-Jacobi preconditioners and a generalized
+  eigensolver in `src/assemblers/`.
+- A KernelAbstractions backend for the matrix-free path with a Float32
+  Metal smoke test in `test/backend/metal/`.
 
-On one hand, the vision of the JuliaFEM includes the opportunity for massive
-parallelization using multiple computers with MPI and threading as well as cloud
-computing resources in Amazon, Azure and Google Cloud services together with a
-company internal server. And on the other hand, the real application complexity
-including the simulation model complexity as well as geometric complexity. Not
-to forget that the reuse of the existing material models as well as the whole
-simulation models are considered crucial features of the JuliaFEM package. 
+The legacy element-based API (`Problem`, `update!`, `Analysis`, …) is
+still present under `src/legacy/` for backward compatibility but is not
+the recommended entry point.
 
-Recreating the wheel again is definitely not anybody's goal, and thus we try
-to use and embrace good practices and formats as much as possible. We have
-implemented Abaqus / CalculiX input-file format support and maybe will in the
-future extend to other FEM solver formats. Using modern development environments
-encourages the user towards fast development time and high productivity. For
-developing and creating new ideas and tutorials, we have used Jupyter notebooks
-to make easy-to-use handouts.
-
-The user interface for JuliaFEM is Jupyter Notebook, and Julia language itself
-is a real programming language. This makes it possible to use JuliaFEM as a part
-of a bigger solution cycle, including for example data mining, automatic geometry
-modifications, mesh generation, solution, and post-processing and enabling
-efficient optimization loops.
-
-## Installing JuliaFEM
-
-Inside Julia REPL, type:
+## Installing
 
 ```julia
+using Pkg
 Pkg.add("JuliaFEM")
 ```
 
-## Initial road map
+## A modern minimal example
 
-JuliaFEM current status: **project planning**
+```julia
+using JuliaFEM
 
-| Version | Number of degree of freedom | Number of cores |
-| ------: | --------------------------: | --------------: |
-|   0.1.0 |                   1 000 000 |              10 |
-|   0.2.0 |                  10 000 000 |             100 |
-|   1.0.0 |                 100 000 000 |           1 000 |
-|   2.0.0 |               1 000 000 000 |          10 000 |
-|   3.0.0 |              10 000 000 000 |         100 000 |
+mesh = create_structured_box_mesh(Hex8;
+    xmin = 0.0, xmax = 1.0, nx = 4,
+    ymin = 0.0, ymax = 1.0, ny = 4,
+    zmin = 0.0, zmax = 1.0, nz = 4,
+)
 
-We strongly believe in the test driven development as well as building on top
-of previous work. Thus all the new code in this project should be 100% tested.
-Also other people have wisdom in style as well:
+S  = @DOFSet{u::DOF{Displacement{3}, Vertex}}
+ET = Element{Hex8, Lagrange{1}, S}
+elements, handler = create_elements!(mesh, ET)
 
-[The Zen of Python](https://www.python.org/dev/peps/pep-0020/):
+material = LinearElastic(E = 210e9, ν = 0.3)
+kernel   = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+                           material, Displacement{3}())
 
-```text
-Beautiful is better than ugly.
-Explicit is better than implicit.
-Simple is better than complex.
-Complex is better than complicated.
-Flat is better than nested.
-Sparse is better than dense.
-Readability counts.
-Errors should never pass silently.
+asm   = DOFBasedCOOAssembler()
+cache = create_cache(asm, elements, handler, mesh, kernel)
+assemble!(cache, asm, kernel, mesh)
+K, f  = extract_system(cache)
 ```
 
-## Citing
+The same block is parsed from this file in `test/docs/readme_example.jl`, so it stays
+copy-pasteable as the API evolves.
 
-If you like using our package, please consider citing our [article](https://rakenteidenmekaniikka.journal.fi/article/view/64224/26397)
+For a matrix-free Krylov solve, see
+`test/assemblers/test_dof_based_apply_K.jl` and
+`test/assemblers/test_eigensolve.jl`.
 
-```text
-@article{frondelius2017juliafem,
-  title={Julia{FEM} - open source solver for both industrial and academia usage},
-  volume={50}, 
-  url={https://rakenteidenmekaniikka.journal.fi/article/view/64224},
-  DOI={10.23998/rm.64224},
-  number={3},
-  journal={Rakenteiden Mekaniikka},
-  author={Frondelius, Tero and Aho, Jukka},
-  year={2017},
-  pages={229-233}
-}
-```
+## Documentation
+
+- [`docs/repository_layout.md`](docs/repository_layout.md): where to put new files
+  (full text under [`docs/src/repository_layout.md`](docs/src/repository_layout.md)).
+- [`docs/`](docs/): Documenter-built API reference and user-facing index.
+  Historical Jupyter tutorials under [`docs/tutorials/`](docs/tutorials/)
+  (2015-2016 API; reference only).
+- `src/<topic>/README.md`: short module notes (topology, mesh, materials, ...).
 
 ## Contributing
 
-We welcome contributions! JuliaFEM encourages good practices, starting from unit
-testing and continuing to full integration testing across platforms.
+Please read [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) before opening a pull
+request: fork and branch, keep changes review-sized, run tests, and describe
+what you changed.
 
-**Interested in contributing?** Please read:
+**Git commits.** Keep history easy to read: small commits, usually one file;
+**two files** in one commit is fine when they are inseparable (e.g. a helper and
+its only caller). An optional hook (`.githooks/`, set `core.hooksPath`) caps
+staged paths at two. If that workflow feels unfamiliar, open your PR with tests
+passing and ask for help splitting history in review.
 
-- **[Contributing Guide](docs/CONTRIBUTING.md)** - Quick start for contributors
-- **[Coding Standards](docs/contributor/coding_standards.md)** - Required reading (includes important rules like "no Greek letters in code")
-- **[Contributor Manual](docs/contributor/README.md)** - Technical details and architecture
+**Code expectations.** Assembly hot paths must stay type-stable and allocation-free
+after warmup; CI and [`test/assemblers/test_dof_based_zero_alloc.jl`](test/assemblers/test_dof_based_zero_alloc.jl)
+guard that. The full suite:
 
-Key requirements:
+```bash
+julia --project=. -e 'using Pkg; Pkg.test()'
+```
 
-- ✅ Type-stable code (performance critical)
-- ✅ Tests included with all changes
-- ✅ Follow coding standards (use `u, v, w` not ξ, η, ζ)
-- ✅ Clean commit messages
+Use that locally before opening a PR; CI runs the same tests.
 
-**Questions?** Open a GitHub Discussion or issue - we're happy to help!
+## Citing
+
+If you use JuliaFEM.jl in academic work, please cite
+
+```text
+@article{frondelius2017juliafem,
+  title   = {Julia{FEM} - open source solver for both industrial and academia usage},
+  volume  = {50},
+  url     = {https://rakenteidenmekaniikka.journal.fi/article/view/64224},
+  doi     = {10.23998/rm.64224},
+  number  = {3},
+  journal = {Rakenteiden Mekaniikka},
+  author  = {Frondelius, Tero and Aho, Jukka},
+  year    = {2017},
+  pages   = {229-233}
+}
+```
