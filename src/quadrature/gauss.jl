@@ -12,18 +12,19 @@ Gauss-Legendre integration using new quadrature API.
 Return integration points for the given topology using default quadrature rule.
 """
 function integration_points(topology::T) where {T<:AbstractTopology}
-    # Get default quadrature rule for this topology (uses node count to infer order)
+    # Default quadrature rule for this topology (basis order inferred
+    # from node count via `_infer_basis_order`).
     rule = default_quadrature(T)
-    
+
     # Map parametric topology type to generic quadrature type
-    # E.g., Hexahedron{8} → Hexahedron, Triangle{3} → Triangle
+    # (e.g. Hexahedron{8} → Hexahedron, Triangle{3} → Triangle).
     quad_topo = _quadrature_topology_type(T)
-    
-    # Get points using new API: get_quadrature_points(Hexahedron, GaussLegendre{2}())
-    # Returns: SVector{N, QuadraturePoint{D,Float64}}
+
+    # Returns SVector{N, QuadraturePoint{D,Float64}}. Wrapping in a
+    # `Tuple` keeps the return type `NTuple{N, QuadraturePoint{...}}`
+    # so call sites can still splat / destructure; for the small N
+    # used here the conversion compiles to a stack-only construction.
     quad_points = get_quadrature_points(quad_topo, rule)
-    
-    # Convert SVector to Tuple (zero-allocation)
     return Tuple(quad_points)
 end
 
