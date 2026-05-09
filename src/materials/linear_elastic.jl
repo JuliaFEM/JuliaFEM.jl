@@ -4,9 +4,6 @@ Linear elastic (Hookean) material model using Tensors.jl.
 
 using Tensors
 
-# Load abstract types
-include("abstract_material.jl")
-
 """
     LinearElastic <: AbstractElasticMaterial
 
@@ -35,17 +32,8 @@ Convenience constructor with keyword arguments.
 """
 LinearElastic(; E, ν) = LinearElastic(Float64(E), Float64(ν))
 
-# Trait declaration: LinearElastic has constant tangent modulus
 material_behavior(::LinearElastic) = StatelessConstantTangent()
-
-# State type trait: LinearElastic is stateless (uses EmptyState)
-state_type(::Type{LinearElastic}) = EmptyState
-
-# New trait system: Physics and state variable requirements
-# LinearElastic supports 3D elasticity only
 supported_physics(::LinearElastic) = (Elasticity{3}(),)
-
-# LinearElastic is stateless - no internal state variables
 required_state_variables(::LinearElastic) = ()
 
 """
