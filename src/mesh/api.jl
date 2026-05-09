@@ -30,13 +30,17 @@ Concrete mesh types must implement:
 
 # Concrete Types
 - `Mesh{T<:AbstractTopology}` - Parametric mesh with single topology type
-- `MixedMesh` - Mesh with multiple topology types (future)
+
+Mixed-topology meshes (multiple element families in one mesh) are not
+implemented yet; the assembly pipeline currently assumes a single
+concrete topology type.
 
 # Design Philosophy
 
-Meshes own topology (node coordinates, connectivity).
-Physics references meshes (does not own them).
-Multiple Physics can share one Mesh (multiphysics coupling).
+Meshes own topology (node coordinates, connectivity). Kernels and
+constraint objects reference meshes; they do not own them. Multiple
+kernels (e.g. `ContinuumKernel` + `HeatKernel`) can share one mesh for
+multiphysics coupling.
 
 # Element Sets and Node Sets
 
