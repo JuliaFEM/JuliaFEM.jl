@@ -75,34 +75,30 @@ npoints(topology::Type{<:AbstractTopology}, rule::AbstractQuadratureRule) =
 """
     default_quadrature(basis_order::Int) -> AbstractQuadratureRule
     default_quadrature(topology::Type{<:AbstractTopology}, basis_order::Int) -> AbstractQuadratureRule
-    default_quadrature(topology::Type{<:AbstractTopology}, basis::Type{<:AbstractBasis}) -> AbstractQuadratureRule
     default_quadrature(topology::Type{<:AbstractTopology}) -> AbstractQuadratureRule
 
-Return the default quadrature rule for given topology and/or basis.
+Return the default quadrature rule for the given topology and/or basis order.
 Uses `GaussLegendre{basis_order + 1}()` to ensure exact integration.
+The single-argument topology form infers the basis order from the node count via
+[`_infer_basis_order`](@ref).
 """
 function default_quadrature end
 
-# Level 1: Just basis order (simplest, works for most cases)
-# Rule of thumb: Use order + 1 for stiffness matrix integration
+# Level 1: Just basis order (simplest, works for most cases).
+# Rule of thumb: use order + 1 for stiffness-matrix integration.
 default_quadrature(basis_order::Int) = GaussLegendre{basis_order + 1}()
 
-# Level 2: Topology + basis order (handles special cases, can be overridden)
-# Default implementation delegates to Level 1
+# Level 2: Topology + basis order (handles special cases, can be overridden).
+# Default implementation delegates to Level 1.
 default_quadrature(::Type{<:AbstractTopology}, basis_order::Int) =
     default_quadrature(basis_order)
 
-# Level 3: Topology + basis type (extract order from basis)
-# Note: Requires basis_order(::Type{<:AbstractBasis}) to be defined
-# This will be implemented when basis types are loaded
-# default_quadrature(::Type{T}, ::Type{B}) where {T<:AbstractTopology, B<:AbstractBasis} =
-#     default_quadrature(T, basis_order(B))
+# Level 3: Topology type only (infer basis order from node count via the
+# `_infer_basis_order` table below). Useful when the basis order is not
+# carried explicitly at the call site.
 
-# Level 4: Topology type only (infer basis order from node count)
-# These will be uncommented after topology types are loaded
-
-# Helper function to infer basis order from node count
-# This is a heuristic based on standard element types
+# Helper function to infer basis order from node count.
+# This is a heuristic based on standard element types.
 function _infer_basis_order end
 
 # 1D Segments
