@@ -1,15 +1,13 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/FEMBase.jl/blob/master/LICENSE
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 #
-# Sparse matrix utilities consolidated from FEMBase.jl and FEMSparse.jl
+# Sparse matrix utilities. `SparseMatrixCOO` is the FEMBase-style triplet
+# container; it is consumed only by the legacy assembly pipeline. The modern
+# element- and DOF-based COO assemblers operate directly on raw `(I, J, V)`
+# vectors (see `src/assemblers/`).
 
 using SparseArrays
 import SparseArrays: sparse, sparsevec
-
-# SparseMatrixCOO from FEMBase (this file)
-# AssemblerSparsityPattern from FEMSparse
-include("sparsematrixcsc.jl")
-# include("sparsevectordok.jl")  # Old Julia syntax, not used, skipping for now
 
 mutable struct SparseMatrixCOO{T<:Real}
     I::Vector{Int}
@@ -76,16 +74,16 @@ function add!(A::SparseMatrixCOO, I::Int, V::Float64)
 end
 
 function empty!(A::SparseMatrixCOO)
-    empty!(A.I)
-    empty!(A.J)
-    empty!(A.V)
+    resize!(A.I, 0)
+    resize!(A.J, 0)
+    resize!(A.V, 0)
     return nothing
 end
 
 function append!(A::SparseMatrixCOO, B::SparseMatrixCOO)
-    append!(A.I, B.I)
-    append!(A.J, B.J)
-    append!(A.V, B.V)
+    Base.append!(A.I, B.I)
+    Base.append!(A.J, B.J)
+    Base.append!(A.V, B.V)
     return nothing
 end
 
@@ -157,24 +155,6 @@ function add!(a::SparseVectorCOO, b::SparseVector)
     return
 end
 
-"""
-    get_nonzero_rows(A)
-
-Returns indices of all nonzero rows from a sparse matrix `A`.
-"""
-function get_nonzero_rows(A)
-    return sort(unique(A.rowval))
-end
-
-"""
-    get_nonzero_columns(A)
-
-Returns indices of all nonzero columns from a sparse matrix `A`.
-"""
-function get_nonzero_columns(A)
-    return get_nonzero_rows(copy(transpose(A)))
-end
-
 function size(A::SparseMatrixCOO)
     isempty(A) && return (0, 0)
     return maximum(A.I), maximum(A.J)
@@ -182,20 +162,6 @@ end
 
 function size(A::SparseMatrixCOO, idx::Int)
     return size(A)[idx]
-end
-
-""" Resize sparse matrix A to (higher) dimension n x m. """
-function resize_sparse(A, n, m)
-    idx = findall(!iszero, A)
-    I = getindex.(idx, 1)
-    J = getindex.(idx, 2)
-    V = [A[i] for i in idx]
-    return sparse(I, J, V, n, m)
-end
-
-""" Resize sparse vector b to (higher) dimension n. """
-function resize_sparsevec(b, n)
-    return sparsevec(b.nzind, b.nzval, n)
 end
 
 """ Approximative comparison of two matrices A and B. """
