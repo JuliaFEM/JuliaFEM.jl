@@ -1,5 +1,5 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 """
     Mesh{N, T<:AbstractTopology{N}}
@@ -19,29 +19,11 @@ Parametric mesh structure with single topology type for type stability and GPU o
 - `node_sets::Dict{Symbol,Set{UInt32}}`: Named node groups (node indices)
 - `inverse_connectivity::Vector{Vector{Tuple{UInt32,UInt8}}}`: For each node: [(elem_id, local_idx), ...]
 
-## Ordering and Bandwidth Optimization
-- `node_permutation::Vector{UInt32}`: Maps original → reordered (identity until RCM applied)
-- `node_inverse_permutation::Vector{UInt32}`: Maps reordered → original
-- `element_permutation::Vector{UInt32}`: Maps original → reordered (for cache optimization)
-
-## Naming and Industrial Workflows
-- `node_ids::Dict{Union{Int,Symbol},UInt32}`: Named node lookup (e.g., :corner_node => 42, 10_000_001 => 1)
-- `element_ids::Dict{Union{Int,Symbol},UInt32}`: Named element lookup (e.g., :E1 => 1, 20_000_001 => 1)
-
-## Parallel Computing and Domain Decomposition
-- `node_colors::Vector{UInt32}`: Color per node (0 = uncolored, for load balancing)
-- `element_colors::Vector{UInt32}`: Color per element (0 = uncolored, for thread-safe assembly)
-- `ghost_nodes::Set{UInt32}`: Nodes owned by other processes (MPI domain decomposition)
-- `ghost_elements::Set{UInt32}`: Elements owned by other processes
-
 # Design Rationale
-- **Type Stability**: Mesh{Tet10} is fully concrete (10× faster than abstract mesh)
-- **Fixed-Size Connectivity**: NTuple{10,Int} enables matrix reinterpretation for GPU
-- **Real Workflows**: Matches multi-body assemblies (separate mesh per component)
-- **GPU-Ready**: connectivity_matrix() provides zero-copy Matrix{Int} for GPU transfer
-- **Bandwidth Optimization**: Node permutation for RCM/Cuthill-McKee minimizes matrix bandwidth
-- **Industrial CAE**: Node/element IDs support multi-part assemblies (part1: 10M+ nodes, part2: 20M+ nodes)
-- **Parallel-Ready**: Colors and ghost data structures prepared for threading and MPI
+- Type Stability: Mesh{Tet10} is fully concrete (10× faster than abstract mesh)
+- Fixed-Size Connectivity: NTuple{10,Int} enables matrix reinterpretation for GPU
+- Real Workflows: Matches multi-body assemblies (separate mesh per component)
+- GPU-Ready: connectivity_matrix() provides zero-copy Matrix{Int} for GPU transfer
 
 # Examples
 
@@ -56,49 +38,29 @@ mesh = Mesh{Tet4}(nodes, connectivity)
 mesh = Mesh{Tet4}(nodes, connectivity, 
                   element_sets=Dict(:all => Set(1)))
 
-# Multi-body assembly
-block = Mesh{Tet10}(...)
-beams = Mesh{Seg2}(...)
-assembly = Assembly(meshes=Dict(:block => block, :beams => beams))
+# Multi-body workflows: keep one `Mesh` per region (or partition), then build
+# separate `Element`/handler sets per region. The old multi-mesh `Assembly`
+# container lives only in `JuliaFEM.Legacy` when `JULIAFEM_ENABLE_LEGACY=1`.
 ```
 
-See also: [`connectivity_matrix`](@ref), [`extract_surface`](@ref), [`Assembly`](@ref)
+See also: [`connectivity_matrix`](@ref), [`extract_surface`](@ref)
 """
 struct Mesh{N,T<:AbstractTopology{N}} <: AbstractMesh
-    # Core data
     nodes::Vector{Vec{3,Float64}}
     connectivity::Vector{NTuple{N,UInt32}}
     element_sets::Dict{Symbol,Set{UInt32}}
     node_sets::Dict{Symbol,Set{UInt32}}
     inverse_connectivity::Vector{Vector{Tuple{UInt32,UInt8}}}
 
-    # Ordering and bandwidth optimization
-    node_permutation::Vector{UInt32}
-    node_inverse_permutation::Vector{UInt32}
-    element_permutation::Vector{UInt32}
-
-    # Naming and industrial workflows
-    node_ids::Dict{Union{Int,Symbol},UInt32}
-    element_ids::Dict{Union{Int,Symbol},UInt32}
-
-    # Parallel computing
-    node_colors::Vector{UInt32}
-    element_colors::Vector{UInt32}
-    ghost_nodes::Set{UInt32}
-    ghost_elements::Set{UInt32}
-
-    # Inner constructor with validation
     function Mesh{N,T}(
         nodes::Vector{Vec{3,Float64}},
         connectivity::Vector{NTuple{N,UInt32}},
         element_sets::Dict{Symbol,Set{UInt32}}=Dict{Symbol,Set{UInt32}}(),
         node_sets::Dict{Symbol,Set{UInt32}}=Dict{Symbol,Set{UInt32}}()
     ) where {N,T<:AbstractTopology{N}}
-        # Validate connectivity size matches topology
         expected_nodes = nnodes(T())
         @assert N == expected_nodes "Connectivity tuple size ($N) must match nnodes($T) = $expected_nodes"
 
-        # Validate all node indices are in range
         n_nodes = length(nodes)
         for (i, conn) in enumerate(connectivity)
             for node_id in conn
@@ -106,7 +68,6 @@ struct Mesh{N,T<:AbstractTopology{N}} <: AbstractMesh
             end
         end
 
-        # Validate element sets
         n_elements = length(connectivity)
         for (set_name, elem_ids) in element_sets
             for elem_id in elem_ids
@@ -114,15 +75,14 @@ struct Mesh{N,T<:AbstractTopology{N}} <: AbstractMesh
             end
         end
 
-        # Validate node sets
-        for (set_name, node_ids) in node_sets
-            for node_id in node_ids
+        for (set_name, node_ids_in_set) in node_sets
+            for node_id in node_ids_in_set
                 @assert 1 ≤ node_id ≤ n_nodes "Node set $set_name: node $node_id out of range [1, $n_nodes]"
             end
         end
 
-        # Build inverse connectivity for nodal assembly
-        # For each node, store list of (element_id, local_node_index) pairs
+        # Build inverse connectivity for nodal assembly:
+        # for each node, the list of (element_id, local_node_index) pairs.
         inverse_connectivity = [Vector{Tuple{UInt32,UInt8}}() for _ in 1:n_nodes]
         for (elem_id, elem_conn) in enumerate(connectivity)
             for (local_idx, node_id) in enumerate(elem_conn)
@@ -130,25 +90,7 @@ struct Mesh{N,T<:AbstractTopology{N}} <: AbstractMesh
             end
         end
 
-        # Initialize ordering (identity permutations until RCM/reordering applied)
-        node_permutation = collect(UInt32(1):UInt32(n_nodes))
-        node_inverse_permutation = collect(UInt32(1):UInt32(n_nodes))
-        element_permutation = collect(UInt32(1):UInt32(n_elements))
-
-        # Initialize naming (empty until user assigns IDs)
-        node_ids = Dict{Union{Int,Symbol},UInt32}()
-        element_ids = Dict{Union{Int,Symbol},UInt32}()
-
-        # Initialize parallel data (uncolored, no ghosts until partitioning)
-        node_colors = zeros(UInt32, n_nodes)       # 0 = uncolored
-        element_colors = zeros(UInt32, n_elements)  # 0 = uncolored
-        ghost_nodes = Set{UInt32}()
-        ghost_elements = Set{UInt32}()
-
-        new{N,T}(nodes, connectivity, element_sets, node_sets, inverse_connectivity,
-            node_permutation, node_inverse_permutation, element_permutation,
-            node_ids, element_ids,
-            node_colors, element_colors, ghost_nodes, ghost_elements)
+        new{N,T}(nodes, connectivity, element_sets, node_sets, inverse_connectivity)
     end
 end
 
@@ -167,18 +109,18 @@ end
 # ============================================================================
 
 """
-    topology_type(mesh::Mesh{T}) -> Type{T}
+    topology_type(mesh::Mesh{N,T}) -> Type{T}
 
 Get the topology type of the mesh.
 """
-topology_type(::Mesh{T}) where T = T
+topology_type(::Mesh{N,T}) where {N,T<:AbstractTopology{N}} = T
 
 """
-    nnodes_per_element(mesh::Mesh{T}) -> Int
+    nnodes_per_element(mesh::Mesh{N,T}) -> Int
 
 Get the number of nodes per element in the mesh.
 """
-nnodes_per_element(mesh::Mesh{T}) where T = nnodes(T)
+nnodes_per_element(mesh::Mesh{N,T}) where {N,T<:AbstractTopology{N}} = nnodes(T)
 
 """
     nelements(mesh::Mesh) -> Int
@@ -252,7 +194,7 @@ get_elements_for_node(mesh::Mesh, node_id::Int) = get_elements_for_node(mesh, UI
 # ============================================================================
 
 """
-    connectivity_matrix(mesh::Mesh{T}) -> Matrix{UInt32}
+    connectivity_matrix(mesh::Mesh{N,T}) -> Matrix{UInt32}
 
 Convert connectivity to a dense matrix for GPU transfer.
 
@@ -267,12 +209,12 @@ conn_mat = connectivity_matrix(mesh)     # 10×1000 matrix
 gpu_conn = CuArray(conn_mat)             # Single contiguous transfer!
 ```
 """
-function connectivity_matrix(mesh::Mesh{T}) where T
-    N = nnodes(T)
+function connectivity_matrix(mesh::Mesh{N,T}) where {N,T<:AbstractTopology{N}}
+    n_pe = nnodes(T)
     n_elem = nelements(mesh)
     # Reinterpret Vector{NTuple{N,UInt32}} as flat UInt32 array, then reshape
     # This is zero-copy!
-    return reshape(reinterpret(UInt32, mesh.connectivity), N, n_elem)
+    return reshape(reinterpret(UInt32, mesh.connectivity), n_pe, n_elem)
 end
 
 # ============================================================================
@@ -287,77 +229,6 @@ Get coordinates of a node by its index.
 function get_node(mesh::Mesh, node_id::Int)
     @assert 1 ≤ node_id ≤ nnodes_total(mesh) "Node index $node_id out of range"
     return mesh.nodes[node_id]
-end
-
-"""
-    find_nearest_nodes(mesh::Mesh, coords::Vec{3,Float64}, npts::Int=1; node_set::Union{Nothing,Symbol}=nothing) -> Vector{UInt32}
-
-Find the npts nearest nodes to the given coordinates.
-
-# Arguments
-- `mesh::Mesh`: The mesh
-- `coords::Vec{3,Float64}`: Target coordinates
-- `npts::Int=1`: Number of nearest nodes to return
-- `node_set::Union{Nothing,Symbol}=nothing`: Restrict search to this node set
-
-# Returns
-- `Vector{UInt32}`: Indices of nearest nodes, sorted by distance
-
-# Example
-```julia
-# Find 3 nearest nodes to point (0.5, 0.5, 0.0)
-nearest = find_nearest_nodes(mesh, Vec(0.5, 0.5, 0.0), 3)
-
-# Find nearest node in a specific node set
-nearest = find_nearest_nodes(mesh, coords, 1; node_set=:boundary)
-```
-"""
-function find_nearest_nodes(
-    mesh::Mesh,
-    coords::Vec{3,Float64},
-    npts::Int=1;
-    node_set::Union{Nothing,Symbol}=nothing
-)
-    @assert npts ≥ 1 "Number of points must be at least 1"
-
-    # Build list of (node_id, distance) pairs
-    distances = Tuple{UInt32,Float64}[]
-
-    if node_set === nothing
-        # Search all nodes
-        for (node_id, node_coords) in enumerate(mesh.nodes)
-            dist = norm(coords - node_coords)
-            push!(distances, (UInt32(node_id), dist))
-        end
-    else
-        # Search only nodes in specified set
-        @assert haskey(mesh.node_sets, node_set) "Node set $node_set not found"
-        for node_id in mesh.node_sets[node_set]
-            node_coords = mesh.nodes[node_id]
-            dist = norm(coords - node_coords)
-            push!(distances, (node_id, dist))
-        end
-    end
-
-    # Sort by distance and return first npts node IDs
-    sort!(distances, by=x -> x[2])
-    n_return = min(npts, length(distances))
-    return UInt32[distances[i][1] for i in 1:n_return]
-end
-
-"""
-    find_nearest_node(mesh::Mesh, coords::Vec{3,Float64}; node_set::Union{Nothing,Symbol}=nothing) -> UInt32
-
-Find the single nearest node to the given coordinates.
-
-Convenience wrapper around `find_nearest_nodes(mesh, coords, 1; node_set=node_set)`.
-"""
-function find_nearest_node(
-    mesh::Mesh,
-    coords::Vec{3,Float64};
-    node_set::Union{Nothing,Symbol}=nothing
-)
-    return first(find_nearest_nodes(mesh, coords, 1; node_set=node_set))
 end
 
 # ============================================================================
@@ -408,82 +279,74 @@ function get_nodes_in_set(mesh::Mesh, set_name::Symbol)
     return sort(collect(node_set))
 end
 
-"""
-    create_node_set_from_element_set!(mesh::Mesh, elem_set_name::Symbol, node_set_name::Symbol=elem_set_name)
-
-Create a node set containing all nodes from elements in an element set.
-
-# Arguments
-- `mesh::Mesh`: The mesh (modified in-place)
-- `elem_set_name::Symbol`: Source element set name
-- `node_set_name::Symbol`: Target node set name (defaults to same as element set)
-
-# Example
-```julia
-# Create node set "surface" from element set "surface"
-create_node_set_from_element_set!(mesh, :surface)
-
-# Or with different names
-create_node_set_from_element_set!(mesh, :volume_elements, :volume_nodes)
-```
-"""
-function create_node_set_from_element_set!(
-    mesh::Mesh,
-    elem_set_name::Symbol,
-    node_set_name::Symbol=elem_set_name
-)
-    @assert haskey(mesh.element_sets, elem_set_name) "Element set $elem_set_name not found"
-
-    node_ids = Set{UInt32}()
-    for elem_id in mesh.element_sets[elem_set_name]
-        # Add all nodes from this element
-        for node_id in mesh.connectivity[elem_id]
-            push!(node_ids, node_id)
-        end
-    end
-
-    mesh.node_sets[node_set_name] = node_ids
-    @info "Created node set :$node_set_name with $(length(node_ids)) nodes from element set :$elem_set_name"
-    return nothing
-end
-
 # ============================================================================
 # Surface Extraction
 # ============================================================================
 
 """
-    extract_surface(mesh::Mesh{T}, face_set::Symbol) -> Mesh{FaceT}
+    surface_topology(::Type{<:AbstractTopology}) -> Type{<:AbstractTopology}
 
-Extract a surface mesh from volume elements.
+Topology trait giving the boundary-face topology for a volume topology.
+Used by [`extract_surface`](@ref). Each supported volume type maps to its
+boundary-face element type:
+
+| Volume topology | Surface topology |
+|-----------------|------------------|
+| `Tetrahedron{4}`  | `Triangle{3}`      |
+| `Tetrahedron{10}` | `Triangle{6}`      |
+| `Hexahedron{8}`   | `Quadrilateral{4}` |
+| `Hexahedron{20}`  | `Quadrilateral{8}` |
+| `Hexahedron{27}`  | `Quadrilateral{9}` |
+
+Topologies whose boundary is a mix of element types (e.g. `Wedge`,
+`Pyramid`) intentionally have no method on this trait, so calling it on
+them raises a `MethodError` with a clear message.
+"""
+function surface_topology end
+
+surface_topology(::Type{Tetrahedron{4}})    = Triangle{3}
+surface_topology(::Type{Tetrahedron{10}})   = Triangle{6}
+surface_topology(::Type{Hexahedron{8}})     = Quadrilateral{4}
+surface_topology(::Type{Hexahedron{20}})    = Quadrilateral{8}
+surface_topology(::Type{Hexahedron{27}})    = Quadrilateral{9}
+
+"""
+    extract_surface(mesh::Mesh{N,T}, face_set::Symbol) -> Mesh{Nface,FaceT}
+
+Extract a surface mesh from volume elements. The boundary-face topology
+is looked up via [`surface_topology`](@ref), which currently supports
+`Tetrahedron{4|10}` and `Hexahedron{8|20|27}` volume meshes.
 
 # Arguments
-- `mesh::Mesh{T}`: Volume mesh (T must be Tet4, Tet10, Hex8, Hex20, etc.)
-- `face_set::Symbol`: Element set defining surface elements
+- `mesh::Mesh{N,T}`: Volume mesh.
+- `face_set::Symbol`: Element set whose elements should contribute their
+  boundary face. The set must already exist in `mesh.element_sets`.
 
 # Returns
-- `Mesh{FaceT}`: Surface mesh where FaceT = surface_topology(T)
-  * Tet4 → Tri3
-  * Tet10 → Tri6
-  * Hex8 → Quad4
-  * Hex20 → Quad4
+- `Mesh{Nface,FaceT}` whose nodes alias the volume mesh's node array.
 
-# Example
-```julia
-volume = Mesh{Tet10}(nodes, connectivity, 
-                     element_sets=Dict(:all => Set(1:100)))
-surface = extract_surface(volume, :all)  # Returns Mesh{Tri6}
-```
+# Limitations
+The current implementation takes the first `nnodes(FaceT)` connectivity
+entries of each volume element as a face. This is correct only when the
+caller has already arranged volume elements so that the first
+`nnodes(FaceT)` nodes form the boundary face (e.g. extruded prism layers).
+Topology-aware face extraction using the per-volume face tables remains a
+known TODO; see the corresponding session log.
 """
-function extract_surface(mesh::Mesh{T}, face_set::Symbol) where T
+function extract_surface(mesh::Mesh{N,T}, face_set::Symbol) where {N,T<:AbstractTopology{N}}
+    if !hasmethod(surface_topology, Tuple{Type{T}})
+        error("extract_surface: no surface_topology trait defined for $T. " *
+              "Supported volume topologies: Tetrahedron{4|10}, Hexahedron{8|20|27}.")
+    end
     FaceT = surface_topology(T)
     n_face_nodes = nnodes(FaceT)
 
-    # Get elements in face set
     @assert haskey(mesh.element_sets, face_set) "Element set $face_set not found"
     face_elements = mesh.element_sets[face_set]
 
-    # Extract surface connectivity (simplified - assumes first n_face_nodes form a face)
-    # TODO: Proper face extraction logic based on topology
+    # Extract surface connectivity. NOTE: this assumes the first
+    # `n_face_nodes` entries of each volume element form a face. See the
+    # function docstring; topology-aware extraction is on the backlog.
     surface_conn = NTuple{n_face_nodes,UInt32}[]
     for elem_id in face_elements
         elem_conn = mesh.connectivity[elem_id]
@@ -491,7 +354,6 @@ function extract_surface(mesh::Mesh{T}, face_set::Symbol) where T
         push!(surface_conn, face_conn)
     end
 
-    # Reuse same nodes (surface mesh references volume nodes)
     return Mesh{FaceT}(mesh.nodes, surface_conn)
 end
 
@@ -504,7 +366,7 @@ end
 
 Validate mesh integrity (connectivity, sets, etc.).
 """
-function validate(mesh::Mesh{T}) where T
+function validate(mesh::Mesh{N,T}) where {N,T<:AbstractTopology{N}}
     n_nodes = nnodes_total(mesh)
     n_elements = nelements(mesh)
     expected_nodes_per_elem = nnodes(T)
@@ -535,321 +397,27 @@ function validate(mesh::Mesh{T}) where T
 end
 
 """
-    info(mesh::Mesh)
+    info([io::IO=stdout,] mesh::Mesh)
 
-Print mesh information.
+Print a human-readable summary of a `Mesh` (node/element counts and named
+sets) to `io` (default `stdout`). The `io`-taking overload is the canonical
+form; the no-`io` shorthand calls it with `stdout`.
 """
-function info(mesh::Mesh{T}) where T
-    println("Mesh{$T}:")
-    println("  Nodes: $(nnodes_total(mesh))")
-    println("  Elements: $(nelements(mesh)) ($(nnodes(T)) nodes/element)")
-    println("  Element sets: $(length(mesh.element_sets))")
+function info(io::IO, mesh::Mesh{N,T}) where {N,T<:AbstractTopology{N}}
+    println(io, "Mesh{$T}:")
+    println(io, "  Nodes: $(nnodes_total(mesh))")
+    println(io, "  Elements: $(nelements(mesh)) ($N nodes/element)")
+    println(io, "  Element sets: $(length(mesh.element_sets))")
     for (name, elems) in mesh.element_sets
-        println("    :$name => $(length(elems)) elements")
+        println(io, "    :$name => $(length(elems)) elements")
     end
-    println("  Node sets: $(length(mesh.node_sets))")
+    println(io, "  Node sets: $(length(mesh.node_sets))")
     for (name, nodes) in mesh.node_sets
-        println("    :$name => $(length(nodes)) nodes")
+        println(io, "    :$name => $(length(nodes)) nodes")
     end
 end
 
-Base.show(io::IO, mesh::Mesh{T}) where T = print(io, "Mesh{$T}($(nnodes_total(mesh)) nodes, $(nelements(mesh)) elements)")
+info(mesh::Mesh) = info(stdout, mesh)
 
-# ============================================================================
-# Node and Element Naming (Industrial CAE Workflows)
-# ============================================================================
-
-"""
-    set_node_id!(mesh::Mesh, internal_index::UInt32, id::Union{Int,Symbol})
-
-Assign a named ID to a node. Useful for industrial workflows where nodes have
-specific ID ranges (e.g., part1: 10_000_000+, part2: 20_000_000+) or symbolic
-names (e.g., :corner_node, :N1).
-
-# Examples
-```julia
-# Industrial ID ranges (multi-part assembly)
-for i in 1:100
-    set_node_id!(mesh, UInt32(i), 10_000_000 + i)  # Part 1 nodes
-end
-
-# Symbolic names (Code Aster style)
-set_node_id!(mesh, UInt32(1), :N1)
-set_node_id!(mesh, UInt32(42), :corner_node)
-```
-"""
-function set_node_id!(mesh::Mesh, internal_index::UInt32, id::Union{Int,Symbol})
-    @assert 1 ≤ internal_index ≤ nnodes_total(mesh) "Node index out of range"
-    mesh.node_ids[id] = internal_index
-    return nothing
-end
-
-"""
-    get_node_by_id(mesh::Mesh, id::Union{Int,Symbol}) -> UInt32
-
-Get internal node index from named ID.
-
-# Example
-```julia
-set_node_id!(mesh, UInt32(42), :corner_node)
-idx = get_node_by_id(mesh, :corner_node)  # Returns UInt32(42)
-```
-"""
-function get_node_by_id(mesh::Mesh, id::Union{Int,Symbol})
-    @assert haskey(mesh.node_ids, id) "Node ID $id not found"
-    return mesh.node_ids[id]
-end
-
-"""
-    set_element_id!(mesh::Mesh, internal_index::UInt32, id::Union{Int,Symbol})
-
-Assign a named ID to an element. Similar to node IDs but for elements.
-
-# Examples
-```julia
-# Industrial ID ranges
-set_element_id!(mesh, UInt32(1), 20_000_001)
-
-# Symbolic names
-set_element_id!(mesh, UInt32(1), :E1)
-```
-"""
-function set_element_id!(mesh::Mesh, internal_index::UInt32, id::Union{Int,Symbol})
-    @assert 1 ≤ internal_index ≤ nelements(mesh) "Element index out of range"
-    mesh.element_ids[id] = internal_index
-    return nothing
-end
-
-"""
-    get_element_by_id(mesh::Mesh, id::Union{Int,Symbol}) -> UInt32
-
-Get internal element index from named ID.
-"""
-function get_element_by_id(mesh::Mesh, id::Union{Int,Symbol})
-    @assert haskey(mesh.element_ids, id) "Element ID $id not found"
-    return mesh.element_ids[id]
-end
-
-# ============================================================================
-# Coloring for Parallel Assembly and Load Balancing
-# ============================================================================
-
-"""
-    set_node_color!(mesh::Mesh, node_index::UInt32, color::UInt32)
-
-Assign a color to a node. Color 0 means uncolored. Used for:
-- Load balancing (assign nodes to MPI ranks)
-- Identifying process ownership in domain decomposition
-
-# Example
-```julia
-# Assign nodes to 4 MPI ranks
-for i in 1:nnodes_total(mesh)
-    rank = mod(i-1, 4) + 1  # Round-robin: 1,2,3,4,1,2,3,4,...
-    set_node_color!(mesh, UInt32(i), UInt32(rank))
-end
-```
-"""
-function set_node_color!(mesh::Mesh, node_index::UInt32, color::UInt32)
-    @assert 1 ≤ node_index ≤ nnodes_total(mesh) "Node index out of range"
-    mesh.node_colors[node_index] = color
-    return nothing
-end
-
-"""
-    get_node_color(mesh::Mesh, node_index::UInt32) -> UInt32
-
-Get the color of a node (0 = uncolored).
-"""
-function get_node_color(mesh::Mesh, node_index::UInt32)
-    @assert 1 ≤ node_index ≤ nnodes_total(mesh) "Node index out of range"
-    return mesh.node_colors[node_index]
-end
-
-"""
-    set_element_color!(mesh::Mesh, elem_index::UInt32, color::UInt32)
-
-Assign a color to an element. Color 0 means uncolored. Used for:
-- Thread-safe assembly (elements with same color can be assembled in parallel)
-- Graph coloring for lock-free nodal assembly
-
-# Example
-```julia
-# After graph coloring algorithm
-for (color, elem_ids) in colored_groups
-    for elem_id in elem_ids
-        set_element_color!(mesh, elem_id, color)
-    end
-end
-```
-"""
-function set_element_color!(mesh::Mesh, elem_index::UInt32, color::UInt32)
-    @assert 1 ≤ elem_index ≤ nelements(mesh) "Element index out of range"
-    mesh.element_colors[elem_index] = color
-    return nothing
-end
-
-"""
-    get_element_color(mesh::Mesh, elem_index::UInt32) -> UInt32
-
-Get the color of an element (0 = uncolored).
-"""
-function get_element_color(mesh::Mesh, elem_index::UInt32)
-    @assert 1 ≤ elem_index ≤ nelements(mesh) "Element index out of range"
-    return mesh.element_colors[elem_index]
-end
-
-"""
-    get_elements_with_color(mesh::Mesh, color::UInt32) -> Vector{UInt32}
-
-Get all elements with a specific color. Useful for parallel assembly loops.
-
-# Example
-```julia
-# Parallel assembly by color
-for color in 1:n_colors
-    elems = get_elements_with_color(mesh, UInt32(color))
-    Threads.@threads for elem_id in elems
-        assemble_element!(K, mesh, elem_id)  # Thread-safe within same color
-    end
-end
-```
-"""
-function get_elements_with_color(mesh::Mesh, color::UInt32)
-    return [UInt32(i) for (i, c) in enumerate(mesh.element_colors) if c == color]
-end
-
-# ============================================================================
-# Ghost Nodes and Elements (MPI Domain Decomposition)
-# ============================================================================
-
-"""
-    mark_ghost_node!(mesh::Mesh, node_index::UInt32)
-
-Mark a node as ghost (owned by another MPI rank). Ghost nodes are needed for
-assembly at partition boundaries but are not part of the local DOF ownership.
-"""
-function mark_ghost_node!(mesh::Mesh, node_index::UInt32)
-    @assert 1 ≤ node_index ≤ nnodes_total(mesh) "Node index out of range"
-    push!(mesh.ghost_nodes, node_index)
-    return nothing
-end
-
-"""
-    is_ghost_node(mesh::Mesh, node_index::UInt32) -> Bool
-
-Check if a node is a ghost node.
-"""
-function is_ghost_node(mesh::Mesh, node_index::UInt32)
-    return node_index in mesh.ghost_nodes
-end
-
-"""
-    mark_ghost_element!(mesh::Mesh, elem_index::UInt32)
-
-Mark an element as ghost (owned by another MPI rank).
-"""
-function mark_ghost_element!(mesh::Mesh, elem_index::UInt32)
-    @assert 1 ≤ elem_index ≤ nelements(mesh) "Element index out of range"
-    push!(mesh.ghost_elements, elem_index)
-    return nothing
-end
-
-"""
-    is_ghost_element(mesh::Mesh, elem_index::UInt32) -> Bool
-
-Check if an element is a ghost element.
-"""
-function is_ghost_element(mesh::Mesh, elem_index::UInt32)
-    return elem_index in mesh.ghost_elements
-end
-
-"""
-    get_local_nodes(mesh::Mesh) -> Vector{UInt32}
-
-Get all non-ghost (locally owned) node indices.
-"""
-function get_local_nodes(mesh::Mesh)
-    return [UInt32(i) for i in 1:nnodes_total(mesh) if !is_ghost_node(mesh, UInt32(i))]
-end
-
-"""
-    get_local_elements(mesh::Mesh) -> Vector{UInt32}
-
-Get all non-ghost (locally owned) element indices.
-"""
-function get_local_elements(mesh::Mesh)
-    return [UInt32(i) for i in 1:nelements(mesh) if !is_ghost_element(mesh, UInt32(i))]
-end
-
-# ============================================================================
-# Node Permutation (Bandwidth Minimization)
-# ============================================================================
-
-"""
-    apply_node_permutation!(mesh::Mesh, permutation::Vector{UInt32})
-
-Apply a node permutation (e.g., from RCM/Cuthill-McKee bandwidth minimization).
-Updates both permutation and inverse permutation. Does NOT reorder actual node
-data (nodes remain in original order, permutation is used during assembly).
-
-# Example
-```julia
-# After computing RCM permutation
-perm = reverse_cuthill_mckee(adjacency_matrix(mesh))
-apply_node_permutation!(mesh, perm)
-
-# Now mesh.node_permutation[i] gives reordered index for node i
-# And mesh.node_inverse_permutation[j] gives original index for reordered position j
-```
-"""
-function apply_node_permutation!(mesh::Mesh, permutation::Vector{UInt32})
-    n = nnodes_total(mesh)
-    @assert length(permutation) == n "Permutation size must match number of nodes"
-    @assert sort(permutation) == collect(UInt32(1):UInt32(n)) "Invalid permutation"
-
-    mesh.node_permutation .= permutation
-
-    # Compute inverse permutation: inv_perm[perm[i]] = i
-    for (i, j) in enumerate(permutation)
-        mesh.node_inverse_permutation[j] = UInt32(i)
-    end
-
-    return nothing
-end
-
-"""
-    apply_element_permutation!(mesh::Mesh, permutation::Vector{UInt32})
-
-Apply an element permutation for cache-optimal memory access patterns.
-"""
-function apply_element_permutation!(mesh::Mesh, permutation::Vector{UInt32})
-    n = nelements(mesh)
-    @assert length(permutation) == n "Permutation size must match number of elements"
-    @assert sort(permutation) == collect(UInt32(1):UInt32(n)) "Invalid permutation"
-
-    mesh.element_permutation .= permutation
-
-    return nothing
-end
-
-"""
-    get_reordered_node_index(mesh::Mesh, original_index::UInt32) -> UInt32
-
-Get the reordered (permuted) index for an original node index.
-"""
-function get_reordered_node_index(mesh::Mesh, original_index::UInt32)
-    @assert 1 ≤ original_index ≤ nnodes_total(mesh) "Node index out of range"
-    return mesh.node_permutation[original_index]
-end
-
-"""
-    get_original_node_index(mesh::Mesh, reordered_index::UInt32) -> UInt32
-
-Get the original index for a reordered (permuted) node index.
-"""
-function get_original_node_index(mesh::Mesh, reordered_index::UInt32)
-    @assert 1 ≤ reordered_index ≤ nnodes_total(mesh) "Node index out of range"
-    return mesh.node_inverse_permutation[reordered_index]
-end
-
+Base.show(io::IO, mesh::Mesh{N,T}) where {N,T<:AbstractTopology{N}} =
+    print(io, "Mesh{$T}($(nnodes_total(mesh)) nodes, $(nelements(mesh)) elements)")
