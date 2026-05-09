@@ -26,18 +26,18 @@ See `src/elements/README.md` for examples.
     offset = 0
     
     for fname in field_names
-        # Get number of DOFs for this field from type
+        # Get number of DOFs for this field from type. `field_tuple_type`
+        # is the per-field spec (`DOF{Quantity, Entity}`); we read the
+        # entity slot directly and the quantity through `quantity_type`.
         field_tuple_type = fieldtype(S, fname)
-        field_type = field_tuple_type.parameters[1]  # Displacement{3}
         entity_type = field_tuple_type.parameters[2]
-        n_entities = (entity_type === Vertex) ? nnodes(K()) : 
+        n_entities = (entity_type === Vertex) ? nnodes(K()) :
                      (entity_type === Edge) ? length(edges(K())) :
                      (entity_type === Face) ? length(faces(K())) :
                      error("Unsupported entity type: $entity_type")
-        
-        # Extract quantity type via trait
-        Q = quantity_type(field_tuple_type)  # Vec{3} or Float64
-        
+
+        Q = quantity_type(field_tuple_type)  # e.g. Vec{3} or Float64
+
         if Q === Float64
             n_dofs = n_entities
         elseif Q isa UnionAll && Q.body <: Tensor && Q.body.parameters[1] == 1
@@ -46,12 +46,12 @@ See `src/elements/README.md` for examples.
         else
             error("Unsupported quantity type: $Q")
         end
-        
-        # Generate tuple for this field using flat dof_indices
+
+        # Generate tuple for this field using flat dof_indices.
         # Access elem.dof_indices[offset+1], elem.dof_indices[offset+2], ...
         dof_vals = [:(u_global[elem.dof_indices[$(offset+i)]]) for i in 1:n_dofs]
         push!(all_field_vals, Expr(:tuple, dof_vals...))
-        
+
         offset += n_dofs
     end
     
@@ -82,15 +82,13 @@ See `src/elements/README.md` for examples.
     
     for fname in field_names
         field_tuple_type = fieldtype(S, fname)
-        field_type = field_tuple_type.parameters[1]  # Displacement{3}
         entity_type = field_tuple_type.parameters[2]
         n_entities = (entity_type === Vertex) ? n_nodes :
                      (entity_type === Edge) ? length(edges(K())) :
                      (entity_type === Face) ? length(faces(K())) :
                      error("Unsupported entity type: $entity_type")
-        
-        # Extract quantity type via trait
-        Q = quantity_type(field_tuple_type)  # Vec{3} or Float64
+
+        Q = quantity_type(field_tuple_type)  # e.g. Vec{3} or Float64
         
         if Q === Float64
             # Scalar field: tuple of scalars from flat dof_indices
