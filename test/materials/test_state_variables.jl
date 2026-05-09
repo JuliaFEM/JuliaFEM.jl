@@ -1,5 +1,5 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 using Test
 using JuliaFEM
@@ -12,6 +12,10 @@ using Tensors
         @test Backstress <: AbstractStateVariable
         @test EquivalentPlasticStrain <: AbstractStateVariable
         @test DamageVariable <: AbstractStateVariable
+        @test DamageEquivalentStrain <: AbstractStateVariable
+        @test Eigenstrain <: AbstractStateVariable
+        @test CreepStrain <: AbstractStateVariable
+        @test ChabocheAlpha{1} <: AbstractStateVariable
     end
 
     @testset "state_variable_type trait" begin
@@ -20,6 +24,10 @@ using Tensors
         @test state_variable_type(Backstress) === SymmetricTensor{2,3,Float64,6}
         @test state_variable_type(EquivalentPlasticStrain) === Float64
         @test state_variable_type(DamageVariable) === Float64
+        @test state_variable_type(DamageEquivalentStrain) === Float64
+        @test state_variable_type(Eigenstrain) === SymmetricTensor{2,3,Float64,6}
+        @test state_variable_type(CreepStrain) === SymmetricTensor{2,3,Float64,6}
+        @test state_variable_type(ChabocheAlpha{1}) === SymmetricTensor{2,3,Float64,6}
     end
 
     @testset "default_symbol trait" begin
@@ -28,6 +36,11 @@ using Tensors
         @test default_symbol(Backstress) === :α
         @test default_symbol(EquivalentPlasticStrain) === :κ
         @test default_symbol(DamageVariable) === :d
+        @test default_symbol(DamageEquivalentStrain) === :κ_d
+        @test default_symbol(Eigenstrain) === :ε_e
+        @test default_symbol(CreepStrain) === :ε_c
+        @test default_symbol(ChabocheAlpha{1}) === :α1
+        @test default_symbol(ChabocheAlpha{2}) === :α2
     end
 
     @testset "Concrete type instantiation" begin
@@ -75,7 +88,16 @@ using Tensors
 
     @testset "Trait consistency" begin
         # Verify that all state variables have both traits defined
-        state_vars = [PlasticStrain, Backstress, EquivalentPlasticStrain, DamageVariable]
+        state_vars = [
+            PlasticStrain,
+            Backstress,
+            EquivalentPlasticStrain,
+            DamageVariable,
+            DamageEquivalentStrain,
+            Eigenstrain,
+            CreepStrain,
+            ChabocheAlpha{1},
+        ]
 
         for var in state_vars
             # Should not throw
