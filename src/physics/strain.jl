@@ -25,6 +25,9 @@ Extract strain tensor from displacement gradient.
 # Returns
 - `ε`: Strain tensor (symmetric)
 
+See also [`compute_strain`](@ref), which first assembles `∇u` from nodal
+values and physical basis derivatives.
+
 # Examples
 ```julia
 ∇u = Tensor{2,3}((1.0, 0.1, 0.0, 0.1, 1.0, 0.0, 0.0, 0.0, 1.0))
