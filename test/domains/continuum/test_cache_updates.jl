@@ -1,5 +1,7 @@
 # Test cache update functions (Phases 1a, 1b, 2)
 
+using BenchmarkTools
+
 @testset "Cache Updates" begin
     kernel = create_test_kernel()
     mesh = create_test_mesh()
@@ -12,16 +14,16 @@
     element_cache = JuliaFEM.create_element_cache(mesh, kernel)
     material_cache = JuliaFEM.create_material_cache(kernel.material, NIP)
 
-    # Test data
-    elem_id = 1
     # u_global as Vec{3} for each node (or nothing for zero displacement)
+    elem_id = 1
     u_global = nothing
-    state_old = create_material_state(kernel, mesh)
     Δt = 0.01
+    global_cache = JuliaFEM.create_global_material_cache(kernel.material;
+                                                        n_ips=NIP, n_elems=1)
 
     @testset "Phase 1a: update_geometry_cache!" begin
         # Update geometry cache
-        JuliaFEM.update_geometry_cache!(geometry_cache, element_cache, kernel, elem_id, mesh)
+        JuliaFEM.update_geometry_cache!(geometry_cache, element_cache, elem_id, mesh)
 
         # Verify X coordinates are extracted correctly
         X_expected = mesh.nodes[1:8]
@@ -44,8 +46,8 @@
         @test all_detJ_positive
 
         # Test zero allocations (warm-up first)
-        JuliaFEM.update_geometry_cache!(geometry_cache, element_cache, kernel, elem_id, mesh)
-        allocs = @allocated JuliaFEM.update_geometry_cache!(geometry_cache, element_cache, kernel, elem_id, mesh)
+        JuliaFEM.update_geometry_cache!(geometry_cache, element_cache, elem_id, mesh)
+        allocs = @allocated JuliaFEM.update_geometry_cache!(geometry_cache, element_cache, elem_id, mesh)
         @test allocs == 0
     end
 
@@ -66,55 +68,12 @@
         @test allocs == 0
     end
 
-    @testset "Phase 2: update_material_cache! (Legacy API)" begin
-        # Ensure geometry and element caches are updated first
-        JuliaFEM.update_geometry_cache!(geometry_cache, element_cache, kernel, elem_id, mesh)
-        JuliaFEM.update_element_cache!(element_cache, kernel, elem_id, mesh, u_global)
-
-        # Update material cache
-        JuliaFEM.update_material_cache!(material_cache, geometry_cache, kernel.material,
-            element_cache, state_old, elem_id, Δt)
-
-        # Verify material state computed at each integration point (check all in one test)
-        # For stateless materials, stress/tangent are in σ and 𝔻 arrays, NOT in states
-        all_stress_zero = true
-        all_tangent_correct = true
-        for ip in 1:NIP
-            # For zero displacement, stress should be zero
-            σ = JuliaFEM.get_stress(material_cache, ip)
-            if !all(x -> abs(x) < 1e-10, σ)
-                all_stress_zero = false
-            end
-
-            # Material tangent should be elasticity tensor
-            C = JuliaFEM.get_tangent(material_cache, ip)
-            if !(C isa SymmetricTensor{4,3,Float64})
-                all_tangent_correct = false
-            end
-        end
-        @test all_stress_zero
-        @test all_tangent_correct
-
-        # Test zero allocations (warm-up first)
-        JuliaFEM.update_material_cache!(material_cache, geometry_cache, kernel.material,
-            element_cache, state_old, elem_id, Δt)
-        allocs = @allocated JuliaFEM.update_material_cache!(material_cache, geometry_cache,
-            kernel.material, element_cache,
-            state_old, elem_id, Δt)
-        # Note: update_material_cache! may have some overhead from NamedTuple field access
-        # The hot path uses vector extraction (get_tangent_vector) which is optimized
-        @test allocs >= 0  # Just verify it doesn't crash
-    end
-
     @testset "Phase 2: update_material_cache! (GlobalMaterialCache API - Zero Allocation)" begin
-        # Create GlobalMaterialCache for new API
-        global_cache = JuliaFEM.create_global_material_cache(kernel.material, n_ips=NIP, n_elems=1)
-        
         # Ensure geometry and element caches are updated first
-        JuliaFEM.update_geometry_cache!(geometry_cache, element_cache, kernel, elem_id, mesh)
+        JuliaFEM.update_geometry_cache!(geometry_cache, element_cache, elem_id, mesh)
         JuliaFEM.update_element_cache!(element_cache, kernel, elem_id, mesh, u_global)
 
-        # Update material cache using new API
+        # Update material cache using GlobalMaterialCache
         JuliaFEM.update_material_cache!(material_cache, geometry_cache, kernel.material,
             element_cache, global_cache, elem_id, Δt)
 
@@ -143,8 +102,6 @@
                 element_cache, global_cache, elem_id, Δt)
         end
         
-        # Use BenchmarkTools for accurate measurement
-        using BenchmarkTools
         result = @benchmark JuliaFEM.update_material_cache!(
             $material_cache, $geometry_cache, $(kernel.material),
             $element_cache, $global_cache, 1, 0.01
