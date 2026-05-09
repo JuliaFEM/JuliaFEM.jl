@@ -26,7 +26,7 @@ end
 Read Gmsh mesh file (ASCII format 4.1)
 """
 function read_gmsh_mesh(filename::String)
-    println("Reading Gmsh mesh: $filename")
+    @info "Reading Gmsh mesh" filename
 
     # Storage
     nodes = Dict{Int,Vector{Float64}}()
@@ -143,9 +143,7 @@ function read_gmsh_mesh(filename::String)
 
     mesh = GmshMesh(node_matrix, elem_matrix, groups)
 
-    println("  Nodes:    $(size(node_matrix, 2))")
-    println("  Elements: $(size(elem_matrix, 2))")
-    println("  Physical groups: $(keys(groups))")
+    @info "Gmsh mesh loaded" nodes = size(node_matrix, 2) elements = size(elem_matrix, 2) physical_groups = collect(keys(groups))
 
     return mesh
 end
