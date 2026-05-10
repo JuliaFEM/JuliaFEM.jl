@@ -1,5 +1,5 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 """
     create_structured_box_mesh(::Type{Hex8}; 
@@ -319,4 +319,200 @@ function create_thin_plate_mesh(
         xmin=0.0, xmax=length, nx=nx,
         ymin=0.0, ymax=width, ny=ny,
         zmin=0.0, zmax=thickness, nz=nz)
+end
+
+"""
+    create_structured_line_mesh(::Type{Seg2};
+        x0::Float64=0.0, x1::Float64=1.0, nx::Int=1,
+        y::Float64=0.0, z::Float64=0.0) -> Mesh{Seg2}
+
+Structured 1D mesh of `Seg2` elements embedded in 3D space along **x**
+(from `x0` to `x1` with `nx` elements). Nodes use `Vec{3,Float64}` with
+constant `y` and `z` (defaults 0), matching the rest of the mesh stack.
+
+# Node sets
+- `:all`, `:xmin` (first node), `:xmax` (last node)
+"""
+function create_structured_line_mesh(
+    ::Type{Seg2};
+    x0::Float64=0.0,
+    x1::Float64=1.0,
+    nx::Int=1,
+    y::Float64=0.0,
+    z::Float64=0.0,
+)
+    @assert nx ≥ 1 "nx must be ≥ 1"
+    @assert x1 > x0 "x1 must be > x0"
+
+    xs = range(x0, x1, length=nx + 1)
+    nodes = Vec{3,Float64}[Vec(x, y, z) for x in xs]
+
+    connectivity = NTuple{2,UInt32}[]
+    for i in 1:nx
+        push!(connectivity, (UInt32(i), UInt32(i + 1)))
+    end
+
+    element_sets = Dict{Symbol,Set{UInt32}}(:all => Set(UInt32(1):UInt32(nx)))
+    node_sets = Dict{Symbol,Set{UInt32}}(
+        :all => Set(UInt32(1):UInt32(length(nodes))),
+        :xmin => Set((UInt32(1),)),
+        :xmax => Set((UInt32(length(nodes)),)),
+    )
+
+    return Mesh{Seg2}(nodes, connectivity; element_sets=element_sets, node_sets=node_sets)
+end
+
+"""
+    create_structured_box_mesh(::Type{Quad4};
+        xmin=0.0, xmax=1.0, nx::Int=1,
+        ymin=0.0, ymax=1.0, ny::Int=1,
+        z::Float64=0.0) -> Mesh{Quad4}
+
+Structured tensor-product mesh of bilinear quads in the **xy** plane at
+fixed `z` (default 0). Connectivity matches the `Hex8` bottom-face winding
+(`Quad4` reference order).
+
+# Node sets
+- `:all`, `:xmin`, `:xmax`, `:ymin`, `:ymax` (same naming as structured bricks;
+  no `z` faces for a single-layer 2D mesh)
+"""
+function create_structured_box_mesh(
+    ::Type{Quad4};
+    xmin::Float64=0.0,
+    xmax::Float64=1.0,
+    nx::Int=1,
+    ymin::Float64=0.0,
+    ymax::Float64=1.0,
+    ny::Int=1,
+    z::Float64=0.0,
+)
+    @assert nx ≥ 1 && ny ≥ 1 "nx and ny must be ≥ 1"
+    @assert xmax > xmin && ymax > ymin "box bounds must be increasing"
+
+    xs = range(xmin, xmax, length=nx + 1)
+    ys = range(ymin, ymax, length=ny + 1)
+
+    nodes = Vec{3,Float64}[]
+    for j in 1:(ny + 1)
+        for i in 1:(nx + 1)
+            push!(nodes, Vec(xs[i], ys[j], z))
+        end
+    end
+
+    node_index(i::Int, j::Int) = UInt32((j - 1) * (nx + 1) + i)
+
+    connectivity = NTuple{4,UInt32}[]
+    for j in 1:ny, i in 1:nx
+        n1 = node_index(i, j)
+        n2 = node_index(i + 1, j)
+        n3 = node_index(i + 1, j + 1)
+        n4 = node_index(i, j + 1)
+        push!(connectivity, (n1, n2, n3, n4))
+    end
+
+    element_sets = Dict{Symbol,Set{UInt32}}(:all => Set(UInt32(1):UInt32(length(connectivity))))
+
+    node_sets = Dict{Symbol,Set{UInt32}}()
+    node_sets[:all] = Set(UInt32(1):UInt32(length(nodes)))
+
+    xmin_nodes = Set{UInt32}()
+    xmax_nodes = Set{UInt32}()
+    for j in 1:(ny + 1)
+        push!(xmin_nodes, node_index(1, j))
+        push!(xmax_nodes, node_index(nx + 1, j))
+    end
+    node_sets[:xmin] = xmin_nodes
+    node_sets[:xmax] = xmax_nodes
+
+    ymin_nodes = Set{UInt32}()
+    ymax_nodes = Set{UInt32}()
+    for i in 1:(nx + 1)
+        push!(ymin_nodes, node_index(i, 1))
+        push!(ymax_nodes, node_index(i, ny + 1))
+    end
+    node_sets[:ymin] = ymin_nodes
+    node_sets[:ymax] = ymax_nodes
+
+    return Mesh{Quad4}(nodes, connectivity; element_sets=element_sets, node_sets=node_sets)
+end
+
+"""
+    create_cook_membrane_mesh(::Type{Quad4}, nx::Int, ny::Int; scale::Float64=1e-3) -> Mesh{Quad4}
+
+Structured `nx × ny` bilinear `Quad4` mesh on **Cook's membrane** reference geometry
+(classical skew panel benchmark).
+
+The physical domain is the convex quadrilateral with corners (millimetres before scaling):
+(0, 0), (48, 44), (48, 60), (0, 44).
+
+Mapped from the parametric unit square `[0, 1]²` with the same bilinear map as a single
+`Quad4` element: corners SW, SE, NE, NW at `(ξ, η) ∈ {(0,0), (1,0), (1,1), (0,1)}`.
+Coordinates are multiplied by `scale` (default `1e-3`, i.e. millimetres to metres).
+
+# Node sets
+
+Same labels as `create_structured_box_mesh(Quad4; xmin=0, xmax=1, ymin=0, ymax=1, …)`:
+`:xmin` is the clamped Cook **left** edge, `:xmax` the **right** edge (typical traction side),
+plus `:ymin`, `:ymax`, `:all`.
+
+# References
+
+Cook, R. D., *Improved Two-Dimensional Finite Element*, Journal of Applied Mechanics
+**40** (1973). The geometry and skew bending/shear mode are widely reproduced in FE
+textbooks and software validation suites.
+"""
+function create_cook_membrane_mesh(::Type{Quad4}, nx::Int, ny::Int; scale::Float64=1e-3)
+    @assert nx ≥ 1 && ny ≥ 1 "nx and ny must be ≥ 1"
+
+    function _cook_xy_mm(ξ::Float64, η::Float64)
+        x = 48.0 * ξ
+        y = ξ * (1.0 - η) * 44.0 + ξ * η * 60.0 + (1.0 - ξ) * η * 44.0
+        return scale * x, scale * y
+    end
+
+    nodes = Vec{3,Float64}[]
+    for j in 1:(ny + 1)
+        for i in 1:(nx + 1)
+            ξ = (i - 1) / nx
+            η = (j - 1) / ny
+            x, y = _cook_xy_mm(ξ, η)
+            push!(nodes, Vec(x, y, 0.0))
+        end
+    end
+
+    node_index(i::Int, j::Int) = UInt32((j - 1) * (nx + 1) + i)
+
+    connectivity = NTuple{4,UInt32}[]
+    for j in 1:ny, i in 1:nx
+        n1 = node_index(i, j)
+        n2 = node_index(i + 1, j)
+        n3 = node_index(i + 1, j + 1)
+        n4 = node_index(i, j + 1)
+        push!(connectivity, (n1, n2, n3, n4))
+    end
+
+    element_sets = Dict{Symbol,Set{UInt32}}(:all => Set(UInt32(1):UInt32(length(connectivity))))
+
+    node_sets = Dict{Symbol,Set{UInt32}}()
+    node_sets[:all] = Set(UInt32(1):UInt32(length(nodes)))
+
+    xmin_nodes = Set{UInt32}()
+    xmax_nodes = Set{UInt32}()
+    for j in 1:(ny + 1)
+        push!(xmin_nodes, node_index(1, j))
+        push!(xmax_nodes, node_index(nx + 1, j))
+    end
+    node_sets[:xmin] = xmin_nodes
+    node_sets[:xmax] = xmax_nodes
+
+    ymin_nodes = Set{UInt32}()
+    ymax_nodes = Set{UInt32}()
+    for i in 1:(nx + 1)
+        push!(ymin_nodes, node_index(i, 1))
+        push!(ymax_nodes, node_index(i, ny + 1))
+    end
+    node_sets[:ymin] = ymin_nodes
+    node_sets[:ymax] = ymax_nodes
+
+    return Mesh{Quad4}(nodes, connectivity; element_sets=element_sets, node_sets=node_sets)
 end

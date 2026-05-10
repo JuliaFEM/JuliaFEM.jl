@@ -311,7 +311,7 @@ surface_topology(::Type{Hexahedron{20}})    = Quadrilateral{8}
 surface_topology(::Type{Hexahedron{27}})    = Quadrilateral{9}
 
 """
-    extract_surface(mesh::Mesh{N,T}, face_set::Symbol) -> Mesh{Nface,FaceT}
+    extract_surface(mesh::Mesh{N,T}, face_set::Symbol, local_face::Int=1) -> Mesh{Nface,FaceT}
 
 Extract a surface mesh from volume elements. The boundary-face topology
 is looked up via [`surface_topology`](@ref), which currently supports
@@ -319,21 +319,24 @@ is looked up via [`surface_topology`](@ref), which currently supports
 
 # Arguments
 - `mesh::Mesh{N,T}`: Volume mesh.
-- `face_set::Symbol`: Element set whose elements should contribute their
-  boundary face. The set must already exist in `mesh.element_sets`.
+- `face_set::Symbol`: Element set whose elements should contribute a face
+  (one surface element per volume element in the set).
+- `local_face::Int`: Which volume-local face to use, `1 … nfaces(T)` in the
+  order returned by `faces(T())` (e.g. `1` is the first `Face` for `Hex8`,
+  typically the ``z = z_{\\min}`` bilinear face in structured meshes).
 
 # Returns
 - `Mesh{Nface,FaceT}` whose nodes alias the volume mesh's node array.
 
-# Limitations
-The current implementation takes the first `nnodes(FaceT)` connectivity
-entries of each volume element as a face. This is correct only when the
-caller has already arranged volume elements so that the first
-`nnodes(FaceT)` nodes form the boundary face (e.g. extruded prism layers).
-Topology-aware face extraction using the per-volume face tables remains a
-known TODO; see the corresponding session log.
+When the face table lists exactly `nnodes(surface_topology(T))` volume-local
+vertices (true for `Tet4` / `Hex8`), connectivity is built from those indices
+(topology-aware). For higher-order volumes whose face description lists only
+corners while the surface topology needs more nodes (e.g. `Hex20` with
+`Quad8`), the implementation falls back to taking the first `nnodes(FaceT)`
+entries of the volume connectivity (legacy behaviour; may not match a true
+quadratic face).
 """
-function extract_surface(mesh::Mesh{N,T}, face_set::Symbol) where {N,T<:AbstractTopology{N}}
+function extract_surface(mesh::Mesh{N,T}, face_set::Symbol, local_face::Int=1) where {N,T<:AbstractTopology{N}}
     if !hasmethod(surface_topology, Tuple{Type{T}})
         error("extract_surface: no surface_topology trait defined for $T. " *
               "Supported volume topologies: Tetrahedron{4|10}, Hexahedron{8|20|27}.")
@@ -344,13 +347,22 @@ function extract_surface(mesh::Mesh{N,T}, face_set::Symbol) where {N,T<:Abstract
     @assert haskey(mesh.element_sets, face_set) "Element set $face_set not found"
     face_elements = mesh.element_sets[face_set]
 
-    # Extract surface connectivity. NOTE: this assumes the first
-    # `n_face_nodes` entries of each volume element form a face. See the
-    # function docstring; topology-aware extraction is on the backlog.
+    vol_faces = faces(T())
+    nf = length(vol_faces)
+    if !(1 ≤ local_face ≤ nf)
+        error("extract_surface: local_face must be in 1:$nf for topology $T, got $local_face")
+    end
+    loc = vol_faces[local_face].vertices
+    use_topology = length(loc) == n_face_nodes
+
     surface_conn = NTuple{n_face_nodes,UInt32}[]
     for elem_id in face_elements
         elem_conn = mesh.connectivity[elem_id]
-        face_conn = ntuple(i -> elem_conn[i], n_face_nodes)
+        if use_topology
+            face_conn = ntuple(j -> elem_conn[Int(loc[j])]::UInt32, n_face_nodes)
+        else
+            face_conn = ntuple(i -> elem_conn[i], n_face_nodes)
+        end
         push!(surface_conn, face_conn)
     end
 

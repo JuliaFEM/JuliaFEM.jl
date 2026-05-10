@@ -12,10 +12,11 @@ optimisations used by the rest of the package.
   type, constructors with validation, the inverse connectivity
   (`node -> elements`) needed by node-based assembly, helpers for sets
   and surface extraction.
-- `structured.jl`     — `create_structured_box_mesh`,
-  `create_unit_cube_mesh`, `create_cantilever_mesh`,
-  `create_thin_plate_mesh`. Boundary node sets are populated
-  automatically (`:xmin`, `:xmax`, …).
+- `structured.jl`     — `create_structured_box_mesh` (`Hex8` or `Quad4`),
+  `create_structured_line_mesh` (`Seg2`), `create_unit_cube_mesh`,
+  `create_cook_membrane_mesh` (`Quad4`, Cook skew panel),
+  `create_cantilever_mesh`, `create_thin_plate_mesh`. Boundary node sets are
+  populated automatically (`:xmin`, `:xmax`, …).
 - `refine.jl`         — `LongestEdgeBisection` and the `refine` entry
   point. Used for h-convergence studies.
 
@@ -66,9 +67,10 @@ longest edge of each element, doubling the element count per level.
 
 ## I/O
 
-Mesh import lives in `src/io/` (currently the self-contained Gmsh
-reader). VTK / XDMF output is not implemented in the new path; the
-legacy results writers under `src/legacy/` cover existing tests.
+Mesh import from external tools (Gmsh, Netgen, Abaqus, …) is **not** part of
+the core load path; use optional extensions or companion packages that build
+`Mesh{…}` (see `src/io/README.md`). VTK / XDMF output is not implemented in the
+new path; legacy results writers under `src/legacy/` cover older tests.
 
 ## Related code
 
