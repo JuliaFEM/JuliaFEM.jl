@@ -69,8 +69,11 @@ longest edge of each element, doubling the element count per level.
 
 Mesh import from external tools (Gmsh, Netgen, Abaqus, …) is **not** part of
 the core load path; use optional extensions or companion packages that build
-`Mesh{…}` (see `src/io/README.md`). VTK / XDMF output is not implemented in the
-new path; legacy results writers under `src/legacy/` cover older tests.
+`Mesh{…}` (see `src/io/README.md`). For **Gmsh**, load `Gmsh.jl` after JuliaFEM
+so `JuliaFEMGmshExt` activates, then call [`read_gmsh_msh`](@ref) or
+[`mesh_from_current_gmsh_model`](@ref) (`src/mesh/gmsh_stub.jl`). VTK / XDMF
+output is not implemented in the new path; legacy results writers under
+`src/legacy/` cover older tests.
 
 ## Related code
 
