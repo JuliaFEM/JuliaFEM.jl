@@ -1,5 +1,5 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 """
 Neumann (load) boundary conditions for the DOF-based assembler.
@@ -7,6 +7,8 @@ Neumann (load) boundary conditions for the DOF-based assembler.
 Counterpart of `dirichlet.jl` for the right-hand-side: declarative
 load types that accumulate into `f` (or any user-provided vector) via a
 single `apply_load!(f, load, cache, asm, kernel, mesh)` entry point.
+The `kernel` argument selects the integration path via method dispatch; it
+should describe the same volume physics as `cache.kernel_column` for the model.
 Each concrete subtype implements the integration appropriate to it,
 reusing the SoA `N_data` / `detJ_w` batches the DOF-based assembler
 already builds in `_prepare_caches!`.
@@ -24,12 +26,20 @@ Load types provided include:
     scalar-valued for heat (`Float64` heat source per unit volume).
 
   * `SurfaceLoad(faces, traction)` — distributed traction (or heat
-    flux) over a list of mesh faces. Computes
-    `f[i, α] += ∫_Γ N_i · t_α dS` per face using a face-element
-    Gauss quadrature. Vector-valued for elasticity, scalar-valued
-    for heat. The natural complement of `UniformBodyForce`: body
-    force lives in the volume integral, surface traction lives in
-    the surface integral.
+    flux) over a list of mesh faces (quads, triangles, or **segments**
+    with `NN = 2`). Computes `f[i, α] += ∫_Γ N_i · t_α dS` (or
+    `∫ N_i · t ds` on segments) per face using face Gauss rules.
+    Vector-valued for elasticity, scalar-valued for heat. The natural
+    complement of `UniformBodyForce`: body force lives in the volume
+    integral, surface traction lives in the surface integral. Entries
+    scatter into **field 1** DOFs via `dof_handler.field_starts[1]`
+    (same as `cache.field_starts1`).
+
+  * [`SurfaceScalarFluxOnField`](@ref) — same scalar face quadrature as
+    `SurfaceLoad` with `Float64` (or `Vector{Float64}`) flux, but targets an
+    arbitrary **vertex field index** (`dof_handler.field_starts[field_index]`).
+    Use for thermal or fluid Neumann data on multi-field handlers (e.g.
+    [`ThermoPoroelasticKernel`](@ref) with `u` / `T` / `p`).
 
   * [`UniformMixedDarcySource`](@ref) — adds ``f \\cdot |K_e|`` to each cell
     pressure DOF for mixed RT₀–P₀ Darcy (second equation); works with
@@ -104,6 +114,7 @@ signature for API symmetry with body / surface loads).
                              asm::DOFBasedCOOAssembler,
                              kernel::AbstractKernel,
                              mesh::AbstractMesh)
+    _depwarn_redundant_kernel_arg!(:apply_load!)
     @inbounds for k in eachindex(load.dofs)
         f[load.dofs[k]] += load.values[k]
     end
@@ -154,11 +165,12 @@ type-stable and allocation-free after warmup.
 """
 function apply_load!(f::AbstractVector{Float64},
                      load::UniformBodyForce,
-                     cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType},
+                     cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
                      asm::DOFBasedCOOAssembler,
                      kernel::AbstractKernel,
                      mesh::AbstractMesh) where {T,B,IPS,E<:AbstractElement,
-                                                GC,Buf,FieldType,StateType}
+                                                GC,Buf,FieldType,StateType,KS}
+    _depwarn_redundant_kernel_arg!(:apply_load!)
     @assert length(f) == cache.ndofs (
         "apply_load!: f has length $(length(f)); expected $(cache.ndofs)")
 
@@ -166,7 +178,7 @@ function apply_load!(f::AbstractVector{Float64},
     # `assemble_M!` so the geometry / N_data / detJ_w are populated
     # exactly the same way. Cheap to call repeatedly because Pass 1
     # is a fixed-cost sweep over the elements.
-    _prepare_caches!(cache, kernel, mesh)
+    _prepare_caches!(cache, mesh)
 
     elements         = cache.elements
     element_caches   = cache.element_caches
@@ -241,15 +253,15 @@ end
 function apply_load!(
     fvec::AbstractVector{Float64},
     load::UniformMixedDarcySource,
-    cache::DOFBasedCOOCache{T, B, IPS, E, GC, Buf, FT, ST},
+    cache::DOFBasedCOOCache{T, B, IPS, E, GC, Buf, FT, ST, KS},
     asm::DOFBasedCOOAssembler,
     kernel::AbstractDarcyMixedRT0P0Kernel,
     mesh::AbstractMesh,
-) where {T, B, IPS, E <: AbstractElement, GC, Buf, FT, ST}
+) where {T, B, IPS, E <: AbstractElement, GC, Buf, FT, ST, KS}
     @assert length(fvec) == cache.ndofs (
         "apply_load!: f has length $(length(fvec)); expected $(cache.ndofs)")
 
-    _prepare_caches!(cache, kernel, mesh)
+    _prepare_caches!(cache, mesh)
 
     layout = local_dof_layout(E)
     p_li = 0
@@ -312,15 +324,15 @@ end
 function apply_load!(
     fvec::AbstractVector{Float64},
     load::MixedDarcyTet4BoundaryNormalFluxLoad,
-    cache::DOFBasedCOOCache{T, B, IPS, E, GC, Buf, FT, ST},
+    cache::DOFBasedCOOCache{T, B, IPS, E, GC, Buf, FT, ST, KS},
     asm::DOFBasedCOOAssembler,
     kernel::DarcyMixedRT0P0Kernel,
     mesh::Mesh{4, Tet4},
-) where {T, B, IPS, E <: AbstractElement, GC, Buf, FT, ST}
+) where {T, B, IPS, E <: AbstractElement, GC, Buf, FT, ST, KS}
     @assert length(fvec) == cache.ndofs (
         "apply_load!: f has length $(length(fvec)); expected $(cache.ndofs)")
 
-    _prepare_caches!(cache, kernel, mesh)
+    _prepare_caches!(cache, mesh)
 
     layout = local_dof_layout(E)
     element_caches = cache.element_caches
@@ -390,7 +402,10 @@ traction lives in the surface integral.
 - `faces::Vector{NTuple{NN,Int}}` — each face is the tuple of *global*
   mesh-node IDs of its corners. `NN = 4` for a quadrilateral face
   (e.g. one face of a Hex8 element); `NN = 3` for a triangular face
-  (one face of a Tet4) — both are supported.
+  (one face of a Tet4); `NN = 2` for a straight **segment** (two distinct
+  corners, order along the edge). For `NN == 2`, vector `traction` is a
+  **line load density** `[N/m]` (scalar flux `[W/m]` or `[m²/s]` analogue);
+  the weak form is `∫_Γ N_i · τ ds` with `ds` the physical arc length.
 
 - `traction` — one of
     * `Vec{3,Float64}` — uniform vector traction on every face (3D
@@ -408,6 +423,8 @@ traction lives in the surface integral.
 * Triangular face (`NN == 3`) → 1-point centroid (exact for linear
   basis with constant traction; bumped to 3-point if needed by a
   later non-flat / higher-order extension).
+* Segment (`NN == 2`) → 2-point Gauss on `[-1, 1]` (exact for linear
+  `N` with constant line load).
 
 # Surface Jacobian
 
@@ -445,11 +462,63 @@ struct SurfaceLoad{NN, V} <: AbstractNeumannLoad
                 "SurfaceLoad: per-face traction has $(length(traction)) entries " *
                 "but $(length(faces)) faces were given")
         end
-        if !(NN == 3 || NN == 4)
-            error("SurfaceLoad: only NN=3 (triangular) and NN=4 (quadrilateral) " *
-                  "faces are supported (got NN=$NN).")
+        if !(NN == 2 || NN == 3 || NN == 4)
+            error(
+                "SurfaceLoad: only NN=2 (segment), NN=3 (triangular), and NN=4 " *
+                "(quadrilateral) faces are supported (got NN=$NN).",
+            )
         end
         return new{NN, V}(faces, traction)
+    end
+end
+
+"""
+    SurfaceScalarFluxOnField(faces, traction, field_index)
+
+Scalar surface flux / traction with the same face quadrature as
+[`SurfaceLoad`](@ref) for `Float64` or `Vector{Float64}` `traction`, but the
+contribution is assembled into `dof_handler.field_starts[field_index]`
+(vertex field), not field `1`.
+
+`field_index` must satisfy `1 ≤ field_index ≤ length(dof_handler.field_starts)`.
+For a typical [`ThermoPoroelasticKernel`](@ref) `DOFSet` ordered `u`, `T`, `p`,
+use `2` for temperature Neumann flux and `3` for prescribed normal Darcy flux
+on pore pressure (same units as a scalar `SurfaceLoad` on a single-field mesh).
+
+Allocation-free after warmup (same `_integrate_face!` path as `SurfaceLoad`).
+"""
+struct SurfaceScalarFluxOnField{NN,V} <: AbstractNeumannLoad
+    faces::Vector{NTuple{NN,Int}}
+    traction::V
+    field_index::Int
+
+    function SurfaceScalarFluxOnField(
+        faces::Vector{NTuple{NN,Int}},
+        traction::V,
+        field_index::Int,
+    ) where {NN,V}
+        field_index ≥ 1 || throw(
+            ArgumentError("SurfaceScalarFluxOnField: field_index must be ≥ 1 (got $field_index)"),
+        )
+        if traction isa Vector{Float64}
+            @assert length(traction) == length(faces) (
+                "SurfaceScalarFluxOnField: per-face traction has $(length(traction)) entries " *
+                "but $(length(faces)) faces were given",
+            )
+        elseif traction isa Vector{<:Vec{3,Float64}}
+            throw(
+                ArgumentError(
+                    "SurfaceScalarFluxOnField: use SurfaceLoad for vector traction on field 1",
+                ),
+            )
+        end
+        if !(NN == 2 || NN == 3 || NN == 4)
+            error(
+                "SurfaceScalarFluxOnField: only NN=2 (segment), NN=3 (triangular), " *
+                "and NN=4 (quadrilateral) faces are supported (got NN=$NN).",
+            )
+        end
+        return new{NN,V}(faces, traction, field_index)
     end
 end
 
@@ -469,35 +538,8 @@ end
 @inline _t_comp_count(::Vec{3,Float64}) = 3
 @inline _t_comp_count(::Float64)        = 1
 
-# ----- face geometry helpers ------------------------------------------------
-
-# Quad4 reference basis at (ξ, η) ∈ [-1, 1]² and its derivatives.
-@inline function _quad4_basis(ξ::Float64, η::Float64)
-    n1 = 0.25 * (1 - ξ) * (1 - η)
-    n2 = 0.25 * (1 + ξ) * (1 - η)
-    n3 = 0.25 * (1 + ξ) * (1 + η)
-    n4 = 0.25 * (1 - ξ) * (1 + η)
-    return (n1, n2, n3, n4)
-end
-
-@inline function _quad4_basis_derivs(ξ::Float64, η::Float64)
-    # ∂N/∂ξ
-    dξ = (-0.25 * (1 - η),  0.25 * (1 - η),  0.25 * (1 + η), -0.25 * (1 + η))
-    # ∂N/∂η
-    dη = (-0.25 * (1 - ξ), -0.25 * (1 + ξ),  0.25 * (1 + ξ),  0.25 * (1 - ξ))
-    return dξ, dη
-end
-
-# Tri3 reference basis at barycentric (L1, L2) on the unit triangle
-# ξ ∈ [0,1], η ∈ [0,1-ξ].
-@inline _tri3_basis(ξ::Float64, η::Float64) = (1.0 - ξ - η, ξ, η)
-@inline _tri3_basis_derivs(::Float64, ::Float64) = ((-1.0, 1.0, 0.0), (-1.0, 0.0, 1.0))
-
-# 2 × 2 Gauss for quad: 4 points, weight 1 each.
-const _GAUSS_2X2 = ((-1.0/√3, -1.0/√3, 1.0),
-                    ( 1.0/√3, -1.0/√3, 1.0),
-                    ( 1.0/√3,  1.0/√3, 1.0),
-                    (-1.0/√3,  1.0/√3, 1.0))
+# Face geometry: use [`get_basis_functions`](@ref) / [`get_basis_derivatives`](@ref)
+# on `Quad4`, `Tri3`, `Seg2` with [`Lagrange{1}`](@ref) (see `basis/basis_generated.jl`).
 
 # ----------------------------------------------------------------------------
 # MixedDarcyHex8BoundaryNormalFluxLoad — ∫ g φ·n dS on RT₀ flux test functions (Hex8)
@@ -507,7 +549,7 @@ const _GAUSS_2X2 = ((-1.0/√3, -1.0/√3, 1.0),
     fc = faces(Hex8())[lf]
     vs = fc.vertices
     ref_c = reference_coordinates(Hex8())
-    N = _quad4_basis(ξf, ηf)
+    N = get_basis_functions(Quad4(), Lagrange{1}(), Vec{2}((ξf, ηf)))
     @inbounds return N[1] * ref_c[vs[1]] +
         N[2] * ref_c[vs[2]] +
         N[3] * ref_c[vs[3]] +
@@ -539,15 +581,15 @@ end
 function apply_load!(
     fvec::AbstractVector{Float64},
     load::MixedDarcyHex8BoundaryNormalFluxLoad,
-    cache::DOFBasedCOOCache{T, B, IPS, E, GC, Buf, FT, ST},
+    cache::DOFBasedCOOCache{T, B, IPS, E, GC, Buf, FT, ST, KS},
     asm::DOFBasedCOOAssembler,
     kernel::DarcyMixedHex8RT0P0Kernel,
     mesh::Mesh{8, Hex8},
-) where {T, B, IPS, E <: AbstractElement, GC, Buf, FT, ST}
+) where {T, B, IPS, E <: AbstractElement, GC, Buf, FT, ST, KS}
     @assert length(fvec) == cache.ndofs (
         "apply_load!: f has length $(length(fvec)); expected $(cache.ndofs)")
 
-    _prepare_caches!(cache, kernel, mesh)
+    _prepare_caches!(cache, mesh)
 
     layout = local_dof_layout(E)
     element_caches = cache.element_caches
@@ -573,7 +615,7 @@ function apply_load!(
 
         orient = Float64(hex8_face_outward_sign(X, lf))
 
-        @inbounds for gpt in _GAUSS_2X2
+        @inbounds for gpt in REF_GAUSS_QUAD_2X2
             ξf = gpt[1]
             ηf = gpt[2]
             wf = gpt[3]
@@ -586,9 +628,9 @@ function apply_load!(
             detJ = det(J)
             detJ == 0.0 && continue
 
-            dξq, dηq = _quad4_basis_derivs(ξf, ηf)
-            tξ = dξq[1] * p1 + dξq[2] * p2 + dξq[3] * p3 + dξq[4] * p4
-            tη = dηq[1] * p1 + dηq[2] * p2 + dηq[3] * p3 + dηq[4] * p4
+            dN_face = get_basis_derivatives(Quad4(), Lagrange{1}(), Vec{2}((ξf, ηf)))
+            tξ = dN_face[1][1] * p1 + dN_face[2][1] * p2 + dN_face[3][1] * p3 + dN_face[4][1] * p4
+            tη = dN_face[1][2] * p1 + dN_face[2][2] * p2 + dN_face[3][2] * p3 + dN_face[4][2] * p4
             jac_met = norm(tξ × tη)
             jac_met == 0.0 && continue
             # Normal direction must match [`hex8_face_outward_sign`](@ref) (first triangle on
@@ -614,9 +656,6 @@ function apply_load!(
     return fvec
 end
 
-# 1-point centroid for tri: weight = 1/2 (unit triangle area).
-const _GAUSS_TRI1 = ((1.0/3.0, 1.0/3.0, 0.5),)
-
 # ----- core face integration ------------------------------------------------
 
 # Look up the global DOF index for (node_id, component) given the
@@ -627,7 +666,7 @@ const _GAUSS_TRI1 = ((1.0/3.0, 1.0/3.0, 0.5),)
     @inbounds field_starts1[node_id] + (comp - 1)
 
 # One-face integration: writes f[d] += traction · N_i · dS · w.
-# Specialised on NN (3 or 4) so the inner loops fully unroll. Takes the
+# Specialised on NN (2, 3, or 4) so the inner loops fully unroll. Takes the
 # pre-resolved `field_starts1::Vector{Int}` so the inner DOF lookup is
 # fully concrete-typed (no allocations regardless of the cache's
 # `DOFHandler` abstract field).
@@ -644,11 +683,12 @@ const _GAUSS_TRI1 = ((1.0/3.0, 1.0/3.0, 0.5),)
     X = ntuple(i -> nodes_xyz[face_nodes[i]], NN)
 
     if NN == 4
-        @inbounds for (ξ, η, w) in _GAUSS_2X2
-            N      = _quad4_basis(ξ, η)
-            dξ, dη = _quad4_basis_derivs(ξ, η)
-            tξ = dξ[1] * X[1] + dξ[2] * X[2] + dξ[3] * X[3] + dξ[4] * X[4]
-            tη = dη[1] * X[1] + dη[2] * X[2] + dη[3] * X[3] + dη[4] * X[4]
+        @inbounds for (ξ, η, w) in REF_GAUSS_QUAD_2X2
+            ξv = Vec{2}((ξ, η))
+            N = get_basis_functions(Quad4(), Lagrange{1}(), ξv)
+            dN = get_basis_derivatives(Quad4(), Lagrange{1}(), ξv)
+            tξ = dN[1][1] * X[1] + dN[2][1] * X[2] + dN[3][1] * X[3] + dN[4][1] * X[4]
+            tη = dN[1][2] * X[1] + dN[2][2] * X[2] + dN[3][2] * X[3] + dN[4][2] * X[4]
             dS_w = norm(tξ × tη) * w
             for li in 1:NN
                 Ni = N[li] * dS_w
@@ -659,12 +699,13 @@ const _GAUSS_TRI1 = ((1.0/3.0, 1.0/3.0, 0.5),)
                 end
             end
         end
-    else  # NN == 3
-        @inbounds for (ξ, η, w) in _GAUSS_TRI1
-            N      = _tri3_basis(ξ, η)
-            dξ, dη = _tri3_basis_derivs(ξ, η)
-            tξ = dξ[1] * X[1] + dξ[2] * X[2] + dξ[3] * X[3]
-            tη = dη[1] * X[1] + dη[2] * X[2] + dη[3] * X[3]
+    elseif NN == 3
+        @inbounds for (ξ, η, w) in REF_GAUSS_TRIANGLE_CENTROID
+            ξv = Vec{2}((ξ, η))
+            N = get_basis_functions(Tri3(), Lagrange{1}(), ξv)
+            dN = get_basis_derivatives(Tri3(), Lagrange{1}(), ξv)
+            tξ = dN[1][1] * X[1] + dN[2][1] * X[2] + dN[3][1] * X[3]
+            tη = dN[1][2] * X[1] + dN[2][2] * X[2] + dN[3][2] * X[3]
             dS_w = norm(tξ × tη) * w
             for li in 1:NN
                 Ni = N[li] * dS_w
@@ -675,6 +716,26 @@ const _GAUSS_TRI1 = ((1.0/3.0, 1.0/3.0, 0.5),)
                 end
             end
         end
+    elseif NN == 2
+        @inbounds p1 = X[1]
+        @inbounds p2 = X[2]
+        L = norm(p2 - p1)
+        L == 0.0 && return nothing
+        half = L / 2
+        @inbounds for (ξ, w) in REF_GAUSS_SEGMENT_ORDER2
+            N = get_basis_functions(Seg2(), Lagrange{1}(), Vec{1}((ξ,)))
+            dS_w = half * w
+            for li in 1:NN
+                Ni = N[li] * dS_w
+                node = face_nodes[li]
+                for comp in 1:n_comp
+                    d = _node_field_dof(field_starts1, node, comp)
+                    f[d] += _t_component(t, comp) * Ni
+                end
+            end
+        end
+    else
+        error("_integrate_face!: unsupported face node count NN=$NN (expected 2, 3, or 4)")
     end
     return nothing
 end
@@ -710,6 +771,44 @@ function apply_load!(f::AbstractVector{Float64},
         face_nodes = load.faces[fi]
         t = _face_traction(load.traction, fi)
         _integrate_face!(f, field_starts1, nodes_xyz, face_nodes, t, Val(NN))
+    end
+
+    return f
+end
+
+"""
+    apply_load!(f, load::SurfaceScalarFluxOnField, cache, asm, kernel, mesh) -> f
+
+Same quadrature as [`SurfaceLoad`](@ref) for scalar `traction`, using
+`dof_handler.field_starts[load.field_index]` for global DOF indices.
+"""
+function apply_load!(
+    f::AbstractVector{Float64},
+    load::SurfaceScalarFluxOnField{NN,V},
+    cache::DOFBasedCOOCache,
+    asm::DOFBasedCOOAssembler,
+    kernel::AbstractKernel,
+    mesh::AbstractMesh,
+) where {NN,V}
+    _depwarn_redundant_kernel_arg!(:apply_load!)
+    @assert length(f) == cache.ndofs (
+        "apply_load!: f has length $(length(f)); expected $(cache.ndofs)",
+    )
+    nfs = length(cache.dof_handler.field_starts)
+    (load.field_index ≤ nfs) || throw(
+        ArgumentError(
+            "SurfaceScalarFluxOnField: field_index=$(load.field_index) exceeds " *
+            "handler field count ($nfs)",
+        ),
+    )
+    field_starts = cache.dof_handler.field_starts[load.field_index]::Vector{Int}
+    nodes_xyz = mesh.nodes
+    nfaces = length(load.faces)
+
+    @inbounds for fi in 1:nfaces
+        face_nodes = load.faces[fi]
+        t = _face_traction(load.traction, fi)
+        _integrate_face!(f, field_starts, nodes_xyz, face_nodes, t, Val(NN))
     end
 
     return f

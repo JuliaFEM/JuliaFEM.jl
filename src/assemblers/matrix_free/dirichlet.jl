@@ -1,5 +1,5 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 """
 Dirichlet boundary conditions for the DOF-based assembler.
@@ -23,6 +23,9 @@ Two flavours are provided:
   penalty parameter, so unpreconditioned CG on the matrix-free operator
   converges as if the BCs weren't there. Inhomogeneous BCs are
   supported via the standard "lift the RHS" trick (`b ← b − K · û`).
+  For `SparseMatrixCSC{Float64}`, only stored entries touching fixed rows or
+  columns are cleared (`O(nnz)`), and the RHS lift uses sparse columns instead
+  of a full `n` loop per fixed DOF.
 
 Each constraint type knows how to:
 
@@ -316,6 +319,34 @@ function apply_constraint!(K::AbstractMatrix{Float64}, c::EliminatedDirichlet)
     return K
 end
 
+function apply_constraint!(K::SparseMatrixCSC{Float64,Ti}, c::EliminatedDirichlet) where {Ti}
+    n = size(K, 1)
+    isempty(c.fixed_dofs) && return K
+    fs = BitSet()
+    @inbounds for d in c.fixed_dofs
+        if 1 <= d <= n
+            push!(fs, d)
+        end
+    end
+    isempty(fs) && return K
+    rows = rowvals(K)
+    nzv = nonzeros(K)
+    @inbounds for col in 1:n
+        for r in nzrange(K, col)
+            row = rows[r]
+            if (row in fs) || (col in fs)
+                nzv[r] = 0.0
+            end
+        end
+    end
+    @inbounds for d in c.fixed_dofs
+        if 1 <= d <= n
+            K[d, d] = 1.0
+        end
+    end
+    return K
+end
+
 """
     apply_constraint!(K::AbstractMatrix, b::AbstractVector, c::EliminatedDirichlet)
 
@@ -343,6 +374,32 @@ function apply_constraint!(K::AbstractMatrix{Float64},
         end
         for i in 1:n
             b[i] -= K[i, d] * ud
+        end
+    end
+    apply_constraint!(K, c)
+    @inbounds for k in eachindex(fixed)
+        b[fixed[k]] = vals[k]
+    end
+    return K, b
+end
+
+function apply_constraint!(K::SparseMatrixCSC{Float64,Ti},
+                           b::AbstractVector{Float64},
+                           c::EliminatedDirichlet) where {Ti}
+    n = size(K, 1)
+    fixed = c.fixed_dofs
+    vals = c.values
+    rows = rowvals(K)
+    nzv = nonzeros(K)
+
+    @inbounds for k in eachindex(fixed)
+        d = fixed[k]
+        ud = vals[k]
+        ud == 0.0 && continue
+        (1 <= d <= n) || continue
+        for r in nzrange(K, d)
+            i = rows[r]
+            b[i] -= nzv[r] * ud
         end
     end
     apply_constraint!(K, c)
@@ -402,4 +459,91 @@ end
     return d
 end
 
+"""
+    eliminated_dirichlet_free_indices(n, c::EliminatedDirichlet) -> Vector{Int}
+
+Global DOF indices in `1:n` that are **not** listed in `c.fixed_dofs` (invalid
+indices are ignored). Order is increasing; the result is the natural indexing
+set for the free block `K[free, free]` after elimination semantics.
+"""
+function eliminated_dirichlet_free_indices(n::Int, c::EliminatedDirichlet)
+    n ≥ 1 || throw(ArgumentError("n must be positive, got n = $n"))
+    fix = falses(n)
+    @inbounds for d in c.fixed_dofs
+        if 1 <= d <= n
+            fix[d] = true
+        end
+    end
+    free = Int[]
+    sizehint!(free, n)
+    @inbounds for i in 1:n
+        fix[i] || push!(free, i)
+    end
+    return free
+end
+
+"""
+    extract_eliminated_dirichlet_subsystem(K, b, c::EliminatedDirichlet) -> (Kff, bf, free)
+
+Non-mutating extraction of the free–free block `Kff = K[free, free]` and RHS
+
+    bf = b[free] − Σ_k K[free, d_k] · û_k
+
+for each fixed pair `(d_k, û_k)` in `c.fixed_dofs` / `c.values`. Returns
+`free = eliminated_dirichlet_free_indices(n, c)`.
+
+`K` may be dense or `SparseMatrixCSC{Float64}`; slicing uses standard
+`AbstractMatrix` indexing (may allocate temporaries for sparse columns).
+"""
+function extract_eliminated_dirichlet_subsystem(
+    K::AbstractMatrix{Float64},
+    b::AbstractVector{Float64},
+    c::EliminatedDirichlet,
+)
+    n = LinearAlgebra.checksquare(K)
+    length(b) == n || throw(DimensionMismatch("b has length $(length(b)), K is $(n)×$(n)"))
+    free = eliminated_dirichlet_free_indices(n, c)
+    isempty(free) && throw(ArgumentError("eliminated Dirichlet: no free DOFs in 1:$n"))
+    bf = Vector{Float64}(undef, length(free))
+    @inbounds for j in eachindex(free)
+        bf[j] = b[free[j]]
+    end
+    @inbounds for k in eachindex(c.fixed_dofs)
+        d = c.fixed_dofs[k]
+        ud = c.values[k]
+        (1 <= d <= n && ud != 0.0) || continue
+        col = K[free, d]
+        for j in eachindex(bf)
+            bf[j] -= col[j] * ud
+        end
+    end
+    Kff = K[free, free]
+    return (Kff, bf, free)
+end
+
+"""
+    prolongate_eliminated_dirichlet_solution(xf, n, c::EliminatedDirichlet) -> Vector{Float64}
+
+Scatter `xf` (length `n_free`) into a length-`n` global vector: free DOFs from
+`xf`, fixed DOFs from `c.values` (later entries overwrite if `fixed_dofs`
+repeat).
+"""
+function prolongate_eliminated_dirichlet_solution(
+    xf::AbstractVector{Float64},
+    n::Int,
+    c::EliminatedDirichlet,
+)
+    free = eliminated_dirichlet_free_indices(n, c)
+    length(xf) == length(free) ||
+        throw(DimensionMismatch("xf length $(length(xf)) ≠ n_free=$(length(free))"))
+    x = zeros(Float64, n)
+    @inbounds for j in eachindex(free)
+        x[free[j]] = xf[j]
+    end
+    @inbounds for k in eachindex(c.fixed_dofs)
+        d = c.fixed_dofs[k]
+        (1 <= d <= n) && (x[d] = c.values[k])
+    end
+    return x
+end
 
