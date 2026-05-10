@@ -1,13 +1,15 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 #=
 DOF-based COO assembly using row-wise matrix-free integration.
 
 The assembler loops over DOFs (matrix rows) rather than over elements or
-over nodes. The current implementation assumes all elements share a single
-kernel; multi-physics with different kernels per element type is left for
-later (it needs an element -> kernel map and a field-coupling registry).
+over nodes. The cache stores a **kernel column** ([`UniformKernelColumn`](@ref) or
+[`PerElementKernelColumn`](@ref)): Pass 1 / Pass 2 use [`kernel_at`](@ref)`(cache, eid)`
+so each volume element can carry its own kernel instance without heap
+allocation in the assembly loops. Mixed physics on different DOF templates
+still requires separate element vectors / handlers.
 
 For each DOF (one matrix row):
 
@@ -93,23 +95,19 @@ Poor fit:
 # Example
 
 ```julia
-mesh     = create_cantilever_mesh(50, 10, 10)
+# ... `mesh`, `elements`, `dof_handler = create_elements!(...)`
 material = LinearElastic(E=210e9, ν=0.3)
 kernel   = ContinuumKernel(
-    ContinuumFormulation{FullThreeD}(),
+    ContinuumFormulation{ThreeDimensional}(),
     material,
     Displacement{3}(),
 )
-
 assembler = DOFBasedCOOAssembler()
-cache     = create_cache(assembler, mesh, kernel)
-
-assemble!(cache, assembler, kernel, mesh)   # zero-alloc after warmup
+cache      = create_cache(assembler, elements, dof_handler, mesh, kernel)
+assemble!(cache, assembler, mesh)          # zero-alloc after warmup
 K, f = extract_system(cache)
-
-# Matrix-free product
 y = similar(f)
-apply_K!(y, cache, kernel, mesh, x)
+apply_K!(y, cache, assembler, mesh, x)    # matrix-free matvec
 ```
 =#
 
@@ -125,7 +123,11 @@ using ..JuliaFEM: create_zero_field, material_field_type, material_state_type
 using ..JuliaFEM: reference_fields
 using ..JuliaFEM: local_dof_layout, DOFLayoutEntry, entity_local, component
 using ..JuliaFEM: AbstractKernel, HeatKernel, ElementWiseScalarDiffusion
-using ..JuliaFEM: qpoint_buffer_eltype, update_qpoint_buffer!, evaluate_entry
+using ..JuliaFEM: prepare_dof_based_material_workspace!
+using ..JuliaFEM: qpoint_buffer_eltype, update_qpoint_buffer!, evaluate_entry, evaluate_mass_entry,
+    compute_internal_force_value, geometry_eltype
+using ..JuliaFEM: GlobalMaterialCache
+using ..JuliaFEM: PartitionPackedLayout, expand_packed_to_global!
 
 """
     DOFBasedCOOCache
@@ -153,6 +155,7 @@ After warmup, both passes are zero-allocation.
   for `ContinuumKernel`
 - `FieldType`: NamedTuple type of material fields (e.g. `(σ, 𝔻)`)
 - `StateType`: NamedTuple type of material state (e.g. `()`)
+- `KS`: kernel column storage ([`UniformKernelColumn`](@ref) or [`PerElementKernelColumn`](@ref))
 
 # Fields
 - `I, J, V`: COO triplets (rows, cols, values)
@@ -162,8 +165,9 @@ After warmup, both passes are zero-allocation.
 - `dof_connectivity`: inverse map DOF → elements touching it
 - `elements`: concrete-typed element vector
 - `ndofs`: total number of global DOFs
-- `fields_ref, empty_state, zero_field`: pre-allocated material
-  state values, reused every assembly to avoid allocation
+- `fields_ref, empty_state, zero_field`: typed reference snapshot from the
+  probe kernel (Pass 1 overwrites per IP when using per-element kernels)
+- `kernel_column`: uniform or per-element kernel storage (no heap churn in Pass 1)
 - `element_caches, material_workspaces`:
   per-element caches built in Pass 1 and consumed in Pass 2.
 - `X_batch, ∇N_batch, detJ_w_batch`: contiguous SoA backing storage for
@@ -190,7 +194,7 @@ After warmup, both passes are zero-allocation.
   and cache-friendly for the per-element streaming pattern in Pass 1
   and the per-IP integration pattern inside `evaluate_entry`.
 """
-mutable struct DOFBasedCOOCache{T<:AbstractTopology,B<:AbstractBasis,IPS,E<:AbstractElement,GC<:GeometryCache,Buf,FieldType<:NamedTuple,StateType<:NamedTuple}
+mutable struct DOFBasedCOOCache{T<:AbstractTopology,B<:AbstractBasis,IPS,E<:AbstractElement,GC<:GeometryCache,Buf,FieldType<:NamedTuple,StateType<:NamedTuple,KS}
     I::Vector{Int}
     J::Vector{Int}
     V::Vector{Float64}
@@ -213,6 +217,7 @@ mutable struct DOFBasedCOOCache{T<:AbstractTopology,B<:AbstractBasis,IPS,E<:Abst
     fields_ref::FieldType
     empty_state::StateType
     zero_field::FieldType
+    kernel_column::KS
     element_caches::Vector{ElementCache{T,B,IPS}}
     # SoA backing storage for geometry across all elements.
     X_batch::Matrix{Vec{3,Float64}}            # (max_nnodes, n_elems)
@@ -227,16 +232,17 @@ mutable struct DOFBasedCOOCache{T<:AbstractTopology,B<:AbstractBasis,IPS,E<:Abst
 end
 
 """
-    DOFBasedCOOCache(elements::Vector{<:AbstractElement}, dof_handler::DOFHandler)
+    DOFBasedCOOCache(elements, dof_handler, mesh, kernel::AbstractKernel)
+    DOFBasedCOOCache(elements, dof_handler, mesh, kernels::AbstractVector{<:AbstractKernel})
+    DOFBasedCOOCache(elements, dof_handler, mesh, kernel_column)
 
 Create cache for DOF-based assembly.
 
-# Arguments
-- `elements`: Element array with assigned DOF indices
-- `dof_handler`: DOF handler (for total DOF count and DOF connectivity)
-
-# Returns
-- Pre-allocated DOF-based COO cache
+The single-kernel form wraps `kernel` in a [`UniformKernelColumn`](@ref) (no
+extra per-element storage). The vector form builds a
+[`PerElementKernelColumn`](@ref): `length(kernels)` must match
+`length(elements)`, and all entries must be pairwise compatible (see
+[`assert_homogeneous_dof_based_kernel_column!`](@ref)).
 
 # Note
 Requires elements created with `create_elements!()` (have `.dof_indices` assigned).
@@ -247,6 +253,33 @@ function DOFBasedCOOCache(
     mesh::AbstractMesh,
     kernel::AbstractKernel,
 ) where {E<:AbstractElement}
+    return DOFBasedCOOCache(elements, dof_handler, mesh, UniformKernelColumn(kernel))
+end
+
+function DOFBasedCOOCache(
+    elements::Vector{E},
+    dof_handler::DOFHandler,
+    mesh::AbstractMesh,
+    kernels::AbstractVector{K},
+) where {E<:AbstractElement,K<:AbstractKernel}
+    n_elems = length(elements)
+    length(kernels) == n_elems || throw(DimensionMismatch(
+        "per-element kernels: length(kernels)=$(length(kernels)) must match nelements=$n_elems",
+    ))
+    vec = Vector{K}(undef, n_elems)
+    @inbounds for i in 1:n_elems
+        vec[i] = kernels[i]
+    end
+    assert_homogeneous_dof_based_kernel_column!(vec)
+    return DOFBasedCOOCache(elements, dof_handler, mesh, PerElementKernelColumn(vec))
+end
+
+function DOFBasedCOOCache(
+    elements::Vector{E},
+    dof_handler::DOFHandler,
+    mesh::AbstractMesh,
+    kernel_column::KS,
+) where {E<:AbstractElement,KS}
     # Inverse map DOF → elements is built once by `create_elements!` and
     # stored on the handler. The handler initializes it with an empty
     # `DOFConnectivity()` placeholder, so we cross-check against
@@ -260,8 +293,9 @@ function DOFBasedCOOCache(
     ndofs = dof_connectivity.n_total_dofs
     n_elems = length(elements)
 
-    if kernel isa HeatKernel && kernel.material isa ElementWiseScalarDiffusion
-        λlen = length(kernel.material.λ_by_elem)
+    probe_k = prototype_kernel(kernel_column)
+    if probe_k isa HeatKernel && probe_k.material isa ElementWiseScalarDiffusion
+        λlen = length(probe_k.material.λ_by_elem)
         λlen == n_elems || throw(
             ArgumentError(
                 "ElementWiseScalarDiffusion: length(λ_by_elem)=$λlen must match nelements=$n_elems",
@@ -290,7 +324,7 @@ function DOFBasedCOOCache(
     elem_basis = basis_type(elements[1])()
     probe_cache = create_element_cache(
         mesh,
-        kernel;
+        probe_k;
         max_local_dofs = max_local_dofs_elem,
         basis = elem_basis,
     )
@@ -303,16 +337,9 @@ function DOFBasedCOOCache(
     MeshType = typeof(mesh)
     max_nnodes = MeshType.parameters[1]::Int
 
-    # Per-IP reference values, kernel-defined via `reference_fields`.
-    # For stateless / constant-tangent materials (linear elasticity,
-    # linear heat conduction, the gradient-only thermo-elastic stub)
-    # these are simply broadcast to every IP in Pass 1 — no per-IP
-    # constitutive call, hence allocation-free. The field-name shape
-    # (e.g. `(σ, 𝔻)` vs `(q, k)` vs `(σ, 𝔻, q, k)`) is what makes the
-    # constructor kernel-agnostic; previously the types came from
-    # `material_field_type(kernel.material)`, which doesn't generalize
-    # to multi-material (multi-physics) kernels.
-    fields_ref, empty_state = reference_fields(kernel)
+    # Typed reference snapshot from the probe kernel (Pass 1 may overwrite
+    # per element when using a per-element kernel column).
+    fields_ref, empty_state = reference_fields(probe_k)
     FieldType = typeof(fields_ref)
     StateType = typeof(empty_state)
     zero_field = fields_ref     # stateless materials ⇒ reference == zero state
@@ -321,7 +348,7 @@ function DOFBasedCOOCache(
     # the `qpoint_buffer_eltype` trait. This is the only place the cache
     # learns what the kernel needs cached per IP — everything else uses
     # the trait/contract surface.
-    Buf = qpoint_buffer_eltype(kernel)
+    Buf = qpoint_buffer_eltype(probe_k)
 
     # Per-element scratch (built in Pass 1, consumed in Pass 2).
     # `qp_buffers` is a contiguous (n_ips, n_elems) matrix — column-major,
@@ -359,7 +386,7 @@ function DOFBasedCOOCache(
     for eid in 1:n_elems
         element_caches[eid] = create_element_cache(
             mesh,
-            kernel;
+            probe_k;
             max_local_dofs = max_local_dofs_elem,
             basis = elem_basis,
         )
@@ -385,15 +412,18 @@ function DOFBasedCOOCache(
 
     field_starts1 = dof_handler.field_starts[1]::Vector{Int}
 
-    return DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType}(
+    return DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS}(
         I, J, V, f, counter, estimated_triplets,
         dof_connectivity, dof_handler, field_starts1, elements, ndofs,
         fields_ref, empty_state, zero_field,
+        kernel_column,
         element_caches,
         X_batch, N_batch, ∇N_batch, detJ_w_batch,
         geometry_caches, material_workspaces, qp_buffers,
     )
 end
+
+@inline kernel_at(cache::DOFBasedCOOCache, eid::Int) = kernel_at(cache.kernel_column, eid)
 
 """
     reset!(cache::DOFBasedCOOCache)
@@ -405,7 +435,7 @@ Only `cache.I[1:cache.counter]`, `cache.J[1:cache.counter]`, and
 zeros that written prefix for easier debugging, zeros the force vector, and
 sets `counter` back to zero.
 """
-function reset!(cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType}) where {T,B,IPS,E,GC,Buf,FieldType,StateType}
+function reset!(cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS}) where {T,B,IPS,E,GC,Buf,FieldType,StateType,KS}
     @inbounds for k in 1:cache.counter
         cache.I[k] = 0
         cache.J[k] = 0
@@ -417,20 +447,24 @@ function reset!(cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType}) w
 end
 
 """
-    assemble!(
-        cache::DOFBasedCOOCache,
-        assembler::DOFBasedCOOAssembler,
-        kernel::AbstractKernel,
-        mesh::AbstractMesh,
-    ) -> Nothing
+    assemble!(cache, assembler, mesh; kwargs...) -> Nothing
+    assemble!(cache, assembler, kernel, mesh; kwargs...) -> Nothing
 
 Assemble the global system using DOF-based traversal built on the
-"element-as-template" idea.
+"element-as-template" idea. The primary entry point is the three-argument
+form: the cache carries a [`UniformKernelColumn`](@ref) or
+[`PerElementKernelColumn`](@ref) built at construction time, so Pass 1 / Pass 2
+stay allocation-free without threading a kernel object through every call.
 
-Single-kernel assumption: all elements share the same kernel, but
-that kernel is now any concrete subtype of `AbstractKernel` that
-implements the microkernel contract
-(`qpoint_buffer_eltype`, `update_qpoint_buffer!`, `evaluate_entry`).
+The four-argument form ignores `kernel` and exists for backward compatibility
+only.
+
+# Nonlinear continuum keywords
+
+Optional keywords are forwarded to [`_prepare_caches!`](@ref): `configuration`
+(global displacement `Vector{Float64}`), `global_material_cache` (for
+[`StatefulStrainDependent`](@ref) solids), and `Δt`. When omitted, behavior
+matches the previous linear / reference Pass~1.
 
 # Algorithm
 
@@ -451,31 +485,28 @@ for dof_i in 1:ndofs
     for conn in dof_connectivity.dof_to_elements[dof_i]
         e_id, l_i = conn.elem_id, conn.local_dof_idx
         for l_j in 1:N
-            K_ij = evaluate_entry(kernel,
-                                  geometry_caches[e_id],
-                                  qp_buffers[e_id],
-                                  layout[l_i], layout[l_j],
-                                  Int(e_id))
+            K_ij = evaluate_entry(kernel_at(cache, e_id), …)
             scatter_entry!(cache, K_ij, dof_i_global, dof_j_global)
         end
     end
 end
 ```
-
-# Arguments
-- `cache`: pre-allocated DOF-based COO cache
-- `assembler`: DOF-based COO assembler tag
-- `kernel`: any kernel implementing the microkernel contract
-- `mesh`: finite element mesh
 """
 function assemble!(
-    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
     assembler::DOFBasedCOOAssembler,
-    kernel::AbstractKernel,
-    mesh::AbstractMesh,
-) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType}
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
     reset!(cache)
-    _prepare_caches!(cache, kernel, mesh)
+    _prepare_caches!(
+        cache, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
 
     # ========================================================================
     # PASS 2 — DOF loop: one matrix row per DOF, driven by element template
@@ -515,6 +546,8 @@ function assemble!(
             dofs_elem    = element_cache.dofs
             dof_i_global = dofs_elem[local_i]
 
+            k_e = kernel_at(cache, Int(elem_id_val))
+
             @inbounds for local_j in 1:ndofs_elem
                 dof_j_global = dofs_elem[local_j]
                 entry_j      = layout[local_j]
@@ -522,7 +555,7 @@ function assemble!(
                 # Kernel-defined microkernel: returns the scalar K[i,j]
                 # contribution for this (i,j) pair on this element.
                 K_ij = evaluate_entry(
-                    kernel,
+                    k_e,
                     geometry_cache,
                     qp_buffer,
                     entry_i,
@@ -536,6 +569,24 @@ function assemble!(
     end
 
     return nothing
+end
+
+@inline function assemble!(
+    cache::DOFBasedCOOCache,
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+)
+    _depwarn_redundant_kernel_arg!(:assemble!)
+    return assemble!(
+        cache, assembler, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
 end
 
 @inline function _dof_based_fill_qpoint_buffer!(
@@ -557,28 +608,43 @@ end
 end
 
 """
-    _prepare_caches!(cache::DOFBasedCOOCache, kernel::AbstractKernel,
-                     mesh::AbstractMesh) -> Nothing
+    _prepare_caches!(cache::DOFBasedCOOCache, mesh::AbstractMesh; kwargs...) -> Nothing
 
 Pass 1 of the DOF-based assembly: fill per-element scratch (element
 cache, geometry cache, material workspace, kernel-specific qp buffer) so
 that Pass 2 can read each element's data by id without recomputation.
 
-Shared between `assemble!` (which writes to COO triplets) and `apply_K!`
-(which uses the same cached state to do a matrix-free `y = K * x`),
-so the only kernel-aware step lives here in `_dof_based_fill_qpoint_buffer!`
-/ `update_qpoint_buffer!`.
+The volume kernel for element `eid` is [`kernel_at`](@ref)`(cache, eid)` from the
+cache's kernel column (uniform or per-element).
+
+# Nonlinear continuum mechanics
+
+Optional keywords (defaults preserve the previous linear / reference
+Pass~1):
+
+- `configuration`: global displacement vector (same length as
+  `cache.ndofs`) forwarded to each kernel's
+  [`prepare_dof_based_material_workspace!`](@ref) (e.g. strain-dependent
+  solids). When `nothing`, vertex displacements are treated as zero where
+  the kernel reads them.
+- `global_material_cache`: required when a kernel's Pass~1 material path
+  needs persistent IP state (e.g. [`StatefulStrainDependent`](@ref) solids);
+  ignored otherwise.
+- `Δt`: time increment forwarded to Pass~1 material updates.
+
+[`assemble!`](@ref), [`apply_K!`](@ref), and related entry points forward
+these keywords to Pass~1.
 
 Allocation-free after warmup.
 """
 @inline function _prepare_caches!(
-    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType},
-    kernel::AbstractKernel,
-    mesh::AbstractMesh,
-) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType}
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
     elements             = cache.elements
-    fields_ref           = cache.fields_ref
-    empty_state          = cache.empty_state
 
     element_caches       = cache.element_caches
     geometry_caches      = cache.geometry_caches
@@ -588,28 +654,16 @@ Allocation-free after warmup.
     n_elems = length(elements)
 
     @inbounds for eid in 1:n_elems
+        k_e                 = kernel_at(cache, eid)
         element_cache       = element_caches[eid]
         geometry_cache      = geometry_caches[eid]
         material_workspace  = material_workspaces[eid]
-        # Column view into the contiguous (n_ips, n_elems) matrix —
-        # SubArray over a dense 1-D slice of a Matrix is stack-allocated
-        # in modern Julia, so this stays zero-allocation.
         qp_buffer           = view(qp_buffers, :, eid)
 
         reset!(element_cache)
         reset!(geometry_cache)
         reset!(material_workspace)
 
-        # ----------------------------------------------------------------
-        # DOF mapping: read from the element instance (`elem.dof_indices`,
-        # populated multi-field-aware by `create_elements!` via the
-        # `DOFHandler`) instead of going through the single-field
-        # `update_element_cache!` → `get_dof_mapping!(get_field(kernel))`
-        # path. This is what makes coupled kernels (e.g. thermo-elastic
-        # u + T, mixed u-p) Just Work in the DOF-based assembler — the
-        # element template owns the layout, the handler owns the global
-        # numbering, and the kernel never has to declare a single "field".
-        # ----------------------------------------------------------------
         elem_inst    = elements[eid]
         dof_indices  = elem_inst.dof_indices
         dofs_storage = element_cache.dofs
@@ -619,35 +673,50 @@ Allocation-free after warmup.
 
         update_geometry_cache!(geometry_cache, element_cache, eid, mesh)
 
-        # Stateless materials reuse the pre-allocated reference state at
-        # every quadrature point (zero allocation).
-        fields_mw = getfield(material_workspace, 1)
-        states_mw = getfield(material_workspace, 2)
-        ips_ec    = getfield(element_cache, :ips)
-        nips      = length(ips_ec)
-        @inbounds for q in 1:nips
-            fields_mw[q] = fields_ref
-            states_mw[q] = empty_state
-        end
+        prepare_dof_based_material_workspace!(
+            k_e,
+            material_workspace,
+            geometry_cache,
+            element_cache,
+            Int(eid),
+            configuration,
+            global_material_cache,
+            Δt,
+            E,
+        )
 
-        # Kernel-defined per-IP buffer fill (e.g. extract elasticity tensor
-        # for ContinuumKernel; conductivity tensor for HeatKernel; etc.).
-        _dof_based_fill_qpoint_buffer!(qp_buffer, material_workspace, kernel, eid)
+        _dof_based_fill_qpoint_buffer!(qp_buffer, material_workspace, k_e, eid)
     end
     return nothing
 end
 
+# Backward-compatible entry point (kernel ignored — use cache.kernel_column).
+@inline function _prepare_caches!(
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
+    ::AbstractKernel,
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
+    _depwarn_redundant_kernel_arg!(:_prepare_caches!)
+    return _prepare_caches!(
+        cache, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+end
+
 """
-    apply_K!(y::Vector{Float64},
-             cache::DOFBasedCOOCache,
-             assembler::DOFBasedCOOAssembler,
-             kernel::AbstractKernel,
-             mesh::AbstractMesh,
-             x::Vector{Float64}) -> y
+    apply_K!(y, cache, assembler, mesh, x) -> y
+    apply_K!(y, cache, assembler, kernel, mesh, x) -> y
 
 Matrix-free product `y = K * x`, computed by the same DOF-row traversal
 as `assemble!` but accumulating into `y` instead of scattering into COO
 triplets.
+
+The five-argument form is primary; the six-argument form ignores `kernel`.
 
 The matrix `K` is never built. For each row, we walk the touching
 elements, ask the kernel for the scalar `K[dof_i, dof_j]` via
@@ -659,15 +728,13 @@ when DOFs are shared across elements.
 # Algorithm
 
 ```text
-_prepare_caches!(cache, kernel, mesh)            # Pass 1, shared
+_prepare_caches!(cache, mesh; configuration=…)   # Pass 1, shared
 
 for dof_i in 1:ndofs
     yi = 0.0
     for conn in dof_connectivity.dof_to_elements[dof_i]
         for local_j in 1:N
-            K_ij = evaluate_entry(kernel, geom, qp_buf,
-                                  layout[local_i], layout[local_j],
-                                  Int(elem_id_val))
+            K_ij = evaluate_entry(kernel_at(cache, e_id), …)
             yi  += K_ij * x[dof_j_global]
         end
     end
@@ -689,22 +756,29 @@ Wrap as a linear operator for a Krylov solve:
 ```julia
 using LinearAlgebra, Krylov
 op = LinearOperator(Float64, n, n, true, true,
-                    (y, x) -> apply_K!(y, cache, asm, kernel, mesh, x))
+                    (y, x) -> apply_K!(y, cache, asm, mesh, x))
 u, _ = cg(op, b)
 ```
 """
 function apply_K!(
     y::AbstractVector{Float64},
-    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
     assembler::DOFBasedCOOAssembler,
-    kernel::AbstractKernel,
     mesh::AbstractMesh,
-    x::AbstractVector{Float64},
-) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType}
+    x::AbstractVector{Float64};
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
     @assert length(y) == cache.ndofs "y has length $(length(y)); expected $(cache.ndofs)"
     @assert length(x) == cache.ndofs "x has length $(length(x)); expected $(cache.ndofs)"
 
-    _prepare_caches!(cache, kernel, mesh)
+    _prepare_caches!(
+        cache, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
 
     elements         = cache.elements
     element_caches   = cache.element_caches
@@ -735,13 +809,14 @@ function apply_K!(
 
             entry_i      = layout[local_i]
             dofs_elem    = element_cache.dofs
+            k_e          = kernel_at(cache, Int(elem_id_val))
 
             @inbounds for local_j in 1:ndofs_elem
                 dof_j_global = dofs_elem[local_j]
                 entry_j      = layout[local_j]
 
                 K_ij = evaluate_entry(
-                    kernel,
+                    k_e,
                     geometry_cache,
                     qp_buffer,
                     entry_i,
@@ -759,7 +834,238 @@ function apply_K!(
     return y
 end
 
+@inline function apply_K!(
+    y::AbstractVector{Float64},
+    cache::DOFBasedCOOCache,
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh,
+    x::AbstractVector{Float64};
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+)
+    _depwarn_redundant_kernel_arg!(:apply_K!)
+    return apply_K!(
+        y, cache, assembler, mesh, x;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+end
+
 """
+    equilibrium_residual!(
+        r, f, Ku_work, cache, assembler, mesh, u,
+    ) -> r
+
+Linear equilibrium residual ``r = f - K u`` using the same stiffness tangent as
+[`assemble!`](@ref) / [`apply_K!`](@ref).
+
+Writes `Ku_work = K * u` via [`apply_K!`](@ref) into the caller-provided scratch
+`Ku_work`, then sets `r[i] = f[i] - Ku_work[i]` for all `i`. All vectors must
+have length `cache.ndofs`. Allocation-free after warmup when `Ku_work` is
+preallocated (no heap traffic in the subtraction loop).
+
+For ``r = f_{\\mathrm{ext}} - f_{\\mathrm{int}}(u)`` with Cauchy stress assembly,
+see [`nonlinear_equilibrium_residual!`](@ref).
+"""
+function equilibrium_residual!(
+    r::AbstractVector{Float64},
+    f::AbstractVector{Float64},
+    Ku_work::AbstractVector{Float64},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
+    assembler::DOFBasedCOOAssembler,
+    mesh::AbstractMesh,
+    u::AbstractVector{Float64};
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
+    nd = cache.ndofs
+    if length(r) != nd || length(f) != nd || length(Ku_work) != nd || length(u) != nd
+        throw(DimensionMismatch("equilibrium_residual!: expected length $nd for r, f, Ku_work, u"))
+    end
+    apply_K!(
+        Ku_work, cache, assembler, mesh, u;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+    @inbounds for i in 1:nd
+        r[i] = f[i] - Ku_work[i]
+    end
+    return r
+end
+
+"""
+    assemble_internal_force!(
+        f, cache, assembler, mesh;
+        configuration = nothing, global_material_cache = nothing, Δt = 0.0,
+    ) -> f
+    assemble_internal_force!(
+        f, cache, assembler, kernel, mesh; kwargs...,
+    ) -> f
+
+Zero `f`, run the same Pass~1 as [`assemble!`](@ref) / [`apply_K!`](@ref), then
+accumulate the **nonlinear internal force** from Cauchy stress ``σ`` at each
+quadrature point (Galerkin discretization of ``∫ σ : ∇(N_i e_α) \\, dV`` for
+displacement test functions).
+
+The cache's material field type must include `:σ` (continuum solids with
+`(σ, 𝔻)` per IP). Other physics kernels raise [`ArgumentError`](@ref).
+
+Optional keywords are forwarded to [`_prepare_caches!`](@ref). When
+`configuration` is passed, [`StatelessConstantTangent`](@ref) solids (e.g.
+[`LinearElastic`](@ref)) recompute ``(σ, 𝔻)`` from the current nodal
+displacements so ``σ`` tracks ``u`` while the tangent remains constitutive.
+
+The six-argument form ignores `kernel` (backward compatibility).
+
+Allocation-free after warmup aside from clearing `f`.
+"""
+function assemble_internal_force!(
+    f::AbstractVector{Float64},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
+    assembler::DOFBasedCOOAssembler,
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
+    hasfield(FieldType, :σ) ||
+        throw(ArgumentError(
+            "assemble_internal_force! requires material workspace fields with `:σ` " *
+            "(continuum mechanics); got $FieldType.",
+        ))
+    nd = cache.ndofs
+    length(f) == nd ||
+        throw(DimensionMismatch(
+            "assemble_internal_force!: length(f)=$(length(f)) != ndofs $nd",
+        ))
+    fill!(f, 0.0)
+    _prepare_caches!(
+        cache, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+    elements            = cache.elements
+    element_caches      = cache.element_caches
+    geometry_caches     = cache.geometry_caches
+    material_workspaces = cache.material_workspaces
+    layout              = local_dof_layout(E)
+    ndofs_elem          = length(layout)
+    n_elems             = length(elements)
+    @inbounds for eid in 1:n_elems
+        element_cache  = element_caches[eid]
+        geometry_cache = geometry_caches[eid]
+        material_ws    = material_workspaces[eid]
+        F              = geometry_eltype(geometry_cache)
+        n_ips          = length(geometry_cache.detJ_w)
+        fields_vec     = material_ws.fields
+        @inbounds for local_i in 1:ndofs_elem
+            dof_g = Int(element_cache.dofs[local_i])
+            entry_i = layout[local_i]
+            node_i = entity_local(entry_i)
+            comp_i = component(entry_i)
+            acc = zero(F)
+            @inbounds for q in 1:n_ips
+                σ = fields_vec[q].σ
+                ∇N_i = geometry_cache.∇N_data[q, node_i]
+                detJw = geometry_cache.detJ_w[q]
+                acc += compute_internal_force_value(∇N_i, σ, comp_i) * detJw
+            end
+            f[dof_g] += Float64(acc)
+        end
+    end
+    return f
+end
+
+@inline function assemble_internal_force!(
+    f::AbstractVector{Float64},
+    cache::DOFBasedCOOCache,
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+)
+    _depwarn_redundant_kernel_arg!(:assemble_internal_force!)
+    return assemble_internal_force!(
+        f, cache, assembler, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+end
+
+"""
+    nonlinear_equilibrium_residual!(
+        r, f_ext, f_work, cache, assembler, mesh, u; kwargs...,
+    ) -> r
+
+Nonlinear equilibrium residual ``r = f_{\\mathrm{ext}} - f_{\\mathrm{int}}(u)``
+with ``f_{\\mathrm{int}}`` from [`assemble_internal_force!`](@ref) at
+`configuration = u`.
+
+Scratch `f_work` must have length `cache.ndofs` and is overwritten.
+Optional `global_material_cache` and `Δt` are forwarded to Pass~1.
+
+The eight-argument form ignores `kernel`.
+"""
+function nonlinear_equilibrium_residual!(
+    r::AbstractVector{Float64},
+    f_ext::AbstractVector{Float64},
+    f_work::AbstractVector{Float64},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
+    assembler::DOFBasedCOOAssembler,
+    mesh::AbstractMesh,
+    u::AbstractVector{Float64};
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
+    nd = cache.ndofs
+    if length(r) != nd || length(f_ext) != nd || length(f_work) != nd || length(u) != nd
+        throw(DimensionMismatch(
+            "nonlinear_equilibrium_residual!: expected length $nd for r, f_ext, f_work, u",
+        ))
+    end
+    assemble_internal_force!(
+        f_work, cache, assembler, mesh;
+        configuration = u,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+    @inbounds for i in 1:nd
+        r[i] = f_ext[i] - f_work[i]
+    end
+    return r
+end
+
+@inline function nonlinear_equilibrium_residual!(
+    r::AbstractVector{Float64},
+    f_ext::AbstractVector{Float64},
+    f_work::AbstractVector{Float64},
+    cache::DOFBasedCOOCache,
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh,
+    u::AbstractVector{Float64};
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+)
+    _depwarn_redundant_kernel_arg!(:nonlinear_equilibrium_residual!)
+    return nonlinear_equilibrium_residual!(
+        r, f_ext, f_work, cache, assembler, mesh, u;
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+end
+
+"""
+    apply_K_masked_rows!(y, keep_rows, cache, assembler, mesh, x) -> y
     apply_K_masked_rows!(y, keep_rows, cache, assembler, kernel, mesh, x) -> y
 
 Matrix-free product [`apply_K!`](@ref)`(y, …, x)` followed by a row mask:
@@ -771,28 +1077,59 @@ partition recovers the global `K x`.
 
 `length(keep_rows)` must equal `cache.ndofs`. Allocation-free after warmup
 (same hot path as [`apply_K!`](@ref) plus a linear mask pass).
+
+The seven-argument form ignores `kernel` (backward compatibility).
 """
 function apply_K_masked_rows!(
     y::AbstractVector{Float64},
     keep_rows::AbstractVector{Bool},
-    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
     assembler::DOFBasedCOOAssembler,
-    kernel::AbstractKernel,
     mesh::AbstractMesh,
-    x::AbstractVector{Float64},
-) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType}
+    x::AbstractVector{Float64};
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
     ndofs = cache.ndofs
     length(keep_rows) == ndofs ||
         throw(DimensionMismatch("keep_rows length $(length(keep_rows)); expected $ndofs"))
 
-    apply_K!(y, cache, assembler, kernel, mesh, x)
+    apply_K!(
+        y, cache, assembler, mesh, x;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
     @inbounds for i in 1:ndofs
         keep_rows[i] || (y[i] = 0.0)
     end
     return y
 end
 
+@inline function apply_K_masked_rows!(
+    y::AbstractVector{Float64},
+    keep_rows::AbstractVector{Bool},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh,
+    x::AbstractVector{Float64};
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
+    _depwarn_redundant_kernel_arg!(:apply_K_masked_rows!)
+    return apply_K_masked_rows!(
+        y, keep_rows, cache, assembler, mesh, x;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+end
+
 """
+    apply_K_owned_rows!(y, owned_rows, cache, assembler, mesh, x) -> y
     apply_K_owned_rows!(y, owned_rows, cache, assembler, kernel, mesh, x) -> y
 
 Matrix-free matvec like [`apply_K!`](@ref), but only **computes** rows `i` with
@@ -804,16 +1141,20 @@ When `count(owned_rows) ≪ ndofs`, this avoids touching non-owned rows (unlike
 [`apply_K_masked_rows!`](@ref), which runs a full matvec then masks).
 
 `length(owned_rows)` must equal `cache.ndofs`. Allocation-free after warmup.
+
+The seven-argument form ignores `kernel` (backward compatibility).
 """
 function apply_K_owned_rows!(
     y::AbstractVector{Float64},
     owned_rows::AbstractVector{Bool},
-    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
     assembler::DOFBasedCOOAssembler,
-    kernel::AbstractKernel,
     mesh::AbstractMesh,
-    x::AbstractVector{Float64},
-) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType}
+    x::AbstractVector{Float64};
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
     @assert length(y) == cache.ndofs "y has length $(length(y)); expected $(cache.ndofs)"
     @assert length(x) == cache.ndofs "x has length $(length(x)); expected $(cache.ndofs)"
 
@@ -821,7 +1162,12 @@ function apply_K_owned_rows!(
     length(owned_rows) == ndofs ||
         throw(DimensionMismatch("owned_rows length $(length(owned_rows)); expected $ndofs"))
 
-    _prepare_caches!(cache, kernel, mesh)
+    _prepare_caches!(
+        cache, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
 
     elements         = cache.elements
     element_caches   = cache.element_caches
@@ -855,13 +1201,14 @@ function apply_K_owned_rows!(
 
             entry_i      = layout[local_i]
             dofs_elem    = element_cache.dofs
+            k_e          = kernel_at(cache, Int(elem_id_val))
 
             @inbounds for local_j in 1:ndofs_elem
                 dof_j_global = dofs_elem[local_j]
                 entry_j      = layout[local_j]
 
                 K_ij = evaluate_entry(
-                    kernel,
+                    k_e,
                     geometry_cache,
                     qp_buffer,
                     entry_i,
@@ -879,7 +1226,277 @@ function apply_K_owned_rows!(
     return y
 end
 
+@inline function apply_K_owned_rows!(
+    y::AbstractVector{Float64},
+    owned_rows::AbstractVector{Bool},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh,
+    x::AbstractVector{Float64};
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
+    _depwarn_redundant_kernel_arg!(:apply_K_owned_rows!)
+    return apply_K_owned_rows!(
+        y, owned_rows, cache, assembler, mesh, x;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+end
+
 """
+    apply_f_int_owned_rows!(
+        y, owned_rows, cache, assembler, mesh;
+        configuration = nothing, global_material_cache = nothing, Δt = 0.0,
+    ) -> y
+    apply_f_int_owned_rows!(
+        y, owned_rows, cache, assembler, kernel, mesh; kwargs...,
+    ) -> y
+
+Like [`assemble_internal_force!`](@ref), but only fills rows `i` with
+`owned_rows[i] == true` (others stay zero). Uses the same Pass~1 and Cauchy
+stress contraction as the full vector assembly.
+
+`length(owned_rows) == cache.ndofs`. Optional keywords match [`apply_K_owned_rows!`](@ref).
+
+The seven-argument form ignores `kernel`.
+"""
+function apply_f_int_owned_rows!(
+    y::AbstractVector{Float64},
+    owned_rows::AbstractVector{Bool},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
+    assembler::DOFBasedCOOAssembler,
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
+    hasfield(FieldType, :σ) ||
+        throw(ArgumentError(
+            "apply_f_int_owned_rows! requires material workspace fields with `:σ`; got $FieldType.",
+        ))
+    ndofs = cache.ndofs
+    length(y) == ndofs ||
+        throw(DimensionMismatch("y length $(length(y)); expected $ndofs"))
+    length(owned_rows) == ndofs ||
+        throw(DimensionMismatch("owned_rows length $(length(owned_rows)); expected $ndofs"))
+
+    _prepare_caches!(
+        cache, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+
+    elements            = cache.elements
+    element_caches      = cache.element_caches
+    geometry_caches     = cache.geometry_caches
+    material_workspaces = cache.material_workspaces
+    dof_connectivity    = cache.dof_connectivity
+    dof_to_elements     = dof_connectivity.dof_to_elements
+    layout              = local_dof_layout(E)
+    ndofs_elem          = length(layout)
+
+    fill!(y, 0.0)
+
+    @inbounds for dof_i in 1:ndofs
+        owned_rows[dof_i] || continue
+
+        yi                = 0.0
+        touching_elements = dof_to_elements[dof_i]
+        n_conns           = length(touching_elements)
+
+        @inbounds for conn_idx in 1:n_conns
+            conn        = touching_elements[conn_idx]
+            elem_id_val = elem_id(conn)
+            local_i     = local_dof_idx(conn)
+
+            element        = elements[elem_id_val]::E
+            element_cache  = element_caches[elem_id_val]
+            geometry_cache = geometry_caches[elem_id_val]
+            material_ws    = material_workspaces[elem_id_val]
+
+            entry_i   = layout[local_i]
+            node_i    = entity_local(entry_i)
+            comp_i    = component(entry_i)
+            F         = geometry_eltype(geometry_cache)
+            n_ips     = length(geometry_cache.detJ_w)
+            fields_vec = material_ws.fields
+            acc = zero(F)
+            @inbounds for q in 1:n_ips
+                σ = fields_vec[q].σ
+                ∇N_i = geometry_cache.∇N_data[q, node_i]
+                detJw = geometry_cache.detJ_w[q]
+                acc += compute_internal_force_value(∇N_i, σ, comp_i) * detJw
+            end
+            yi += Float64(acc)
+        end
+
+        y[dof_i] = yi
+    end
+
+    return y
+end
+
+@inline function apply_f_int_owned_rows!(
+    y::AbstractVector{Float64},
+    owned_rows::AbstractVector{Bool},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
+    _depwarn_redundant_kernel_arg!(:apply_f_int_owned_rows!)
+    return apply_f_int_owned_rows!(
+        y, owned_rows, cache, assembler, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+end
+
+"""
+    apply_f_int_owned_rows_from_packed!(
+        Ap_owned, packed, work, layout, cache, assembler, mesh; kwargs...,
+    ) -> Ap_owned
+    apply_f_int_owned_rows_from_packed!(
+        Ap_owned, packed, work, layout, cache, assembler, kernel, mesh; kwargs...,
+    ) -> Ap_owned
+
+Owned-row internal force in compact layout: `Ap_owned[k]` is the global row
+`layout.packed_to_global[k]` for ``k \\in 1:\\texttt{layout.n\\_owned}``.
+
+`work` is a scratch vector of length `cache.ndofs` used to
+[`expand_packed_to_global!`](@ref) the patch displacement, then Pass~1 uses
+`configuration \\equiv work` unless `configuration` is passed explicitly (full
+length `cache.ndofs`).
+
+The nine-argument form ignores `kernel`.
+"""
+function apply_f_int_owned_rows_from_packed!(
+    Ap_owned::AbstractVector{Float64},
+    packed::AbstractVector{Float64},
+    work::AbstractVector{Float64},
+    layout::PartitionPackedLayout,
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
+    assembler::DOFBasedCOOAssembler,
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
+    hasfield(FieldType, :σ) ||
+        throw(ArgumentError(
+            "apply_f_int_owned_rows_from_packed! requires material workspace fields with `:σ`; got $FieldType.",
+        ))
+    ndofs = cache.ndofs
+    layout.ndofs_global == ndofs ||
+        throw(DimensionMismatch(
+            "layout.ndofs_global $(layout.ndofs_global) != cache.ndofs $ndofs",
+        ))
+    no = layout.n_owned
+    n_packed = layout.n_packed
+    length(Ap_owned) == no ||
+        throw(DimensionMismatch("Ap_owned length $(length(Ap_owned)), n_owned $no"))
+    length(packed) ≥ n_packed ||
+        throw(DimensionMismatch("packed length $(length(packed)) < n_packed $n_packed"))
+    length(work) == ndofs ||
+        throw(DimensionMismatch("work length $(length(work)); expected $ndofs"))
+
+    owned_rows = layout.owned_rows
+    length(owned_rows) == ndofs ||
+        throw(DimensionMismatch("owned_rows length $(length(owned_rows)); expected $ndofs"))
+
+    p2g = layout.packed_to_global
+
+    fill!(work, 0.0)
+    expand_packed_to_global!(work, packed, layout)
+    prep_cfg = configuration === nothing ? work : configuration
+
+    _prepare_caches!(
+        cache, mesh;
+        configuration = prep_cfg,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+
+    geometry_caches     = cache.geometry_caches
+    material_workspaces = cache.material_workspaces
+    dof_connectivity    = cache.dof_connectivity
+    dof_to_elements     = dof_connectivity.dof_to_elements
+    loc_layout          = local_dof_layout(E)
+
+    @inbounds for k in 1:no
+        dof_i = p2g[k]
+        owned_rows[dof_i] ||
+            throw(ArgumentError(
+                "packed owned slot $k → global $dof_i not marked owned in layout",
+            ))
+
+        yi                = 0.0
+        touching_elements = dof_to_elements[dof_i]
+        n_conns           = length(touching_elements)
+
+        @inbounds for conn_idx in 1:n_conns
+            conn        = touching_elements[conn_idx]
+            elem_id_val = elem_id(conn)
+            local_i     = local_dof_idx(conn)
+
+            geometry_cache = geometry_caches[elem_id_val]
+            material_ws    = material_workspaces[elem_id_val]
+
+            entry_i    = loc_layout[local_i]
+            node_i     = entity_local(entry_i)
+            comp_i     = component(entry_i)
+            F          = geometry_eltype(geometry_cache)
+            n_ips      = length(geometry_cache.detJ_w)
+            fields_vec = material_ws.fields
+            acc = zero(F)
+            @inbounds for q in 1:n_ips
+                σ = fields_vec[q].σ
+                ∇N_i = geometry_cache.∇N_data[q, node_i]
+                detJw = geometry_cache.detJ_w[q]
+                acc += compute_internal_force_value(∇N_i, σ, comp_i) * detJw
+            end
+            yi += Float64(acc)
+        end
+
+        Ap_owned[k] = yi
+    end
+
+    return Ap_owned
+end
+
+@inline function apply_f_int_owned_rows_from_packed!(
+    Ap_owned::AbstractVector{Float64},
+    packed::AbstractVector{Float64},
+    work::AbstractVector{Float64},
+    layout::PartitionPackedLayout,
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
+    _depwarn_redundant_kernel_arg!(:apply_f_int_owned_rows_from_packed!)
+    return apply_f_int_owned_rows_from_packed!(
+        Ap_owned, packed, work, layout, cache, assembler, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+end
+
+"""
+    apply_K_contributions!(y, cache, assembler, mesh, x, element_ids) -> y
     apply_K_contributions!(y, cache, assembler, kernel, mesh, x, element_ids) -> y
 
 Add the stiffness matrix-vector contribution from the listed volume elements
@@ -898,23 +1515,32 @@ Concurrent writes to the same `dof_i` from different threads or ranks
 require a reduction strategy; this routine performs plain `+=` without
 atomics.
 
+The eight-argument form ignores `kernel` (backward compatibility).
+
 # See also
 
 - [`apply_K!`](@ref) — full product with one write per row (serial).
 """
 function apply_K_contributions!(
     y::AbstractVector{Float64},
-    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
     assembler::DOFBasedCOOAssembler,
-    kernel::AbstractKernel,
     mesh::AbstractMesh,
     x::AbstractVector{Float64},
-    element_ids,
-) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType}
+    element_ids;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
     @assert length(y) == cache.ndofs "y has length $(length(y)); expected $(cache.ndofs)"
     @assert length(x) == cache.ndofs "x has length $(length(x)); expected $(cache.ndofs)"
 
-    _prepare_caches!(cache, kernel, mesh)
+    _prepare_caches!(
+        cache, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
 
     elements        = cache.elements
     element_caches  = cache.element_caches
@@ -929,6 +1555,7 @@ function apply_K_contributions!(
         (1 <= elem_id_val <= n_elems) ||
             throw(ArgumentError("element id $elem_id_val out of range 1:$n_elems"))
 
+        k_e            = kernel_at(cache, Int(elem_id_val))
         element        = elements[elem_id_val]::E
         element_cache  = element_caches[elem_id_val]
         geometry_cache = geometry_caches[elem_id_val]
@@ -944,7 +1571,7 @@ function apply_K_contributions!(
                 entry_j      = layout[local_j]
 
                 K_ij = evaluate_entry(
-                    kernel,
+                    k_e,
                     geometry_cache,
                     qp_buffer,
                     entry_i,
@@ -960,19 +1587,38 @@ function apply_K_contributions!(
     return y
 end
 
+@inline function apply_K_contributions!(
+    y::AbstractVector{Float64},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh,
+    x::AbstractVector{Float64},
+    element_ids;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
+    _depwarn_redundant_kernel_arg!(:apply_K_contributions!)
+    return apply_K_contributions!(
+        y, cache, assembler, mesh, x, element_ids;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+end
+
 """
-    apply_M!(y::Vector{Float64},
-             cache::DOFBasedCOOCache,
-             assembler::DOFBasedCOOAssembler,
-             kernel::AbstractKernel,
-             mesh::AbstractMesh,
-             x::Vector{Float64}) -> y
+    apply_M!(y, cache, assembler, mesh, x) -> y
+    apply_M!(y, cache, assembler, kernel, mesh, x) -> y
 
 Matrix-free product `y = M * x` where `M` is the consistent mass
 matrix (or, for `HeatKernel`, the heat-capacity matrix). Same DOF-row
 traversal as `apply_K!`; only difference is that the inner kernel call
 is `evaluate_mass_entry` instead of `evaluate_entry`, so the bilinear
 form `(N_i, ρ N_j)` replaces `(B_i : C : B_j)`.
+
+The five-argument form is primary; the six-argument form ignores `kernel`.
 
 Kernels that don't override `evaluate_mass_entry` see the default
 `= 0.0`, so `apply_M!` produces a structural-zero `y` and serves as a
@@ -990,22 +1636,29 @@ Wrap as a `LinearOperator` to feed mass-matrix into eigen and transient
 solvers without ever assembling `M`:
 
 ```julia
-op_K = matrix_free_op(cache, asm, kernel, mesh)
-op_M = (y, x) -> apply_M!(y, cache, asm, kernel, mesh, x)
+op_K = matrix_free_op(cache, asm, mesh)
+op_M = (y, x) -> apply_M!(y, cache, asm, mesh, x)
 ```
 """
 function apply_M!(
     y::AbstractVector{Float64},
-    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
     assembler::DOFBasedCOOAssembler,
-    kernel::AbstractKernel,
     mesh::AbstractMesh,
-    x::AbstractVector{Float64},
-) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType}
+    x::AbstractVector{Float64};
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
     @assert length(y) == cache.ndofs "y has length $(length(y)); expected $(cache.ndofs)"
     @assert length(x) == cache.ndofs "x has length $(length(x)); expected $(cache.ndofs)"
 
-    _prepare_caches!(cache, kernel, mesh)
+    _prepare_caches!(
+        cache, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
 
     elements         = cache.elements
     element_caches   = cache.element_caches
@@ -1036,13 +1689,14 @@ function apply_M!(
 
             entry_i      = layout[local_i]
             dofs_elem    = element_cache.dofs
+            k_e          = kernel_at(cache, Int(elem_id_val))
 
             @inbounds for local_j in 1:ndofs_elem
                 dof_j_global = dofs_elem[local_j]
                 entry_j      = layout[local_j]
 
                 M_ij = evaluate_mass_entry(
-                    kernel,
+                    k_e,
                     geometry_cache,
                     qp_buffer,
                     entry_i,
@@ -1059,24 +1713,44 @@ function apply_M!(
     return y
 end
 
+@inline function apply_M!(
+    y::AbstractVector{Float64},
+    cache::DOFBasedCOOCache,
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh,
+    x::AbstractVector{Float64};
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+)
+    _depwarn_redundant_kernel_arg!(:apply_M!)
+    return apply_M!(
+        y, cache, assembler, mesh, x;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+end
+
 """
-    assemble_M!(cache::DOFBasedCOOCache,
-                assembler::DOFBasedCOOAssembler,
-                kernel::AbstractKernel,
-                mesh::AbstractMesh) -> Nothing
+    assemble_M!(cache, assembler, mesh) -> Nothing
+    assemble_M!(cache, assembler, kernel, mesh) -> Nothing
 
 Assemble the consistent mass / heat-capacity matrix into the cache's
 COO triplets via the same DOF-row traversal as `assemble!`, calling
 `evaluate_mass_entry` instead of `evaluate_entry`. After this, the
 caller pulls `M, _ = extract_system(cache)`.
 
+The three-argument form is primary; the four-argument form ignores `kernel`.
+
 Cache reuse: this overwrites the triplets from any prior
 `assemble!`. The intended use pattern when both `K` and `M` are needed
 is:
 
 ```julia
-assemble!(cache, asm, kernel, mesh);   K, _ = extract_system(cache)
-assemble_M!(cache, asm, kernel, mesh); M, _ = extract_system(cache)
+assemble!(cache, asm, mesh);   K, _ = extract_system(cache)
+assemble_M!(cache, asm, mesh); M, _ = extract_system(cache)
 ```
 
 Each `extract_system` builds an independent `SparseMatrixCSC`, so the
@@ -1090,13 +1764,20 @@ running `assemble_M!` on a static-only kernel is harmless and produces
 a structural-zero `M`.
 """
 function assemble_M!(
-    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
     assembler::DOFBasedCOOAssembler,
-    kernel::AbstractKernel,
-    mesh::AbstractMesh,
-) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType}
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
     reset!(cache)
-    _prepare_caches!(cache, kernel, mesh)
+    _prepare_caches!(
+        cache, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
 
     elements         = cache.elements
     element_caches   = cache.element_caches
@@ -1128,13 +1809,14 @@ function assemble_M!(
 
             dofs_elem    = element_cache.dofs
             dof_i_global = dofs_elem[local_i]
+            k_e          = kernel_at(cache, Int(elem_id_val))
 
             @inbounds for local_j in 1:ndofs_elem
                 dof_j_global = dofs_elem[local_j]
                 entry_j      = layout[local_j]
 
                 M_ij = evaluate_mass_entry(
-                    kernel,
+                    k_e,
                     geometry_cache,
                     qp_buffer,
                     entry_i,
@@ -1149,35 +1831,59 @@ function assemble_M!(
     return nothing
 end
 
+@inline function assemble_M!(
+    cache::DOFBasedCOOCache,
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+)
+    _depwarn_redundant_kernel_arg!(:assemble_M!)
+    return assemble_M!(
+        cache, assembler, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+end
+
 """
-    compute_diagonal!(d::AbstractVector{Float64},
-                      cache::DOFBasedCOOCache,
-                      assembler::DOFBasedCOOAssembler,
-                      kernel::AbstractKernel,
-                      mesh::AbstractMesh) -> d
+    compute_diagonal!(d, cache, assembler, mesh) -> d
+    compute_diagonal!(d, cache, assembler, kernel, mesh) -> d
 
 Matrix-free extraction of `diag(K)` using the same DOF-row traversal
 as `apply_K!` — same complexity (one element-row pass, one
 `evaluate_entry` per touching element), no `K` materialisation.
 
+The four-argument form ignores `kernel`.
+
 The returned diagonal is the diagonal of the *unconstrained* operator.
 For a Jacobi preconditioner consistent with `matrix_free_op(...; dirichlet=c)`
 follow up with `apply_constraint_diag!(d, c)` (or just use
-`JacobiPreconditioner(cache, asm, kernel, mesh; dirichlet=c)` which
+`JacobiPreconditioner(cache, asm, mesh; dirichlet=c)` which
 chains the two).
 
 Allocation-free after warmup (`d` is mutated in place).
 """
 function compute_diagonal!(
     d::AbstractVector{Float64},
-    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
     assembler::DOFBasedCOOAssembler,
-    kernel::AbstractKernel,
-    mesh::AbstractMesh,
-) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType}
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
     @assert length(d) == cache.ndofs "d has length $(length(d)); expected $(cache.ndofs)"
 
-    _prepare_caches!(cache, kernel, mesh)
+    _prepare_caches!(
+        cache, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
     fill!(d, 0.0)
 
     elements         = cache.elements
@@ -1206,10 +1912,11 @@ function compute_diagonal!(
             qp_buffer      = view(qp_buffers, :, elem_id_val)
 
             entry_i = layout[local_i]
+            k_e     = kernel_at(cache, Int(elem_id_val))
 
             # Diagonal entry only — same `evaluate_entry` call, j == i.
             di += evaluate_entry(
-                kernel,
+                k_e,
                 geometry_cache,
                 qp_buffer,
                 entry_i,
@@ -1222,6 +1929,25 @@ function compute_diagonal!(
     end
 
     return d
+end
+
+@inline function compute_diagonal!(
+    d::AbstractVector{Float64},
+    cache::DOFBasedCOOCache,
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+)
+    _depwarn_redundant_kernel_arg!(:compute_diagonal!)
+    return compute_diagonal!(
+        d, cache, assembler, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
 end
 
 """
@@ -1301,19 +2027,14 @@ end
 # ============================================================================
 
 """
-    create_cache(
-        assembler::DOFBasedCOOAssembler,
-        elements::Vector{<:AbstractElement},
-        dof_handler::DOFHandler,
-        mesh::AbstractMesh,
-        kernel::AbstractKernel
-    ) -> DOFBasedCOOCache
+    create_cache(assembler, elements, dof_handler, mesh, kernel::AbstractKernel)
+    create_cache(assembler, elements, dof_handler, mesh, kernels::AbstractVector)
 
 Create pre-allocated cache for DOF-based COO assembly.
 
-The kernel may be any concrete `AbstractKernel` that implements the
-DOF-based microkernel contract used by `assemble!`, `apply_K!`, and
-`apply_M!`.
+The single-kernel form wraps `kernel` in a [`UniformKernelColumn`](@ref). The
+vector form must have `length(kernels) == length(elements)` and is validated by
+[`assert_homogeneous_dof_based_kernel_column!`](@ref).
 
 Requires elements with assigned DOF indices (from `create_elements!`).
 
@@ -1324,12 +2045,12 @@ S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
 ElemType = Element{Hexahedron{8}, Lagrange{1}, S}
 elements, handler = create_elements!(mesh, ElemType)
 
-kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(), material, Displacement{3}())
+kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(), material, Displacement{3}())
 
 assembler = DOFBasedCOOAssembler()
 cache = create_cache(assembler, elements, handler, mesh, kernel)
 
-assemble!(cache, assembler, kernel, mesh)
+assemble!(cache, assembler, mesh)
 K, f = extract_system(cache)
 ```
 """
@@ -1338,7 +2059,17 @@ function create_cache(
     elements::Vector{E},
     dof_handler::DOFHandler,
     mesh::AbstractMesh,
-    kernel::AbstractKernel
+    kernel::AbstractKernel,
 ) where {E<:AbstractElement}
     return DOFBasedCOOCache(elements, dof_handler, mesh, kernel)
+end
+
+function create_cache(
+    assembler::DOFBasedCOOAssembler,
+    elements::Vector{E},
+    dof_handler::DOFHandler,
+    mesh::AbstractMesh,
+    kernels::AbstractVector{K},
+) where {E<:AbstractElement,K<:AbstractKernel}
+    return DOFBasedCOOCache(elements, dof_handler, mesh, kernels)
 end
