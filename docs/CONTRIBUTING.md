@@ -64,8 +64,10 @@ when rendering the website) rather than chasing false positives in the library.
   (e.g. implementation + its test). Never `git add .` or `git add -A`
   unless you mean it. The full protocol is in
   `.github/prompts/commit.prompt.md`. With
-  `git config core.hooksPath .githooks`, the pre-commit hook allows at
-  most **two** staged files per commit.
+  `git config core.hooksPath .githooks`, **pre-commit** allows at most **two**
+  staged files per commit, and **commit-msg** rejects messages with any line
+  longer than **80 characters** (merge commits skip the length check while
+  `.git/MERGE_HEAD` exists).
 - Match **commit message depth** to the patch: a short summary suffices for
   small edits; **large files, large diffs, or several concerns in one commit**
   should add **grouped bullets** (major API or behavior, wiring, migrations,

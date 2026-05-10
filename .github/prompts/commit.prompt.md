@@ -38,9 +38,17 @@ git add path/a.jl path/b.jl
 - Avoid `git add .` and `git add -A` unless the user explicitly wants everything (still read the full staged diff after).
 - Never stage unrelated changes into the same commit.
 
-## Optional git hook (max two staged paths)
+## Optional git hooks (`.githooks/`)
 
-The repo ships `.githooks/pre-commit`. After `git config core.hooksPath .githooks`, commits with **more than two** staged files are rejected. This supports the common “impl + test” or “snippet + verifier” pair without allowing large batches. Split bigger changes across commits or adjust the hook deliberately.
+After `git config core.hooksPath .githooks`:
+
+- **pre-commit:** rejects commits with **more than two** staged files. This
+  supports the common “impl + test” or “snippet + verifier” pair without
+  allowing large batches. Split bigger changes across commits or adjust the
+  hook deliberately.
+- **commit-msg:** rejects the commit if **any** message line is longer than
+  **80 characters** (including the subject). Wrap prose and bullets; merge
+  commits skip this check while `.git/MERGE_HEAD` is present.
 
 ## Read the full staged diff
 
@@ -94,17 +102,24 @@ EOF
 
 Use `-` bullet lists; omit sections that do not apply.
 
+### Line length (enforced when hooks are enabled)
+
+Keep **every** line at **80 characters or fewer**, including the subject and
+each bullet. This keeps `git log` readable in terminals and mail archives. If
+the hook is enabled, overlong lines cause the commit to fail—rewrap before
+retrying.
+
 ### Example (single file)
 
 ```
-refactor(basis): Replace per-element lagrange includes with generator entrypoints
+refactor(basis): fold lagrange includes behind generator entrypoints
 
-The basis tree previously listed seven separate lagrange_*.jl includes; they are
-folded behind lagrange_generator.jl and lagrange_generated.jl so new elements
-register in one place.
+The basis tree listed seven separate lagrange_*.jl includes; they now load
+through lagrange_generator.jl and lagrange_generated.jl so registration lives
+in one place.
 
 - Drop redundant includes from JuliaFEM.jl
-- Document the 'Basis' suffix convention in the include comment
+- Note the Basis suffix convention in the include comment
 ```
 
 ### Example (multi-file — requires justification to user)
@@ -160,6 +175,7 @@ Never use `git diff --staged | head` (etc.). Read the full diff.
 - [ ] If `.githooks` is active: are there **at most two** staged paths?
 - [ ] Did I read the **full** `git diff --staged`?
 - [ ] Subject line: Conventional Commits, specific, matches diff?
+- [ ] Is **every** message line (subject, summary, bullets) **≤ 80 characters**?
 - [ ] Body: blank line, then **1–3 sentence** summary, then **bullets scaled to diff size** (rich, grouped bullets for large / multi-concern commits)?
 - [ ] Did I **propose** the commit and wait for **approval** before `git commit`?
 

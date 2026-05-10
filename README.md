@@ -85,9 +85,11 @@ what you changed.
 
 **Git commits.** Keep history easy to read: small commits, usually one file;
 **two files** in one commit is fine when they are inseparable (e.g. a helper and
-its only caller). An optional hook (`.githooks/`, set `core.hooksPath`) caps
-staged paths at two. If that workflow feels unfamiliar, open your PR with tests
-passing and ask for help splitting history in review.
+its only caller). With `.githooks/` and `core.hooksPath`, **pre-commit** caps
+staged paths at two and **commit-msg** rejects log lines longer than **80
+characters** (wrap subject, summary, and bullets). If that workflow feels
+unfamiliar, open your PR with tests passing and ask for help splitting history
+in review.
 
 **Code expectations.** Assembly hot paths must stay type-stable and allocation-free
 after warmup; CI and [`test/assemblers/test_dof_based_zero_alloc.jl`](test/assemblers/test_dof_based_zero_alloc.jl)

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Reject commit messages with any line longer than 80 characters.
+# Enable with: git config core.hooksPath .githooks
+#
+# Merge commits often carry Git-generated "Merge branch …" lines that can
+# exceed 80 columns when branch or remote names are long; skip the check then.
+
+set -euo pipefail
+
+msg_file=${1:?commit-msg hook requires path to message file}
+
+if [[ -f .git/MERGE_HEAD ]]; then
+    exit 0
+fi
+
+lineno=0
+while IFS= read -r line || [[ -n "${line}" ]]; do
+    lineno=$((lineno + 1))
+    len=${#line}
+    if ((len > 80)); then
+        echo "❌ COMMIT MESSAGE: line ${lineno} is ${len} chars (max 80)"
+        echo ""
+        echo "Wrap the subject, summary, and bullets to 80 columns or fewer."
+        echo "See .github/prompts/commit.prompt.md"
+        echo ""
+        echo "Offending line (truncated for display):"
+        printf '%s\n' "${line}" | cut -c1-120
+        exit 1
+    fi
+done <"${msg_file}"
+
+exit 0

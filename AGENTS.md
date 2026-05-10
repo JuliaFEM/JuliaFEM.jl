@@ -205,8 +205,10 @@ These are non-negotiable. Tests and code analysis enforce them.
 ## 5. Critical workflow rules
 
 Contributor-facing workflow text lives in `.github/prompts/commit.prompt.md`
-and `.github/copilot-instructions.md`. Optional `.githooks/pre-commit`
-(enabling `core.hooksPath`) caps staged paths at two per commit.
+and `.github/copilot-instructions.md`. Optional `.githooks/` hooks (enable with
+`git config core.hooksPath .githooks`): **pre-commit** caps staged paths at
+two per commit; **commit-msg** rejects any log line longer than **80
+characters** (merge commits skip that check while `.git/MERGE_HEAD` exists).
 Editor-local Cursor rules under `.cursor/` are not part of the git tree.
 
 - Commits: prefer **small** steps (default one file per commit). Combine
@@ -215,8 +217,8 @@ Editor-local Cursor rules under `.cursor/` are not part of the git tree.
   deliberately. Read the **full** staged diff (no `head`/`tail`). Message
   format: Conventional Commits **subject**, blank line, **1–3 sentence**
   summary, then bullets **scaled to the patch** (small change → few or none;
-  large / multi-concern → grouped, substantive bullets). **Propose** paths + full message
-  and wait for **explicit approval** before each `git commit`. See
+  large / multi-concern → grouped, substantive bullets). **Propose** paths and
+  full message and wait for **explicit approval** before each `git commit`. See
   `.github/prompts/commit.prompt.md` for the full protocol.
 - **AI agents: commits are not a loop variable.** Never drive `git commit` from a
   shell or Python loop that stages paths and emits placeholder subjects such as
@@ -225,7 +227,9 @@ Editor-local Cursor rules under `.cursor/` are not part of the git tree.
   `head`, `tail`, `less`, or other truncation when forming the message). The
   subject and body must describe the **actual** API and behaviour changes in
   those hunks; the optional two-path `.githooks/pre-commit` rule limits batch
-  size, it does **not** replace reading the diff. If many low-quality commits
+  size, it does **not** replace reading the diff. Keep every commit message line
+  at 80 columns or fewer when hooks are enabled (see **commit-msg**). If many
+  low-quality commits
   already exist locally, repair with `git reset --soft <good_base>` and rebuild
   following this file and `.github/prompts/commit.prompt.md`, or use
   `git rebase -i` to reword; do not apply a second scripted sweep of generic
