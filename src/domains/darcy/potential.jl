@@ -30,7 +30,7 @@ steady primal Darcy: same assembly path as thermal diffusion with tensor
 
 ```julia
 kernel = DarcyPotentialKernel(
-    ContinuumFormulation{FullThreeD}(),
+    ContinuumFormulation{ThreeDimensional}(),
     HydraulicConductivity(K = 1e-4),
 )
 ```

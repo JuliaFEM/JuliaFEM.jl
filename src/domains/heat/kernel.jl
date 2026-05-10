@@ -36,7 +36,7 @@ Differences from `ContinuumKernel`:
 using Tensors
 
 using ..JuliaFEM: AbstractKernel, AbstractFormulation, AbstractMaterial, AbstractField
-using ..JuliaFEM: ContinuumFormulation, FullThreeD
+using ..JuliaFEM: ContinuumFormulation, ThreeDimensional
 using ..JuliaFEM: Temperature, MoistureContent, PressurePotential, dofs_per_node, get_field
 using ..JuliaFEM: HeatConductivity, MoistureDiffusivity, HydraulicConductivity,
     ElementWiseScalarDiffusion, scalar_diffusion_tensor
@@ -58,7 +58,7 @@ Domain kernel for steady-state **scalar diffusion**: linear heat conduction
 volume element.
 
 Reuses `ContinuumFormulation{Theory}` (the geometric formulation is
-field-agnostic; `FullThreeD` works equally well for displacement,
+field-agnostic; `ThreeDimensional` works equally well for displacement,
 temperature, potential, …).
 
 # Fields
@@ -71,7 +71,7 @@ temperature, potential, …).
 
 ```julia
 kernel = HeatKernel(
-    ContinuumFormulation{FullThreeD}(),
+    ContinuumFormulation{ThreeDimensional}(),
     HeatConductivity(k = 401.0),
 )
 ```

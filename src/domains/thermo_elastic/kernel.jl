@@ -41,7 +41,7 @@ geometry batches via `GeometryCache.∇N_data` / `GeometryCache.N_data`
 using Tensors
 
 using ..JuliaFEM: AbstractKernel, AbstractFormulation
-using ..JuliaFEM: ContinuumFormulation, FullThreeD, AbstractContinuumTheory
+using ..JuliaFEM: ContinuumFormulation, ThreeDimensional, AbstractContinuumTheory
 using ..JuliaFEM: AbstractMaterial, LinearElastic, HeatConductivity
 using ..JuliaFEM: elasticity_tensor, conductivity_tensor
 using ..JuliaFEM: AssemblyMaterialWorkspace
