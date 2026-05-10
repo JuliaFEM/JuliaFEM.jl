@@ -48,7 +48,7 @@ export Vec  # Re-export from Tensors.jl, used by basis function APIs.
 export AbstractBasis, Lagrange, Serendipity
 export get_basis_functions, get_basis_derivatives
 export get_basis_function, get_basis_derivative
-export nbasis, dof_types
+export nbasis
 export nedelec_whitney_tet_reference,
     nedelec_hierarchical_tet_edge_reference, rt0_tet_reference_basis, rt0_hex8_reference_basis
 
@@ -56,9 +56,9 @@ export nedelec_whitney_tet_reference,
 # Formulations and field tags
 # ---------------------------------------------------------------------------
 export AbstractFormulation, ContinuumFormulation
-export AbstractContinuumTheory, FullThreeD, PlaneStress, PlaneStrain, Axisymmetric
+export AbstractContinuumTheory, ThreeDimensional, PlaneStress, PlaneStrain, Axisymmetric
 
-export AbstractField, Displacement, Temperature, MoistureContent, PressurePotential, RT0FaceFlux, Nedelec1Edge, DisplacementRotation
+export AbstractField, Displacement, Temperature, PorePressure, MoistureContent, PressurePotential, RT0FaceFlux, Nedelec1Edge, DisplacementRotation
 export LocalField
 
 # ---------------------------------------------------------------------------
@@ -112,8 +112,11 @@ export get_element_set, get_node_set
 export get_elements_in_set, get_nodes_in_set
 export extract_surface, surface_topology, validate, info
 export AbstractRefineStrategy, LongestEdgeBisection, refine
-export create_structured_box_mesh, create_unit_cube_mesh
+export create_structured_box_mesh, create_unit_cube_mesh, create_cook_membrane_mesh
+export create_structured_line_mesh
+export read_gmsh_msh, mesh_from_current_gmsh_model, write_vtu_mesh
 export create_cantilever_mesh, create_thin_plate_mesh
+export FEDiscretization, linear_system, total_dofs
 export AbstractFacetConnectivityMaps
 export Hex8FacetMaps, build_hex8_facet_maps, build_hex20_facet_maps, hex8_face_area_physical,
        hex8_face_outward_sign, hex8_edge_length_physical, hex8_edge_orientation_sign,
@@ -194,14 +197,19 @@ export reset!, extract_system
 export create_cache
 
 # Microkernel contract (DOF-based / matrix-free path)
-export qpoint_buffer_eltype, update_qpoint_buffer!
-export evaluate_entry, evaluate_mass_entry
+export qpoint_buffer_eltype, update_qpoint_buffer!, prepare_dof_based_material_workspace!
+export evaluate_entry, evaluate_mass_entry, compute_internal_force_value
 export reference_fields
 
 # DOF-based assembler (CPU + KernelAbstractions)
 export DOFBasedCOOAssembler, DOFBasedCOOCache
+export UniformKernelColumn, PerElementKernelColumn
+export prototype_kernel, kernel_at, assert_homogeneous_dof_based_kernel_column!
+export ka_per_element_kernel_column_supported
 export DOFBasedCOOCacheKA, sync_from_cpu!, to_float32
-export apply_K!, apply_K_masked_rows!, apply_K_owned_rows!, apply_K_owned_rows_from_packed!, apply_K_contributions!, apply_M!, assemble_M!
+export apply_K!, apply_K_masked_rows!, apply_K_owned_rows!, apply_K_owned_rows_from_packed!, apply_K_contributions!, apply_M!, assemble_M!, equilibrium_residual!
+export apply_f_int_owned_rows!, apply_f_int_owned_rows_from_packed!
+export assemble_internal_force!, nonlinear_equilibrium_residual!
 
 export AbstractMultiplyGhostLayout, LocalMultiplyLayout, ReferenceMaskMultiplyLayout
 export prepare_multiply_workspace!
@@ -224,21 +232,27 @@ export unpack_halo_recv_to_packed!, pack_halo_send_from_packed!
 export owned_dot_packed, owned_norm²_packed, owned_dot_global_vecs
 export allocate_halo_recv_buffers, allocate_halo_send_buffers, partitioned_matvec_workspace
 export partitioned_mpi_owned_matvec_workspace, allocate_exchange_matvec_halo_mpi_requests
-export simulate_halo_recv_from_global!, partitioned_owned_matvec!, exchange_matvec_halos_mpi!
-export mpi_owned_dot_global, mpi_owned_dot_local, mpi_partitioned_operator_matvec!, mpi_partitioned_operator_matvec_owned!
+export simulate_halo_recv_from_global!, partitioned_owned_matvec!, partitioned_owned_internal_force!, exchange_matvec_halos_mpi!
+export mpi_owned_dot_global, mpi_owned_dot_local, mpi_partitioned_operator_matvec!, mpi_partitioned_operator_matvec_owned!, mpi_partitioned_internal_force_owned!
 
 # Matrix-free operator + constraints + loads + preconditioners + eigensolve
-export AbstractMatrixFreeOperator, MatrixFreeOperator, MatrixFreeMassOperator
-export matrix_free_op
+export AbstractMatrixFreeOperator, MatrixFreeOperator, MatrixFreeMassOperator,
+    MatrixFreeOperatorKA, MatrixFreeMassOperatorKA, matrix_free_op_ka,
+    matrix_free_mass_op_ka
+export InternalForceOperator, NonlinearResidualOperator
+export matrix_free_op, internal_force_op, nonlinear_residual_op
 
 export AbstractDirichletConstraint, PenaltyDirichlet, EliminatedDirichlet
 export AbstractMultipointConstraint, LinearMPC
 export apply_constraint!, apply_constraint_pre!, apply_constraint_post!, apply_penalty_dirichlet_post_owned!, apply_penalty_dirichlet_post_ap_owned!
+export eliminated_dirichlet_free_indices,
+       extract_eliminated_dirichlet_subsystem,
+       prolongate_eliminated_dirichlet_solution
 export apply_constraint_diag!, apply_constraint_block_diag!
 
 export AbstractNeumannLoad, NodalForce, UniformBodyForce, UniformMixedDarcySource,
        MixedDarcyTet4BoundaryNormalFluxLoad, MixedDarcyHex8BoundaryNormalFluxLoad,
-       SurfaceLoad
+       SurfaceLoad, SurfaceScalarFluxOnField
 export apply_load!
 
 export JacobiPreconditioner,
@@ -263,11 +277,12 @@ export FacetMassKernel, EdgeMassKernel
 export HellingerReissnerKernel
 export HuWashizuKernel
 export compute_block!, compute_block_at_point
-export update_geometry_cache!, update_element_cache!, update_material_cache!
+export update_geometry_cache!, update_element_cache!, update_material_cache!, update_material_cache_stateless_strain!
 
 export HeatKernel, DarcyPotentialKernel,
     AbstractDarcyMixedRT0P0Kernel, DarcyMixedRT0P0Kernel, DarcyMixedHex8RT0P0Kernel
-export ThermoElasticKernel, ThermoElasticQPBuffer
+export ThermoElasticKernel, ThermoElasticQPBuffer, BiotPoroelasticKernel
+export ThermoPoroelasticKernel, ThermoPoroelasticQPBuffer
 
 # ---------------------------------------------------------------------------
 # Element template
