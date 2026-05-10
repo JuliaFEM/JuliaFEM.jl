@@ -1,12 +1,13 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 #=
 Microkernel contract for the DOF-based assembler.
 
 The DOF-based assembler walks one DOF row at a time and asks the kernel
 for a single scalar `K[i, j]`. To keep the assembler kernel-agnostic and
-zero-allocation, every kernel must opt in by implementing three pieces:
+zero-allocation, every kernel must opt in by implementing three pieces
+plus one Pass~1 material hook:
 
 1. `qpoint_buffer_eltype(kernel)` — what type of value the kernel needs
    stored once per quadrature point per element. For continuum mechanics
@@ -20,17 +21,32 @@ zero-allocation, every kernel must opt in by implementing three pieces:
    use an extra `eid` argument only on the internal
    `_dof_based_fill_qpoint_buffer!` dispatch path in `dof_based_coo.jl`.
 
-3. `evaluate_entry(kernel, geometry_cache, qpoint_buffer, layout_i, layout_j, elem_id)`
+3. `prepare_dof_based_material_workspace!(kernel, material_workspace,
+   geometry_cache, element_cache, eid, configuration, global_material_cache,
+   Δt, ::Type{E})` — fill each integration point of `material_workspace`
+   for this element before `update_qpoint_buffer!`. The default seeds every
+   IP from [`reference_fields`](@ref)`(kernel)`; continuum mechanics overrides
+   this for strain- and state-dependent materials (see
+   `domains/continuum/dof_based_pass1.jl`).
+
+4. `evaluate_entry(kernel, geometry_cache, qpoint_buffer, layout_i, layout_j, elem_id)`
    — the actual microkernel. Returns the single scalar `K[i, j]` for the
    local DOF pair `(i, j)` described by two `DOFLayoutEntry` values.
    `elem_id` is the volume element index (needed for facet-oriented kernels).
    Called inside Pass 2 of `assemble!`, in a hot loop, so it must also
    be allocation-free.
 
-Together these three methods let the DOF-based assembler dispatch on any
-`AbstractKernel` without baking in continuum-specific assumptions, while
-keeping the inner loop fully type-stable thanks to the compile-time
-`local_dof_layout(E)` table that produces the `DOFLayoutEntry` arguments.
+Together these methods let the DOF-based assembler dispatch on any
+`AbstractKernel` without baking in domain-specific Pass~1 logic in the
+driver, while keeping the inner loop fully type-stable thanks to the
+compile-time `local_dof_layout(E)` table that produces the `DOFLayoutEntry`
+arguments.
+
+The KernelAbstractions stiffness / mass matvecs (`dof_based_coo_ka.jl`) call
+the same `evaluate_entry` / `evaluate_mass_entry` with one prototype kernel per
+launch; per-element variation must live in `qpoint_buffer` columns unless the
+volume kernel column is uniform. For `PerElementKernelColumn`, see
+`ka_per_element_kernel_column_supported` in `dof_based/kernel_column.jl`.
 =#
 
 """
@@ -142,3 +158,50 @@ A kernel must define this method; there is no default — the previous
 assembler accidentally continuum-only.
 """
 function reference_fields end
+
+"""
+    prepare_dof_based_material_workspace!(
+        kernel,
+        material_workspace,
+        geometry_cache,
+        element_cache,
+        eid::Int,
+        configuration::Union{Nothing,AbstractVector{Float64}},
+        global_material_cache::Union{Nothing,GlobalMaterialCache},
+        Δt::Float64,
+        ::Type{E},
+    ) -> Nothing
+
+DOF-based Pass~1 (element loop): populate every integration point of
+`material_workspace` for this element before [`update_qpoint_buffer!`](@ref).
+
+The default implementation copies [`reference_fields`](@ref)`(kernel)` to
+all IPs. Kernels that need configuration-dependent or stateful constitutive
+updates (e.g. [`ContinuumKernel`](@ref)) should override this method.
+
+Must be allocation-free on the hot path.
+"""
+function prepare_dof_based_material_workspace! end
+
+@inline function prepare_dof_based_material_workspace!(
+    kernel::AbstractKernel,
+    material_workspace::AssemblyMaterialWorkspace,
+    ::GeometryCache,
+    element_cache::ElementCache,
+    ::Int,
+    ::Union{Nothing,AbstractVector{Float64}},
+    ::Union{Nothing,GlobalMaterialCache},
+    ::Float64,
+    ::Type{<:AbstractElement},
+)
+    fields_ref_e, empty_state_e = reference_fields(kernel)
+    fields_mw = getfield(material_workspace, 1)
+    states_mw = getfield(material_workspace, 2)
+    ips_ec = getfield(element_cache, :ips)
+    nips = length(ips_ec)
+    @inbounds for q in 1:nips
+        fields_mw[q] = fields_ref_e
+        states_mw[q] = empty_state_e
+    end
+    return nothing
+end

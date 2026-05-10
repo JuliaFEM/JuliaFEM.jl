@@ -1,8 +1,8 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
-# Single-partition orchestration for matrix-free `K*x` on owned rows using a
-# packed patch + matvec halo exchange (MPI-ready).
+# Single-partition orchestration for matrix-free `K*x` and owned-row internal
+# force using a packed patch + matvec halo exchange (MPI-ready).
 
 """
     allocate_halo_recv_buffers(exchange::RankHaloExchange) -> Vector{Vector{Float64}}
@@ -109,8 +109,15 @@ end
 """
     partitioned_owned_matvec!(
         y_contrib, x_global, packed, work, recv_vals,
+        layout, exchange, cache, assembler, mesh;
+        fill_recv_from_global = true,
+        configuration = nothing, global_material_cache = nothing, Δt = 0.0,
+    ) -> y_contrib
+    partitioned_owned_matvec!(
+        y_contrib, x_global, packed, work, recv_vals,
         layout, exchange, cache, assembler, kernel, mesh;
         fill_recv_from_global = true,
+        configuration = nothing, global_material_cache = nothing, Δt = 0.0,
     ) -> y_contrib
 
 One partition’s additive contribution to `K*x` on **owned rows** (zeros elsewhere
@@ -121,7 +128,10 @@ metadata:
 2. If `fill_recv_from_global` — [`simulate_halo_recv_from_global!`](@ref)`(recv_vals, x_global, exchange)` (skip when MPI fills `recv_vals`)
 3. [`unpack_halo_recv_to_packed!`](@ref)`(packed, recv_vals, exchange, layout)`
 4. [`fill!`](@ref)`(work, 0)` then [`expand_packed_to_global!`](@ref)`(work, packed, layout)`
-5. [`apply_K_owned_rows!`](@ref)`(y_contrib, layout.owned_rows, ...)`
+5. [`apply_K_owned_rows!`](@ref)`(y_contrib, layout.owned_rows, …; configuration, …)`
+
+Optional keywords `configuration`, `global_material_cache`, and `Δt` match
+[`apply_K!`](@ref) / [`apply_K_owned_rows!`](@ref) (nonlinear continuum Pass~1).
 
 Requires `exchange.part == layout.part`, `length(y_contrib) == cache.ndofs`, and
 matching `work` / `packed` sizes from [`partitioned_matvec_workspace`](@ref).
@@ -130,6 +140,8 @@ Summing `y_contrib` over disjoint owned partitions recovers global [`apply_K!`](
 when `x_global` is the full vector (serial replica).
 
 Allocation-free after workspace setup when `fill_recv_from_global` follows the same pattern.
+
+The form with `kernel` ignores it (backward compatibility).
 """
 function partitioned_owned_matvec!(
     y_contrib::AbstractVector{Float64},
@@ -141,9 +153,11 @@ function partitioned_owned_matvec!(
     exchange::RankHaloExchange,
     cache::DOFBasedCOOCache,
     assembler::DOFBasedCOOAssembler,
-    kernel::AbstractKernel,
     mesh::AbstractMesh;
     fill_recv_from_global::Bool = true,
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
 )
     exchange.part == layout.part ||
         throw(ArgumentError("exchange.part $(exchange.part) != layout.part $(layout.part)"))
@@ -164,11 +178,149 @@ function partitioned_owned_matvec!(
     unpack_halo_recv_to_packed!(packed, recv_vals, exchange, layout)
     fill!(work, 0.0)
     expand_packed_to_global!(work, packed, layout)
-    apply_K_owned_rows!(y_contrib, layout.owned_rows, cache, assembler, kernel, mesh, work)
+    apply_K_owned_rows!(
+        y_contrib, layout.owned_rows, cache, assembler, mesh, work;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
     return y_contrib
 end
 
+function partitioned_owned_matvec!(
+    y_contrib::AbstractVector{Float64},
+    x_global::AbstractVector{Float64},
+    packed::AbstractVector{Float64},
+    work::AbstractVector{Float64},
+    recv_vals::Vector{Vector{Float64}},
+    layout::PartitionPackedLayout,
+    exchange::RankHaloExchange,
+    cache::DOFBasedCOOCache,
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh;
+    fill_recv_from_global::Bool = true,
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+)
+    _depwarn_redundant_kernel_arg!(:partitioned_owned_matvec!)
+    return partitioned_owned_matvec!(
+        y_contrib, x_global, packed, work, recv_vals, layout, exchange, cache, assembler, mesh;
+        fill_recv_from_global = fill_recv_from_global,
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+end
+
 """
+    partitioned_owned_internal_force!(
+        y_contrib, u_global, packed, work, recv_vals,
+        layout, exchange, cache, assembler, mesh;
+        fill_recv_from_global = true,
+        configuration = nothing, global_material_cache = nothing, Δt = 0.0,
+    ) -> y_contrib
+    partitioned_owned_internal_force!(
+        y_contrib, u_global, packed, work, recv_vals,
+        layout, exchange, cache, assembler, kernel, mesh;
+        fill_recv_from_global = true,
+        configuration = nothing, global_material_cache = nothing, Δt = 0.0,
+    ) -> y_contrib
+
+One partition’s additive contribution to the nonlinear internal force
+[`assemble_internal_force!`](@ref) on **owned rows** (zeros elsewhere in
+`y_contrib`), using the same packed patch and halo metadata as
+[`partitioned_owned_matvec!`](@ref):
+
+1. [`gather_owned_from_global_to_packed!`](@ref)`(packed, u_global, layout)`
+2. If `fill_recv_from_global` — [`simulate_halo_recv_from_global!`](@ref)`(recv_vals, u_global, exchange)`
+3. [`unpack_halo_recv_to_packed!`](@ref)
+4. [`fill!`](@ref)`(work, 0)` then [`expand_packed_to_global!`](@ref)`(work, packed, layout)`
+5. [`apply_f_int_owned_rows!`](@ref)`(y_contrib, layout.owned_rows, …; configuration, …)`
+
+When `configuration === nothing`, Pass~1 uses the expanded patch displacement
+`work`. Otherwise `configuration` is forwarded to [`_prepare_caches!`](@ref)
+explicitly (length `cache.ndofs`).
+
+The form with `kernel` ignores it (backward compatibility).
+"""
+function partitioned_owned_internal_force!(
+    y_contrib::AbstractVector{Float64},
+    u_global::AbstractVector{Float64},
+    packed::AbstractVector{Float64},
+    work::AbstractVector{Float64},
+    recv_vals::Vector{Vector{Float64}},
+    layout::PartitionPackedLayout,
+    exchange::RankHaloExchange,
+    cache::DOFBasedCOOCache,
+    assembler::DOFBasedCOOAssembler,
+    mesh::AbstractMesh;
+    fill_recv_from_global::Bool = true,
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+)
+    exchange.part == layout.part ||
+        throw(ArgumentError("exchange.part $(exchange.part) != layout.part $(layout.part)"))
+    nd = cache.ndofs
+    length(y_contrib) == nd ||
+        throw(DimensionMismatch("y_contrib length $(length(y_contrib)), ndofs $nd"))
+    length(u_global) == nd ||
+        throw(DimensionMismatch("u_global length $(length(u_global)), ndofs $nd"))
+    length(work) == nd ||
+        throw(DimensionMismatch("work length $(length(work)), ndofs $nd"))
+    layout.ndofs_global == nd ||
+        throw(DimensionMismatch("layout.ndofs_global $(layout.ndofs_global), cache.ndofs $nd"))
+
+    gather_owned_from_global_to_packed!(packed, u_global, layout)
+    if fill_recv_from_global
+        simulate_halo_recv_from_global!(recv_vals, u_global, exchange)
+    end
+    unpack_halo_recv_to_packed!(packed, recv_vals, exchange, layout)
+    fill!(work, 0.0)
+    expand_packed_to_global!(work, packed, layout)
+    prep_cfg = configuration === nothing ? work : configuration
+    apply_f_int_owned_rows!(
+        y_contrib, layout.owned_rows, cache, assembler, mesh;
+        configuration = prep_cfg,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+    return y_contrib
+end
+
+function partitioned_owned_internal_force!(
+    y_contrib::AbstractVector{Float64},
+    u_global::AbstractVector{Float64},
+    packed::AbstractVector{Float64},
+    work::AbstractVector{Float64},
+    recv_vals::Vector{Vector{Float64}},
+    layout::PartitionPackedLayout,
+    exchange::RankHaloExchange,
+    cache::DOFBasedCOOCache,
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh;
+    fill_recv_from_global::Bool = true,
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+)
+    _depwarn_redundant_kernel_arg!(:partitioned_owned_internal_force!)
+    return partitioned_owned_internal_force!(
+        y_contrib, u_global, packed, work, recv_vals, layout, exchange, cache, assembler, mesh;
+        fill_recv_from_global = fill_recv_from_global,
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+end
+
+"""
+    apply_K_owned_rows_from_packed!(
+        Ap_owned, packed, layout, cache, assembler, mesh,
+    ) -> Ap_owned
     apply_K_owned_rows_from_packed!(
         Ap_owned, packed, layout, cache, assembler, kernel, mesh,
     ) -> Ap_owned
@@ -183,16 +335,20 @@ Requires every stencil neighbor `j` of those rows to satisfy `layout.global_to_p
 
 `length(Ap_owned) == layout.n_owned`, `length(packed) ≥ layout.n_packed`, `layout.ndofs_global == cache.ndofs`.
 Allocation-free after warmup.
+
+The form with `kernel` ignores it (backward compatibility).
 """
 function apply_K_owned_rows_from_packed!(
     Ap_owned::AbstractVector{Float64},
     packed::AbstractVector{Float64},
     layout::PartitionPackedLayout,
-    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
     assembler::DOFBasedCOOAssembler,
-    kernel::AbstractKernel,
-    mesh::AbstractMesh,
-) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType}
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
     ndofs = cache.ndofs
     layout.ndofs_global == ndofs ||
         throw(DimensionMismatch(
@@ -212,7 +368,12 @@ function apply_K_owned_rows_from_packed!(
     g2p = layout.global_to_packed
     p2g = layout.packed_to_global
 
-    _prepare_caches!(cache, kernel, mesh)
+    _prepare_caches!(
+        cache, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
 
     elements         = cache.elements
     element_caches   = cache.element_caches
@@ -246,13 +407,14 @@ function apply_K_owned_rows_from_packed!(
 
             entry_i      = loc_layout[local_i]
             dofs_elem    = element_cache.dofs
+            k_e          = kernel_at(cache, Int(elem_id_val))
 
             @inbounds for local_j in 1:ndofs_elem
                 dof_j_global = Int(dofs_elem[local_j])
                 entry_j      = loc_layout[local_j]
 
                 K_ij = evaluate_entry(
-                    kernel,
+                    k_e,
                     geometry_cache,
                     qp_buffer,
                     entry_i,
@@ -273,4 +435,25 @@ function apply_K_owned_rows_from_packed!(
     end
 
     return Ap_owned
+end
+
+function apply_K_owned_rows_from_packed!(
+    Ap_owned::AbstractVector{Float64},
+    packed::AbstractVector{Float64},
+    layout::PartitionPackedLayout,
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh;
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
+    _depwarn_redundant_kernel_arg!(:apply_K_owned_rows_from_packed!)
+    return apply_K_owned_rows_from_packed!(
+        Ap_owned, packed, layout, cache, assembler, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
 end

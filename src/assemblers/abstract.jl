@@ -1,5 +1,5 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 """
 Abstract assembler type hierarchy.
@@ -118,10 +118,10 @@ multi-thread row-parallel CPU is planned.
 # Usage
 
 ```julia
-elements    = create_elements!(mesh, kernel, dof_handler)  # Vector{Element}
+elements, handler = create_elements!(mesh, ET)
 assembler   = DOFBasedCOOAssembler()
-cache       = create_cache(assembler, elements, dof_handler, mesh, kernel)
-assemble!(cache, assembler, kernel, mesh)  # DOF-wise traversal!
+cache       = create_cache(assembler, elements, handler, mesh, kernel)
+assemble!(cache, assembler, mesh)  # DOF-wise traversal (kernel lives in cache)
 K, f        = extract_system(cache)
 ```
 """
@@ -252,7 +252,7 @@ Trait answering whether the matrix-free stiffness operator built around
 `kernel` is symmetric positive-definite. The default is `true` (single-field
 elliptic problems such as continuum displacement, heat). Mixed / saddle-point
 kernels (`MixedUPKernel`, `StokesMixedKernel`, `HellingerReissnerKernel`,
-`HuWashizuKernel`) override this to `false` so Krylov stacks (CG, etc.) do
+`HuWashizuKernel`, `BiotPoroelasticKernel`, `ThermoPoroelasticKernel`) override this to `false` so Krylov stacks (CG, etc.) do
 not pick the SPD branch.
 """
 @inline operator_is_posdef(::AbstractKernel) = true
