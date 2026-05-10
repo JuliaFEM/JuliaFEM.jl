@@ -40,6 +40,62 @@ jobs:
           test_args: assemblers
           coverage: false
 
+  # Fast path: Biot poroelastic + thermo-poroelastic (high churn, MPI-free).
+  test-domains-multiphysics:
+    name: Julia ${{ matrix.version }} - poroelastic + thermo-poroelastic (fast)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+
+      - name: Layer contract (src architecture)
+        run: julia scripts/check_layer_contract.jl
+
+      - uses: julia-actions/cache@v2
+
+      - uses: julia-actions/julia-buildpkg@v1
+
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          test_args: domains/poroelastic domains/thermo_poroelastic
+          coverage: false
+
+  # Fast path: high-level physics API + field helpers (MPI-free).
+  test-physics-fields:
+    name: Julia ${{ matrix.version }} - physics + fields (fast)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+
+      - name: Layer contract (src architecture)
+        run: julia scripts/check_layer_contract.jl
+
+      - uses: julia-actions/cache@v2
+
+      - uses: julia-actions/julia-buildpkg@v1
+
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          test_args: physics fields
+          coverage: false
+
   mpi-partitioned-matvec-smoke:
     name: MPI partitioned matvec + CG smoke (3 ranks)
     runs-on: ubuntu-latest
@@ -55,7 +111,7 @@ jobs:
       # MPI is a weak dependency: the default package environment does not install it.
       # Use a throwaway env with `Pkg.develop` + `Pkg.add("MPI")` so `using MPI` loads
       # `JuliaFEMMPIExt` when running the smoke driver under mpiexec.
-      - name: mpiexec smoke scripts (matvec + CG)
+      - name: mpiexec smoke scripts (matvec + CG + internal force)
         working-directory: ${{ github.workspace }}
         run: |
           export MPI_SMOKE_ENV="$(mktemp -d)"
@@ -69,7 +125,11 @@ jobs:
             Pkg.instantiate()
             using MPI
             mpidir = joinpath(root, "test", "mpi")
-            for script_name in ("partitioned_matvec_smoke.jl", "partitioned_matvec_cg.jl")
+            for script_name in (
+                "partitioned_matvec_smoke.jl",
+                "partitioned_matvec_cg.jl",
+                "partitioned_internal_force_smoke.jl",
+            )
               script = joinpath(mpidir, script_name)
               run(`$(MPI.mpiexec()) -n 3 $(Base.julia_cmd()) --project=$envdir --startup-file=no $script`)
             end
