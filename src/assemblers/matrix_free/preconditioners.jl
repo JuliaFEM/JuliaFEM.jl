@@ -1,5 +1,5 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 """
 Lightweight, matrix-free preconditioners for Krylov solves built on top
@@ -32,8 +32,8 @@ the `A` block when that slice is SPD enough for an incomplete factorisation.
 using IterativeSolvers, LinearOperators, JuliaFEM
 
 bc = PenaltyDirichlet(fixed_dofs, vals; penalty = 1e8)
-op = matrix_free_op(cache, asm, kernel, mesh; dirichlet = bc)
-P  = JacobiPreconditioner(cache, asm, kernel, mesh; dirichlet = bc)
+op = matrix_free_op(cache, asm, mesh; dirichlet = bc)
+P  = JacobiPreconditioner(cache, asm, mesh; dirichlet = bc)
 
 linop = LinearOperator(Float64, n, n, true, true, op)
 
@@ -57,15 +57,14 @@ using SparseArrays: SparseMatrixCSC, sparse, nnz, rowvals, nonzeros, getcolptr
 
 Diagonal preconditioner with stored *inverse* diagonal so that
 `ldiv!(P, x)` is a single multiplication per entry. Direct constructor;
-prefer the `(cache, asm, kernel, mesh; dirichlet)` factory for the
-common matrix-free path.
+prefer the `(cache, asm, mesh; dirichlet)` factory for the common matrix-free path.
 """
 struct JacobiPreconditioner
     inv_diag::Vector{Float64}
 end
 
 """
-    JacobiPreconditioner(cache, asm, kernel, mesh; dirichlet = nothing, mpc = nothing)
+    JacobiPreconditioner(cache, asm, mesh; dirichlet = nothing, mpc = nothing)
 
 Build a Jacobi preconditioner from the matrix-free operator. Internally:
 
@@ -78,16 +77,21 @@ Build a Jacobi preconditioner from the matrix-free operator. Internally:
   3. invert entry-wise (zeros are kept as `1.0` so the preconditioner
      stays well-defined; in practice every DOF row of `K` has a positive
      diagonal in any well-posed FEM problem).
+
+    JacobiPreconditioner(cache, asm, kernel, mesh; …)
+
+Four-argument backward-compatibility overload: `kernel` is ignored; volume
+physics come from `cache.kernel_column` only (same as [`compute_diagonal!`](@ref)).
+Emits `Base.depwarn` once per session (shared with other redundant-kernel overloads).
 """
 function JacobiPreconditioner(cache::DOFBasedCOOCache,
                               asm::DOFBasedCOOAssembler,
-                              kernel::AbstractKernel,
                               mesh::AbstractMesh;
                               dirichlet::Union{AbstractDirichletConstraint, Nothing} = nothing,
                               mpc::Union{AbstractMultipointConstraint, Nothing} = nothing)
     n = cache.ndofs
     d = zeros(Float64, n)
-    compute_diagonal!(d, cache, asm, kernel, mesh)
+    compute_diagonal!(d, cache, asm, mesh)
     if dirichlet !== nothing
         apply_constraint_diag!(d, dirichlet)
     end
@@ -100,6 +104,15 @@ function JacobiPreconditioner(cache::DOFBasedCOOCache,
         inv_d[i] = d[i] != 0.0 ? 1.0 / d[i] : 1.0
     end
     return JacobiPreconditioner(inv_d)
+end
+
+@inline function JacobiPreconditioner(cache::DOFBasedCOOCache,
+                                      asm::DOFBasedCOOAssembler,
+                                      ::AbstractKernel,
+                                      mesh::AbstractMesh;
+                                      kwargs...)
+    _depwarn_redundant_kernel_arg!(:JacobiPreconditioner)
+    return JacobiPreconditioner(cache, asm, mesh; kwargs...)
 end
 
 # `ldiv!(y, P, x)` is the contract IterativeSolvers.cg! / Krylov.jl call
@@ -143,7 +156,6 @@ end
     compute_block_diagonal!(blocks::Array{Float64,3},
                             cache::DOFBasedCOOCache,
                             asm::DOFBasedCOOAssembler,
-                            kernel::AbstractKernel,
                             mesh::AbstractMesh) -> blocks
 
 Assemble the `N × N` block-diagonal of the stiffness matrix into
@@ -153,14 +165,18 @@ for vector fields).
 
 Same DOF-by-element traversal as `assemble!` but only the entries with
 both DOFs in the same block contribute. Allocation-free after warmup.
+
+    compute_block_diagonal!(blocks, cache, asm, kernel, mesh)
+
+Five-argument overload: `kernel` is ignored; volume kernels are read from
+`cache.kernel_column`. Emits `Base.depwarn` once per session when used.
 """
 function compute_block_diagonal!(
     blocks::Array{Float64,3},
-    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
     asm::DOFBasedCOOAssembler,
-    kernel::AbstractKernel,
     mesh::AbstractMesh,
-) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType}
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
     N, N2, n_blocks = size(blocks)
     @assert N == N2 (
         "compute_block_diagonal!: blocks must be (N,N,n_blocks); got $(size(blocks))")
@@ -169,7 +185,7 @@ function compute_block_diagonal!(
         "cache.ndofs = $(cache.ndofs)")
 
     fill!(blocks, 0.0)
-    _prepare_caches!(cache, kernel, mesh)
+    _prepare_caches!(cache, mesh)
 
     elements         = cache.elements
     element_caches   = cache.element_caches
@@ -180,6 +196,7 @@ function compute_block_diagonal!(
     ndofs_elem = length(layout)
 
     @inbounds for elem_idx in 1:length(elements)
+        k_e = kernel_at(cache, elem_idx)
         ec = element_caches[elem_idx]
         gc = geometry_caches[elem_idx]
         qp = view(qp_buffers, :, elem_idx)
@@ -200,13 +217,24 @@ function compute_block_diagonal!(
                 comp_j  = mod(dof_j - 1, N) + 1
                 entry_j = layout[lj]
 
-                K_ij = evaluate_entry(kernel, gc, qp, entry_i, entry_j, elem_idx)
+                K_ij = evaluate_entry(k_e, gc, qp, entry_i, entry_j, elem_idx)
                 blocks[comp_i, comp_j, blk_i] += K_ij
             end
         end
     end
 
     return blocks
+end
+
+@inline function compute_block_diagonal!(
+    blocks::Array{Float64,3},
+    cache::DOFBasedCOOCache{T,B,IPS,E,GC,Buf,FieldType,StateType,KS},
+    asm::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh,
+) where {T,B,IPS,E<:AbstractElement,GC,Buf,FieldType,StateType,KS}
+    _depwarn_redundant_kernel_arg!(:compute_block_diagonal!)
+    return compute_block_diagonal!(blocks, cache, asm, mesh)
 end
 
 """
@@ -276,7 +304,7 @@ struct BlockJacobiPreconditioner{N}
 end
 
 """
-    BlockJacobiPreconditioner{N}(cache, asm, kernel, mesh; dirichlet = nothing)
+    BlockJacobiPreconditioner{N}(cache, asm, mesh; dirichlet = nothing)
 
 Build a block-Jacobi preconditioner from the matrix-free operator.
 Internally:
@@ -288,11 +316,14 @@ Internally:
      singular blocks, fall back to identity to keep the preconditioner
      well-defined (a singular nodal block typically signals an ill-posed
      problem, so this is intentionally permissive).
+
+    BlockJacobiPreconditioner{N}(cache, asm, kernel, mesh; …)
+
+Five-argument overload: `kernel` is ignored (emits `Base.depwarn` once per session).
 """
 function BlockJacobiPreconditioner{N}(
     cache::DOFBasedCOOCache,
     asm::DOFBasedCOOAssembler,
-    kernel::AbstractKernel,
     mesh::AbstractMesh;
     dirichlet::Union{AbstractDirichletConstraint, Nothing} = nothing,
 ) where {N}
@@ -302,7 +333,7 @@ function BlockJacobiPreconditioner{N}(
         "BlockJacobiPreconditioner{N=$N}: ndofs = $(cache.ndofs) is not divisible by N")
 
     blocks = zeros(Float64, N, N, n_blocks)
-    compute_block_diagonal!(blocks, cache, asm, kernel, mesh)
+    compute_block_diagonal!(blocks, cache, asm, mesh)
     if dirichlet !== nothing
         apply_constraint_block_diag!(blocks, dirichlet)
     end
@@ -324,6 +355,17 @@ function BlockJacobiPreconditioner{N}(
     end
 
     return BlockJacobiPreconditioner{N}(inv_blocks)
+end
+
+@inline function BlockJacobiPreconditioner{N}(
+    cache::DOFBasedCOOCache,
+    asm::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh;
+    kwargs...,
+) where {N}
+    _depwarn_redundant_kernel_arg!(:BlockJacobiPreconditioner)
+    return BlockJacobiPreconditioner{N}(cache, asm, mesh; kwargs...)
 end
 
 # ldiv!(y, P, x): y = P^{-1} x, block by block.
@@ -504,7 +546,7 @@ end
 
 Lower-triangular Incomplete-Cholesky preconditioner. Build it with
 either `ICholPreconditioner(K::SparseMatrixCSC)` (factor an existing
-SPD matrix) or `ICholPreconditioner(cache, asm, kernel, mesh; dirichlet)`
+SPD matrix) or `ICholPreconditioner(cache, asm, mesh; dirichlet)`
 (assemble + factor in one shot for the matrix-free workflow).
 
 `ldiv!(P, x)` solves `L L^T y = x` via two sparse triangular solves
@@ -583,30 +625,42 @@ function ICholPreconditioner(K::SparseMatrixCSC{Float64,Int})
 end
 
 """
-    ICholPreconditioner(cache::DOFBasedCOOCache, asm, kernel, mesh;
+    ICholPreconditioner(cache::DOFBasedCOOCache, asm, mesh;
                         dirichlet = nothing) -> ICholPreconditioner
 
 Convenience constructor for the matrix-free workflow:
 
-    1. assemble K via `assemble!(cache, asm, kernel, mesh)` and
-       extract it with `extract_system(cache)`,
+    1. assemble K via `assemble!(cache, asm, mesh)` and extract it with
+       `extract_system(cache)`,
     2. apply the Dirichlet constraint (if given) to `K`,
     3. build `IC(0)` of the modified `K`.
 
 This *does* materialise the sparse `K` once — the price of IC(0). The
 returned preconditioner then plugs into the matrix-free Krylov solve.
+
+    ICholPreconditioner(cache, asm, kernel, mesh; …)
+
+Four-argument overload: `kernel` is ignored (same as [`assemble!`](@ref)).
 """
 function ICholPreconditioner(cache::DOFBasedCOOCache,
                              asm::DOFBasedCOOAssembler,
-                             kernel::AbstractKernel,
                              mesh::AbstractMesh;
                              dirichlet::Union{AbstractDirichletConstraint, Nothing} = nothing)
-    assemble!(cache, asm, kernel, mesh)
+    assemble!(cache, asm, mesh)
     K, _ = extract_system(cache)
     if dirichlet !== nothing
         apply_constraint!(K, dirichlet)
     end
     return ICholPreconditioner(K)
+end
+
+@inline function ICholPreconditioner(cache::DOFBasedCOOCache,
+                                     asm::DOFBasedCOOAssembler,
+                                     ::AbstractKernel,
+                                     mesh::AbstractMesh;
+                                     kwargs...)
+    _depwarn_redundant_kernel_arg!(:ICholPreconditioner)
+    return ICholPreconditioner(cache, asm, mesh; kwargs...)
 end
 
 # Crout left-looking IC(0) on CSC storage. Returns the factor `L`

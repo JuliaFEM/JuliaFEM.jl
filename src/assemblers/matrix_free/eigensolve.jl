@@ -1,5 +1,5 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 import IterativeSolvers
 import LinearOperators
@@ -226,18 +226,22 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    solve_eigenproblem(cache, asm, kernel, mesh;
+    solve_eigenproblem(cache, asm, mesh;
                        nev = 1, tol = 1e-8, maxiter = 200,
                        p = nothing, verbose = false,
                        dirichlet = nothing, mpc = nothing,
                        shift = 0.0) -> (λ, V)
+    solve_eigenproblem(cache, asm, kernel, mesh; …)
 
 Convenience wrapper around `lowest_eigenpairs`: assembles matrix-free
 `K` and `M` operators (via `apply_K!` / `apply_M!`) and runs subspace
 iteration to extract the lowest `nev` generalized eigenpairs of
-`K φ = λ M φ`.
+`K φ = λ M φ`. Volume kernels are read from `cache.kernel_column`.
 
-`dirichlet` and `mpc` are forwarded to `matrix_free_op` so the
+The four-argument form ignores `kernel` (backward compatibility; emits
+`Base.depwarn` once per session, same as the matrix-free operator overloads).
+
+`dirichlet` and `mpc` are forwarded to [`MatrixFreeOperator`](@ref) so the
 constrained operator is solved directly. `shift` adds `σ M` to `K`
 internally and subtracts `σ` from the returned eigenvalues — useful
 for problems with rigid-body / null-space modes (free-free elasticity,
@@ -245,22 +249,23 @@ unconstrained heat) where the unshifted `K` is singular and the inner
 CG cannot invert it. A shift slightly larger than the smallest
 non-trivial eigenvalue is sufficient.
 """
-function solve_eigenproblem(cache::DOFBasedCOOCache,
-                            asm::DOFBasedCOOAssembler,
-                            kernel::AbstractKernel,
-                            mesh::AbstractMesh;
-                            nev::Int = 1,
-                            tol::Real = 1e-8,
-                            maxiter::Int = 200,
-                            p::Union{Nothing,Int} = nothing,
-                            verbose::Bool = false,
-                            dirichlet = nothing,
-                            mpc = nothing,
-                            shift::Real = 0.0)
+function solve_eigenproblem(
+    cache::DOFBasedCOOCache,
+    asm::DOFBasedCOOAssembler,
+    mesh::AbstractMesh;
+    nev::Int = 1,
+    tol::Real = 1e-8,
+    maxiter::Int = 200,
+    p::Union{Nothing,Int} = nothing,
+    verbose::Bool = false,
+    dirichlet = nothing,
+    mpc = nothing,
+    shift::Real = 0.0,
+)
     n = cache.ndofs
-    op_K_base = MatrixFreeOperator(cache, asm, kernel, mesh;
+    op_K_base = MatrixFreeOperator(cache, asm, mesh;
                                    dirichlet = dirichlet, mpc = mpc)
-    op_M      = MatrixFreeMassOperator(cache, asm, kernel, mesh)
+    op_M      = MatrixFreeMassOperator(cache, asm, mesh)
 
     # Optional shift: K_shift = K + σ M  ⇒  λ_shift = λ + σ.
     op_K = if shift == 0.0
@@ -285,4 +290,15 @@ function solve_eigenproblem(cache::DOFBasedCOOCache,
         λ = λ .- Float64(shift)
     end
     return (λ, V)
+end
+
+@inline function solve_eigenproblem(
+    cache::DOFBasedCOOCache,
+    asm::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh;
+    kwargs...,
+)
+    _depwarn_redundant_kernel_arg!(:solve_eigenproblem)
+    return solve_eigenproblem(cache, asm, mesh; kwargs...)
 end
