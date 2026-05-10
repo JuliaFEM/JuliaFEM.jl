@@ -239,11 +239,13 @@ include("physics/discretization.jl")
 # ============================================================================
 include("mesh/refine.jl")
 include("mesh/structured.jl")
+include("mesh/gmsh_stub.jl")
+include("io/write_vtu.jl")
 
 include("domains/continuum/material_element_lab.jl")
 
-# External mesh formats (Gmsh, Abaqus, Netgen, …) → `Mesh{…}` belong in
-# optional package extensions or side packages; see `src/io/README.md`.
+# External mesh formats (Gmsh, VTK export, …) → `Mesh{…}` use optional
+# package extensions; see `src/io/README.md`.
 
 # ============================================================================
 # Optional older API surface (Problem / Assembly / Solver / Analysis,
