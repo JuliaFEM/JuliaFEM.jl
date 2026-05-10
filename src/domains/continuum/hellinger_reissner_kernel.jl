@@ -78,7 +78,7 @@ the discrete `σ`–`σ` block uses `G M⁻¹ G` in the Voigt component basis.
 ```julia
 S = @DOFSet{u::DOF{Displacement{3}, Vertex}, σ::DOF{SymmetricTensor{2,3}, Cell}}
 kernel = HellingerReissnerKernel(
-    ContinuumFormulation{FullThreeD}(),
+    ContinuumFormulation{ThreeDimensional}(),
     LinearElastic(E = 210e9, ν = 0.3),
 )
 ```

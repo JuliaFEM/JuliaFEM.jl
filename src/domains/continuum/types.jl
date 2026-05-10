@@ -1,12 +1,13 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 """
 Concrete types for continuum mechanics formulations and theories.
 
-Abstract types are in abstract.jl, implementations are in formulations.jl.
+Abstract types are in `abstract.jl`; concrete theory structs and
+`ContinuumFormulation` live in this file.
 
-Must be included after abstract.jl.
+Must be included after `abstract.jl`.
 """
 
 # ============================================================================
@@ -14,13 +15,15 @@ Must be included after abstract.jl.
 # ============================================================================
 
 """
-    FullThreeD <: AbstractContinuumTheory
+    ThreeDimensional <: AbstractContinuumTheory
 
-Full 3D analysis with no simplifications. All six stress / flux components
-are carried; no geometric simplifications. Domain-agnostic — used by both
-`ContinuumKernel` (solid mechanics) and `HeatKernel` (heat conduction).
+Bulk three-dimensional model: no in-plane or axisymmetric reduction. All
+independent tensor components are retained at the quadrature point (six for
+symmetric mechanical stress / strain; three for isotropic flux, etc.).
+Domain-agnostic tag shared by `ContinuumKernel`, `HeatKernel`, Darcy-style
+kernels, and other `ContinuumFormulation{…}` drivers on 3D meshes.
 """
-struct FullThreeD <: AbstractContinuumTheory end
+struct ThreeDimensional <: AbstractContinuumTheory end
 
 """
     PlaneStress <: AbstractContinuumTheory
@@ -60,7 +63,7 @@ Used as a type tag inside `ContinuumKernel{Theory, Material, Field}`.
 # Examples
 
 ```julia
-ContinuumFormulation{FullThreeD}()
+ContinuumFormulation{ThreeDimensional}()
 ContinuumFormulation{PlaneStress}()
 ContinuumFormulation{PlaneStrain}()
 ContinuumFormulation{Axisymmetric}()

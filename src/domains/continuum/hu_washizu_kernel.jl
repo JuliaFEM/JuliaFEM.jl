@@ -101,7 +101,7 @@ S = @DOFSet{
     sig::DOF{SymmetricTensor{2,3}, Cell},
 }
 kernel = HuWashizuKernel(
-    ContinuumFormulation{FullThreeD}(),
+    ContinuumFormulation{ThreeDimensional}(),
     LinearElastic(E = 210e9, ν = 0.3),
 )
 ```

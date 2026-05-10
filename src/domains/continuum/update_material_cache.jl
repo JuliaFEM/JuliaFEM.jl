@@ -1,5 +1,5 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 """
 Material cache update functions for continuum elements.
@@ -10,6 +10,7 @@ Computes stress, tangent modulus, and internal state at integration points.
 using Tensors
 using ..JuliaFEM: GlobalMaterialCache, get_old_state, set_state!
 using ..JuliaFEM: continuum_kinematics, SmallStrainKinematics, GreenLagrangeKinematics
+using ..JuliaFEM: material_behavior, StatelessStrainDependent
 
 # ============================================================================
 # GLOBAL MATERIAL CACHE — behavior-dispatched implementations
@@ -126,6 +127,55 @@ end
     return nothing
 end
 
+"""
+    update_material_cache_stateless_strain!(
+        material_workspace, geometry_cache, material, element_cache, Δt,
+    ) -> Nothing
+
+Finite-strain / hyperelastic branch with **no** persistent integration-point
+state in [`GlobalMaterialCache`](@ref). Requires
+`material_behavior(material) isa StatelessStrainDependent`.
+
+`element_cache.u_buffer` must hold the current nodal displacements (vertex
+ordering matching `geometry_cache.∇N_data`). Used by the DOF-based Pass 1
+when the configuration vector is supplied (or zero displacement when it
+is not).
+
+Zero-allocation in the integration loop.
+"""
+@inline function update_material_cache_stateless_strain!(
+    material_workspace::AssemblyMaterialWorkspace,
+    geometry_cache::GeometryCache,
+    material::AbstractMaterial,
+    element_cache::ElementCache,
+    Δt::Float64,
+)
+    material_behavior(material) isa StatelessStrainDependent ||
+        throw(ArgumentError("update_material_cache_stateless_strain! requires StatelessStrainDependent material"))
+    nips = length(element_cache.ips)
+    nnodes = length(geometry_cache.X)
+    I = one(Tensor{2,3,Float64,9})
+
+    @inbounds for q in 1:nips
+        F = I
+        for k in 1:nnodes
+            u_k = element_cache.u_buffer[k]
+            ∇N_k_q = geometry_cache.∇N_data[q, k]
+            F += u_k ⊗ ∇N_k_q
+        end
+
+        C_tensor = symmetric(F' ⋅ F)
+        E = SymmetricTensor{2,3}(0.5 * (C_tensor - I))
+
+        σ, 𝔻, _ = compute_stress(material, E, NamedTuple(), Δt)
+
+        @inbounds material_workspace.fields[q] = (σ=σ, 𝔻=𝔻)
+        material_workspace.states[q] = NamedTuple()
+    end
+
+    return nothing
+end
+
 # StatelessStrainDependent — strain at each IP, no persistent state.
 @inline function update_material_cache!(
     material_workspace::AssemblyMaterialWorkspace,
@@ -137,30 +187,9 @@ end
     elem_id::Int,
     Δt::Float64,
 )
-    nips = length(element_cache.ips)
-    nnodes = length(geometry_cache.X)
-    I = one(Tensor{2,3,Float64,9})
-
-    @inbounds for q in 1:nips
-        # Deformation gradient F = I + ∇u
-        F = I
-        for k in 1:nnodes
-            u_k = element_cache.u_buffer[k]
-            ∇N_k_q = geometry_cache.∇N_data[q, k]
-            F += u_k ⊗ ∇N_k_q
-        end
-
-        # Green–Lagrange strain E = ½(F'F − I)
-        C_tensor = symmetric(F' ⋅ F)
-        E = SymmetricTensor{2,3}(0.5 * (C_tensor - I))
-
-        σ, 𝔻, _ = compute_stress(material, E, NamedTuple(), 0.0)
-
-        @inbounds material_workspace.fields[q] = (σ=σ, 𝔻=𝔻)
-        material_workspace.states[q] = NamedTuple()
-    end
-
-    return nothing
+    return update_material_cache_stateless_strain!(
+        material_workspace, geometry_cache, material, element_cache, Δt,
+    )
 end
 
 # StatefulStrainDependent — read old state from `global_cache`, compute the

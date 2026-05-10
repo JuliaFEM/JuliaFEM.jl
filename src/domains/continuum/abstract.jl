@@ -1,5 +1,5 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 """
 Abstract types for continuum mechanics domain.
@@ -24,7 +24,7 @@ DESIGN PHILOSOPHY: Formulations are DOMAIN-AGNOSTIC dimensionality concepts.
 Formulation (domain-agnostic):
 - Describes DIMENSIONALITY and geometric simplifications
 - Used by multiple physics domains
-- Examples: FullThreeD, Axisymmetric
+- Examples: ThreeDimensional, Axisymmetric
 - Can be reused across continuum, heat, acoustics, etc.
 
 Theory (domain-specific):
@@ -34,8 +34,8 @@ Theory (domain-specific):
 
 # Why Separate Them?
 
-Problem: Heat transfer needs FullThreeD and Axisymmetric, just like continuum!
-If FullThreeD is defined in domains/continuum/, heat can't use it without duplication.
+Problem: Heat transfer needs ThreeDimensional and Axisymmetric, just like continuum!
+If ThreeDimensional is defined in domains/continuum/, heat can't use it without duplication.
 
 Solution: Formulations are dimensionality (shared), theories are physics (domain-specific).
 
@@ -43,7 +43,7 @@ Solution: Formulations are dimensionality (shared), theories are physics (domain
 
 ```julia
 # Domain-agnostic formulations
-FullThreeD()              # Used by: continuum, heat, poisson, acoustics
+ThreeDimensional()              # Used by: continuum, heat, poisson, acoustics
 Axisymmetric()            # Used by: continuum, heat, etc.
 
 # Domain-specific theories (in domains/*/types.jl)
@@ -75,7 +75,7 @@ PlaneStrain (ε_xx, ε_yy, ε_xy, ε_zz = 0):
 - Out-of-plane strain ε_zz = 0
 - Examples: Dams, tunnels, retaining walls, long cylinders
 
-FullThreeD:
+ThreeDimensional:
 - No simplifications, all six stress/strain components
 - Most accurate but most expensive
 
@@ -97,6 +97,6 @@ Plane Strain (thick section):
 - Constitutive: 3×3 reduced stiffness matrix (different from plane stress!)
 
 # See Also
-- Concrete theories: `continuum/types.jl` (FullThreeD, PlaneStress, PlaneStrain, Axisymmetric)
+- Concrete theories: `continuum/types.jl` (ThreeDimensional, PlaneStress, PlaneStrain, Axisymmetric)
 """
 abstract type AbstractContinuumTheory end

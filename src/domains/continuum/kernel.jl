@@ -1,5 +1,5 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 """
 Continuum mechanics kernel - defines the weak form only.
@@ -10,9 +10,10 @@ This module defines:
 3. Block builder: compute_stiffness_block (builds D×D blocks)
 
 The DOF-based / matrix-free assembler microkernel surface
-(`qpoint_buffer_eltype`, `update_qpoint_buffer!`, `evaluate_entry`,
-`evaluate_mass_entry`, `reference_fields`) is implemented further
-down in this file. Everything else (geometry preprocessing,
+(`qpoint_buffer_eltype`, `prepare_dof_based_material_workspace!`,
+`update_qpoint_buffer!`, `evaluate_entry`, `evaluate_mass_entry`,
+`reference_fields`) is implemented in this file and in
+`dof_based_pass1.jl`. Everything else (geometry preprocessing,
 integration, assembly, DOF mapping) belongs elsewhere.
 """
 
@@ -29,7 +30,7 @@ optional density (carried on the kernel rather than the material so
 existing material structs stay untouched).
 
 # Type Parameters
-- `Theory`: Continuum theory (FullThreeD, PlaneStress, PlaneStrain, Axisymmetric)
+- `Theory`: Continuum theory (ThreeDimensional, PlaneStress, PlaneStrain, Axisymmetric)
 - `Mat`: Material model (LinearElastic, NeoHookean, etc.)
 
 # Fields
@@ -45,7 +46,7 @@ existing material structs stay untouched).
 
 ```julia
 kernel = ContinuumKernel(
-    ContinuumFormulation{FullThreeD}(),
+    ContinuumFormulation{ThreeDimensional}(),
     LinearElastic(E=210e9, ν=0.3),
     Displacement{3}();
     density = 7850.0,        # for mass matrix; omit for static-only
@@ -221,6 +222,35 @@ keeps the entire chain inside the symmetric-tensor methods of
     B_k_α = symmetric(half * (grad_k ⊗ e_α + e_α ⊗ grad_k))
     B_l_β = symmetric(half * (grad_l ⊗ e_β + e_β ⊗ grad_l))
     return dcontract(B_k_α, dcontract(C, B_l_β))
+end
+
+"""
+    compute_internal_force_value(grad_i::Vec{3,F}, σ::SymmetricTensor{2,3,F}, α::Int) where {F}
+
+Scalar factor for the Galerkin internal-force row of a displacement test function
+associated with shape function ``N_i`` (gradient ``\\nabla N_i``) and Cartesian
+component ``\\alpha``:
+
+``\\sigma_{j\\alpha} \\, \\partial N_i / \\partial x_j``
+
+(sum over ``j = 1\\ldots 3``). The caller multiplies by ``\\det J \\cdot w`` per
+quadrature point and accumulates over IPs and elements.
+
+Cauchy stress ``\\sigma`` is the value stored in the material workspace at the IP
+(small-strain or finite-strain model, depending on the constitutive update).
+
+Zero allocation.
+"""
+@inline function compute_internal_force_value(
+    grad_i::Vec{3,F},
+    σ::SymmetricTensor{2,3,F},
+    α::Int,
+) where {F<:AbstractFloat}
+    s = zero(F)
+    @inbounds for j in 1:3
+        s += grad_i[j] * σ[j, α]
+    end
+    return s
 end
 
 """

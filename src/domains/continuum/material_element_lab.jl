@@ -101,7 +101,7 @@ function hex8_symmetric_uniaxial_eliminated_dirichlet(
 end
 
 """
-    material_lab_linear_elastic_uniaxial_solve(mesh, handler, elements, E, ν, δx; formulation = ContinuumFormulation{FullThreeD}())
+    material_lab_linear_elastic_uniaxial_solve(mesh, handler, elements, E, ν, δx; formulation = ContinuumFormulation{ThreeDimensional}())
 
 Assemble `K`, apply [`hex8_symmetric_uniaxial_eliminated_dirichlet`](@ref), solve `K u = 0`
 with elimination lift, and return `u`.
@@ -115,7 +115,7 @@ function material_lab_linear_elastic_uniaxial_solve(
     E::Float64,
     ν::Float64,
     δx::Float64;
-    formulation = ContinuumFormulation{FullThreeD}(),
+    formulation = ContinuumFormulation{ThreeDimensional}(),
 )
     material = LinearElastic(E = E, ν = ν)
     kernel = ContinuumKernel(formulation, material, Displacement{3}())

@@ -42,7 +42,7 @@ Newtonian Stokes mixed kernel: `u` (vertex, three components) + scalar
 `p` on `Cell`. See the file-level docstring for the weak form.
 
 # Fields
-- `formulation::ContinuumFormulation{Theory}` — geometric driver (`FullThreeD`, …)
+- `formulation::ContinuumFormulation{Theory}` — geometric driver (`ThreeDimensional`, …)
 - `μ::Float64` — dynamic viscosity (Stokes: `σ = 2μ ε(u)` with symmetric gradient `ε`)
 - `inv_bulk::Float64` — `1/κ` for the `−κ⁻¹ ∫ p q dΩ` term (`0` = incompressible)
 
@@ -50,7 +50,7 @@ Newtonian Stokes mixed kernel: `u` (vertex, three components) + scalar
 
 ```julia
 S = @DOFSet{u::DOF{Displacement{3}, Vertex}, p::DOF{Float64, Cell}}
-kernel = StokesMixedKernel(ContinuumFormulation{FullThreeD}(); μ = 1.0e-3, inv_bulk = 0.0)
+kernel = StokesMixedKernel(ContinuumFormulation{ThreeDimensional}(); μ = 1.0e-3, inv_bulk = 0.0)
 ```
 """
 struct StokesMixedKernel{Theory<:AbstractContinuumTheory} <: AbstractKernel

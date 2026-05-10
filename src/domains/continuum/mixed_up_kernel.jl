@@ -47,7 +47,7 @@ This is the first mixed kernel: `evaluate_entry` dispatches on
 using Tensors
 
 using ..JuliaFEM: AbstractKernel, AbstractFormulation
-using ..JuliaFEM: ContinuumFormulation, FullThreeD, AbstractContinuumTheory
+using ..JuliaFEM: ContinuumFormulation, ThreeDimensional, AbstractContinuumTheory
 using ..JuliaFEM: AbstractMaterial, Displacement
 using ..JuliaFEM: AssemblyMaterialWorkspace, compute_stress
 import ..JuliaFEM: qpoint_buffer_eltype, update_qpoint_buffer!, evaluate_entry,
@@ -63,7 +63,7 @@ Mixed `u`–`p` kernel: 3D vertex displacement (field 1) + scalar cell pressure
 (field 2). See the file-level docstring for the weak form.
 
 # Fields
-- `formulation::ContinuumFormulation{Theory}` — geometric driver (`FullThreeD`, …)
+- `formulation::ContinuumFormulation{Theory}` — geometric driver (`ThreeDimensional`, …)
 - `material::Mat` — mechanical material (`LinearElastic`, …)
 - `inv_bulk::Float64` — `1/κ` for the `−κ⁻¹ ∫ p q dΩ` term (`0` = incompressible limit)
 
@@ -72,7 +72,7 @@ Mixed `u`–`p` kernel: 3D vertex displacement (field 1) + scalar cell pressure
 ```julia
 S = @DOFSet{u::DOF{Displacement{3}, Vertex}, p::DOF{Float64, Cell}}
 kernel = MixedUPKernel(
-    ContinuumFormulation{FullThreeD}(),
+    ContinuumFormulation{ThreeDimensional}(),
     LinearElastic(E = 210e9, ν = 0.3),
     inv_bulk = 1.0 / (210e9 / 3),  # order-of-magnitude compressible term
 )
