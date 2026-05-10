@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "9a67e6793f96d4456a3ac13f063b9d5ad1df8c6a"
+project_hash = "5d2e867a4299eb5619f304e6a153e51462cc7b54"
 
 [[deps.Adapt]]
 deps = ["LinearAlgebra", "Requires"]
@@ -192,10 +192,14 @@ uuid = "f80590ac-b429-510a-8a99-e7c46989f22d"
 version = "0.5.2"
 
     [deps.JuliaFEM.extensions]
+    JuliaFEMGmshExt = ["Gmsh"]
     JuliaFEMMPIExt = ["MPI"]
+    JuliaFEMWriteVTKExt = ["WriteVTK"]
 
     [deps.JuliaFEM.weakdeps]
+    Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
     MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+    WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [[deps.JuliaSyntaxHighlighting]]
 deps = ["StyledStrings"]
