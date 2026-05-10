@@ -1,35 +1,27 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 #=
-Backend-agnostic GPU port of `apply_K!` using KernelAbstractions.jl.
+Backend-agnostic GPU port of DOF-based matrix-free stiffness and mass
+products using KernelAbstractions.jl.
 
-The CPU `apply_K!` (in `dof_based_coo.jl`) iterates DOF rows and, for
-each row, walks the touching elements and calls `evaluate_entry` to
-assemble `y[i] += K[i,j] * x[j]`. The same loop maps cleanly to GPU as
-one device thread per DOF: each thread owns its own row, so no
-atomics are needed.
+The CPU `apply_K!` / `apply_M!` paths (in `dof_based_coo.jl`) iterate global
+DOF rows and call `evaluate_entry` or `evaluate_mass_entry` on each incident
+element. The same loops map to one device thread per DOF row without atomics.
 
 This file provides:
 
-* `DOFBasedCOOCacheKA{...}`  — a backend-agnostic mirror of the CPU
-  `DOFBasedCOOCache` containing only the data Pass 2 needs (geometry
-  batches, qp buffer batch, per-element DOF table, flat DOF→element
-  CSR-ish map, and the decoded element-template DOF layout). All
-  storage is `AbstractArray`-parametric and can be `Adapt.adapt`ed to
-  any backend (`CPU()`, `CUDABackend()`, `MetalBackend()`, ...).
+* `DOFBasedCOOCacheKA{...}`  — mirror of the CPU cache carrying the batched
+  geometry, `qp_buffers`, flat DOF maps, and flattened element-template layout.
 
-* `apply_K_kernel!`  — a single `@kernel` covering all backends.
+* `apply_K_kernel!` / `apply_M_kernel!` — `@kernel` entry points.
 
-* `apply_K!(y, cache_ka, kernel, x; backend=…)` — launcher.
+* `apply_K!(y, cache_ka, kernel, x)` / `apply_M!(y, cache_ka, kernel, x)` —
+  launchers (same precision contract as the CPU cache / vectors).
 
-Pass 1 (the per-element scratch fill) still runs on the CPU. After Pass
-1 we copy the result into the KA cache (one batched copy per array),
-then `apply_K!` runs entirely on the chosen backend.
-
-Validation on `CPU()` backend matches the direct CPU `apply_K!` to
-round-off; CUDA / Metal validation is deferred to a host with the
-hardware.
+Pass 1 still runs on the CPU; after `sync_from_cpu!`, the matvec runs on the
+chosen backend. Local validation uses the `CPU()` KA backend against the direct
+CPU loops.
 =#
 
 using KernelAbstractions
@@ -38,15 +30,31 @@ using Tensors
 
 using ..JuliaFEM: AbstractKernel
 using ..JuliaFEM: DOFLayoutEntry, local_dof_layout, entity_local, component
-using ..JuliaFEM: GeometryCache, evaluate_entry
+using ..JuliaFEM: GeometryCache, evaluate_entry, evaluate_mass_entry
 using ..JuliaFEM: DOFBasedCOOCache, _prepare_caches!
+using ..JuliaFEM: PerElementKernelColumn, ka_per_element_kernel_column_supported
+
+function _assert_ka_cpu_cache_kernel_column_supported!(cpu_cache::DOFBasedCOOCache)
+    if cpu_cache.kernel_column isa PerElementKernelColumn &&
+            !ka_per_element_kernel_column_supported(cpu_cache.kernel_column)
+        throw(ArgumentError(
+            "DOFBasedCOOCacheKA: this per-element kernel column is not supported on the KA/GPU " *
+            "path (the launcher passes a single prototype kernel to `evaluate_entry` / `evaluate_mass_entry`). " *
+            "Use CPU `apply_K!` / `apply_M!` with the CPU cache, or a column of " *
+            "`ContinuumKernel` / `HeatKernel` / `ThermoElasticKernel` / `BiotPoroelasticKernel` / " *
+            "`ThermoPoroelasticKernel` with pairwise-compatible kernels (see " *
+            "`ka_per_element_kernel_column_supported`).",
+        ))
+    end
+    return nothing
+end
 
 
 """
     DOFBasedCOOCacheKA{T_∇N, T_W, T_QP, T_DOFS, T_CONN, T_LAY, T_CNT}
 
 Backend-agnostic mirror of `DOFBasedCOOCache` carrying just the state
-`apply_K!` reads:
+`apply_K!` / `apply_M!` read:
 
 | field              | shape                                  | what  |
 | --- | --- | --- |
@@ -172,6 +180,7 @@ function _build_dof_based_coo_cache_ka(cpu_cache::DOFBasedCOOCache, ::Type{E};
     end
 
     n_ips = size(cpu_cache.detJ_w_batch, 1)
+    _assert_ka_cpu_cache_kernel_column_supported!(cpu_cache)
 
     return DOFBasedCOOCacheKA(
         cpu_cache.X_batch,
@@ -286,6 +295,7 @@ function _build_dof_based_coo_cache_ka_f(cpu_cache::DOFBasedCOOCache, ::Type{E},
     end
 
     n_ips = size(cpu_cache.detJ_w_batch, 1)
+    _assert_ka_cpu_cache_kernel_column_supported!(cpu_cache)
 
     # Allocate fresh F-typed geometry batches. We don't share storage
     # with the Float64 CPU cache when F != Float64 — that would defeat
@@ -471,6 +481,63 @@ end
 end
 
 
+# ============================================================================
+# KA kernel — mass matvec `y = M * x` (same row layout as `apply_K_kernel!`).
+# ============================================================================
+
+@kernel function apply_M_kernel!(
+    y,
+    @Const(x),
+    @Const(X_batch),
+    @Const(N_batch),
+    @Const(∇N_batch),
+    @Const(detJ_w_batch),
+    @Const(qp_buffers),
+    @Const(elem_dofs),
+    @Const(dof_elem_ids),
+    @Const(dof_local_idx),
+    @Const(dof_counts),
+    @Const(layout_field),
+    @Const(layout_entity),
+    @Const(layout_component),
+    n_local_dofs::Int32,
+    n_ips::Int32,
+    kernel,
+)
+    dof_i = @index(Global)
+
+    F   = eltype(y)
+    cnt = dof_counts[dof_i]
+    yi  = zero(F)
+
+    @inbounds for k in 1:cnt
+        eid     = dof_elem_ids[k, dof_i]
+        local_i = dof_local_idx[k, dof_i]
+
+        geom = GeometryCache(
+            view(X_batch, :, eid),
+            view(N_batch, :, :, eid),
+            view(∇N_batch, :, :, eid),
+            view(detJ_w_batch, :, eid),
+        )
+        qp_buffer = view(qp_buffers, :, eid)
+
+        ent_i = DOFLayoutEntry(layout_field[local_i], layout_entity[local_i], layout_component[local_i])
+
+        for local_j in 1:n_local_dofs
+            ent_j = DOFLayoutEntry(layout_field[local_j], layout_entity[local_j], layout_component[local_j])
+
+            M_ij = evaluate_mass_entry(kernel, geom, qp_buffer, ent_i, ent_j)
+
+            dof_j_global = elem_dofs[local_j, eid]
+            yi += M_ij * x[dof_j_global]
+        end
+    end
+
+    @inbounds y[dof_i] = yi
+end
+
+
 """
     apply_K!(y::AbstractVector{Float64},
              cache_ka::DOFBasedCOOCacheKA,
@@ -538,6 +605,57 @@ function apply_K!(
 
     backend = get_backend(y)
     krn = apply_K_kernel!(backend, workgroupsize)
+    krn(
+        y, x,
+        cache_ka.X_batch,
+        cache_ka.N_batch,
+        cache_ka.∇N_batch,
+        cache_ka.detJ_w_batch,
+        cache_ka.qp_buffers,
+        cache_ka.elem_dofs,
+        cache_ka.dof_elem_ids,
+        cache_ka.dof_local_idx,
+        cache_ka.dof_counts,
+        cache_ka.layout_field,
+        cache_ka.layout_entity,
+        cache_ka.layout_component,
+        cache_ka.n_local_dofs,
+        cache_ka.n_ips,
+        kernel;
+        ndrange = length(y),
+    )
+    KernelAbstractions.synchronize(backend)
+    return y
+end
+
+
+"""
+    apply_M!(y, cache_ka::DOFBasedCOOCacheKA, kernel::AbstractKernel, x;
+              workgroupsize::Int = 256) -> y
+
+Matrix-free mass product `y = M * x` on the KA cache, calling
+`evaluate_mass_entry` with the same geometry / `qp_buffers` views as the CPU
+`apply_M!(y, cache, assembler, mesh, x)` in `dof_based_coo.jl`.
+
+Requires the same Pass~1 + `sync_from_cpu!` preparation as `apply_K!`.
+Per-element kernel columns must satisfy `ka_per_element_kernel_column_supported`
+(the same gate as stiffness: prototype kernel plus per-element buffers).
+"""
+function apply_M!(
+    y::AbstractVector{F},
+    cache_ka::DOFBasedCOOCacheKA,
+    kernel::AbstractKernel,
+    x::AbstractVector{F};
+    workgroupsize::Int = 256,
+) where {F<:AbstractFloat}
+    @assert length(y) == length(cache_ka.dof_counts)
+    @assert length(x) == length(cache_ka.dof_counts)
+    @assert eltype(cache_ka.detJ_w_batch) === F (
+        "apply_M!: y/x precision $F mismatches cache precision " *
+        "$(eltype(cache_ka.detJ_w_batch)) — use `to_float32(cache)` to build a F32 cache.")
+
+    backend = get_backend(y)
+    krn = apply_M_kernel!(backend, workgroupsize)
     krn(
         y, x,
         cache_ka.X_batch,
