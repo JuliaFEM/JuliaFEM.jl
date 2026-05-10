@@ -46,9 +46,10 @@ After `git config core.hooksPath .githooks`:
   supports the common “impl + test” or “snippet + verifier” pair without
   allowing large batches. Split bigger changes across commits or adjust the
   hook deliberately.
-- **commit-msg:** rejects the commit if **any** message line is longer than
-  **80 characters** (including the subject). Wrap prose and bullets; merge
-  commits skip this check while `.git/MERGE_HEAD` is present.
+- **commit-msg:** enforces the **subject → blank → summary → blank → bullets**
+  layout, **≥1** `- ...` detail line, **no** blanks inside the bullet block, and
+  **≤80** characters per line. Merge commits skip checks while `.git/MERGE_HEAD`
+  is present.
 
 ## Read the full staged diff
 
@@ -95,19 +96,29 @@ EOF
 
 **3. Summary** — one short paragraph, **one to three sentences**: what changed and why, for this commit only.
 
-**4. Body detail (scale with the diff)** — after the summary:
+**4. Blank line** (separator before the bullet list).
 
-- **Small / localized change:** optional bullets only when they add real value; often the summary is enough.
-- **Large file, large diff, or several concerns in one commit:** expand with **substantive bullets**. Prefer **grouped sections** (short headings or bullet groups) that mirror the patch: major types/functions added, behavior changes, wiring/exports, migrations, risks, or follow-ups. A few vague bullets are not sufficient when the diff is hundreds of lines or touches multiple subsystems—the message should let a reviewer reconstruct *why* the patch looks the way it does without re-reading every hunk.
+**5. Body detail — `-` bullets (required when `.githooks/commit-msg` is active):**
 
-Use `-` bullet lists; omit sections that do not apply.
+After the separator blank line, write **at least one** `- ...` line. Scale depth
+to the diff: a tiny change can use a single substantive bullet; large or
+multi-file patches need **grouped, substantive bullets** (major types or
+functions, behavior, wiring, migrations, caveats) so a reviewer can reconstruct
+the story without re-reading every hunk.
 
-### Line length (enforced when hooks are enabled)
+### Hook-enforced shape (with `core.hooksPath` → `.githooks`)
 
-Keep **every** line at **80 characters or fewer**, including the subject and
-each bullet. This keeps `git log` readable in terminals and mail archives. If
-the hook is enabled, overlong lines cause the commit to fail—rewrap before
-retrying.
+The **commit-msg** hook (except during merges while `.git/MERGE_HEAD` exists)
+requires, in order:
+
+1. non-empty subject line;
+2. blank line;
+3. one or more summary lines (none may start like a `- ` bullet);
+4. blank line;
+5. one or more lines each starting with `- ` (details).
+
+Every line must be **80 characters or fewer**. There must be **no** blank lines
+inside the bullet block. Rewrap before committing.
 
 ### Example (single file)
 
@@ -147,7 +158,7 @@ When proposing:
 # ❌ WRONG
 git commit -m "Update documentation"
 
-# ✅ RIGHT — subject + summary (+ bullets if needed), from the real diff
+# ✅ RIGHT — subject, blank, summary, blank, "- ..." bullets (from the diff)
 ```
 
 ### Bundling unrelated files
@@ -176,7 +187,10 @@ Never use `git diff --staged | head` (etc.). Read the full diff.
 - [ ] Did I read the **full** `git diff --staged`?
 - [ ] Subject line: Conventional Commits, specific, matches diff?
 - [ ] Is **every** message line (subject, summary, bullets) **≤ 80 characters**?
-- [ ] Body: blank line, then **1–3 sentence** summary, then **bullets scaled to diff size** (rich, grouped bullets for large / multi-concern commits)?
+- [ ] Shape: subject, **blank**, summary paragraph, **blank**, then **≥1** `-`
+      bullet (required when the commit-msg hook is enabled)?
+- [ ] Bullets **scaled to the diff** (one tight bullet is fine for a one-liner
+      patch; large patches need rich, grouped bullets)?
 - [ ] Did I **propose** the commit and wait for **approval** before `git commit`?
 
 ## Why this matters

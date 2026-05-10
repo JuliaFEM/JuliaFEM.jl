@@ -207,8 +207,9 @@ These are non-negotiable. Tests and code analysis enforce them.
 Contributor-facing workflow text lives in `.github/prompts/commit.prompt.md`
 and `.github/copilot-instructions.md`. Optional `.githooks/` hooks (enable with
 `git config core.hooksPath .githooks`): **pre-commit** caps staged paths at
-two per commit; **commit-msg** rejects any log line longer than **80
-characters** (merge commits skip that check while `.git/MERGE_HEAD` exists).
+two per commit; **commit-msg** enforces subject, blank, summary paragraph,
+blank, then `-` bullets (with line length **≤80**); merge commits skip while
+`.git/MERGE_HEAD` exists.
 Editor-local Cursor rules under `.cursor/` are not part of the git tree.
 
 - Commits: prefer **small** steps (default one file per commit). Combine
