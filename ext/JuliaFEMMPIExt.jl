@@ -1,5 +1,5 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 module JuliaFEMMPIExt
 
@@ -99,17 +99,24 @@ function JuliaFEM.mpi_partitioned_operator_matvec_owned!(
     exchange::RankHaloExchange,
     cache::DOFBasedCOOCache,
     assembler::DOFBasedCOOAssembler,
-    kernel::AbstractKernel,
     mesh::AbstractMesh,
     comm::MPI.Comm;
     dirichlet = nothing,
     mpi_requests = nothing,
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
 )
     copy_owned_subset_to_packed_owned_prefix!(packed, p_owned, layout)
     exchange_matvec_halos_mpi!(
         recv_vals, send_vals, packed, layout, exchange, comm; mpi_requests = mpi_requests)
     unpack_halo_recv_to_packed!(packed, recv_vals, exchange, layout)
-    apply_K_owned_rows_from_packed!(Ap_owned, packed, layout, cache, assembler, kernel, mesh)
+    apply_K_owned_rows_from_packed!(
+        Ap_owned, packed, layout, cache, assembler, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
     if dirichlet !== nothing
         dirichlet isa PenaltyDirichlet ||
             throw(ArgumentError(
@@ -118,6 +125,98 @@ function JuliaFEM.mpi_partitioned_operator_matvec_owned!(
         apply_penalty_dirichlet_post_ap_owned!(Ap_owned, packed, layout, dirichlet)
     end
     return Ap_owned
+end
+
+function JuliaFEM.mpi_partitioned_operator_matvec_owned!(
+    Ap_owned::AbstractVector{Float64},
+    p_owned::AbstractVector{Float64},
+    packed::AbstractVector{Float64},
+    recv_vals::Vector{Vector{Float64}},
+    send_vals::Vector{Vector{Float64}},
+    layout::PartitionPackedLayout,
+    exchange::RankHaloExchange,
+    cache::DOFBasedCOOCache,
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh,
+    comm::MPI.Comm;
+    dirichlet = nothing,
+    mpi_requests = nothing,
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+)
+    JuliaFEM._depwarn_redundant_kernel_arg!(:mpi_partitioned_operator_matvec_owned!)
+    return mpi_partitioned_operator_matvec_owned!(
+        Ap_owned, p_owned, packed, recv_vals, send_vals, layout, exchange, cache, assembler, mesh, comm;
+        dirichlet = dirichlet,
+        mpi_requests = mpi_requests,
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+end
+
+# Owned-row internal force: pack `u`, halo exchange, then [`apply_f_int_owned_rows_from_packed!`](@ref).
+# Requires `work` of length `cache.ndofs` for Pass~1 (expand + optional explicit `configuration`).
+function JuliaFEM.mpi_partitioned_internal_force_owned!(
+    f_int_owned::AbstractVector{Float64},
+    u_owned::AbstractVector{Float64},
+    packed::AbstractVector{Float64},
+    work::AbstractVector{Float64},
+    recv_vals::Vector{Vector{Float64}},
+    send_vals::Vector{Vector{Float64}},
+    layout::PartitionPackedLayout,
+    exchange::RankHaloExchange,
+    cache::DOFBasedCOOCache,
+    assembler::DOFBasedCOOAssembler,
+    mesh::AbstractMesh,
+    comm::MPI.Comm;
+    mpi_requests = nothing,
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+)
+    copy_owned_subset_to_packed_owned_prefix!(packed, u_owned, layout)
+    exchange_matvec_halos_mpi!(
+        recv_vals, send_vals, packed, layout, exchange, comm; mpi_requests = mpi_requests)
+    unpack_halo_recv_to_packed!(packed, recv_vals, exchange, layout)
+    apply_f_int_owned_rows_from_packed!(
+        f_int_owned, packed, work, layout, cache, assembler, mesh;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
+    return f_int_owned
+end
+
+function JuliaFEM.mpi_partitioned_internal_force_owned!(
+    f_int_owned::AbstractVector{Float64},
+    u_owned::AbstractVector{Float64},
+    packed::AbstractVector{Float64},
+    work::AbstractVector{Float64},
+    recv_vals::Vector{Vector{Float64}},
+    send_vals::Vector{Vector{Float64}},
+    layout::PartitionPackedLayout,
+    exchange::RankHaloExchange,
+    cache::DOFBasedCOOCache,
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh,
+    comm::MPI.Comm;
+    mpi_requests = nothing,
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+)
+    JuliaFEM._depwarn_redundant_kernel_arg!(:mpi_partitioned_internal_force_owned!)
+    return mpi_partitioned_internal_force_owned!(
+        f_int_owned, u_owned, packed, work, recv_vals, send_vals, layout, exchange, cache, assembler, mesh, comm;
+        mpi_requests = mpi_requests,
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
 end
 
 # Global replicated matvec: owned-row stiffness + `MPI.Allreduce!`, then optional penalty BC post-hook.
@@ -132,11 +231,13 @@ function JuliaFEM.mpi_partitioned_operator_matvec!(
     exchange::RankHaloExchange,
     cache::DOFBasedCOOCache,
     assembler::DOFBasedCOOAssembler,
-    kernel::AbstractKernel,
     mesh::AbstractMesh,
     comm::MPI.Comm;
     dirichlet = nothing,
     mpi_requests = nothing,
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
 )
     gather_owned_from_global_to_packed!(packed, p, layout)
     exchange_matvec_halos_mpi!(
@@ -145,12 +246,48 @@ function JuliaFEM.mpi_partitioned_operator_matvec!(
     fill!(work, 0.0)
     expand_packed_to_global!(work, packed, layout)
     fill!(Ap, 0.0)
-    apply_K_owned_rows!(Ap, layout.owned_rows, cache, assembler, kernel, mesh, work)
+    apply_K_owned_rows!(
+        Ap, layout.owned_rows, cache, assembler, mesh, work;
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
     MPI.Allreduce!(Ap, MPI.SUM, comm)
     if dirichlet !== nothing
         apply_constraint_post!(Ap, p, dirichlet)
     end
     return Ap
+end
+
+function JuliaFEM.mpi_partitioned_operator_matvec!(
+    Ap::AbstractVector{Float64},
+    p::AbstractVector{Float64},
+    packed::AbstractVector{Float64},
+    work::AbstractVector{Float64},
+    recv_vals::Vector{Vector{Float64}},
+    send_vals::Vector{Vector{Float64}},
+    layout::PartitionPackedLayout,
+    exchange::RankHaloExchange,
+    cache::DOFBasedCOOCache,
+    assembler::DOFBasedCOOAssembler,
+    ::AbstractKernel,
+    mesh::AbstractMesh,
+    comm::MPI.Comm;
+    dirichlet = nothing,
+    mpi_requests = nothing,
+    configuration::Union{Nothing,AbstractVector{Float64}} = nothing,
+    global_material_cache::Union{Nothing,GlobalMaterialCache} = nothing,
+    Δt::Float64 = 0.0,
+)
+    JuliaFEM._depwarn_redundant_kernel_arg!(:mpi_partitioned_operator_matvec!)
+    return mpi_partitioned_operator_matvec!(
+        Ap, p, packed, work, recv_vals, send_vals, layout, exchange, cache, assembler, mesh, comm;
+        dirichlet = dirichlet,
+        mpi_requests = mpi_requests,
+        configuration = configuration,
+        global_material_cache = global_material_cache,
+        Δt = Δt,
+    )
 end
 
 end # module JuliaFEMMPIExt
