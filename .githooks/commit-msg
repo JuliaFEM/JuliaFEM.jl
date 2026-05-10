@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
-# Reject commit messages with any line longer than 80 characters.
+# Enforce commit message layout and line length (pure bash; no helper scripts).
 # Enable with: git config core.hooksPath .githooks
 #
-# Merge commits often carry Git-generated "Merge branch …" lines that can
-# exceed 80 columns when branch or remote names are long; skip the check then.
+# Required shape (merge commits skip all checks while .git/MERGE_HEAD exists):
+#   1) subject (non-empty, <=80 chars)
+#   2) blank line
+#   3) one or more summary lines (no "- " bullet prefix), <=80 chars each
+#   4) blank line
+#   5) one or more body lines, each a "- ..." bullet, <=80 chars each
+#
+# Merge templates from Git can exceed 80 columns; skip checks then.
 
 set -euo pipefail
 
@@ -13,6 +19,7 @@ if [[ -f .git/MERGE_HEAD ]]; then
     exit 0
 fi
 
+lines=()
 lineno=0
 while IFS= read -r line || [[ -n "${line}" ]]; do
     lineno=$((lineno + 1))
@@ -20,13 +27,104 @@ while IFS= read -r line || [[ -n "${line}" ]]; do
     if ((len > 80)); then
         echo "❌ COMMIT MESSAGE: line ${lineno} is ${len} chars (max 80)"
         echo ""
-        echo "Wrap the subject, summary, and bullets to 80 columns or fewer."
+        echo "Required layout: subject, blank, summary paragraph, blank, bullets."
         echo "See .github/prompts/commit.prompt.md"
         echo ""
         echo "Offending line (truncated for display):"
         printf '%s\n' "${line}" | cut -c1-120
         exit 1
     fi
+    lines+=("$line")
 done <"${msg_file}"
+
+# Drop trailing empty lines so optional final newline does not confuse counts.
+while ((${#lines[@]} > 0)); do
+    last=$(( ${#lines[@]} - 1 ))
+    if [[ -z ${lines[last]} ]]; then
+        unset "lines[last]"
+    else
+        break
+    fi
+done
+
+n=${#lines[@]}
+if ((n < 5)); then
+    echo "❌ COMMIT MESSAGE: need subject, blank, summary, blank, then bullets"
+    echo "(at least five lines). See .github/prompts/commit.prompt.md"
+    exit 1
+fi
+
+if [[ -z "${lines[0]}" ]]; then
+    echo "❌ COMMIT MESSAGE: first line (subject) must not be empty"
+    exit 1
+fi
+
+if [[ -n "${lines[1]}" ]]; then
+    echo "❌ COMMIT MESSAGE: line 2 must be blank (separator after subject)"
+    exit 1
+fi
+
+bullet_idx=-1
+for ((i = 2; i < n; i++)); do
+    line=${lines[i]}
+    if [[ "${line}" =~ ^[[:space:]]*-[[:space:]] ]]; then
+        bullet_idx=$i
+        break
+    fi
+done
+
+if ((bullet_idx < 0)); then
+    echo "❌ COMMIT MESSAGE: no bullet list found (lines starting with \"- \")"
+    echo "After the summary paragraph and its trailing blank line, add details"
+    echo "as \"- ...\" bullets. See .github/prompts/commit.prompt.md"
+    exit 1
+fi
+
+if ((bullet_idx < 3)); then
+    echo "❌ COMMIT MESSAGE: add at least one summary line after the subject blank"
+    echo "before the separator blank and bullets."
+    exit 1
+fi
+
+if [[ -n "${lines[bullet_idx - 1]}" ]]; then
+    echo "❌ COMMIT MESSAGE: blank line required between summary and bullet list"
+    echo "(line $((bullet_idx)) should be empty)."
+    exit 1
+fi
+
+has_summary=0
+for ((i = 2; i < bullet_idx - 1; i++)); do
+    line=${lines[i]}
+    if [[ -n "${line}" ]] && [[ "${line}" =~ ^[[:space:]]*-[[:space:]] ]]; then
+        echo "❌ COMMIT MESSAGE: line $((i + 1)) looks like a bullet but is above"
+        echo "the summary block; write prose summary lines first, then a blank"
+        echo "line, then \"- ...\" bullets."
+        exit 1
+    fi
+    if [[ -n "${line}" ]]; then
+        has_summary=1
+    fi
+done
+
+if ((has_summary == 0)); then
+    echo "❌ COMMIT MESSAGE: summary paragraph is empty (need 1–3 sentences before"
+    echo "the blank line that precedes bullets)."
+    exit 1
+fi
+
+for ((i = bullet_idx; i < n; i++)); do
+    line=${lines[i]}
+    if [[ -z "${line}" ]]; then
+        echo "❌ COMMIT MESSAGE: line $((i + 1)) is empty inside the bullet block;"
+        echo "remove blank lines between bullets or end the message after the last"
+        echo "bullet."
+        exit 1
+    fi
+    if ! [[ "${line}" =~ ^[[:space:]]*-[[:space:]] ]]; then
+        echo "❌ COMMIT MESSAGE: line $((i + 1)) must be a \"- ...\" bullet after the"
+        echo "summary section."
+        exit 1
+    fi
+done
 
 exit 0
