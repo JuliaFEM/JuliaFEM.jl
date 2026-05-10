@@ -3,6 +3,12 @@
 
 using JuliaFEM, Test
 
+# Shared zero-allocation / LLVM IR helpers for topic tests (loaded once).
+include(joinpath(@__DIR__, "zero_alloc_helpers.jl"))
+include(joinpath(@__DIR__, "test_api_contract.jl"))
+include(joinpath(@__DIR__, "test_pkg_hygiene.jl"))
+include(joinpath(@__DIR__, "test_inference_smoke.jl"))
+
 # The active test tree mirrors `src/`. Every subdirectory below has its
 # own `runtests.jl` that bundles the topic into a single `@testset`.
 # Adding a new topic = adding the directory to `topics` below.
@@ -20,11 +26,12 @@ const TOPICS = [
     "domains/heat",
     "domains/darcy",
     "domains/thermo_elastic",
+    "domains/poroelastic",
+    "domains/thermo_poroelastic",
     "dofs",
     "interface",
     "assemblers",
     "sparse",
-    "io",
     "validation",
     "reference",
     "docs",
@@ -35,6 +42,7 @@ const TOPICS = [
 # if none match, run the full suite with a warning.
 #
 # `Pkg.test(; test_args=["assemblers", ...])` forwards those strings to ARGS.
+# Only names from `TOPICS` below are accepted (e.g. `"assemblers"`), not file paths.
 function _topics_from_args()
     requested = String[s for s in ARGS if !startswith(s, '-')]
     isempty(requested) && return TOPICS
@@ -83,6 +91,11 @@ end
         @test Tet4 isa Type
         @test LocalField isa Type
     end
+
+    run_api_contract_tests(TOPICS, @__DIR__)
+
+    run_pkg_hygiene_tests()
+    run_inference_smoke_tests()
 
     for topic in _topics_from_args()
         include(joinpath(topic, "runtests.jl"))
