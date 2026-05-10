@@ -19,7 +19,7 @@ here.
 ```julia
 # Two bricks along x with different K; λ_by_elem[i] is conductivity of element i.
 mat = ElementWiseScalarDiffusion([1.0, 4.0])
-kernel = HeatKernel(ContinuumFormulation{FullThreeD}(), mat, PressurePotential())
+kernel = HeatKernel(ContinuumFormulation{ThreeDimensional}(), mat, PressurePotential())
 ```
 """
 

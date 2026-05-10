@@ -22,7 +22,7 @@ for the primal potential path via [`DarcyPotentialKernel`](@ref).
 # Example
 ```julia
 soil = HydraulicConductivity(K = 1e-4)
-kernel = DarcyPotentialKernel(ContinuumFormulation{FullThreeD}(), soil)
+kernel = DarcyPotentialKernel(ContinuumFormulation{ThreeDimensional}(), soil)
 ```
 """
 
