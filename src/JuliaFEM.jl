@@ -89,6 +89,7 @@ include("quadrature/gl_triangles.jl")
 include("quadrature/gl_wedges.jl")
 include("quadrature/gl_pyramids.jl")
 include("quadrature/gl_tensor_product.jl")
+include("quadrature/reference_gauss_tuples.jl")
 include("quadrature/gauss.jl")
 
 include("geometry/jacobian.jl")
@@ -165,6 +166,7 @@ include("domains/continuum/kernel.jl")
 include("domains/continuum/update_geometry_cache.jl")
 include("domains/continuum/update_element_cache.jl")
 include("domains/continuum/update_material_cache.jl")
+include("domains/continuum/dof_based_pass1.jl")
 include("domains/continuum/mixed_up_kernel.jl")
 include("domains/continuum/stokes_mixed_kernel.jl")
 include("domains/continuum/hellinger_reissner_kernel.jl")
@@ -176,6 +178,8 @@ include("domains/darcy/mixed_rt0.jl")
 include("domains/darcy/mixed_rt0_hex.jl")
 
 include("domains/thermo_elastic/kernel.jl")
+include("domains/poroelastic/kernel.jl")
+include("domains/thermo_poroelastic/kernel.jl")
 
 # ============================================================================
 # Level 7 - Concrete mesh + DOFHandler + DOF-based assembler + matrix-free
@@ -198,17 +202,23 @@ include("dofs/dof_connectivity.jl")
 include("interface/interface_mesh.jl")
 include("interface/interface_dof_handler.jl")
 
-# DOF-based assembler — CPU plus the backend-agnostic KernelAbstractions
-# port (CPU(), CUDABackend(), MetalBackend(), AMDGPUBackend(), oneAPIBackend();
-# locally validated against CPU()).
-include("assemblers/dof_based/dof_based_coo.jl")
-include("assemblers/dof_based/dof_based_coo_ka.jl")
-
-# Partition metadata + multiply-buffer layouts (MPI/GPU hooks; default is
-# single-process identity).
+# Partition metadata + packed layouts must load before `dof_based_coo.jl`
+# (method signatures use `PartitionPackedLayout`). `packed_layout.jl` depends on
+# `MeshPartitionLayout` / halo helpers from `partitioning.jl` / `halo_exchange.jl`.
 include("assemblers/partitioning.jl")
 include("assemblers/halo_exchange.jl")
 include("assemblers/packed_layout.jl")
+
+include("assemblers/redundant_kernel_depwarn.jl")
+
+# DOF-based assembler — CPU plus the backend-agnostic KernelAbstractions
+# port (CPU(), CUDABackend(), MetalBackend(), AMDGPUBackend(), oneAPIBackend();
+# locally validated against CPU()).
+include("assemblers/dof_based/ka_column_homogeneity.jl")
+include("assemblers/dof_based/kernel_column.jl")
+include("assemblers/dof_based/dof_based_coo.jl")
+include("assemblers/dof_based/dof_based_coo_ka.jl")
+
 include("assemblers/partitioned_matvec.jl")
 
 # Matrix-free path: declarative Dirichlet / MPC constraints, declarative
@@ -222,6 +232,8 @@ include("assemblers/matrix_free/preconditioners.jl")
 include("assemblers/matrix_free/eigensolve.jl")
 include("assemblers/matrix_free/loads.jl")
 
+include("physics/discretization.jl")
+
 # ============================================================================
 # Level 8 - Mesh utilities and I/O
 # ============================================================================
@@ -230,9 +242,8 @@ include("mesh/structured.jl")
 
 include("domains/continuum/material_element_lab.jl")
 
-# Self-contained Gmsh mesh reader (defines its own `JuliaFEM.GmshReader`
-# submodule with `read_gmsh_mesh` / `GmshMesh`).
-include("io/gmsh_reader.jl")
+# External mesh formats (Gmsh, Abaqus, Netgen, …) → `Mesh{…}` belong in
+# optional package extensions or side packages; see `src/io/README.md`.
 
 # ============================================================================
 # Optional older API surface (Problem / Assembly / Solver / Analysis,
@@ -286,14 +297,26 @@ function mpi_owned_dot_global end
 """
     mpi_partitioned_operator_matvec!(
         Ap, p, packed, work, recv_vals, send_vals,
+        layout, exchange, cache, assembler, mesh, comm;
+        dirichlet = nothing, mpi_requests = nothing,
+        configuration = nothing, global_material_cache = nothing, Δt = 0.0,
+    )
+    mpi_partitioned_operator_matvec!(
+        Ap, p, packed, work, recv_vals, send_vals,
         layout, exchange, cache, assembler, kernel, mesh, comm;
         dirichlet = nothing, mpi_requests = nothing,
+        configuration = nothing, global_material_cache = nothing, Δt = 0.0,
     )
 
 Replicated-global matrix-free product including optional [`PenaltyDirichlet`](@ref) post-hook.
 Loads `JuliaFEMMPIExt` when both `JuliaFEM` and `MPI` are imported.
 
-Keyword `mpi_requests` is forwarded to [`exchange_matvec_halos_mpi!`](@ref).
+The primary form reads the volume kernel from `cache.kernel_column`. The overload
+with `kernel` ignores it (backward compatibility).
+
+Keywords `mpi_requests` (to [`exchange_matvec_halos_mpi!`](@ref)) and
+`configuration` / `global_material_cache` / `Δt` (to [`apply_K_owned_rows!`](@ref), nonlinear continuum Pass~1)
+are forwarded when `JuliaFEMMPIExt` is loaded.
 """
 function mpi_partitioned_operator_matvec! end
 
@@ -309,8 +332,15 @@ function mpi_owned_dot_local end
 """
     mpi_partitioned_operator_matvec_owned!(
         Ap_owned, p_owned, packed, recv_vals, send_vals,
+        layout, exchange, cache, assembler, mesh, comm;
+        dirichlet = nothing, mpi_requests = nothing,
+        configuration = nothing, global_material_cache = nothing, Δt = 0.0,
+    )
+    mpi_partitioned_operator_matvec_owned!(
+        Ap_owned, p_owned, packed, recv_vals, send_vals,
         layout, exchange, cache, assembler, kernel, mesh, comm;
         dirichlet = nothing, mpi_requests = nothing,
+        configuration = nothing, global_material_cache = nothing, Δt = 0.0,
     )
 
 Lean MPI matvec: [`copy_owned_subset_to_packed_owned_prefix!`](@ref), halo exchange,
@@ -318,10 +348,36 @@ Lean MPI matvec: [`copy_owned_subset_to_packed_owned_prefix!`](@ref), halo excha
 No `ndofs_global`-length trial workspace — trial DOFs stay in `packed`. **No** full-vector
 [`MPI.Allreduce!`](@ref) on `Ap`.
 
-Keyword `mpi_requests` is forwarded to [`exchange_matvec_halos_mpi!`](@ref).
+The primary form uses `cache.kernel_column`; the overload with `kernel` ignores it.
+
+Keywords `mpi_requests` and `configuration` / `global_material_cache` / `Δt` are forwarded when
+`JuliaFEMMPIExt` is loaded.
 
 Supports [`PenaltyDirichlet`](@ref) only on this path.
 """
 function mpi_partitioned_operator_matvec_owned! end
+
+"""
+    mpi_partitioned_internal_force_owned!(
+        f_int_owned, u_owned, packed, work, recv_vals, send_vals,
+        layout, exchange, cache, assembler, mesh, comm;
+        mpi_requests = nothing,
+        configuration = nothing, global_material_cache = nothing, Δt = 0.0,
+    )
+    mpi_partitioned_internal_force_owned!(
+        f_int_owned, u_owned, packed, work, recv_vals, send_vals,
+        layout, exchange, cache, assembler, kernel, mesh, comm;
+        mpi_requests = nothing,
+        configuration = nothing, global_material_cache = nothing, Δt = 0.0,
+    )
+
+Lean MPI path for [`assemble_internal_force!`](@ref) on owned rows: pack owned
+`u`, halo exchange, then [`apply_f_int_owned_rows_from_packed!`](@ref). The
+`work` buffer must have length `cache.ndofs` (expand + Pass~1 scratch).
+
+The overload with `kernel` ignores it (backward compatibility). Requires
+`using MPI` after `JuliaFEM` so `JuliaFEMMPIExt` is loaded.
+"""
+function mpi_partitioned_internal_force_owned! end
 
 end # module JuliaFEM
