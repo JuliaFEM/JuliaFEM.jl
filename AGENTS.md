@@ -58,7 +58,7 @@ The authoritative file-organization guide is
 | `src/domains/` | Physics kernels per discipline (`continuum/`, `beams/`, `plates/`, …). |
 | `src/solvers/` | Linear/nonlinear solvers (still minimal). |
 | `src/physics/` | High-level user API (BCs, problems). |
-| `src/io/` | Mesh readers (Gmsh by default; Abaqus + Aster live in `Legacy`). |
+| `src/io/` | Mesh I/O policy (`README.md`); format-specific readers → weakdeps / extensions or separate packages; Abaqus + Aster remain in `Legacy`. |
 | `src/legacy/` | Older pre-reset API (`Problem`/`Assembly`/`Solver`/`Analysis`, Dict-based fields, Abaqus reader, …) wrapped in `module Legacy`; loaded only when `JULIAFEM_ENABLE_LEGACY=1`. |
 | `test/<topic>/` | Mirrors `src/<topic>/`. |
 | `benchmarks/regression/`, `benchmarks/analysis/` | Timestamped reports. |
@@ -163,8 +163,9 @@ and pass a persistent `mpi_requests` buffer from `allocate_exchange_matvec_halo_
 so each matvec does not allocate a fresh `Vector{MPI.Request}`.
 
 Reference drivers: `test/mpi/partitioned_matvec_smoke.jl`,
-`test/mpi/partitioned_matvec_cg.jl`. CI runs both under mpiexec (see
-`.github/workflows/CI.yml`, job `mpi-partitioned-matvec-smoke`).
+`test/mpi/partitioned_matvec_cg.jl`, `test/mpi/partitioned_internal_force_smoke.jl`.
+CI runs all three under mpiexec (see `.github/workflows/CI.yml`, job
+`mpi-partitioned-matvec-smoke`).
 
 ---
 
@@ -175,7 +176,9 @@ These are non-negotiable. Tests and code analysis enforce them.
 1. Zero allocations in hot paths.
    `test/assemblers/test_dof_based_zero_alloc.jl` asserts
    `@allocated assemble!(...) == 0` and `0` GC allocation sites in the
-   optimized LLVM IR. Don't introduce `Dict`, `Vector{Any}`, untyped
+   optimized LLVM IR; `test/assemblers/test_dof_based_internal_force.jl`
+   does the same for **`assemble_internal_force!`** and
+   **`apply_f_int_owned_rows!`** on a reference Hex8 patch. Don't introduce `Dict`, `Vector{Any}`, untyped
    closures, or `Vector` literals inside loops. For the intended split
    between tier 1 numeric kernels (always C-speed, no heap churn in
    loops), tier 2 warmed assembly drivers (setup may allocate), and tier 3
@@ -215,6 +218,18 @@ Editor-local Cursor rules under `.cursor/` are not part of the git tree.
   large / multi-concern → grouped, substantive bullets). **Propose** paths + full message
   and wait for **explicit approval** before each `git commit`. See
   `.github/prompts/commit.prompt.md` for the full protocol.
+- **AI agents: commits are not a loop variable.** Never drive `git commit` from a
+  shell or Python loop that stages paths and emits placeholder subjects such as
+  `update path/to/file.jl` or `sync <module>` derived only from the path. Before
+  **every** `git commit`, read the **entire** `git diff --staged` yourself (no
+  `head`, `tail`, `less`, or other truncation when forming the message). The
+  subject and body must describe the **actual** API and behaviour changes in
+  those hunks; the optional two-path `.githooks/pre-commit` rule limits batch
+  size, it does **not** replace reading the diff. If many low-quality commits
+  already exist locally, repair with `git reset --soft <good_base>` and rebuild
+  following this file and `.github/prompts/commit.prompt.md`, or use
+  `git rebase -i` to reword; do not apply a second scripted sweep of generic
+  messages.
 - Never commit without an explicit user command to start committing. Do not
   propose or initiate commits unprompted.
 - Never create files in the root except for `README*` files.
@@ -225,6 +240,11 @@ Editor-local Cursor rules under `.cursor/` are not part of the git tree.
 - Run the full test suite before declaring done.
 `julia --project=. -e 'using Pkg; Pkg.test()'`. All bundled topic tests must pass
 with no errors (the exact test count grows with the tree under `test/`).
+
+To run a subset, pass topic directory names from `test/runtests.jl` (`TOPICS`), for example
+`julia --project=. -e 'using Pkg; Pkg.test(; test_args=["assemblers"])'`.
+`test_args` does not accept individual file paths; unknown strings are ignored with a warning
+and the full suite runs.
 - SPDX tags at file tops must use comment syntax for that file type (for example
   `# …` in `.jl`, HTML comments in Markdown); see `docs/CONTRIBUTING.md`.
 
@@ -257,7 +277,7 @@ The goal is professional engineering documentation, not marketing copy.
   elements, handler = create_elements!(mesh, ET)
 
   material = LinearElastic(E=210e9, ν=0.3)
-  kernel   = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+  kernel   = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                              material, Displacement{3}())
 
   asm   = DOFBasedCOOAssembler()           # or COOAssembler()
