@@ -1,24 +1,19 @@
 # src/io/
 
-Mesh readers that ship with the current 0.x package surface.
+Policy for **external mesh formats** (Gmsh, Netgen, Abaqus, Code Aster, …).
 
-The Abaqus `.inp` and Code Aster `.med` readers were built around the
-older `Element(Poi1, ...)` constructors and the Dict-based field
-system; they have been moved into the optional `JuliaFEM.Legacy`
-submodule (see `src/legacy/io/`). Set the environment variable
-`JULIAFEM_ENABLE_LEGACY=1` before `using JuliaFEM` to load them.
+The core package owns the type-stable mesh model (`Mesh{N, T}` under
+`src/mesh/`) and assembly; it does **not** ship format-specific parsers in
+`src/io/`. Converters that read third-party files and build `Mesh{…}`,
+`element_sets`, and `node_sets` should live in **separate packages** or in
+**JuliaFEM package extensions** wired through `[weakdeps]` / `[extensions]` in
+`Project.toml`, mirroring the MPI extension pattern (`JuliaFEMMPIExt`).
 
-## Files
+Legacy `.inp` / `.med` readers tied to the pre-reset API remain under
+`src/legacy/io/` and load only with `JULIAFEM_ENABLE_LEGACY=1`.
 
-- `gmsh_reader.jl`
-  Self-contained Gmsh `.msh` (ASCII format 4.1) reader.
-  Defines its own `JuliaFEM.GmshReader` submodule with `GmshMesh`,
-  `read_gmsh_mesh`. Has no dependency on legacy types and is loaded
-  unconditionally.
+## This directory
 
-## Future work
-
-A current-API replacement for the Abaqus reader (returning
-`Mesh{T<:AbstractTopology, N}` and elements built via `create_elements!`)
-is on the roadmap. When it lands it will live here next to
-`gmsh_reader.jl`.
+This folder holds **documentation only** until a new extension or companion
+package is added. Do not grow unconditional `include("io/*.jl")` paths in
+`JuliaFEM.jl` for heavy or format-specific I/O.
