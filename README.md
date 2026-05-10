@@ -86,8 +86,8 @@ what you changed.
 **Git commits.** Keep history easy to read: small commits, usually one file;
 **two files** in one commit is fine when they are inseparable (e.g. a helper and
 its only caller). With `.githooks/` and `core.hooksPath`, **pre-commit** caps
-staged paths at two and **commit-msg** rejects log lines longer than **80
-characters** (wrap subject, summary, and bullets). If that workflow feels
+staged paths at two and **commit-msg** enforces subject, summary, `-` bullets,
+and an **80**-character line cap. If that workflow feels
 unfamiliar, open your PR with tests passing and ask for help splitting history
 in review.
 

@@ -65,8 +65,8 @@ when rendering the website) rather than chasing false positives in the library.
   unless you mean it. The full protocol is in
   `.github/prompts/commit.prompt.md`. With
   `git config core.hooksPath .githooks`, **pre-commit** allows at most **two**
-  staged files per commit, and **commit-msg** rejects messages with any line
-  longer than **80 characters** (merge commits skip the length check while
+  staged files per commit, and **commit-msg** enforces the subject / summary /
+  bullet layout plus an **80**-character line cap (merge commits skip while
   `.git/MERGE_HEAD` exists).
 - Match **commit message depth** to the patch: a short summary suffices for
   small edits; **large files, large diffs, or several concerns in one commit**
