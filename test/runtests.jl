@@ -21,6 +21,7 @@ const TOPICS = [
     "topology",
     "geometry",
     "mesh",
+    "io",
     "quadrature",
     "domains/continuum",
     "domains/heat",
