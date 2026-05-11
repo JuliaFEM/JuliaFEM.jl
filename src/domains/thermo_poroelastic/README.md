@@ -14,6 +14,10 @@ optional cross-coupling between `T` and `p` (`kappa_tp`, `zeta_tp`). See
 `α`, thermo-elastic `M_Tu` / `M_uT` from `β`, optional `M_uu` from solid
 `density`).
 
+Stiffness and mass microkernels split non-zero `(field_i, field_j)` blocks into
+small `Val`-tagged helpers (`_thm_stiff_K_*`, `_thm_mass_M_*`) for clearer IR;
+see `test_thm_microkernel_alloc.jl` for per-pair `@allocated` checks.
+
 Monolithic transient stepping (backward Euler on `(K + M/Δt)`) can use the same
 `DOFBasedCOOCache` with `assemble!` + `assemble_M!`.
 

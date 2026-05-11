@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+SPDX-License-Identifier: MIT
+-->
+
 # src/
 
 Top-level layout of the JuliaFEM source tree. The package is **0.x**; the
@@ -17,14 +22,14 @@ inside each subdirectory.
 | `basis/`        | Shape-function families (`Lagrange{P}`, `Serendipity{P}`, plate bases) plus the symbolic generator that produces them.       |
 | `quadrature/`   | Gauss-Legendre integration points for every supported topology.                                                              |
 | `geometry/`     | Jacobians, physical derivatives, strain tensors.                                                                             |
-| `mesh/`         | Type-stable `Mesh{N, Topo}`, structured/circular generators, refinement, RCM ordering, gmsh wrapper.                         |
+| `mesh/`         | Type-stable `Mesh{N, Topo}`, structured/circular generators, refinement, RCM ordering.                                      |
 | `dofs/`         | `DOF{Quantity, Entity}`, `@DOFSet`, `DOFHandler`, DOF connectivity and the field/dof-extraction infrastructure.              |
 | `elements/`     | `Element{K, P, S, N}` template, compile-time `local_dof_layout`, DOF-extraction and field-interpolation utilities.           |
 | `materials/`    | `LinearElastic`, `NeoHookean`, `PerfectPlasticity`, `HeatConductivity` and the trait-based dispatch used by the kernels.     |
 | `assemblers/`   | Assembly caches, `ElementBasedAssembler` (COO/CSC) and `DOFBasedCOOAssembler`, the matrix-free `apply_K!`/`apply_M!` path.   |
 | `domains/`      | Physics kernels per discipline: `continuum/`, `heat/`, `thermo_elastic/`. See `domains/README.md`; each subdirectory implements an `AbstractKernel`. |
 | `physics/`      | `AbstractPhysics` tag (`Elasticity{Dim}`, `Thermal{Dim}`), microkernel contract for the DOF-based path, formulation helpers and strain extraction. |
-| `io/`           | Mesh readers (Gmsh by default; Abaqus + Aster live in the optional `Legacy` submodule).                                      |
+| `io/`           | Mesh I/O policy only; external formats via extensions / side packages; Abaqus + Aster in optional `Legacy`.                 |
 | `sparse/`       | Lightweight sparse-matrix utilities (DOK / COO).                                                                             |
 | `fields/`       | `AbstractField` (`Displacement`, `Temperature`, `DisplacementRotation`) and the `LocalField` interpolation type.             |
 
