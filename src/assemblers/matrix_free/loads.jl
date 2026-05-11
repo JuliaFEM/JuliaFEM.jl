@@ -300,11 +300,6 @@ end
 # MixedDarcyTet4BoundaryNormalFluxLoad — ∫ g φ·n dS on RT₀ flux test functions (Tet4)
 # ----------------------------------------------------------------------------
 
-# Symmetric order-2 rule on the reference triangle ξ ≥ 0, η ≥ 0, ξ + η ≤ 1 (area 1/2).
-const _MIXED_DARCY_TRI3_AB =
-    ((1.0 / 6.0, 1.0 / 6.0), (2.0 / 3.0, 1.0 / 6.0), (1.0 / 6.0, 2.0 / 3.0))
-const _MIXED_DARCY_TRI3_W = (1.0 / 6.0, 1.0 / 6.0, 1.0 / 6.0)
-
 """
     MixedDarcyTet4BoundaryNormalFluxLoad(panels, g)
 
@@ -313,7 +308,9 @@ Boundary contribution ``\\int_\\Gamma g\\, \\mathbf{\\phi}_i \\cdot \\mathbf{n}\
 (`[m/s]`, outward positive relative to the element). Each entry of `panels` is
 `(elem_id, local_face)` with `local_face ∈ 1:4` ([`faces(::Tet4)`](@ref)).
 
-Uses three quadrature points per triangle (exact if ``g \\,\\mathbf{\\phi}\\!\\cdot\\!\\mathbf{n}`` is linear on the face).
+Uses three quadrature points per triangle from `REF_GAUSS_TRIANGLE_ORDER2` in
+`quadrature/reference_gauss_tuples.jl` (exact if ``g \\,\\mathbf{\\phi}\\!\\cdot\\!\\mathbf{n}`` is linear on the face).
+Face points use `get_basis_functions(Tri3(), Lagrange{1}(), …)` for the isoparametric map.
 Requires [`DarcyMixedRT0P0Kernel`](@ref) and [`Mesh{4, Tet4}`](@ref).
 """
 struct MixedDarcyTet4BoundaryNormalFluxLoad <: AbstractNeumannLoad
@@ -367,10 +364,10 @@ function apply_load!(
         n_unit = orient * cross_vec / jac_face
 
         for k in 1:3
-            ξq, ηq = _MIXED_DARCY_TRI3_AB[k]
-            wq = _MIXED_DARCY_TRI3_W[k]
-            λ1 = 1.0 - ξq - ηq
-            xq = λ1 * p1 + ξq * p2 + ηq * p3
+            ξq, ηq, wq = REF_GAUSS_TRIANGLE_ORDER2[k]
+            ξv = Vec{2}((ξq, ηq))
+            N = get_basis_functions(Tri3(), Lagrange{1}(), ξv)
+            xq = N[1] * p1 + N[2] * p2 + N[3] * p3
             base = load.g * wq * jac_face
             for ifi in 1:4
                 φ = _rt0_phi_tet4(X, Vphys, ifi, xq)
