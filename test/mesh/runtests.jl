@@ -7,3 +7,4 @@ using Tensors
 
 include("test_refine.jl")
 include("test_mesh_api.jl")
+include("test_gmsh_stub.jl")
