@@ -1,5 +1,5 @@
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/JuliaFEM.jl/blob/master/LICENSE.md
+# SPDX-FileCopyrightText: 2015-2026 Jukka Aho
+# SPDX-License-Identifier: MIT
 
 """
 Field API definitions.
@@ -120,6 +120,16 @@ end-to-end use.
 struct Temperature <: AbstractField end
 
 """
+    PorePressure <: AbstractField
+
+Scalar **pore pressure** (or pore-fluid pressure potential) at mesh vertices for
+quasi-steady Biot poroelasticity paired with `BiotPoroelasticKernel` and
+`HydraulicConductivity`. Same numerical layout as [`Temperature`](@ref)
+(one DOF per node); the type tag keeps poroelastic DOF sets explicit.
+"""
+struct PorePressure <: AbstractField end
+
+"""
     MoistureContent <: AbstractField
 
 Scalar moisture-related field (humidity, saturation, or pore-water fraction) at
@@ -218,6 +228,7 @@ Number of degrees of freedom per node for this field type.
 dofs_per_node(Displacement{3}())          # 3
 dofs_per_node(Displacement{2}())          # 2
 dofs_per_node(Temperature())              # 1
+dofs_per_node(PorePressure())             # 1
 dofs_per_node(DisplacementRotation{3}())  # 6
 dofs_per_node(DisplacementRotation{2}())  # 4
 ```
@@ -228,6 +239,7 @@ Field types must provide this method:
 ```julia
 dofs_per_node(::Displacement{Dim}) where Dim = Dim
 dofs_per_node(::Temperature) = 1
+dofs_per_node(::PorePressure) = 1
 dofs_per_node(::DisplacementRotation{Dim}) where Dim = 2 * Dim
 ```
 """
@@ -236,6 +248,7 @@ function dofs_per_node end
 # Concrete implementations
 dofs_per_node(::Displacement{Dim}) where Dim = Dim
 dofs_per_node(::Temperature) = 1
+dofs_per_node(::PorePressure) = 1
 dofs_per_node(::MoistureContent) = 1
 dofs_per_node(::PressurePotential) = 1
 dofs_per_node(::RT0FaceFlux) = 1
@@ -254,6 +267,7 @@ Extract underlying quantity type from field type.
 The quantity type is the actual data type used to represent the field values:
 - `Displacement{Dim}` → `Vec{Dim}` (vector quantity)
 - `Temperature` → `Float64` (scalar quantity)
+- `PorePressure` → `Float64` (scalar quantity)
 - `DisplacementRotation{Dim}` → `Vec{2*Dim}` (vector quantity with 2*Dim components)
 
 # Examples
@@ -262,6 +276,7 @@ The quantity type is the actual data type used to represent the field values:
 quantity_type(Displacement{3})          # Vec{3}
 quantity_type(Displacement{2})          # Vec{2}
 quantity_type(Temperature)              # Float64
+quantity_type(PorePressure)             # Float64
 quantity_type(DisplacementRotation{3})   # Vec{6}
 quantity_type(DisplacementRotation{2})   # Vec{4}
 ```
@@ -281,6 +296,7 @@ function quantity_type end
 # Concrete implementations
 quantity_type(::Type{Displacement{Dim}}) where Dim = Vec{Dim}
 quantity_type(::Type{Temperature}) = Float64
+quantity_type(::Type{PorePressure}) = Float64
 quantity_type(::Type{MoistureContent}) = Float64
 quantity_type(::Type{PressurePotential}) = Float64
 quantity_type(::Type{RT0FaceFlux}) = Float64
