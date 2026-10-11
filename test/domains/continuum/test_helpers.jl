@@ -43,7 +43,7 @@ function create_test_kernel()
     material = LinearElastic(E, ν)
 
     # Create continuum formulation (3D elasticity)
-    formulation = ContinuumFormulation{FullThreeD}()
+    formulation = ContinuumFormulation{ThreeDimensional}()
 
     # Create kernel (field is optional, defaults to Displacement{3})
     kernel = ContinuumKernel(formulation, material)

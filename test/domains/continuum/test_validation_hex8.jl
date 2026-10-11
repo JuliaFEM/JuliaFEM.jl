@@ -200,7 +200,7 @@ using Tensors
 
     # Create kernel
     kernel = ContinuumKernel(
-        ContinuumFormulation{FullThreeD}(),
+        ContinuumFormulation{ThreeDimensional}(),
         material,
         Displacement{3}()
     )
@@ -288,7 +288,7 @@ end
     material = LinearElastic(E=E, ν=ν)
 
     kernel = ContinuumKernel(
-        ContinuumFormulation{FullThreeD}(),
+        ContinuumFormulation{ThreeDimensional}(),
         material,
         Displacement{3}()
     )

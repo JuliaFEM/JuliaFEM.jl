@@ -59,7 +59,7 @@ end
 
 function _setup(mesh, ::Type{Topo}) where {Topo}
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel   = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel   = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                                material, Displacement{3}())
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, dof_mgr = create_elements!(mesh, Element{Topo, Lagrange{1}, S})

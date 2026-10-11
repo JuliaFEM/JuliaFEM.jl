@@ -40,7 +40,7 @@ type without touching the assembler.
 
 using Test
 using JuliaFEM
-using JuliaFEM: ContinuumFormulation, FullThreeD, Temperature, Vertex
+using JuliaFEM: ContinuumFormulation, ThreeDimensional, Temperature, Vertex
 using JuliaFEM: @DOFSet, DOF
 using JuliaFEM: LinearElastic, Displacement, ContinuumKernel
 using JuliaFEM: HeatConductivity, HeatKernel
@@ -85,7 +85,7 @@ end
 "Set up DOF-based elasticity assembly with optional density."
 function _setup_elasticity(mesh; density::Float64 = 0.0)
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel   = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel   = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                                material, Displacement{3}();
                                density = density)
     S        = @DOFSet{u::DOF{Displacement{3}, Vertex}}
@@ -98,7 +98,7 @@ end
 "Set up DOF-based heat assembly with optional heat capacity."
 function _setup_heat(mesh; heat_capacity::Float64 = 0.0)
     material = HeatConductivity(k = 50.2)
-    kernel   = HeatKernel(ContinuumFormulation{FullThreeD}(),
+    kernel   = HeatKernel(ContinuumFormulation{ThreeDimensional}(),
                           material, Temperature();
                           heat_capacity = heat_capacity)
     S        = @DOFSet{T::DOF{Temperature, Vertex}}

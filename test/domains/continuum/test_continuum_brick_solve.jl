@@ -8,7 +8,7 @@ Small `Hex8` brick: `ContinuumKernel` + `PenaltyDirichlet` on `xmin` + nodal
 
 using Test
 using JuliaFEM
-using JuliaFEM: ContinuumKernel, ContinuumFormulation, FullThreeD, LinearElastic
+using JuliaFEM: ContinuumKernel, ContinuumFormulation, ThreeDimensional, LinearElastic
 using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache, assemble!, extract_system
 using JuliaFEM: PenaltyDirichlet, apply_constraint!, apply_load!, NodalForce
 using JuliaFEM: @DOFSet, DOF, Displacement, Vertex, Hex8
@@ -20,7 +20,7 @@ include("solve_brick_helpers.jl")
     mesh = brick_hex_mesh(2, 2, 2)
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(), LinearElastic(E = 210e9, ν = 0.3))
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(), LinearElastic(E = 210e9, ν = 0.3))
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elements, handler, mesh, kernel)
     assemble!(cache, asm, kernel, mesh)

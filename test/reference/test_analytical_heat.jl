@@ -14,7 +14,7 @@ https://biba1632.gitlab.io/code-aster-manuals/docs/validation/v_toc.html).
 using Test
 using LinearAlgebra
 using JuliaFEM
-using JuliaFEM: ContinuumFormulation, FullThreeD, Temperature, Vertex
+using JuliaFEM: ContinuumFormulation, ThreeDimensional, Temperature, Vertex
 using JuliaFEM: @DOFSet, DOF, HeatConductivity, HeatKernel
 using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache, assemble!, extract_system
 using JuliaFEM: EliminatedDirichlet, apply_constraint!
@@ -36,7 +36,7 @@ using JuliaFEM: get_nodes_in_set, get_node_dofs
     )
     S = @DOFSet{T::DOF{Temperature, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    kernel = HeatKernel(ContinuumFormulation{FullThreeD}(), HeatConductivity(k = kcond))
+    kernel = HeatKernel(ContinuumFormulation{ThreeDimensional}(), HeatConductivity(k = kcond))
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elements, handler, mesh, kernel)
     assemble!(cache, asm, kernel, mesh)

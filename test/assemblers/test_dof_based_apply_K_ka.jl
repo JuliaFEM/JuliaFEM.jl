@@ -85,7 +85,7 @@ end
 "Set up DOF-based cache + kernel for elasticity."
 function _ka_setup(mesh, ::Type{Topo}) where {Topo}
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel   = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel   = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                                material, Displacement{3}())
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     ElemType = Element{Topo, Lagrange{1}, S}

@@ -30,7 +30,7 @@ assembler is broken.
 
 using Test
 using JuliaFEM
-using JuliaFEM: ContinuumFormulation, FullThreeD
+using JuliaFEM: ContinuumFormulation, ThreeDimensional
 using JuliaFEM: Displacement, Temperature, Vertex
 using JuliaFEM: @DOFSet, DOF
 using JuliaFEM: LinearElastic, HeatConductivity
@@ -86,7 +86,7 @@ end
 function _setup_te_block_diagonal(mesh; β = 0.0)
     mech = LinearElastic(E = 210e9, ν = 0.3)
     therm = HeatConductivity(k = 50.2)
-    kernel = ThermoElasticKernel(ContinuumFormulation{FullThreeD}(),
+    kernel = ThermoElasticKernel(ContinuumFormulation{ThreeDimensional}(),
                                  mech, therm, β)
     S = @DOFSet{u::DOF{Displacement{3}, Vertex},
                 T::DOF{Temperature, Vertex}}
@@ -98,7 +98,7 @@ end
 
 function _setup_pure_elasticity(mesh)
     mat = LinearElastic(E = 210e9, ν = 0.3)
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(), mat,
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(), mat,
                              Displacement{3}())
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hexahedron{8}, Lagrange{1}, S})
@@ -109,7 +109,7 @@ end
 
 function _setup_pure_heat(mesh)
     mat = HeatConductivity(k = 50.2)
-    kernel = HeatKernel(ContinuumFormulation{FullThreeD}(), mat)
+    kernel = HeatKernel(ContinuumFormulation{ThreeDimensional}(), mat)
     S = @DOFSet{T::DOF{Temperature, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hexahedron{8}, Lagrange{1}, S})
     asm   = DOFBasedCOOAssembler()

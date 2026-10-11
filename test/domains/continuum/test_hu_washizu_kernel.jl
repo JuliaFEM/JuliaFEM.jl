@@ -13,7 +13,7 @@
 
 using Test
 using JuliaFEM
-using JuliaFEM: HuWashizuKernel, ContinuumFormulation, FullThreeD
+using JuliaFEM: HuWashizuKernel, ContinuumFormulation, ThreeDimensional
 using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache, assemble!, extract_system
 using JuliaFEM: create_unit_cube_mesh, create_elements!, @DOFSet, DOF, Displacement, Vertex
 using JuliaFEM: matrix_free_op
@@ -34,7 +34,7 @@ end
         sig::DOF{SymmetricTensor{2,3}, Cell},
     }
     elem, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    k = HuWashizuKernel(ContinuumFormulation{FullThreeD}(), mat)
+    k = HuWashizuKernel(ContinuumFormulation{ThreeDimensional}(), mat)
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elem, handler, mesh, k)
     assemble!(cache, asm, k, mesh)
@@ -64,7 +64,7 @@ end
         sig::DOF{SymmetricTensor{2,3}, Cell},
     }
     elem, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    k = HuWashizuKernel(ContinuumFormulation{FullThreeD}(), mat)
+    k = HuWashizuKernel(ContinuumFormulation{ThreeDimensional}(), mat)
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elem, handler, mesh, k)
     assemble!(cache, asm, k, mesh)
@@ -98,7 +98,7 @@ end
         sig::DOF{SymmetricTensor{2,3}, Cell},
     }
     elem, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    k = HuWashizuKernel(ContinuumFormulation{FullThreeD}(), mat)
+    k = HuWashizuKernel(ContinuumFormulation{ThreeDimensional}(), mat)
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elem, handler, mesh, k)
     op = matrix_free_op(cache, asm, k, mesh)
@@ -114,7 +114,7 @@ end
         sig::DOF{SymmetricTensor{2,3}, Cell},
     }
     elem, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    k = HuWashizuKernel(ContinuumFormulation{FullThreeD}(), mat)
+    k = HuWashizuKernel(ContinuumFormulation{ThreeDimensional}(), mat)
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elem, handler, mesh, k)
     for _ in 1:3
@@ -126,7 +126,7 @@ end
 
 @testset "HuWashizuKernel API guards" begin
     mat = LinearElastic(E = 210e9, ν = 0.3)
-    k = HuWashizuKernel(ContinuumFormulation{FullThreeD}(), mat)
+    k = HuWashizuKernel(ContinuumFormulation{ThreeDimensional}(), mat)
     @test dofs_per_node(k) == 6
     @test_throws ErrorException get_field(k)
 end

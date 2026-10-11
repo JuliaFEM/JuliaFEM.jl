@@ -11,7 +11,7 @@
 
 using Test
 using JuliaFEM
-using JuliaFEM: StokesMixedKernel, MixedUPKernel, ContinuumFormulation, FullThreeD, LinearElastic
+using JuliaFEM: StokesMixedKernel, MixedUPKernel, ContinuumFormulation, ThreeDimensional, LinearElastic
 using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache, assemble!, extract_system
 using JuliaFEM: create_unit_cube_mesh, create_elements!, @DOFSet, DOF, Displacement, Vertex
 using LinearAlgebra
@@ -29,12 +29,12 @@ end
     elem, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
     asm = DOFBasedCOOAssembler()
 
-    k_stokes = StokesMixedKernel(ContinuumFormulation{FullThreeD}(); μ = 1.0e-3, inv_bulk = inv_bulk)
+    k_stokes = StokesMixedKernel(ContinuumFormulation{ThreeDimensional}(); μ = 1.0e-3, inv_bulk = inv_bulk)
     c_s = DOFBasedCOOCache(elem, handler, mesh, k_stokes)
     assemble!(c_s, asm, k_stokes, mesh)
     K_s, _ = extract_system(c_s)
 
-    k_up = MixedUPKernel(ContinuumFormulation{FullThreeD}(), mat; inv_bulk = inv_bulk)
+    k_up = MixedUPKernel(ContinuumFormulation{ThreeDimensional}(), mat; inv_bulk = inv_bulk)
     c_u = DOFBasedCOOCache(elem, handler, mesh, k_up)
     assemble!(c_u, asm, k_up, mesh)
     K_u, _ = extract_system(c_u)
@@ -54,12 +54,12 @@ end
     elem, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
     asm = DOFBasedCOOAssembler()
 
-    k1 = StokesMixedKernel(ContinuumFormulation{FullThreeD}(); μ = 1.0, inv_bulk = 0.0)
+    k1 = StokesMixedKernel(ContinuumFormulation{ThreeDimensional}(); μ = 1.0, inv_bulk = 0.0)
     c1 = DOFBasedCOOCache(elem, handler, mesh, k1)
     assemble!(c1, asm, k1, mesh)
     K1, _ = extract_system(c1)
 
-    k2 = StokesMixedKernel(ContinuumFormulation{FullThreeD}(); μ = 2.0, inv_bulk = 0.0)
+    k2 = StokesMixedKernel(ContinuumFormulation{ThreeDimensional}(); μ = 2.0, inv_bulk = 0.0)
     c2 = DOFBasedCOOCache(elem, handler, mesh, k2)
     assemble!(c2, asm, k2, mesh)
     K2, _ = extract_system(c2)
@@ -74,7 +74,7 @@ end
     mesh = _hex8_unit_cube_single_element()
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}, p::DOF{Float64, Cell}}
     elem, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    k = StokesMixedKernel(ContinuumFormulation{FullThreeD}(); μ = 1.0e-2, inv_bulk = 1e-6)
+    k = StokesMixedKernel(ContinuumFormulation{ThreeDimensional}(); μ = 1.0e-2, inv_bulk = 1e-6)
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elem, handler, mesh, k)
     assemble!(cache, asm, k, mesh)
@@ -90,8 +90,8 @@ end
 end
 
 @testset "StokesMixedKernel API guards" begin
-    k = StokesMixedKernel(ContinuumFormulation{FullThreeD}(); μ = 1.0)
+    k = StokesMixedKernel(ContinuumFormulation{ThreeDimensional}(); μ = 1.0)
     @test dofs_per_node(k) == 4
     @test_throws ErrorException get_field(k)
-    @test_throws ArgumentError StokesMixedKernel(ContinuumFormulation{FullThreeD}(); μ = 0.0)
+    @test_throws ArgumentError StokesMixedKernel(ContinuumFormulation{ThreeDimensional}(); μ = 0.0)
 end

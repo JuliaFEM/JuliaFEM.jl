@@ -96,13 +96,13 @@ using BenchmarkTools
     
     # Create kernel
     kernel = ContinuumKernel(
-        ContinuumFormulation{FullThreeD}(),
+        ContinuumFormulation{ThreeDimensional}(),
         material,
         Displacement{3}()
     )
     
     println("  Material: LinearElastic (E=$(E/1e9) GPa, ν=$ν)")
-    println("  Kernel: ContinuumKernel (FullThreeD, Displacement{3})")
+    println("  Kernel: ContinuumKernel (ThreeDimensional, Displacement{3})")
     
     # ========================================================================
     # 3. Create Elements and DOF Manager

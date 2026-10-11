@@ -13,7 +13,7 @@ on the DOF-based assembler.
 
 using Test
 using JuliaFEM
-using JuliaFEM: HellingerReissnerKernel, ContinuumFormulation, FullThreeD
+using JuliaFEM: HellingerReissnerKernel, ContinuumFormulation, ThreeDimensional
 using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache, assemble!, extract_system
 using JuliaFEM: create_unit_cube_mesh, create_elements!, @DOFSet, DOF, Displacement, Vertex
 using LinearAlgebra
@@ -28,7 +28,7 @@ end
     mat = LinearElastic(E = 210e9, ν = 0.3)
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}, sig::DOF{SymmetricTensor{2,3}, Cell}}
     elem, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    k = HellingerReissnerKernel(ContinuumFormulation{FullThreeD}(), mat)
+    k = HellingerReissnerKernel(ContinuumFormulation{ThreeDimensional}(), mat)
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elem, handler, mesh, k)
     assemble!(cache, asm, k, mesh)
@@ -47,7 +47,7 @@ end
     mat = LinearElastic(E = 210e9, ν = 0.3)
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}, sig::DOF{SymmetricTensor{2,3}, Cell}}
     elem, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    k = HellingerReissnerKernel(ContinuumFormulation{FullThreeD}(), mat)
+    k = HellingerReissnerKernel(ContinuumFormulation{ThreeDimensional}(), mat)
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elem, handler, mesh, k)
     assemble!(cache, asm, k, mesh)
@@ -66,7 +66,7 @@ end
     mat = LinearElastic(E = 210e9, ν = 0.3)
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}, sig::DOF{SymmetricTensor{2,3}, Cell}}
     elem, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    k = HellingerReissnerKernel(ContinuumFormulation{FullThreeD}(), mat)
+    k = HellingerReissnerKernel(ContinuumFormulation{ThreeDimensional}(), mat)
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elem, handler, mesh, k)
     for _ in 1:3
@@ -78,7 +78,7 @@ end
 
 @testset "HellingerReissnerKernel API guards" begin
     mat = LinearElastic(E = 210e9, ν = 0.3)
-    k = HellingerReissnerKernel(ContinuumFormulation{FullThreeD}(), mat)
+    k = HellingerReissnerKernel(ContinuumFormulation{ThreeDimensional}(), mat)
     @test dofs_per_node(k) == 5
     @test_throws ErrorException get_field(k)
 end

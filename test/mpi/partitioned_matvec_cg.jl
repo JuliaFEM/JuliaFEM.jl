@@ -26,7 +26,7 @@ function main()
         nx = ny = nz = 3
         mesh = create_structured_box_mesh(Hex8; nx = nx, ny = ny, nz = nz)
         material = HeatConductivity(k = 50.2)
-        kernel = HeatKernel(ContinuumFormulation{FullThreeD}(), material)
+        kernel = HeatKernel(ContinuumFormulation{ThreeDimensional}(), material)
         S = @DOFSet{T::DOF{Temperature, Vertex}}
         elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
         asm = DOFBasedCOOAssembler()

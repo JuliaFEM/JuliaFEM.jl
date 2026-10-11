@@ -8,7 +8,7 @@ direct sparse solve, then matrix-free vs assembled `K` and Jacobi diagonal check
 
 using Test
 using JuliaFEM
-using JuliaFEM: StokesMixedKernel, ContinuumFormulation, FullThreeD
+using JuliaFEM: StokesMixedKernel, ContinuumFormulation, ThreeDimensional
 using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache, assemble!, extract_system
 using JuliaFEM: default_pressure_gauge_dof, matrix_free_op
 using JuliaFEM: PenaltyDirichlet, apply_constraint!, apply_load!
@@ -24,7 +24,7 @@ include("solve_brick_helpers.jl")
     mesh = brick_hex_mesh(2, 2, 2)
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}, p::DOF{Float64, Cell}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    kernel = StokesMixedKernel(ContinuumFormulation{FullThreeD}(); μ = 1.0e-3, inv_bulk = 0.0)
+    kernel = StokesMixedKernel(ContinuumFormulation{ThreeDimensional}(); μ = 1.0e-3, inv_bulk = 0.0)
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elements, handler, mesh, kernel)
     assemble!(cache, asm, kernel, mesh)
@@ -54,7 +54,7 @@ end
     mesh = brick_hex_mesh(2, 2, 2)
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}, p::DOF{Float64, Cell}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    kernel = StokesMixedKernel(ContinuumFormulation{FullThreeD}(); μ = 1.0e-3, inv_bulk = 0.0)
+    kernel = StokesMixedKernel(ContinuumFormulation{ThreeDimensional}(); μ = 1.0e-3, inv_bulk = 0.0)
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elements, handler, mesh, kernel)
     assemble!(cache, asm, kernel, mesh)

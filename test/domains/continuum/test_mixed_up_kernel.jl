@@ -13,7 +13,7 @@
 
 using Test
 using JuliaFEM
-using JuliaFEM: MixedUPKernel, ContinuumKernel, ContinuumFormulation, FullThreeD
+using JuliaFEM: MixedUPKernel, ContinuumKernel, ContinuumFormulation, ThreeDimensional
 using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache, assemble!, extract_system
 using JuliaFEM: create_unit_cube_mesh, create_elements!, @DOFSet, DOF, Displacement, Vertex
 using JuliaFEM: global_field_ranges, saddle_point_blocks
@@ -30,7 +30,7 @@ end
 
     S_u = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elem_u, h_u = create_elements!(mesh, Element{Hex8, Lagrange{1}, S_u})
-    ku = ContinuumKernel(ContinuumFormulation{FullThreeD}(), mat)
+    ku = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(), mat)
     asm = DOFBasedCOOAssembler()
     cache_u = DOFBasedCOOCache(elem_u, h_u, mesh, ku)
     assemble!(cache_u, asm, ku, mesh)
@@ -38,7 +38,7 @@ end
 
     S_up = @DOFSet{u::DOF{Displacement{3}, Vertex}, p::DOF{Float64, Cell}}
     elem_up, h_up = create_elements!(mesh, Element{Hex8, Lagrange{1}, S_up})
-    kup = MixedUPKernel(ContinuumFormulation{FullThreeD}(), mat; inv_bulk = 0.0)
+    kup = MixedUPKernel(ContinuumFormulation{ThreeDimensional}(), mat; inv_bulk = 0.0)
     cache_up = DOFBasedCOOCache(elem_up, h_up, mesh, kup)
     assemble!(cache_up, asm, kup, mesh)
     K_up, _ = extract_system(cache_up)
@@ -71,7 +71,7 @@ end
 
     S_up = @DOFSet{u::DOF{Displacement{3}, Vertex}, p::DOF{Float64, Cell}}
     elem_up, h_up = create_elements!(mesh, Element{Hex8, Lagrange{1}, S_up})
-    kup = MixedUPKernel(ContinuumFormulation{FullThreeD}(), mat; inv_bulk = inv_bulk)
+    kup = MixedUPKernel(ContinuumFormulation{ThreeDimensional}(), mat; inv_bulk = inv_bulk)
     asm = DOFBasedCOOAssembler()
     cache_up = DOFBasedCOOCache(elem_up, h_up, mesh, kup)
     assemble!(cache_up, asm, kup, mesh)
@@ -93,7 +93,7 @@ end
 
     S_u = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elem_u, h_u = create_elements!(mesh, Element{Tet10, Lagrange{2}, S_u})
-    ku = ContinuumKernel(ContinuumFormulation{FullThreeD}(), mat)
+    ku = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(), mat)
     asm = DOFBasedCOOAssembler()
     cache_u = DOFBasedCOOCache(elem_u, h_u, mesh, ku)
     assemble!(cache_u, asm, ku, mesh)
@@ -101,7 +101,7 @@ end
 
     S_up = @DOFSet{u::DOF{Displacement{3}, Vertex}, p::DOF{Float64, Cell}}
     elem_up, h_up = create_elements!(mesh, Element{Tet10, Lagrange{2}, S_up})
-    kup = MixedUPKernel(ContinuumFormulation{FullThreeD}(), mat; inv_bulk = 0.0)
+    kup = MixedUPKernel(ContinuumFormulation{ThreeDimensional}(), mat; inv_bulk = 0.0)
     cache_up = DOFBasedCOOCache(elem_up, h_up, mesh, kup)
     assemble!(cache_up, asm, kup, mesh)
     K_up, _ = extract_system(cache_up)
@@ -124,7 +124,7 @@ end
     mat = LinearElastic(E = 210e9, ν = 0.3)
     S_up = @DOFSet{u::DOF{Displacement{3}, Vertex}, p::DOF{Float64, Cell}}
     elem_up, h_up = create_elements!(mesh, Element{Hex8, Lagrange{1}, S_up})
-    kup = MixedUPKernel(ContinuumFormulation{FullThreeD}(), mat; inv_bulk = 1e-11)
+    kup = MixedUPKernel(ContinuumFormulation{ThreeDimensional}(), mat; inv_bulk = 1e-11)
     asm = DOFBasedCOOAssembler()
     cache_up = DOFBasedCOOCache(elem_up, h_up, mesh, kup)
     for _ in 1:3
@@ -136,7 +136,7 @@ end
 
 @testset "MixedUPKernel API guards" begin
     mat = LinearElastic(E = 210e9, ν = 0.3)
-    k = MixedUPKernel(ContinuumFormulation{FullThreeD}(), mat)
+    k = MixedUPKernel(ContinuumFormulation{ThreeDimensional}(), mat)
     @test dofs_per_node(k) == 4
     @test_throws ErrorException get_field(k)
 end

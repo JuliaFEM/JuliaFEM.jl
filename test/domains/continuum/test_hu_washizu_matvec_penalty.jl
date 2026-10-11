@@ -8,7 +8,7 @@ assembled `K` vs `MatrixFreeOperator` matvec and Jacobi diagonal check.
 
 using Test
 using JuliaFEM
-using JuliaFEM: HuWashizuKernel, ContinuumFormulation, FullThreeD, LinearElastic
+using JuliaFEM: HuWashizuKernel, ContinuumFormulation, ThreeDimensional, LinearElastic
 using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache, assemble!, extract_system
 using JuliaFEM: PenaltyDirichlet, apply_constraint!, apply_load!
 using JuliaFEM: compute_diagonal!, apply_constraint_diag!
@@ -27,7 +27,7 @@ include("solve_brick_helpers.jl")
         sig::DOF{SymmetricTensor{2,3}, Cell},
     }
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    kernel = HuWashizuKernel(ContinuumFormulation{FullThreeD}(), LinearElastic(E = 210e9, ν = 0.3))
+    kernel = HuWashizuKernel(ContinuumFormulation{ThreeDimensional}(), LinearElastic(E = 210e9, ν = 0.3))
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elements, handler, mesh, kernel)
     assemble!(cache, asm, kernel, mesh)

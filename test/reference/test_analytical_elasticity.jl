@@ -30,7 +30,7 @@ using Test
 using LinearAlgebra
 using Tensors
 using JuliaFEM
-using JuliaFEM: ContinuumKernel, ContinuumFormulation, FullThreeD, LinearElastic
+using JuliaFEM: ContinuumKernel, ContinuumFormulation, ThreeDimensional, LinearElastic
 using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache, assemble!, extract_system
 using JuliaFEM: EliminatedDirichlet, apply_constraint!, apply_load!
 using JuliaFEM: SurfaceLoad, @DOFSet, DOF, Displacement, Vertex, Hex8
@@ -84,7 +84,7 @@ end
     )
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(), LinearElastic(E = E, ν = ν))
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(), LinearElastic(E = E, ν = ν))
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elements, handler, mesh, kernel)
     assemble!(cache, asm, kernel, mesh)
@@ -122,7 +122,7 @@ end
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
     E = 70.0e9
     ν = 0.33
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(), LinearElastic(E = E, ν = ν))
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(), LinearElastic(E = E, ν = ν))
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elements, handler, mesh, kernel)
     assemble!(cache, asm, kernel, mesh)
@@ -164,7 +164,7 @@ end
     mesh = create_structured_box_mesh(Hex8; nx = nx, ny = ny, nz = nz)
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
         LinearElastic(E = 200.0e9, ν = 0.29))
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elements, handler, mesh, kernel)

@@ -30,7 +30,7 @@ function main()
         mesh = create_structured_box_mesh(Hex8; nx = nx, ny = ny, nz = nz)
         material = LinearElastic(E = 210e9, ν = 0.3)
         kernel = ContinuumKernel(
-            ContinuumFormulation{FullThreeD}(),
+            ContinuumFormulation{ThreeDimensional}(),
             material,
             Displacement{3}(),
         )

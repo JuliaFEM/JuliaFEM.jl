@@ -32,7 +32,7 @@ added in B+++:
 
 using Test
 using JuliaFEM
-using JuliaFEM: ContinuumFormulation, FullThreeD, Vertex
+using JuliaFEM: ContinuumFormulation, ThreeDimensional, Vertex
 using JuliaFEM: @DOFSet, DOF
 using JuliaFEM: LinearElastic, Displacement, ContinuumKernel
 using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache
@@ -78,7 +78,7 @@ end
 
 function _setup_elasticity(mesh)
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel   = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel   = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                                material, Displacement{3}())
     S        = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, dof_mgr = create_elements!(mesh, Element{Hexahedron{8}, Lagrange{1}, S})

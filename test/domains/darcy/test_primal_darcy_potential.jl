@@ -12,7 +12,7 @@ using Test
 end
 
 @testset "HeatKernel invalid material–field pairing" begin
-    form = ContinuumFormulation{FullThreeD}()
+    form = ContinuumFormulation{ThreeDimensional}()
     @test_throws ArgumentError HeatKernel(form, HeatConductivity(k = 1.0), PressurePotential())
     @test_throws ArgumentError HeatKernel(form, HydraulicConductivity(K = 1.0), Temperature())
 end
@@ -24,8 +24,8 @@ end
     S_T = @DOFSet{T::DOF{Temperature, Vertex}}
     S_p = @DOFSet{p::DOF{PressurePotential, Vertex}}
 
-    k_heat = HeatKernel(ContinuumFormulation{FullThreeD}(), HeatConductivity(k = κ))
-    k_darcy = DarcyPotentialKernel(ContinuumFormulation{FullThreeD}(), HydraulicConductivity(K = κ))
+    k_heat = HeatKernel(ContinuumFormulation{ThreeDimensional}(), HeatConductivity(k = κ))
+    k_darcy = DarcyPotentialKernel(ContinuumFormulation{ThreeDimensional}(), HydraulicConductivity(K = κ))
 
     el_T, h_T = create_elements!(mesh, Element{Hex8, Lagrange{1}, S_T})
     el_p, h_p = create_elements!(mesh, Element{Hex8, Lagrange{1}, S_p})
@@ -86,7 +86,7 @@ end
     Lz = 1.0
     mesh = create_unit_cube_mesh(Hex8; nx = nx, ny = ny, nz = nz)
     S = @DOFSet{p::DOF{PressurePotential, Vertex}}
-    kernel = DarcyPotentialKernel(ContinuumFormulation{FullThreeD}(), HydraulicConductivity(K = Kcond))
+    kernel = DarcyPotentialKernel(ContinuumFormulation{ThreeDimensional}(), HydraulicConductivity(K = Kcond))
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
     asm = DOFBasedCOOAssembler()
     cache = create_cache(asm, elements, handler, mesh, kernel)
@@ -119,7 +119,7 @@ end
     @test nelements(mesh) == 2
 
     mat = ElementWiseScalarDiffusion([K1, K2])
-    kernel = DarcyPotentialKernel(ContinuumFormulation{FullThreeD}(), mat)
+    kernel = DarcyPotentialKernel(ContinuumFormulation{ThreeDimensional}(), mat)
     S = @DOFSet{p::DOF{PressurePotential, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
     asm = DOFBasedCOOAssembler()
@@ -148,7 +148,7 @@ end
 @testset "ElementWiseScalarDiffusion length must match nelements" begin
     mesh = create_unit_cube_mesh(Hex8; nx = 2, ny = 1, nz = 1)
     bad = ElementWiseScalarDiffusion([1.0, 2.0, 99.0])
-    kernel = HeatKernel(ContinuumFormulation{FullThreeD}(), bad, PressurePotential())
+    kernel = HeatKernel(ContinuumFormulation{ThreeDimensional}(), bad, PressurePotential())
     S = @DOFSet{p::DOF{PressurePotential, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
     asm = DOFBasedCOOAssembler()

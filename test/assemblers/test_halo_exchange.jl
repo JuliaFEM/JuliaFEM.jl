@@ -9,7 +9,7 @@ Partition adjacency + [`RankHaloExchange`](@ref) consistency (send vs recv).
 using Test
 using InteractiveUtils: @allocated
 using JuliaFEM
-using JuliaFEM: ContinuumKernel, ContinuumFormulation, FullThreeD, LinearElastic
+using JuliaFEM: ContinuumKernel, ContinuumFormulation, ThreeDimensional, LinearElastic
 using JuliaFEM: create_elements!, @DOFSet, DOF, Displacement, Vertex
 using JuliaFEM: brick_hex_partition_slabs, element_indices_for_part
 using JuliaFEM: node_partition_owner_min!, build_partition_adjacency
@@ -68,7 +68,7 @@ end
     nx, ny, nz = 4, 2, 2
     mesh = create_structured_box_mesh(Hex8; nx = nx, ny = ny, nz = nz)
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                              material, Displacement{3}())
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
@@ -87,7 +87,7 @@ end
     nx, ny, nz = 4, 2, 2
     mesh = create_structured_box_mesh(Hex8; nx = nx, ny = ny, nz = nz)
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                              material, Displacement{3}())
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
@@ -108,7 +108,7 @@ end
     nx, ny, nz = 4, 2, 2
     mesh = create_structured_box_mesh(Hex8; nx = nx, ny = ny, nz = nz)
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                              material, Displacement{3}())
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
@@ -137,7 +137,7 @@ end
     nx = 2
     mesh = create_structured_box_mesh(Hex8; nx = nx, ny = nx, nz = nx)
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                              material, Displacement{3}())
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})

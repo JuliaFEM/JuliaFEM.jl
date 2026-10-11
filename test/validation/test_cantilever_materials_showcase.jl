@@ -25,7 +25,7 @@
 
 using Test
 using JuliaFEM
-using JuliaFEM: ContinuumKernel, ContinuumFormulation, FullThreeD, Displacement
+using JuliaFEM: ContinuumKernel, ContinuumFormulation, ThreeDimensional, Displacement
 using JuliaFEM: HeatKernel, HeatConductivity, Temperature
 using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache, assemble!, extract_system
 using JuliaFEM: create_cantilever_mesh, create_elements!, get_nodes_in_set, get_node_dofs
@@ -103,7 +103,7 @@ end
 
     for (name, mat) in materials
         @testset "$name — assemble! 0 allocs, finite solve" begin
-            kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(), mat)
+            kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(), mat)
             cache = DOFBasedCOOCache(elements, handler, mesh, kernel)
 
             for _ in 1:3
@@ -137,7 +137,7 @@ end
     S = @DOFSet{T::DOF{Temperature, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
     mat = HeatConductivity(k = 45.0)
-    kernel = HeatKernel(ContinuumFormulation{FullThreeD}(), mat)
+    kernel = HeatKernel(ContinuumFormulation{ThreeDimensional}(), mat)
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elements, handler, mesh, kernel)
 

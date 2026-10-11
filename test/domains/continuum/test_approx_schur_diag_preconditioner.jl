@@ -5,7 +5,7 @@ using Test
 using LinearAlgebra
 using SparseArrays
 using JuliaFEM
-using JuliaFEM: MixedUPKernel, ContinuumFormulation, FullThreeD
+using JuliaFEM: MixedUPKernel, ContinuumFormulation, ThreeDimensional
 using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache, assemble!, extract_system
 using JuliaFEM: create_unit_cube_mesh, create_elements!, @DOFSet, DOF, Displacement, Vertex, Cell
 using JuliaFEM: global_field_ranges, saddle_point_matrix_blocks,
@@ -52,7 +52,7 @@ end
     κ = mat.E / (3 * (1 - 2 * mat.ν))
     S_up = @DOFSet{u::DOF{Displacement{3}, Vertex}, p::DOF{Float64, Cell}}
     elem, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S_up})
-    kup = MixedUPKernel(ContinuumFormulation{FullThreeD}(), mat; inv_bulk = 1.0 / κ)
+    kup = MixedUPKernel(ContinuumFormulation{ThreeDimensional}(), mat; inv_bulk = 1.0 / κ)
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elem, handler, mesh, kup)
     assemble!(cache, asm, kup, mesh)

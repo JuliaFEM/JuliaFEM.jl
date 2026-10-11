@@ -39,7 +39,7 @@ using ..JuliaFEM
 # JuliaFEM bindings.
 using ..JuliaFEM: AbstractField, AbstractElement, Element, AbstractMesh
 using ..JuliaFEM: AbstractBasis, AbstractTopology
-using ..JuliaFEM: ContinuumFormulation, FullThreeD, AbstractContinuumTheory
+using ..JuliaFEM: ContinuumFormulation, ThreeDimensional, AbstractContinuumTheory
 using ..JuliaFEM: AbstractFormulation
 using ..JuliaFEM: dofs_per_node, get_field
 using ..JuliaFEM: Seg2, Seg3, Tri3, Tri6, Tri7, Quad4, Quad8, Quad9

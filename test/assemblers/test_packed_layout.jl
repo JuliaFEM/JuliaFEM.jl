@@ -72,7 +72,7 @@ end
     nx, ny, nz = 2, 3, 2
     mesh = create_structured_box_mesh(Hex8; nx = nx, ny = ny, nz = nz)
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                              material, Displacement{3}())
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
@@ -150,7 +150,7 @@ end
     nparts = 3
     mesh = create_structured_box_mesh(Hex8; nx = nx, ny = ny, nz = nz)
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                              material, Displacement{3}())
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
@@ -190,7 +190,7 @@ end
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                              material, Displacement{3}())
     cache = DOFBasedCOOCache(elements, handler, mesh, kernel)
     layout = brick_hex_partition_slabs(nx, ny, nz, 2; axis = :x)
@@ -211,7 +211,7 @@ end
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                              material, Displacement{3}())
     cache = DOFBasedCOOCache(elements, handler, mesh, kernel)
     layout = brick_hex_partition_slabs(nx, ny, nz, 2; axis = :x)
@@ -252,7 +252,7 @@ end
     nparts = 3
     mesh = create_structured_box_mesh(Hex8; nx = nx, ny = ny, nz = nz)
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                              material, Displacement{3}())
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
@@ -315,7 +315,7 @@ end
     nx, ny, nz = 3, 3, 2
     mesh = create_structured_box_mesh(Hex8; nx = nx, ny = ny, nz = nz)
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                              material, Displacement{3}())
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})

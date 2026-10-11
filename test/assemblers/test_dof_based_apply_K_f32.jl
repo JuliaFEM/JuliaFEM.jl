@@ -39,7 +39,7 @@ Metal port has a green oracle to compare against.
 
 using Test
 using JuliaFEM
-using JuliaFEM: ContinuumFormulation, FullThreeD, Vertex, Temperature
+using JuliaFEM: ContinuumFormulation, ThreeDimensional, Vertex, Temperature
 using JuliaFEM: @DOFSet, DOF
 using JuliaFEM: LinearElastic, Displacement, ContinuumKernel
 using JuliaFEM: HeatConductivity, HeatKernel
@@ -81,7 +81,7 @@ end
 
 function _setup_elasticity(mesh)
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel   = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel   = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                                material, Displacement{3}())
     S        = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, dof_mgr = create_elements!(mesh, Element{Hexahedron{8}, Lagrange{1}, S})
@@ -92,7 +92,7 @@ end
 
 function _setup_heat(mesh; k_value::Float64 = 50.2)
     material = HeatConductivity(k = k_value)
-    kernel   = HeatKernel(ContinuumFormulation{FullThreeD}(), material)
+    kernel   = HeatKernel(ContinuumFormulation{ThreeDimensional}(), material)
     S        = @DOFSet{T::DOF{Temperature, Vertex}}
     elements, dof_mgr = create_elements!(mesh, Element{Hexahedron{8}, Lagrange{1}, S})
     asm   = DOFBasedCOOAssembler()

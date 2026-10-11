@@ -17,7 +17,7 @@ function minimal_elasticity_quickstart()
     elements, handler = create_elements!(mesh, ET)
 
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel   = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel   = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                                material, Displacement{3}())
 
     asm   = DOFBasedCOOAssembler()

@@ -8,7 +8,7 @@ stress gauge DOF; assembled `K` vs `MatrixFreeOperator` matvec on random `x`.
 
 using Test
 using JuliaFEM
-using JuliaFEM: HellingerReissnerKernel, ContinuumFormulation, FullThreeD, LinearElastic
+using JuliaFEM: HellingerReissnerKernel, ContinuumFormulation, ThreeDimensional, LinearElastic
 using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache, assemble!, extract_system
 using JuliaFEM: PenaltyDirichlet, apply_constraint!, apply_load!
 using JuliaFEM: compute_diagonal!, apply_constraint_diag!
@@ -23,7 +23,7 @@ include("solve_brick_helpers.jl")
     mesh = brick_hex_mesh(2, 2, 2)
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}, sig::DOF{SymmetricTensor{2,3}, Cell}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    kernel = HellingerReissnerKernel(ContinuumFormulation{FullThreeD}(), LinearElastic(E = 210e9, ν = 0.3))
+    kernel = HellingerReissnerKernel(ContinuumFormulation{ThreeDimensional}(), LinearElastic(E = 210e9, ν = 0.3))
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elements, handler, mesh, kernel)
     assemble!(cache, asm, kernel, mesh)

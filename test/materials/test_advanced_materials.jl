@@ -76,17 +76,17 @@ using Tensors
     @testset "Moisture diffusion kernel wiring" begin
         D = MoistureDiffusivity(D_w = 2.5e-9)
         @test tr(conductivity_tensor(D)) > 0.0
-        kernel = HeatKernel(ContinuumFormulation{FullThreeD}(), D)
+        kernel = HeatKernel(ContinuumFormulation{ThreeDimensional}(), D)
         @test get_field(kernel) isa MoistureContent
         rf = reference_fields(kernel)
         @test rf[1].k ≈ scalar_diffusion_tensor(D)
         @test_throws ArgumentError HeatKernel(
-            ContinuumFormulation{FullThreeD}(),
+            ContinuumFormulation{ThreeDimensional}(),
             MoistureDiffusivity(D_w = 1.0),
             Temperature(),
         )
         @test_throws ArgumentError HeatKernel(
-            ContinuumFormulation{FullThreeD}(),
+            ContinuumFormulation{ThreeDimensional}(),
             HeatConductivity(k = 1.0),
             MoistureContent(),
         )

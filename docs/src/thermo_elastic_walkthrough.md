@@ -33,7 +33,7 @@ mesh = create_structured_box_mesh(Hex8;
 mech  = LinearElastic(E = 210e9, ν = 0.3)
 therm = HeatConductivity(k = 50.2)
 β     = 0.0
-kernel = ThermoElasticKernel(ContinuumFormulation{FullThreeD}(), mech, therm, β)
+kernel = ThermoElasticKernel(ContinuumFormulation{ThreeDimensional}(), mech, therm, β)
 
 S = @DOFSet{u::DOF{Displacement{3}, Vertex},
             T::DOF{Temperature, Vertex}}

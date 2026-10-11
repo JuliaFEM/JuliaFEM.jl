@@ -43,7 +43,7 @@ SurfaceLoad path is intentionally compositional and does not depend on
 
 using Test
 using JuliaFEM
-using JuliaFEM: ContinuumFormulation, FullThreeD, Vertex, Temperature
+using JuliaFEM: ContinuumFormulation, ThreeDimensional, Vertex, Temperature
 using JuliaFEM: @DOFSet, DOF
 using JuliaFEM: LinearElastic, Displacement, ContinuumKernel
 using JuliaFEM: HeatConductivity, HeatKernel
@@ -116,7 +116,7 @@ end
 
 function _setup_elasticity(mesh; E::Float64 = 210e9, ν::Float64 = 0.3)
     material = LinearElastic(E = E, ν = ν)
-    kernel   = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel   = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                                material, Displacement{3}())
     S        = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, dof_mgr = create_elements!(mesh, Element{Hexahedron{8}, Lagrange{1}, S})
@@ -127,7 +127,7 @@ end
 
 function _setup_heat(mesh; k::Float64 = 50.0)
     material = HeatConductivity(k = k)
-    kernel   = HeatKernel(ContinuumFormulation{FullThreeD}(), material)
+    kernel   = HeatKernel(ContinuumFormulation{ThreeDimensional}(), material)
     S        = @DOFSet{T::DOF{Temperature, Vertex}}
     elements, dof_mgr = create_elements!(mesh, Element{Hexahedron{8}, Lagrange{1}, S})
     asm   = DOFBasedCOOAssembler()

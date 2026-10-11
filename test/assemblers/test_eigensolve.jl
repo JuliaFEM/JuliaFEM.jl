@@ -31,7 +31,7 @@ A+++:
 
 using Test
 using JuliaFEM
-using JuliaFEM: ContinuumFormulation, FullThreeD, Vertex
+using JuliaFEM: ContinuumFormulation, ThreeDimensional, Vertex
 using JuliaFEM: @DOFSet, DOF
 using JuliaFEM: LinearElastic, Displacement, ContinuumKernel
 using JuliaFEM: HeatConductivity, HeatKernel, Temperature
@@ -77,7 +77,7 @@ end
 
 function _setup_elasticity(mesh; ρ::Float64 = 7850.0)
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel   = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel   = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                                material, Displacement{3}();
                                density = ρ)
     S        = @DOFSet{u::DOF{Displacement{3}, Vertex}}
@@ -90,7 +90,7 @@ end
 function _setup_heat(mesh; k_value::Float64 = 1.0,
                      ρcp::Float64 = 1.0)
     material = HeatConductivity(k = k_value)
-    kernel   = HeatKernel(ContinuumFormulation{FullThreeD}(), material;
+    kernel   = HeatKernel(ContinuumFormulation{ThreeDimensional}(), material;
                           heat_capacity = ρcp)
     S        = @DOFSet{T::DOF{Temperature, Vertex}}
     elements, dof_mgr = create_elements!(mesh, Element{Hexahedron{8}, Lagrange{1}, S})

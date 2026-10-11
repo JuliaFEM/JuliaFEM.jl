@@ -22,7 +22,7 @@ using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache
 using JuliaFEM: MatrixFreeOperator, MatrixFreeMassOperator, matrix_free_op
 using JuliaFEM: PenaltyDirichlet
 using JuliaFEM: extract_system, apply_K!, apply_M!
-using JuliaFEM: ContinuumKernel, ContinuumFormulation, FullThreeD
+using JuliaFEM: ContinuumKernel, ContinuumFormulation, ThreeDimensional
 using JuliaFEM: HeatKernel, HeatConductivity
 using JuliaFEM: LinearElastic, Displacement, Vertex, Temperature
 using JuliaFEM: create_elements!, @DOFSet, DOF
@@ -60,7 +60,7 @@ end
 function _setup_elasticity(nx::Int, ny::Int, nz::Int)
     mesh     = _hex8_unit_box(nx, ny, nz)
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel   = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel   = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                                material, Displacement{3}())
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}
     elements, dof_mgr = create_elements!(mesh, Element{Hexahedron{8}, Lagrange{1}, S})
@@ -72,7 +72,7 @@ end
 function _setup_heat(nx::Int, ny::Int, nz::Int)
     mesh   = _hex8_unit_box(nx, ny, nz)
     cond   = HeatConductivity(k = 5.0)
-    kernel = HeatKernel(ContinuumFormulation{FullThreeD}(), cond)
+    kernel = HeatKernel(ContinuumFormulation{ThreeDimensional}(), cond)
     S = @DOFSet{T::DOF{Temperature, Vertex}}
     elements, dof_mgr = create_elements!(mesh, Element{Hexahedron{8}, Lagrange{1}, S})
     asm   = DOFBasedCOOAssembler()

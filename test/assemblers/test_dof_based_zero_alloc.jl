@@ -79,7 +79,7 @@ Returns (cache_dof, asm_dof, cache_elem, asm_elem, kernel, mesh).
 """
 function _setup_assembly(mesh, ::Type{Topo}) where {Topo}
     material = LinearElastic(E = 210e9, ν = 0.3)
-    kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(),
+    kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(),
                              material, Displacement{3}())
 
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}}

@@ -15,7 +15,7 @@ using Tensors
 
     @testset "StatelessStrainDependent (NeoHookean)" begin
         mat = NeoHookean(E_mod=210e9, nu=0.3)
-        kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(), mat)
+        kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(), mat)
         element_cache = JuliaFEM.create_element_cache(mesh, kernel)
         material_cache = JuliaFEM.create_material_cache(mat, NIP)
         global_cache = JuliaFEM.create_global_material_cache(mat; n_ips=NIP, n_elems=1)
@@ -35,7 +35,7 @@ using Tensors
 
     @testset "StatefulStrainDependent (PerfectPlasticity)" begin
         mat = PerfectPlasticity(; E=210e9, ν=0.3, σ_y=200e6, H=0.0)
-        kernel = ContinuumKernel(ContinuumFormulation{FullThreeD}(), mat)
+        kernel = ContinuumKernel(ContinuumFormulation{ThreeDimensional}(), mat)
         element_cache = JuliaFEM.create_element_cache(mesh, kernel)
         material_cache = JuliaFEM.create_material_cache(mat, NIP)
         global_cache = JuliaFEM.create_global_material_cache(mat; n_ips=NIP, n_elems=1)

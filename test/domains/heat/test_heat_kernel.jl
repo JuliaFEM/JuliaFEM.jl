@@ -37,7 +37,7 @@ Layered coverage:
 
 using Test
 using JuliaFEM
-using JuliaFEM: ContinuumFormulation, FullThreeD, Temperature, Vertex
+using JuliaFEM: ContinuumFormulation, ThreeDimensional, Temperature, Vertex
 using JuliaFEM: @DOFSet, DOF
 using JuliaFEM: HeatConductivity, HeatKernel
 using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache, apply_K!, extract_system
@@ -95,7 +95,7 @@ end
 "Set up DOF-based heat assembly fixture for a given mesh + topology."
 function _setup_heat(mesh, ::Type{Topo}; k::Float64 = 50.2) where {Topo}
     material = HeatConductivity(k = k)
-    kernel   = HeatKernel(ContinuumFormulation{FullThreeD}(), material)
+    kernel   = HeatKernel(ContinuumFormulation{ThreeDimensional}(), material)
     S        = @DOFSet{T::DOF{Temperature, Vertex}}
     elements, dof_mgr = create_elements!(mesh, Element{Topo, Lagrange{1}, S})
     asm   = DOFBasedCOOAssembler()

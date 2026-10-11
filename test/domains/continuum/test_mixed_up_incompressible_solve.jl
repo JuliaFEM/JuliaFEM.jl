@@ -10,7 +10,7 @@ Schur preconditioners (`ApproxSchurDiagBlockPreconditioner`,
 
 using Test
 using JuliaFEM
-using JuliaFEM: MixedUPKernel, ContinuumFormulation, FullThreeD
+using JuliaFEM: MixedUPKernel, ContinuumFormulation, ThreeDimensional
 using JuliaFEM: DOFBasedCOOAssembler, DOFBasedCOOCache, assemble!, extract_system
 using JuliaFEM: create_structured_box_mesh, create_elements!, get_nodes_in_set, get_node_dofs
 using JuliaFEM: default_pressure_gauge_dof, matrix_free_op
@@ -57,7 +57,7 @@ end
     mat = LinearElastic(E = 210e9, ν = 0.49)
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}, p::DOF{Float64, Cell}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    kernel = MixedUPKernel(ContinuumFormulation{FullThreeD}(), mat; inv_bulk = 0.0)
+    kernel = MixedUPKernel(ContinuumFormulation{ThreeDimensional}(), mat; inv_bulk = 0.0)
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elements, handler, mesh, kernel)
     assemble!(cache, asm, kernel, mesh)
@@ -90,7 +90,7 @@ end
     mat = LinearElastic(E = 210e9, ν = 0.49)
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}, p::DOF{Float64, Cell}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    kernel = MixedUPKernel(ContinuumFormulation{FullThreeD}(), mat; inv_bulk = 0.0)
+    kernel = MixedUPKernel(ContinuumFormulation{ThreeDimensional}(), mat; inv_bulk = 0.0)
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elements, handler, mesh, kernel)
     assemble!(cache, asm, kernel, mesh)
@@ -132,7 +132,7 @@ end
     mat = LinearElastic(E = 210e9, ν = 0.49)
     S = @DOFSet{u::DOF{Displacement{3}, Vertex}, p::DOF{Float64, Cell}}
     elements, handler = create_elements!(mesh, Element{Hex8, Lagrange{1}, S})
-    kernel = MixedUPKernel(ContinuumFormulation{FullThreeD}(), mat; inv_bulk = 0.0)
+    kernel = MixedUPKernel(ContinuumFormulation{ThreeDimensional}(), mat; inv_bulk = 0.0)
     asm = DOFBasedCOOAssembler()
     cache = DOFBasedCOOCache(elements, handler, mesh, kernel)
     assemble!(cache, asm, kernel, mesh)
